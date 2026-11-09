@@ -203,11 +203,18 @@ gradle.taskGraph.whenReady { graph ->
     //  - yerel SORA_RELEASE_* degiskenleri
     //  - EAS Build ortami (EAS_BUILD)
     //  - EAS'in bulutta olusturdugu credentials.json
+    def releaseStoreFile = System.getenv('SORA_RELEASE_STORE_FILE')
     def hasReleaseCredentials =
-        System.getenv('SORA_RELEASE_STORE_FILE') ||
         System.getenv('EAS_BUILD') ||
         rootProject.file("credentials.json").exists() ||
-        rootProject.file("../credentials.json").exists()
+        rootProject.file("../credentials.json").exists() ||
+        (releaseStoreFile && file(releaseStoreFile).exists())
+    if (releaseStoreFile && !file(releaseStoreFile).exists()) {
+        throw new GradleException(
+            "SORA_RELEASE_STORE_FILE tanimli ancak dosya bulunamadi: " + releaseStoreFile +
+            ". GitHub Actions ANDROID_KEYSTORE_BASE64 secretini kontrol edin."
+        )
+    }
     if (releaseSigningRequested && !hasReleaseCredentials) {
         throw new GradleException(
             "Yayin imzalama anahtari tanimli degil. Yerel release derlemesi durduruldu.\n" +

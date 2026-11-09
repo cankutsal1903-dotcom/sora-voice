@@ -68,6 +68,10 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/sora-release.jks"
 
+      - name: Android SDK yolunu tanımla
+        shell: bash
+        run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+
       - name: Release APK üret
         working-directory: android
         env:
@@ -75,7 +79,9 @@ jobs:
           SORA_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           SORA_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           SORA_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew :app:assembleRelease --no-daemon
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace
 
       - name: APK imzasını doğrula
         run: $ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner verify --verbose android/app/build/outputs/apk/release/app-release.apk
