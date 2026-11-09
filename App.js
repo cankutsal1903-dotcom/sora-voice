@@ -4397,7 +4397,9 @@ const DEFAULT_APP_SETTINGS = {
 };
 const DEFAULT_WALLET_BALANCE = 1250;
 const DAILY_REWARD_AMOUNT = 75;
-const DEMO_CONTENT_ENABLED = __DEV__;
+// Canlı uygulamada örnek oda, kullanıcı ve bildirim hiçbir koşulda gösterilmez.
+// Test verisi yalnızca geliştirme aracında özellikle açıldığında kullanılmalıdır.
+const DEMO_CONTENT_ENABLED = false;
 const SEEDED_ROOMS = DEMO_CONTENT_ENABLED ? INITIAL_ROOMS : [];
 const SEEDED_SCHEDULED_ROOMS = DEMO_CONTENT_ENABLED
   ? DEFAULT_SCHEDULED_ROOMS
@@ -4703,7 +4705,7 @@ function Room({
               icon: "warning-outline",
               title: "Ses bağlantısı kurulamadı",
               description:
-                "Sunucuyla bağlantı kurulamadı. Birkaç saniye sonra tekrar dene.",
+                "Bağlantını kontrol et ve yeniden dene.",
               style: styles.roomVoiceError,
             }
           : {
@@ -5341,7 +5343,17 @@ function Room({
             </View>
           )}
         </View>
-        <View style={[styles.roomVoiceStatus, voiceStatusInfo.style]}>
+        <Pressable
+          disabled={liveVoice.status !== "error"}
+          onPress={liveVoice.reconnect}
+          style={[styles.roomVoiceStatus, voiceStatusInfo.style]}
+          accessibilityRole={liveVoice.status === "error" ? "button" : undefined}
+          accessibilityLabel={
+            liveVoice.status === "error"
+              ? "Ses bağlantısını yeniden dene"
+              : undefined
+          }
+        >
           <Ionicons
             name={voiceStatusInfo.icon}
             size={17}
@@ -5355,7 +5367,13 @@ function Room({
               {voiceStatusInfo.description}
             </Text>
           </View>
-        </View>
+          {liveVoice.status === "error" ? (
+            <View style={styles.roomVoiceRetry}>
+              <Ionicons name="refresh" size={17} color={COLORS.primary} />
+              <Text style={styles.roomVoiceRetryText}>Yeniden dene</Text>
+            </View>
+          ) : null}
+        </Pressable>
         <LiveParticipantList
           participants={activeRoomParticipants}
           canModerate={canModerate}
@@ -5442,20 +5460,26 @@ function Room({
             </LinearGradient>
           </View>
           <Pressable
-            onPress={() =>
-              Alert.alert(
-                "Istek gonderildi",
-                "Ev sahibine konusma istegin iletildi.",
-              )
+            onPress={toggleHand}
+            style={[styles.raiseHand, handRaised && styles.raiseHandActive]}
+            accessibilityRole="button"
+            accessibilityLabel={
+              handRaised ? "Konuşma isteğini geri çek" : "Konuşmak için el kaldır"
             }
-            style={styles.raiseHand}
           >
             <Ionicons
-              name="hand-left-outline"
+              name={handRaised ? "checkmark-circle" : "hand-left-outline"}
               size={17}
-              color={COLORS.primary}
+              color={handRaised ? COLORS.primaryInk : COLORS.primary}
             />
-            <Text style={styles.raiseHandText}>Konusmak icin el kaldir</Text>
+            <Text
+              style={[
+                styles.raiseHandText,
+                handRaised && styles.raiseHandTextActive,
+              ]}
+            >
+              {handRaised ? "İsteğin gönderildi" : "Konuşmak için el kaldır"}
+            </Text>
           </Pressable>
           <View style={styles.chatPanel}>
             <View style={styles.chatPanelHead}>
@@ -5712,6 +5736,9 @@ const AppSettingsSheet = memo(function AppSettingsSheet({
               key={option.key}
               onPress={() => onChange(option.key, !settings[option.key])}
               style={styles.settingRow}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: settings[option.key] }}
+              accessibilityLabel={option.title}
             >
               <View
                 style={[
@@ -5735,7 +5762,7 @@ const AppSettingsSheet = memo(function AppSettingsSheet({
               </View>
               <Switch
                 value={settings[option.key]}
-                onValueChange={(value) => onChange(option.key, value)}
+                pointerEvents="none"
                 trackColor={{ false: "#4B4E63", true: "#6DAF48" }}
                 thumbColor={settings[option.key] ? COLORS.primary : "#D8DAE5"}
               />
@@ -10205,6 +10232,11 @@ const styles = StyleSheet.create({
     borderColor: "#3E6255",
   },
   raiseHandText: { color: COLORS.primary, fontSize: 12, fontWeight: "900" },
+  raiseHandActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  raiseHandTextActive: { color: COLORS.primaryInk },
   chatPanel: {
     backgroundColor: "#1B1D29",
     borderRadius: 21,
@@ -10308,6 +10340,16 @@ const styles = StyleSheet.create({
   roomVoiceStatusCopy: { flex: 1 },
   roomVoiceStatusTitle: { color: COLORS.text, fontSize: 11, fontWeight: "900" },
   roomVoiceStatusDescription: { color: "#B9BDCA", fontSize: 10, marginTop: 3 },
+  roomVoiceRetry: {
+    minHeight: 32,
+    paddingHorizontal: 9,
+    borderRadius: 10,
+    backgroundColor: "rgba(181,255,120,0.12)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  roomVoiceRetryText: { color: COLORS.primary, fontSize: 10, fontWeight: "900" },
   followHostButton: {
     minHeight: 31,
     paddingHorizontal: 11,

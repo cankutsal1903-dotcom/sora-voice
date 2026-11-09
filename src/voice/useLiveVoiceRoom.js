@@ -19,6 +19,7 @@ const roomRoleCanPublish = (role, muted) => ["host", "moderator", "speaker"].inc
 export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, startWithMicrophone }) {
   const liveKitRoomRef = useRef(null);
   const [state, setState] = useState(initialState);
+  const [connectionAttempt, setConnectionAttempt] = useState(0);
   const tokenServerUrl = process.env.EXPO_PUBLIC_TOKEN_SERVER_URL?.replace(/\/$/, "");
   const enabled = Boolean(tokenServerUrl);
 
@@ -125,7 +126,7 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
       if (liveKitRoomRef.current === connectedRoom) liveKitRoomRef.current = null;
       AudioSession.stopAudioSession().catch(() => undefined);
     };
-  }, [accessToken, profile.name, roomName, startWithMicrophone, tokenServerUrl, userId]);
+  }, [accessToken, connectionAttempt, profile.name, roomName, startWithMicrophone, tokenServerUrl, userId]);
 
   const setMicrophoneEnabled = useCallback(async (enabled) => {
     const room = liveKitRoomRef.current;
@@ -142,9 +143,14 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
     await room.disconnect();
   }, []);
 
+  const reconnect = useCallback(() => {
+    setConnectionAttempt((attempt) => attempt + 1);
+  }, []);
+
   return {
     ...state,
     enabled,
+    reconnect,
     setMicrophoneEnabled,
     disconnect,
   };
