@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#10111c" />
+    <title>Sora — Sesli odalar</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell" aria-live="polite">
+      <section class="screen home-screen" id="homeScreen">
+        <header class="topbar">
+          <button class="brand" aria-label="Sora ana sayfa"><span class="brand-mark">S</span><span>SORA</span></button>
+          <div class="topbar-actions">
+            <button class="icon-button" id="searchButton" aria-label="Odalar arasında ara">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4.1 4.1"></path></svg>
+            </button>
+            <button class="avatar avatar-small" id="profileButton" aria-label="Profilini aç">D</button>
+          </div>
+        </header>
+
+        <div class="welcome-row">
+          <div>
+            <p class="eyebrow">İYİ AKŞAMLAR, DENİZ</p>
+            <h1>Sesini duyur.</h1>
+          </div>
+          <button class="create-button" id="createRoomButton"><span>+</span> Oda aç</button>
+        </div>
+
+        <div class="filter-row" id="filterRow" role="tablist" aria-label="Oda kategorileri">
+          <button class="filter active" data-filter="Tümü" role="tab">Tümü</button>
+          <button class="filter" data-filter="Sohbet" role="tab">Sohbet</button>
+          <button class="filter" data-filter="Müzik" role="tab">Müzik</button>
+          <button class="filter" data-filter="Oyun" role="tab">Oyun</button>
+          <button class="filter" data-filter="Gece" role="tab">Gece</button>
+        </div>
+
+        <section class="featured-card" id="featuredRoom" tabindex="0">
+          <div class="featured-copy">
+            <p class="room-label"><span class="live-dot"></span> ŞİMDİ CANLI</p>
+            <h2>Gece Vardiyası</h2>
+            <p>Uykusu kaçanlar için sakin bir köşe.</p>
+            <div class="room-meta"><span class="listener-icon">◉</span> 128 dinliyor <span class="sep">·</span> Sohbet</div>
+          </div>
+          <div class="featured-art" aria-hidden="true">
+            <span class="orb orb-one"></span><span class="orb orb-two"></span><span class="orb orb-three"></span>
+            <span class="wave wave-one"></span><span class="wave wave-two"></span><span class="wave wave-three"></span>
+          </div>
+        </section>
+
+        <div class="section-heading"><h2>Senin için odalar</h2><button id="sortButton">Popüler <span>⌄</span></button></div>
+        <section class="room-list" id="roomList" aria-label="Canlı odalar"></section>
+      </section>
+
+      <section class="screen room-screen hidden" id="roomScreen">
+        <header class="room-header">
+          <button class="round-button" id="leaveRoomButton" aria-label="Odadan çık">‹</button>
+          <div class="room-title-wrap"><p id="roomCategory">GECE · SOHBET</p><h2 id="roomTitle">Gece Vardiyası</h2></div>
+          <button class="round-button" id="roomMoreButton" aria-label="Oda seçenekleri">•••</button>
+        </header>
+
+        <div class="room-stage">
+          <div class="stage-glow"></div>
+          <p class="room-presence"><span class="live-dot"></span><span id="listenerCount">128</span> dinliyor</p>
+          <div class="host-card">
+            <span class="host-crown">✦</span>
+            <div class="avatar avatar-host" id="hostAvatar">E</div>
+            <strong id="hostName">Ece</strong>
+            <span>Ev sahibi</span>
+            <div class="voice-pulse" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+          <div class="seat-grid" id="seatGrid"></div>
+          <button class="request-seat" id="requestSeatButton"><span>+</span> Konuşmak için el kaldır</button>
+        </div>
+
+        <section class="chat-panel">
+          <div class="chat-topline"><span>ODA SOHBETİ</span><button id="clearChatButton">Temizle</button></div>
+          <div class="chat-messages" id="chatMessages"></div>
+          <form class="chat-composer" id="chatForm">
+            <button type="button" class="gift-button" id="giftButton" aria-label="Hediye gönder">✦</button>
+            <input id="chatInput" maxlength="160" autocomplete="off" placeholder="Mesaj yaz..." aria-label="Mesaj yaz" />
+            <button type="submit" class="send-button" aria-label="Mesajı gönder">↑</button>
+          </form>
+        </section>
+
+        <div class="room-controls">
+          <button class="control" id="micButton" aria-pressed="false"><span class="control-icon mic-icon">⌁</span><span>Mikrofon</span></button>
+          <button class="control" id="speakerButton" aria-pressed="false"><span class="control-icon">◔</span><span>Hoparlör</span></button>
+          <button class="control" id="shareButton"><span class="control-icon">↗</span><span>Davet et</span></button>
+          <button class="control leave-control" id="endRoomButton"><span class="control-icon">↗</span><span>Çık</span></button>
+        </div>
+      </section>
+
+      <nav class="bottom-nav" id="bottomNav" aria-label="Ana menü">
+        <button class="nav-item active" data-view="discover"><span>⌂</span>Keşfet</button>
+        <button class="nav-item" data-view="inbox"><span>◌</span><i></i>Mesajlar</button>
+        <button class="nav-item" data-view="community"><span>◫</span>Topluluk</button>
+        <button class="nav-item" data-view="profile"><span>◯</span>Profil</button>
+      </nav>
+
+      <div class="modal-backdrop hidden" id="modalBackdrop"></div>
+      <section class="sheet hidden" id="createSheet" aria-modal="true" role="dialog" aria-labelledby="createHeading">
+        <div class="sheet-handle"></div>
+        <button class="sheet-close" data-close-sheet aria-label="Kapat">×</button>
+        <p class="eyebrow">YENİ SESLİ ODA</p><h2 id="createHeading">Sohbete yön ver.</h2>
+        <form id="createRoomForm">
+          <label>Oda adı<input id="newRoomName" required maxlength="36" placeholder="Örn. Kahve arası" /></label>
+          <label>Kategori<select id="newRoomCategory"><option>Sohbet</option><option>Müzik</option><option>Oyun</option><option>Gece</option></select></label>
+          <label class="switch-row">Odayı kilitle <input type="checkbox" /><span class="switch"></span></label>
+          <button class="primary-button" type="submit">Odayı oluştur <span>→</span></button>
+        </form>
+      </section>
+
+      <section class="toast hidden" id="toast"></section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

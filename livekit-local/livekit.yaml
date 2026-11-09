@@ -1,0 +1,26 @@
+# Sora - Yerel LiveKit sunucusu yapilandirmasi
+#
+# Bu dosya SADECE yerel gelistirme/canli test icindir.
+# Yayinda (internete acikken) mutlaka kendi API key/secret'inizi uretin:
+#   livekit-server.exe generate-keys
+#
+# Yerel LiveKit, token sunucunuzun (server/.env) ayni anahtarlarla
+# konfigure edilmesini gerektirir.
+
+port: 7880
+
+rtc:
+  # Yerel agda/docker'siz calisirken tek UDP portu yeterlidir.
+  udp_port: 7882
+  tcp_port: 7881
+  use_external_ip: false
+
+keys:
+  # server/.env icindeki LIVEKIT_API_KEY / LIVEKIT_API_SECRET ile AYNI olmali.
+  # Yerel test icin sabit deger kullaniliyor; LiveKit en az 32 karakter ister.
+  # Disari acmayin.
+  devkey: sora_local_dev_secret_0123456789abcdef
+
+logging:
+  level: info
+  json: false

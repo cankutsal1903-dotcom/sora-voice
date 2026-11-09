@@ -1,0 +1,2 @@
+[functions.notify-room-live]
+verify_jwt = false

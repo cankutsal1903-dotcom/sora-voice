@@ -1,0 +1,76 @@
+{
+  "expo": {
+    "name": "Sora",
+    "slug": "sora-voice",
+    "version": "1.0.2",
+
+    "description": "Canlı sesli odalar, topluluk sohbeti ve güvenli etkileşim için Sora.",
+    "primaryColor": "#10111C",
+    "icon": "./assets/images/sora-logo.png",
+    "splash": {
+      "image": "./assets/images/sora-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#050509"
+    },
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "scheme": "sora",
+    "plugins": [
+      "expo-font",
+      "expo-audio",
+      "expo-asset",
+      "@livekit/react-native-expo-plugin",
+      "@config-plugins/react-native-webrtc",
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/sora-logo.png",
+          "color": "#B5FF78",
+          "defaultChannel": "sora-default",
+          "sounds": []
+        }
+      ]
+    ],
+    "android": {
+      "package": "com.arescan.soravoice",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.WAKE_LOCK",
+        "android.permission.BLUETOOTH"
+      ],
+      "notification": {
+        "channelId": "sora-default",
+        "color": "#B5FF78"
+      },
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/sora-logo.png",
+        "backgroundColor": "#050509"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.arescan.soravoice",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Sora, sesli odalarda konuşabilmen için mikrofonuna erişir.",
+        "UIBackgroundModes": [
+          "audio"
+        ]
+      },
+      "bitcode": false
+    },
+    "extra": {
+      "eas": {
+        "projectId": "eaa65edd-9980-4db9-950a-9ecb047f0ad7"
+      }
+    },
+    "owner": "arescan"
+  }
+}

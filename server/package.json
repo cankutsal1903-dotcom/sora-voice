@@ -1,0 +1,14 @@
+{
+  "name": "sora-voice-token-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "livekit-server-sdk": "^2.11.0"
+  }
+}
