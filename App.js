@@ -3856,6 +3856,7 @@ const LiveParticipantList = memo(function LiveParticipantList({
       setWorkingId(null);
     }
   };
+  if (participants.length === 0) return null;
   return (
     <>
       <Pressable onPress={() => setVisible(true)} style={styles.audienceBar}>
@@ -4701,7 +4702,8 @@ function Room({
           ? {
               icon: "warning-outline",
               title: "Ses bağlantısı kurulamadı",
-              description: liveVoice.error || "Sunucu ayarlarını kontrol et.",
+              description:
+                "Sunucuyla bağlantı kurulamadı. Birkaç saniye sonra tekrar dene.",
               style: styles.roomVoiceError,
             }
           : {
@@ -5372,7 +5374,10 @@ function Room({
           <View style={styles.roomHero}>
             <LinearGradient
               colors={room.colors}
-              style={styles.roomHeroGradient}
+              style={[
+                styles.roomHeroGradient,
+                !roomSeatParticipants.length && styles.roomHeroGradientEmpty,
+              ]}
             >
               <View style={styles.roomHeroOrb} />
                 <Text style={styles.roomLive}>
@@ -5397,38 +5402,43 @@ function Room({
                   ))}
                 </View>
               </View>
-              <View style={styles.seatGrid}>
-                {Array.from({ length: 7 }, (_, index) => {
-                  const participant = roomSeatParticipants[index];
-                  return (
-                    <View style={styles.seat} key={participant?.userId || `empty-${index}`}>
+              {roomSeatParticipants.length ? (
+                <View style={styles.seatGrid}>
+                  {roomSeatParticipants.map((participant) => (
+                    <View style={styles.seat} key={participant.userId}>
                       <View
                         style={[
                           styles.seatAvatar,
-                          participant && { backgroundColor: participant.color },
-                          participant?.microphoneEnabled && styles.seatAvatarSpeaking,
+                          { backgroundColor: participant.color },
+                          participant.microphoneEnabled && styles.seatAvatarSpeaking,
                         ]}
                       >
-                        {participant ? (
-                          <Text style={styles.seatInitial}>
-                            {participant.name?.charAt(0)?.toUpperCase() || "?"}
-                          </Text>
-                        ) : (
-                          <Ionicons name="person-outline" size={20} color={COLORS.muted} />
-                        )}
-                        {participant && !participant.microphoneEnabled && (
+                        <Text style={styles.seatInitial}>
+                          {participant.name?.charAt(0)?.toUpperCase() || "?"}
+                        </Text>
+                        {!participant.microphoneEnabled && (
                           <View style={styles.seatMuted}>
                             <Ionicons name="mic-off" size={10} color={COLORS.pink} />
                           </View>
                         )}
                       </View>
                       <Text style={styles.seatName} numberOfLines={1}>
-                        {participant?.name || "Boş"}
+                        {participant.name}
                       </Text>
                     </View>
-                  );
-                })}
-              </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.emptyStage}>
+                  <View style={styles.emptyStageIcon}>
+                    <Ionicons name="mic-outline" size={20} color={COLORS.primary} />
+                  </View>
+                  <Text style={styles.emptyStageTitle}>Sahne seni bekliyor</Text>
+                  <Text style={styles.emptyStageText}>
+                    Konuşmak için el kaldır; katılanlar burada görünür.
+                  </Text>
+                </View>
+              )}
             </LinearGradient>
           </View>
           <Pressable
@@ -7345,7 +7355,11 @@ export default function App() {
 
 const styles = StyleSheet.create({
   app: { flex: 1, backgroundColor: COLORS.background },
-  safeArea: { flex: 1, backgroundColor: COLORS.background },
+  safeArea: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    paddingTop: Platform.OS === "android" ? 8 : 0,
+  },
   pageContent: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 104 },
   topBar: {
     height: 48,
@@ -7736,7 +7750,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
-    bottom: 0,
+    bottom: Platform.OS === "android" ? 24 : 0,
     height: 77,
     paddingHorizontal: 9,
     paddingTop: 9,
@@ -10050,13 +10064,14 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   roomHeroGradient: {
-    minHeight: 425,
+    minHeight: 392,
     padding: 19,
     overflow: "hidden",
     position: "relative",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
   },
+  roomHeroGradientEmpty: { minHeight: 344 },
   roomHeroOrb: {
     width: 315,
     height: 315,
@@ -10119,8 +10134,9 @@ const styles = StyleSheet.create({
   seatGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-around",
-    rowGap: 18,
+    justifyContent: "center",
+    columnGap: 18,
+    rowGap: 16,
     marginTop: 12,
     paddingTop: 16,
     borderTopWidth: 1,
@@ -10143,6 +10159,37 @@ const styles = StyleSheet.create({
     borderColor: "#D4FF89",
   },
   seatName: { color: "#F1EFF9", fontSize: 10, fontWeight: "700", marginTop: 7 },
+  emptyStage: {
+    alignItems: "center",
+    marginTop: 18,
+    paddingTop: 17,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.12)",
+  },
+  emptyStageIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(13,15,27,0.22)",
+    borderWidth: 1,
+    borderColor: "rgba(212,255,137,0.25)",
+  },
+  emptyStageTitle: {
+    color: "#F5F3FC",
+    fontSize: 13,
+    fontWeight: "900",
+    marginTop: 10,
+  },
+  emptyStageText: {
+    color: "#D0CDD9",
+    fontSize: 10,
+    lineHeight: 15,
+    textAlign: "center",
+    marginTop: 5,
+    maxWidth: 230,
+  },
   raiseHand: {
     flexDirection: "row",
     alignItems: "center",
@@ -10203,10 +10250,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
   roomControls: {
-    minHeight: 82,
+    minHeight: 96,
     paddingHorizontal: 7,
     paddingTop: 9,
-    paddingBottom: Platform.OS === "ios" ? 14 : 9,
+    paddingBottom: Platform.OS === "ios" ? 14 : 21,
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
