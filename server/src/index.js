@@ -206,8 +206,11 @@ app.post("/token", async (request, response) => {
       canPublishData: true,
       roomAdmin: roomRoleIsStaff(membership.role),
     });
-    response.json({ serverUrl: process.env.LIVEKIT_URL, token: await token.toJwt(), role: membership.role, muted: membership.is_muted });
+    const jwt = await token.toJwt();
+    console.info("Room token issued");
+    response.json({ serverUrl: process.env.LIVEKIT_URL, token: jwt, role: membership.role, muted: membership.is_muted });
   } catch (error) {
+    console.error("Room token request failed:", error.message);
     response.status(error.status || 403).json({ error: error.message || "Unable to join this room" });
   }
 });
