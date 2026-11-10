@@ -589,7 +589,6 @@ function Discover({
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
-  const [followedNames, setFollowedNames] = useState([]);
 
   const handleToggleSearch = useCallback(() => {
     setSearching((value) => !value);
@@ -669,49 +668,62 @@ function Discover({
       rooms[0],
     [favoriteRoomIds, recentRoomIds, rooms],
   );
-  const recentRooms = useMemo(
-    () =>
-      recentRoomIds
-        .map((roomId) => rooms.find((room) => room.id === roomId))
-        .filter(Boolean)
-        .slice(0, 4),
-    [recentRoomIds, rooms],
-  );
-  const followedRooms = useMemo(
-    () => rooms.filter((room) => followedNames.includes(room.host)).slice(0, 5),
-    [followedNames, rooms],
-  );
-  useEffect(() => {
-    AsyncStorage.getItem(FOLLOWED_USERS_KEY)
-      .then((savedNames) => {
-        const parsedNames = JSON.parse(savedNames || "[]");
-        if (Array.isArray(parsedNames)) setFollowedNames(parsedNames);
-      })
-      .catch(() => undefined);
-  }, []);
-
   if (!featuredRoom) {
     return (
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.pageContent}
       >
-        <View style={styles.emptyState}>
-          <View style={styles.emptyIcon}>
-            <Ionicons name="radio-outline" size={27} color={COLORS.primary} />
+        <View style={styles.topBar}>
+          <View style={styles.discoverHeadingCopy}>
+            <Text style={styles.discoverEyebrow}>SORA · SESLİ SOHBET</Text>
+            <Text style={styles.discoverHeading}>Keşfet</Text>
           </View>
-          <Text style={styles.emptyTitle}>Henüz canlı oda yok</Text>
-          <Text style={styles.emptyDescription}>
-            İlk sohbeti başlatmak için bir oda aç.
-          </Text>
+          <IconButton
+            icon="notifications-outline"
+            accessibilityLabel="Bildirimleri aç"
+            badge={notificationCount > 0}
+            onPress={onOpenNotifications}
+          />
+        </View>
+        <LinearGradient
+          colors={["#30245C", "#171B36", "#102720"]}
+          style={styles.discoverEmptyHero}
+        >
+          <View style={styles.discoverEmptyGlow} />
+          <View style={styles.discoverEmptyArt}>
+            <View style={styles.discoverEmptySeat}>
+              <Ionicons name="mic-outline" size={25} color={COLORS.primary} />
+            </View>
+            <View style={[styles.discoverEmptySeat, styles.discoverEmptySeatSide]}>
+              <Ionicons name="add" size={22} color={COLORS.textSecondary} />
+            </View>
+            <View style={[styles.discoverEmptySeat, styles.discoverEmptySeatSide]}>
+              <Ionicons name="add" size={22} color={COLORS.textSecondary} />
+            </View>
+          </View>
+          <View style={styles.discoverEmptyCopy}>
+            <Text style={styles.discoverEmptyLabel}>SAHNE HAZIR</Text>
+            <Text style={styles.discoverEmptyTitle}>İlk sesi sen başlat.</Text>
+            <Text style={styles.discoverEmptyDescription}>
+              Şu anda açık oda yok. Bir oda aç, sohbet başladığında burada görünsün.
+            </Text>
+          </View>
           <Pressable
             accessibilityRole="button"
-            style={styles.newRoomButton}
+            accessibilityLabel="Yeni sesli oda aç"
+            style={styles.discoverEmptyButton}
             onPress={onCreate}
           >
-            <Ionicons name="add" size={20} color={COLORS.primaryInk} />
-            <Text style={styles.newRoomText}>Oda aç</Text>
+            <Text style={styles.discoverEmptyButtonText}>Oda aç</Text>
+            <Ionicons name="arrow-forward" size={20} color={COLORS.primaryInk} />
           </Pressable>
+        </LinearGradient>
+        <View style={styles.discoverEmptyNote}>
+          <Ionicons name="headset-outline" size={18} color={COLORS.primary} />
+          <Text style={styles.discoverEmptyNoteText}>
+            Odaya herkes dinleyici olarak katılabilir. Konuşmak isteyenler koltuğa geçer.
+          </Text>
         </View>
       </ScrollView>
     );
@@ -729,16 +741,9 @@ function Discover({
       >
         <Reveal distance={10}>
           <View style={styles.topBar}>
-            <View style={styles.brand}>
-              <View style={styles.brandMark}>
-                <Image
-                  source={SORA_LOGO}
-                  style={styles.brandLogo}
-                  fadeDuration={0}
-                  accessibilityLabel="Sora logosu"
-                />
-              </View>
-              <Text style={styles.brandText}>sora</Text>
+            <View style={styles.discoverHeadingCopy}>
+              <Text style={styles.discoverEyebrow}>SORA · SESLİ SOHBET</Text>
+              <Text style={styles.discoverHeading}>Keşfet</Text>
             </View>
             <View style={styles.topActions}>
               <IconButton
@@ -752,6 +757,14 @@ function Discover({
                 badge={notificationCount > 0}
                 onPress={onOpenNotifications}
               />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Yeni sesli oda aç"
+                onPress={onCreate}
+                style={styles.discoverCreateButton}
+              >
+                <Ionicons name="add" size={23} color={COLORS.primaryInk} />
+              </Pressable>
             </View>
           </View>
         </Reveal>
@@ -785,47 +798,7 @@ function Discover({
           </View>
         )}
 
-        <Reveal delay={50} distance={12}>
-          <View style={styles.greetingRow}>
-            <View>
-              <Text style={styles.kicker}>
-                HOŞ GELDİN, {profile.name.toUpperCase()}
-              </Text>
-              <Text style={styles.heroHeading}>
-                Baglanmak icin{`\n`}iyi bir an.
-              </Text>
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Yeni sesli oda aç"
-              style={styles.newRoomButton}
-              onPress={onCreate}
-            >
-              <Ionicons name="add" size={20} color={COLORS.primaryInk} />
-              <Text style={styles.newRoomText}>Oda ac</Text>
-            </Pressable>
-          </View>
-        </Reveal>
-
-        <Reveal delay={70} distance={10}>
-          <View style={styles.discoverLiveSummary}>
-            <View style={styles.discoverLiveCopy}>
-              <View style={styles.discoverLiveLabel}>
-                <LivePulse size={7} />
-                <Text style={styles.discoverLiveLabelText}>CANLI AKIŞ</Text>
-              </View>
-              <Text style={styles.discoverLiveTitle}>
-                Sohbete bir yerden katıl.
-              </Text>
-            </View>
-            <View style={styles.discoverLiveCount}>
-              <Text style={styles.discoverLiveNumber}>{rooms.length}</Text>
-              <Text style={styles.discoverLiveCountText}>ODA</Text>
-            </View>
-          </View>
-        </Reveal>
-
-        <Reveal delay={90}>
+        <Reveal delay={50}>
           <Pressable
             onPress={() => onOpenRoom(featuredRoom)}
             accessibilityRole="button"
@@ -860,6 +833,9 @@ function Discover({
                   <Text style={styles.featureSubtitle} numberOfLines={2}>
                     {featuredRoom.description}
                   </Text>
+                  <Text style={styles.featureListenerText}>
+                    {featuredRoom.listeners} kişi odada
+                  </Text>
                 </View>
                 <View style={styles.featureFooterModern}>
                   <View style={styles.featureHost}>
@@ -887,20 +863,11 @@ function Discover({
                   </View>
                 </View>
               </View>
-              <View style={styles.featureListenerBadge}>
-                <Ionicons name="people" size={14} color="#FFFFFF" />
-                <Text style={styles.featureListeners}>
-                  {featuredRoom.listeners} dinliyor
-                </Text>
-              </View>
-              <View style={styles.featureSound}>
-                <AudioBars color="rgba(255,255,255,0.78)" />
-              </View>
             </LinearGradient>
           </Pressable>
         </Reveal>
 
-        <Text style={styles.sectionTitle}>Sohbetini seç</Text>
+        <Text style={styles.sectionTitle}>İlgini çeken sohbetler</Text>
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -937,124 +904,20 @@ function Discover({
           updateCellsBatchingPeriod={50}
         />
 
-        {recentRooms.length > 0 && (
-          <>
-            <View style={styles.recentHeading}>
-              <Text style={styles.sectionTitle}>Son ziyaret ettiklerin</Text>
-              <Text style={styles.recentHint}>Tekrar katil</Text>
-            </View>
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.recentList}
-              data={recentRooms}
-              keyExtractor={(room) => room.id}
-              renderItem={({ item: room }) => (
-                <Pressable
-                  onPress={() => handleOpenRoom(room)}
-                  style={styles.recentRoom}
-                >
-                  <LinearGradient
-                    colors={room.colors}
-                    style={styles.recentArtwork}
-                  >
-                    <Text style={styles.recentInitial}>{room.initials}</Text>
-                    <View
-                      style={[
-                        styles.recentOrb,
-                        { backgroundColor: room.accent },
-                      ]}
-                    />
-                  </LinearGradient>
-                  <Text numberOfLines={1} style={styles.recentName}>
-                    {room.title}
-                  </Text>
-                  <Text style={styles.recentMeta}>
-                    {room.listeners} dinliyor
-                  </Text>
-                </Pressable>
-              )}
-              scrollEnabled={true}
-              maxToRenderPerBatch={8}
-              updateCellsBatchingPeriod={50}
-            />
-          </>
-        )}
-
-        {followedRooms.length > 0 && (
-          <>
-            <View style={styles.followedHeading}>
-              <View>
-                <Text style={styles.sectionTitle}>
-                  Takip ettiklerin yayinda
-                </Text>
-                <Text style={styles.listCount}>
-                  {followedRooms.length} kisi simdi konusuyor
-                </Text>
-              </View>
-              <Ionicons name="heart" size={17} color={COLORS.pink} />
-            </View>
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.followedList}
-              data={followedRooms}
-              keyExtractor={(room) => room.id}
-              renderItem={({ item: followedRoom }) => (
-                <Pressable
-                  onPress={() => onOpenRoom(followedRoom)}
-                  style={styles.followedRoom}
-                >
-                  <LinearGradient
-                    colors={followedRoom.colors}
-                    style={styles.followedArtwork}
-                  >
-                    <View style={styles.followedLive}>
-                      <View style={styles.followedLiveDot} />
-                      <Text style={styles.followedLiveText}>CANLI</Text>
-                    </View>
-                    <Avatar
-                      label={followedRoom.initials}
-                      color={followedRoom.accent}
-                      size={45}
-                      bordered
-                    />
-                  </LinearGradient>
-                  <View style={styles.followedDetails}>
-                    <Text numberOfLines={1} style={styles.followedName}>
-                      {followedRoom.host}
-                    </Text>
-                    <Text numberOfLines={1} style={styles.followedTitle}>
-                      {followedRoom.title}
-                    </Text>
-                    <View style={styles.followedMeta}>
-                      <Ionicons
-                        name="headset-outline"
-                        size={12}
-                        color={COLORS.primary}
-                      />
-                      <Text style={styles.followedMetaText}>
-                        {followedRoom.listeners}
-                      </Text>
-                    </View>
-                  </View>
-                </Pressable>
-              )}
-            />
-          </>
-        )}
-
-        <View style={styles.listHeading}>
+        <View style={styles.discoverListHeading}>
           <View>
-            <Text style={styles.sectionTitle}>
-              {favoritesOnly ? "Favori odalar" : "Canli odalar"}
+            <Text style={[styles.sectionTitle, styles.discoverListTitle]}>
+              {favoritesOnly ? "Favori odalar" : "Şimdi canlı"}
             </Text>
             <Text style={styles.listCount}>
-              {visibleRooms.length} oda senin icin aktif
+              {visibleRooms.length} oda açık
             </Text>
           </View>
           <Pressable
-            onPress={() => setFavoritesOnly((value) => !value)}
+            onPress={handleToggleFavoritesFilter}
+            accessibilityRole="button"
+            accessibilityState={{ selected: favoritesOnly }}
+            accessibilityLabel="Favori odaları filtrele"
             style={[
               styles.favoriteFilter,
               favoritesOnly && styles.favoriteFilterActive,
@@ -1075,22 +938,18 @@ function Discover({
             </Text>
           </Pressable>
         </View>
-        <FlatList
-          scrollEnabled={false}
-          data={visibleRooms}
-          extraData={favoriteRoomIds}
-          renderItem={({ item, index }) => (
+        <View style={styles.roomGrid}>
+          {visibleRooms.map((item, index) => (
             <RoomCard
+              key={item.id}
               room={item}
               index={index}
               isFavorite={favoriteRoomIds.includes(item.id)}
               onPress={handleOpenRoom}
               onToggleFavorite={handleToggleFav}
             />
-          )}
-          keyExtractor={(room) => room.id}
-          initialNumToRender={6}
-        />
+          ))}
+        </View>
         {!visibleRooms.length && (
           <View style={styles.emptyState}>
             <View style={styles.emptyIcon}>
@@ -1098,7 +957,7 @@ function Discover({
             </View>
             <Text style={styles.emptyTitle}>Oda bulunamadı</Text>
             <Text style={styles.emptyDescription}>
-              Farkli bir kategori veya arama deneyebilirsin.
+              Farklı bir kategori veya arama deneyebilirsin.
             </Text>
           </View>
         )}
@@ -1266,7 +1125,7 @@ const RoomCard = memo(function RoomCard({
   const revealDelay = useMemo(() => Math.min(index, 6) * 55, [index]);
 
   return (
-    <Reveal delay={revealDelay} distance={12}>
+    <Reveal delay={revealDelay} distance={12} style={styles.roomGridItem}>
       <View style={styles.roomCard}>
         <Pressable
           onPress={handlePress}
@@ -1277,51 +1136,41 @@ const RoomCard = memo(function RoomCard({
             pressed && styles.roomCardPressed,
           ]}
         >
-          <LinearGradient colors={room.colors} style={styles.roomArtwork}>
+          <LinearGradient
+            colors={[...room.colors, "#161829"]}
+            style={styles.roomArtwork}
+          >
             <View
               style={[styles.roomArtworkOrb, { backgroundColor: room.accent }]}
             />
-            <View style={styles.roomArtworkLive}>
-              <LivePulse size={6} />
+            <View style={styles.roomArtworkRing} />
+            <View style={styles.roomArtworkTop}>
+              <View style={styles.roomArtworkLive}>
+                <LivePulse size={5} color={COLORS.primary} />
+                <Text style={styles.roomArtworkLiveText}>CANLI</Text>
+              </View>
+              <View style={styles.roomArtworkCount}>
+                <Ionicons name="people" size={12} color="#FFFFFF" />
+                <Text style={styles.roomArtworkCountText}>{room.listeners}</Text>
+              </View>
             </View>
-            <Text style={styles.roomArtworkInitial}>{room.initials}</Text>
-            <AudioBars color="rgba(255,255,255,0.78)" compact />
+            <View style={styles.roomArtworkMonogram}>
+              <Text style={styles.roomArtworkInitial}>
+                {room.initials || room.title?.charAt(0) || "S"}
+              </Text>
+              <AudioBars color="rgba(255,255,255,0.78)" compact />
+            </View>
+            <Text style={styles.roomArtworkTitle} numberOfLines={2}>
+              {room.title}
+            </Text>
           </LinearGradient>
           <View style={styles.roomDetails}>
-            <View style={styles.roomTitleRow}>
-              <Text style={styles.roomName} numberOfLines={1}>
-                {room.title}
-              </Text>
-              <View style={styles.livePill}>
-                <LivePulse size={5} />
-                <Text style={styles.livePillText}>CANLI</Text>
-              </View>
+            <View style={styles.roomHostRow}>
+              <Avatar label={room.host?.charAt(0) || "S"} color={room.accent} size={25} />
+              <Text style={styles.roomHostName} numberOfLines={1}>{room.host}</Text>
+              <Ionicons name="arrow-forward" size={15} color={COLORS.primary} />
             </View>
-            <Text style={styles.roomDescription} numberOfLines={1}>
-              {room.host} ile · {room.description}
-            </Text>
-            <View style={styles.roomBottom}>
-              <View style={styles.miniPeople}>
-                <Ionicons
-                  name="headset-outline"
-                  size={15}
-                  color={COLORS.primary}
-                />
-                <Text style={styles.listenerCount}>
-                  {room.listeners} dinliyor
-                </Text>
-              </View>
-              <View style={styles.roomCategoryPill}>
-                <Text style={styles.roomCategory}>{room.category}</Text>
-              </View>
-            </View>
-          </View>
-          <View style={styles.roomJoinIcon}>
-            <Ionicons
-              name="arrow-forward"
-              size={16}
-              color={COLORS.primaryInk}
-            />
+            <Text style={styles.roomCategory}>{room.category}</Text>
           </View>
         </Pressable>
         <Pressable
@@ -1341,8 +1190,8 @@ const RoomCard = memo(function RoomCard({
         >
           <Ionicons
             name={isFavorite ? "heart" : "heart-outline"}
-            size={19}
-            color={isFavorite ? COLORS.pink : COLORS.muted}
+            size={17}
+            color={isFavorite ? COLORS.pink : "#FFFFFF"}
           />
         </Pressable>
       </View>
@@ -2177,10 +2026,6 @@ function Profile({
   const [activityStreak, setActivityStreak] = useState(1);
   const [followedCount, setFollowedCount] = useState(0);
   const openSafetyCenter = useCallback(() => setSafetyOpen(true), []);
-  const showComingSoon = useCallback(
-    (title) => Alert.alert(title, "Bu alan yakinda aktif olacak."),
-    [],
-  );
   const actions = useMemo(
     () => [
       ["person-outline", "Profili duzenle", onEdit],
@@ -2190,7 +2035,6 @@ function Profile({
         ? [["shield-half-outline", "Yonetim paneli", onOpenAdmin]]
         : []),
       ["settings-outline", "Ayarlar", onOpenSettings],
-      ["help-circle-outline", "Yardim ve destek", null, showComingSoon],
     ],
     [
       adminRole,
@@ -2199,7 +2043,6 @@ function Profile({
       onOpenSettings,
       onOpenWallet,
       openSafetyCenter,
-      showComingSoon,
     ],
   );
   useEffect(() => {
@@ -2351,9 +2194,6 @@ function Profile({
           </View>
           <View style={styles.profileNameRow}>
             <Text style={styles.profileName}>{profile.name}</Text>
-            <View style={styles.profileVerified}>
-              <Ionicons name="checkmark" size={12} color={COLORS.primaryInk} />
-            </View>
           </View>
           <Text style={styles.handle}>@{profile.handle}</Text>
           {profile.bio ? (
@@ -2539,11 +2379,11 @@ function Profile({
         data={actions}
         keyExtractor={(item) => item[1]}
         scrollEnabled={false}
-        renderItem={({ item: [icon, title, action, fallback] }) => (
+        renderItem={({ item: [icon, title, action] }) => (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={title}
-            onPress={action || (() => fallback(title))}
+            onPress={action}
             style={styles.actionRow}
           >
             <View style={styles.actionIcon}>
@@ -2587,20 +2427,16 @@ const BottomNavigation = memo(function BottomNavigation({ active, onChange }) {
     <View
       style={[
         styles.bottomNavigation,
-        { paddingBottom: Math.max(insets.bottom, 10), minHeight: 64 + Math.max(insets.bottom, 10) },
+        { paddingBottom: Math.max(insets.bottom, 10) },
       ]}
     >
-      <FlatList
-        data={items}
-        keyExtractor={(item) => item[0]}
-        scrollEnabled={false}
-        horizontal={false}
-        numColumns={4}
-        columnWrapperStyle={styles.tabRow}
-        renderItem={({ item: [key, icon, label] }) => (
+      <View style={styles.tabRow}>
+        {items.map(([key, icon, label]) => (
           <Pressable
+            key={key}
             onPress={() => handleTabPress(key)}
             accessibilityRole="tab"
+            accessibilityLabel={label}
             accessibilityState={{ selected: active === key }}
             style={[styles.tabItem, active === key && styles.tabItemActive]}
           >
@@ -2615,7 +2451,6 @@ const BottomNavigation = memo(function BottomNavigation({ active, onChange }) {
                 size={21}
                 color={active === key ? COLORS.primary : COLORS.muted}
               />
-              {key === "inbox" && <View style={styles.tabBadge} />}
             </View>
             <Text
               numberOfLines={1}
@@ -2624,8 +2459,8 @@ const BottomNavigation = memo(function BottomNavigation({ active, onChange }) {
               {label}
             </Text>
           </Pressable>
-        )}
-      />
+        ))}
+      </View>
     </View>
   );
 });
@@ -4056,13 +3891,14 @@ const LiveParticipantList = memo(function LiveParticipantList({
 });
 
 function CreateRoomSheet({ visible, onDismiss, onCreate }) {
+  const insets = useSafeAreaInsets();
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("Sohbet");
   const [description, setDescription] = useState("");
   const create = () => {
     const cleanTitle = title.trim();
     if (!cleanTitle) {
-      Alert.alert("Oda adi gerekli", "Devam etmek icin odana bir ad ver.");
+      Alert.alert("Oda adı gerekli", "Devam etmek için odana bir ad ver.");
       return;
     }
     const theme = ROOM_THEMES[0];
@@ -4071,12 +3907,10 @@ function CreateRoomSheet({ visible, onDismiss, onCreate }) {
       title: cleanTitle,
       category,
       listeners: 1,
-      host: "Deniz",
-      initials: "D",
       colors: theme.colors,
       accent: theme.accent,
       description:
-        description.trim().slice(0, 90) || "Yeni baslayan bir sohbet.",
+        description.trim().slice(0, 90) || "Yeni başlayan bir sohbet.",
     });
     setTitle("");
     setDescription("");
@@ -4099,14 +3933,14 @@ function CreateRoomSheet({ visible, onDismiss, onCreate }) {
           contentContainerStyle={styles.createRoomSheetContent}
           keyboardShouldPersistTaps="handled"
         >
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, styles.createRoomSheet, { paddingBottom: Math.max(insets.bottom, 24) + 16 }]}>
           <View style={styles.sheetHandle} />
           <Pressable onPress={onDismiss} style={styles.sheetClose}>
             <Ionicons name="close" size={20} color={COLORS.text} />
           </Pressable>
-          <Text style={styles.kicker}>YENI SESLI ODA</Text>
-          <Text style={styles.sheetTitle}>Sohbete yon ver.</Text>
-          <Text style={styles.fieldLabel}>KATEGORI</Text>
+          <Text style={styles.kicker}>YENİ SESLİ ODA</Text>
+          <Text style={styles.sheetTitle}>Bir oda aç.</Text>
+          <Text style={styles.fieldLabel}>KATEGORİ</Text>
           <View style={styles.sheetCategories}>
             {CATEGORIES.slice(1).map((item) => (
               <Pressable
@@ -4132,16 +3966,16 @@ function CreateRoomSheet({ visible, onDismiss, onCreate }) {
           <TextInput
             value={title}
             onChangeText={setTitle}
-            placeholder="Orn. Kahve arasi"
+            placeholder="Örn. Kahve arası"
             placeholderTextColor={COLORS.muted}
             style={styles.sheetInput}
             maxLength={36}
           />
-          <Text style={styles.fieldLabel}>KISA ACIKLAMA</Text>
+          <Text style={styles.fieldLabel}>KISA AÇIKLAMA</Text>
           <TextInput
             value={description}
             onChangeText={setDescription}
-            placeholder="Odanin konusunu anlat"
+            placeholder="Odanın konusunu anlat"
             placeholderTextColor={COLORS.muted}
             style={styles.sheetInput}
             maxLength={90}
@@ -4152,7 +3986,7 @@ function CreateRoomSheet({ visible, onDismiss, onCreate }) {
               colors={BRAND_GRADIENT}
               style={styles.createSubmit}
             >
-              <Text style={styles.createSubmitText}>Odayi olustur</Text>
+              <Text style={styles.createSubmitText}>Odayı oluştur</Text>
               <Ionicons
                 name="arrow-forward"
                 size={20}
@@ -9879,8 +9713,7 @@ const styles = StyleSheet.create({
   featureModernContent: {
     flex: 1,
     justifyContent: "space-between",
-    paddingTop: 29,
-    paddingRight: 88,
+    paddingTop: 17,
     zIndex: 1,
   },
   featureHost: { flexDirection: "row", alignItems: "center", gap: 8 },
@@ -10414,7 +10247,122 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 20,
+    marginBottom: 16,
+  },
+  discoverHeadingCopy: { flex: 1, minWidth: 0, justifyContent: "center" },
+  discoverEyebrow: {
+    color: COLORS.primary,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1.6,
+    marginBottom: 3,
+  },
+  discoverHeading: {
+    color: COLORS.text,
+    fontSize: 26,
+    fontWeight: "900",
+    letterSpacing: -0.8,
+    lineHeight: 30,
+  },
+  discoverCreateButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.primary,
+  },
+  discoverEmptyHero: {
+    minHeight: 390,
+    borderRadius: 28,
+    padding: 24,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.13)",
+    justifyContent: "flex-end",
+  },
+  discoverEmptyGlow: {
+    position: "absolute",
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: "rgba(181,255,120,0.10)",
+    top: -112,
+    right: -92,
+  },
+  discoverEmptyArt: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 37,
+  },
+  discoverEmptySeat: {
+    width: 80,
+    height: 80,
+    borderRadius: 27,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(181,255,120,0.17)",
+    borderWidth: 1,
+    borderColor: "rgba(181,255,120,0.48)",
+    transform: [{ rotate: "-5deg" }],
+  },
+  discoverEmptySeatSide: {
+    width: 62,
+    height: 62,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderColor: "rgba(255,255,255,0.17)",
+    transform: [{ rotate: "5deg" }],
+  },
+  discoverEmptyCopy: { marginBottom: 22 },
+  discoverEmptyLabel: {
+    color: COLORS.primary,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.6,
+    marginBottom: 9,
+  },
+  discoverEmptyTitle: {
+    color: COLORS.text,
+    fontSize: 30,
+    lineHeight: 35,
+    fontWeight: "900",
+    letterSpacing: -0.9,
+    marginBottom: 8,
+  },
+  discoverEmptyDescription: {
+    color: "rgba(255,255,255,0.74)",
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  discoverEmptyButton: {
+    minHeight: 50,
+    borderRadius: 16,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 17,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  discoverEmptyButtonText: {
+    color: COLORS.primaryInk,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  discoverEmptyNote: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginTop: 18,
+    paddingHorizontal: 6,
+  },
+  discoverEmptyNoteText: {
+    flex: 1,
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
   },
   iconButton: {
     width: 42,
@@ -10520,9 +10468,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.9,
     marginTop: 1,
   },
-  featurePressable: { marginTop: 13 },
+  featurePressable: { marginTop: 3 },
   featureCardModern: {
-    minHeight: 244,
+    minHeight: 210,
     overflow: "hidden",
     borderRadius: 26,
     padding: 20,
@@ -10536,13 +10484,19 @@ const styles = StyleSheet.create({
     letterSpacing: -0.8,
     fontWeight: "900",
     marginBottom: 6,
-    maxWidth: "88%",
+    maxWidth: "100%",
   },
   featureSubtitle: {
     color: "#E0DDF0",
     fontSize: 14,
     lineHeight: 19,
-    maxWidth: "78%",
+    maxWidth: "100%",
+  },
+  featureListenerText: {
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 11,
+    fontWeight: "800",
+    marginTop: 10,
   },
   featureSound: {
     position: "absolute",
@@ -10557,7 +10511,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "900",
     letterSpacing: -0.5,
-    marginTop: 30,
+    marginTop: 23,
     marginBottom: 12,
   },
   categoryChip: {
@@ -10574,33 +10528,36 @@ const styles = StyleSheet.create({
   categoryText: { color: COLORS.muted, fontSize: 13, fontWeight: "800" },
   listCount: { color: COLORS.muted, fontSize: 13, lineHeight: 18 },
   roomList: { gap: 13 },
-  roomCard: {
-    minHeight: 112,
-    borderRadius: 24,
-    backgroundColor: COLORS.surfaceRaised,
-    padding: 12,
+  discoverListHeading: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    marginTop: 16,
+  },
+  discoverListTitle: { marginTop: 0, marginBottom: 2 },
+  roomGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    rowGap: 12,
+    marginTop: 14,
+  },
+  roomGridItem: { width: "48.2%" },
+  roomCard: {
+    borderRadius: 22,
+    backgroundColor: COLORS.surfaceRaised,
+    padding: 7,
     borderWidth: 1,
     borderColor: COLORS.lineSoft,
+    position: "relative",
     ...ELEVATION.card,
   },
-  roomCardPressed: {
-    backgroundColor: COLORS.surfaceHigh,
-    borderColor: COLORS.line,
-    transform: [{ scale: 0.987 }],
-  },
-  roomCardMain: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 13,
-  },
+  roomCardPressed: { opacity: 0.82, transform: [{ scale: 0.987 }] },
+  roomCardMain: { flex: 1 },
   roomArtwork: {
-    width: 82,
-    height: 82,
-    borderRadius: 22,
+    width: "100%",
+    height: 166,
+    borderRadius: 17,
     overflow: "hidden",
     justifyContent: "center",
     alignItems: "center",
@@ -10609,27 +10566,80 @@ const styles = StyleSheet.create({
   },
   roomArtworkOrb: {
     position: "absolute",
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 155,
+    height: 155,
+    borderRadius: 78,
+    right: -59,
+    bottom: -54,
+    opacity: 0.57,
+  },
+  roomArtworkRing: {
+    position: "absolute",
+    width: 123,
+    height: 123,
+    borderRadius: 62,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.24)",
+    top: 20,
     right: -22,
-    bottom: -25,
-    opacity: 0.85,
   },
-  roomArtworkLive: { position: "absolute", top: 9, left: 9, zIndex: 2 },
-  roomArtworkInitial: {
-    color: "#FFFFFF",
-    fontSize: 25,
+  roomArtworkTop: {
+    position: "absolute",
+    top: 9,
+    left: 9,
+    right: 9,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    zIndex: 2,
+  },
+  roomArtworkLive: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 7,
+    backgroundColor: "rgba(13,17,25,0.65)",
+  },
+  roomArtworkLiveText: {
+    color: COLORS.primary,
+    fontSize: 8,
     fontWeight: "900",
-    marginBottom: 5,
+    letterSpacing: 0.7,
   },
-  roomDetails: {
-    flex: 1,
-    minWidth: 0,
-    alignSelf: "stretch",
-    justifyContent: "center",
-    paddingVertical: 2,
+  roomArtworkCount: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 7,
+    backgroundColor: "rgba(13,17,25,0.65)",
   },
+  roomArtworkCountText: { color: "#FFFFFF", fontSize: 9, fontWeight: "900" },
+  roomArtworkMonogram: { alignItems: "center", marginBottom: 13 },
+  roomArtworkInitial: {
+    color: "rgba(255,255,255,0.91)",
+    fontSize: 37,
+    fontWeight: "900",
+    letterSpacing: -1,
+  },
+  roomArtworkTitle: {
+    position: "absolute",
+    left: 10,
+    right: 10,
+    bottom: 11,
+    color: "#FFFFFF",
+    fontSize: 15,
+    lineHeight: 19,
+    fontWeight: "900",
+    textShadowColor: "rgba(0,0,0,0.6)",
+    textShadowRadius: 5,
+  },
+  roomDetails: { paddingHorizontal: 3, paddingTop: 10, paddingBottom: 4 },
+  roomHostRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  roomHostName: { flex: 1, color: COLORS.text, fontSize: 12, fontWeight: "800" },
   roomTitleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -10676,7 +10686,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(181,255,120,0.18)",
   },
-  roomCategory: { color: COLORS.primary, fontSize: 11, fontWeight: "900" },
+  roomCategory: {
+    color: COLORS.textSecondary,
+    fontSize: 10,
+    fontWeight: "700",
+    marginTop: 6,
+    marginLeft: 1,
+  },
   roomJoinIcon: {
     width: 34,
     height: 34,
@@ -10687,43 +10703,47 @@ const styles = StyleSheet.create({
     marginLeft: 3,
   },
   favoriteButton: {
-    width: 38,
-    minHeight: 58,
+    position: "absolute",
+    right: 15,
+    top: 45,
+    width: 31,
+    height: 31,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 14,
+    borderRadius: 11,
+    backgroundColor: "rgba(13,17,25,0.68)",
+    zIndex: 2,
   },
-  favoriteButtonActive: { backgroundColor: "rgba(255,123,167,0.1)" },
+  favoriteButtonActive: { backgroundColor: "rgba(255,123,167,0.22)" },
   bottomNavigation: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    minHeight: 74,
-    paddingHorizontal: 8,
-    paddingTop: 10,
+    paddingHorizontal: 12,
+    paddingTop: 7,
     paddingBottom: 10,
     backgroundColor: "rgba(16,17,28,0.97)",
     borderTopWidth: 1,
     borderTopColor: COLORS.lineSoft,
     ...ELEVATION.raised,
   },
-  tabRow: { flex: 1, justifyContent: "space-between" },
+  tabRow: { flexDirection: "row", alignItems: "center", width: "100%" },
   tabItem: {
     flex: 1,
     minWidth: 0,
-    minHeight: 50,
+    minHeight: 51,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 2,
-    borderRadius: 16,
+    borderRadius: 14,
   },
   tabItemActive: {
     backgroundColor: COLORS.primarySoft,
   },
   tabLabel: {
     color: COLORS.muted,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "700",
     marginTop: 4,
   },
@@ -10950,4 +10970,12 @@ const styles = StyleSheet.create({
   },
   createRoomSheetScroll: { flexGrow: 0, maxHeight: "92%", width: "100%" },
   createRoomSheetContent: { flexGrow: 1, justifyContent: "flex-end" },
+  createRoomSheet: {
+    width: "100%",
+    maxWidth: 600,
+    alignSelf: "center",
+    backgroundColor: "#171B29",
+    borderTopWidth: 1,
+    borderColor: "rgba(255,255,255,0.11)",
+  },
 });
