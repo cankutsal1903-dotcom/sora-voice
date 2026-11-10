@@ -6157,7 +6157,9 @@ function AppContent() {
       try {
         const existingRoom = await getHostedRoom(authSession.user.id);
         if (existingRoom) {
-          const liveRoom = await setRemoteRoomPresence(existingRoom.id, true);
+          const liveRoom = existingRoom.state === "live"
+            ? existingRoom
+            : await setRemoteRoomPresence(existingRoom.id, true);
           setRooms((currentRooms) => [
             liveRoom,
             ...currentRooms.filter((item) => item.id !== liveRoom.id),
@@ -6176,10 +6178,11 @@ function AppContent() {
         ]);
         setCreateOpen(false);
         openRoom(savedRoom);
-      } catch {
+      } catch (error) {
+        console.error("Room creation failed", error);
         Alert.alert(
           "Oda oluşturulamadı",
-          "Veritabanı bağlantısını ve Supabase şemasını kontrol edip tekrar dene.",
+          "Bağlantıyı kontrol edip tekrar dene.",
         );
       }
       return;

@@ -113,16 +113,27 @@ export const deleteRoom = async (roomId) => {
 
 export const getHostedRoom = async (userId) => {
   const client = requireClient();
-  const { data, error } = await client
+  const { data: liveRoom, error: liveRoomError } = await client
     .from("rooms")
     .select(ROOM_SELECT)
     .eq("host_id", userId)
-    .in("state", ["live", "inactive"])
+    .eq("state", "live")
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  throwIfError(error);
-  return data ? mapRoom(data) : null;
+  throwIfError(liveRoomError);
+  if (liveRoom) return mapRoom(liveRoom);
+
+  const { data: inactiveRoom, error: inactiveRoomError } = await client
+    .from("rooms")
+    .select(ROOM_SELECT)
+    .eq("host_id", userId)
+    .eq("state", "inactive")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  throwIfError(inactiveRoomError);
+  return inactiveRoom ? mapRoom(inactiveRoom) : null;
 };
 
 export const setRoomPresence = async (roomId, isActive) => {
