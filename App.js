@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState, useCallback, memo } from "react";
 import {
   Alert,
+  AppState,
   Image,
   KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   Share,
   StatusBar,
@@ -18,6 +18,7 @@ import {
   View,
   FlatList,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -40,6 +41,7 @@ import {
   claimDailyReward as claimRemoteDailyReward,
   createRoom as createRemoteRoom,
   deleteRoom as deleteRemoteRoom,
+  getHostedRoom,
   getRoom,
   getCurrentAdminRole,
   getWallet,
@@ -54,8 +56,10 @@ import {
   listWalletTransactions,
   sendRoomMessage,
   setFollowing,
+  setRoomHandRaise,
   setUserBlocked,
   startScheduledRoom as startRemoteScheduledRoom,
+  setRoomPresence as setRemoteRoomPresence,
   spendWalletCredit,
   updateRoom as updateRemoteRoom,
 } from "./src/data/soraRepository";
@@ -570,24 +574,17 @@ function Discover({
   profile,
   favoriteRoomIds,
   recentRoomIds,
-  scheduledRooms,
-  reminderRoomIds,
   notificationCount,
   currentUserId,
   onOpenNotifications,
   onOpenRoom,
   onCreate,
-  onOpenSchedule,
   onToggleFavorite,
-  onToggleReminder,
-  onCancelScheduledRoom,
-  onStartScheduledRoom,
 }) {
   const [category, setCategory] = useState("Tumu");
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
-  const [agendaOpen, setAgendaOpen] = useState(false);
   const [followedNames, setFollowedNames] = useState([]);
 
   const handleToggleSearch = useCallback(() => {
@@ -603,12 +600,6 @@ function Discover({
     setFavoritesOnly((value) => !value);
   }, []);
 
-  const handleCloseAgenda = useCallback(() => setAgendaOpen(false), []);
-
-  const handlePlanAgenda = useCallback(() => {
-    setAgendaOpen(false);
-    onOpenSchedule();
-  }, [onOpenSchedule]);
   const normalizedQuery = query.trim().toLowerCase();
   const visibleRooms = useMemo(
     () =>
@@ -667,12 +658,6 @@ function Discover({
     [onToggleFavorite],
   );
 
-  const handleToggleReminder = useCallback(
-    (roomId) => {
-      onToggleReminder(roomId);
-    },
-    [onToggleReminder],
-  );
   const featuredRoom = useMemo(
     () =>
       rooms.find((room) => favoriteRoomIds.includes(room.id)) ||
@@ -756,11 +741,6 @@ function Discover({
                 icon={searching ? "close-outline" : "search-outline"}
                 accessibilityLabel={searching ? "Oda aramayı kapat" : "Oda ara"}
                 onPress={handleToggleSearch}
-              />
-              <IconButton
-                icon="calendar-outline"
-                accessibilityLabel="Yaklaşan odalar ajandası"
-                onPress={() => setAgendaOpen(true)}
               />
               <IconButton
                 icon="notifications-outline"
@@ -1042,64 +1022,6 @@ function Discover({
           </>
         )}
 
-        <View style={styles.upcomingHeading}>
-          <View>
-            <Text style={styles.sectionTitle}>Yaklasan odalar</Text>
-            <Text style={styles.listCount}>
-              {scheduledRooms.length} planli bulusma
-            </Text>
-          </View>
-          <Pressable onPress={onOpenSchedule}>
-            <Text style={styles.upcomingAdd}>Planla</Text>
-          </Pressable>
-        </View>
-        <FlatList
-          data={scheduledRooms.slice(0, 3)}
-          keyExtractor={(item) => item.id}
-          scrollEnabled={false}
-          renderItem={({ item: scheduledRoom }) => {
-            const reminderActive = reminderRoomIds.includes(scheduledRoom.id);
-            return (
-              <View style={styles.upcomingCard}>
-                <View style={styles.upcomingTime}>
-                  <Ionicons
-                    name="calendar-outline"
-                    size={16}
-                    color={COLORS.primary}
-                  />
-                  <Text style={styles.upcomingTimeText}>
-                    {scheduledRoom.startsAt}
-                  </Text>
-                </View>
-                <View style={styles.upcomingContent}>
-                  <Text style={styles.upcomingTitle} numberOfLines={1}>
-                    {scheduledRoom.title}
-                  </Text>
-                  <Text style={styles.upcomingMeta}>
-                    {scheduledRoom.host} · {scheduledRoom.category}
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={() => onToggleReminder(scheduledRoom.id)}
-                  style={[
-                    styles.reminderButton,
-                    reminderActive && styles.reminderButtonActive,
-                  ]}
-                >
-                  <Ionicons
-                    name={
-                      reminderActive ? "notifications" : "notifications-outline"
-                    }
-                    size={16}
-                    color={reminderActive ? COLORS.primaryInk : COLORS.primary}
-                  />
-                </Pressable>
-              </View>
-            );
-          }}
-          contentContainerStyle={styles.upcomingList}
-        />
-
         <View style={styles.listHeading}>
           <View>
             <Text style={styles.sectionTitle}>
@@ -1159,17 +1081,6 @@ function Discover({
           </View>
         )}
       </ScrollView>
-      <ScheduleAgenda
-        visible={agendaOpen}
-        rooms={scheduledRooms}
-        reminderRoomIds={reminderRoomIds}
-        currentUserId={currentUserId}
-        onDismiss={handleCloseAgenda}
-        onToggleReminder={onToggleReminder}
-        onCancel={onCancelScheduledRoom}
-        onStart={onStartScheduledRoom}
-        onPlan={handlePlanAgenda}
-      />
     </>
   );
 }
@@ -2639,6 +2550,7 @@ const ProfileStat = memo(function ProfileStat({ number, label }) {
 });
 
 const BottomNavigation = memo(function BottomNavigation({ active, onChange }) {
+  const insets = useSafeAreaInsets();
   const items = useMemo(
     () => [
       ["discover", "compass-outline", "Keşfet"],
@@ -2650,12 +2562,19 @@ const BottomNavigation = memo(function BottomNavigation({ active, onChange }) {
   );
   const handleTabPress = useCallback((key) => onChange(key), [onChange]);
   return (
-    <View style={styles.bottomNavigation}>
+    <View
+      style={[
+        styles.bottomNavigation,
+        { paddingBottom: Math.max(insets.bottom, 10), minHeight: 64 + Math.max(insets.bottom, 10) },
+      ]}
+    >
       <FlatList
         data={items}
         keyExtractor={(item) => item[0]}
         scrollEnabled={false}
-        horizontal
+        horizontal={false}
+        numColumns={4}
+        columnWrapperStyle={styles.tabRow}
         renderItem={({ item: [key, icon, label] }) => (
           <Pressable
             onPress={() => handleTabPress(key)}
@@ -2677,6 +2596,7 @@ const BottomNavigation = memo(function BottomNavigation({ active, onChange }) {
               {key === "inbox" && <View style={styles.tabBadge} />}
             </View>
             <Text
+              numberOfLines={1}
               style={[styles.tabLabel, active === key && styles.tabLabelActive]}
             >
               {label}
@@ -2698,6 +2618,7 @@ const RoomSettingsSheet = memo(function RoomSettingsSheet({
   onToggleChatLock,
   onReportRoom,
   onBlockHost,
+  onInvite,
   onDismiss,
 }) {
   const reportRoom = () => {
@@ -2722,6 +2643,16 @@ const RoomSettingsSheet = memo(function RoomSettingsSheet({
           <Text style={styles.sheetTitle}>
             {isHost ? "Oda yonetimi" : "Oda bilgileri"}
           </Text>
+          <Pressable onPress={onInvite} style={styles.settingRow}>
+            <View style={styles.settingIcon}>
+              <Ionicons name="share-outline" size={18} color={COLORS.primary} />
+            </View>
+            <View style={styles.settingContent}>
+              <Text style={styles.settingTitle}>Davet et</Text>
+              <Text style={styles.settingDescription}>Oda bağlantısını paylaş</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
+          </Pressable>
           {isHost ? (
             <>
               <Text style={styles.settingsCaption}>EV SAHIBI KONTROLLERI</Text>
@@ -4091,14 +4022,13 @@ function CreateRoomSheet({ visible, onDismiss, onCreate }) {
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("Sohbet");
   const [description, setDescription] = useState("");
-  const [themeIndex, setThemeIndex] = useState(0);
   const create = () => {
     const cleanTitle = title.trim();
     if (!cleanTitle) {
       Alert.alert("Oda adi gerekli", "Devam etmek icin odana bir ad ver.");
       return;
     }
-    const theme = ROOM_THEMES[themeIndex];
+    const theme = ROOM_THEMES[0];
     onCreate({
       id: `room-${Date.now()}`,
       title: cleanTitle,
@@ -4114,7 +4044,6 @@ function CreateRoomSheet({ visible, onDismiss, onCreate }) {
     setTitle("");
     setDescription("");
     setCategory("Sohbet");
-    setThemeIndex(0);
   };
   return (
     <Modal
@@ -4123,8 +4052,16 @@ function CreateRoomSheet({ visible, onDismiss, onCreate }) {
       animationType="slide"
       onRequestClose={onDismiss}
     >
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
         <Pressable style={styles.modalDismiss} onPress={onDismiss} />
+        <ScrollView
+          style={styles.createRoomSheetScroll}
+          contentContainerStyle={styles.createRoomSheetContent}
+          keyboardShouldPersistTaps="handled"
+        >
         <View style={styles.sheet}>
           <View style={styles.sheetHandle} />
           <Pressable onPress={onDismiss} style={styles.sheetClose}>
@@ -4132,58 +4069,6 @@ function CreateRoomSheet({ visible, onDismiss, onCreate }) {
           </Pressable>
           <Text style={styles.kicker}>YENI SESLI ODA</Text>
           <Text style={styles.sheetTitle}>Sohbete yon ver.</Text>
-          <Text style={styles.fieldLabel}>ODA ADI</Text>
-          <TextInput
-            value={title}
-            onChangeText={setTitle}
-            placeholder="Orn. Kahve arasi"
-            placeholderTextColor={COLORS.muted}
-            style={styles.sheetInput}
-            maxLength={36}
-          />
-          <Text style={styles.fieldLabel}>KISA ACIKLAMA</Text>
-          <TextInput
-            value={description}
-            onChangeText={setDescription}
-            placeholder="Odanin konusunu anlat"
-            placeholderTextColor={COLORS.muted}
-            style={styles.sheetInput}
-            maxLength={90}
-            multiline
-          />
-          <Text style={styles.fieldLabel}>ODA TEMASI</Text>
-          <View style={styles.roomThemeList}>
-            {ROOM_THEMES.map((theme, index) => (
-              <Pressable
-                key={theme.name}
-                onPress={() => setThemeIndex(index)}
-                style={[
-                  styles.roomThemeOption,
-                  themeIndex === index && styles.roomThemeOptionSelected,
-                ]}
-              >
-                <LinearGradient
-                  colors={theme.colors}
-                  style={styles.roomThemePreview}
-                >
-                  <View
-                    style={[
-                      styles.roomThemeDot,
-                      { backgroundColor: theme.accent },
-                    ]}
-                  />
-                </LinearGradient>
-                <Text
-                  style={[
-                    styles.roomThemeName,
-                    themeIndex === index && styles.roomThemeNameSelected,
-                  ]}
-                >
-                  {theme.name}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
           <Text style={styles.fieldLabel}>KATEGORI</Text>
           <View style={styles.sheetCategories}>
             {CATEGORIES.slice(1).map((item) => (
@@ -4206,6 +4091,25 @@ function CreateRoomSheet({ visible, onDismiss, onCreate }) {
               </Pressable>
             ))}
           </View>
+          <Text style={styles.fieldLabel}>ODA ADI</Text>
+          <TextInput
+            value={title}
+            onChangeText={setTitle}
+            placeholder="Orn. Kahve arasi"
+            placeholderTextColor={COLORS.muted}
+            style={styles.sheetInput}
+            maxLength={36}
+          />
+          <Text style={styles.fieldLabel}>KISA ACIKLAMA</Text>
+          <TextInput
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Odanin konusunu anlat"
+            placeholderTextColor={COLORS.muted}
+            style={styles.sheetInput}
+            maxLength={90}
+            multiline
+          />
           <Pressable onPress={create}>
             <LinearGradient
               colors={BRAND_GRADIENT}
@@ -4220,7 +4124,8 @@ function CreateRoomSheet({ visible, onDismiss, onCreate }) {
             </LinearGradient>
           </Pressable>
         </View>
-      </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -4390,7 +4295,6 @@ const DEFAULT_SCHEDULED_ROOMS = [
   },
 ];
 const DEFAULT_APP_SETTINGS = {
-  roomReminders: true,
   chatNotifications: true,
   profilePublic: true,
   autoJoinMuted: true,
@@ -4601,6 +4505,7 @@ function Room({
   initialMicrophoneOn = false,
   isFollowingHost = false,
   onToggleFollowHost,
+  onHostPresenceChange,
 }) {
   const [speakerOn, setSpeakerOn] = useState(initialSpeakerOn);
   const [handRaised, setHandRaised] = useState(false);
@@ -4676,10 +4581,26 @@ function Room({
     [blockedUserIds, isHost, liveVoice.participants, roomMembers, userId],
   );
   const roomSeatParticipants = useMemo(
-    () => activeRoomParticipants
-      .filter((participant) => participant.userId !== room.hostId)
-      .slice(0, 7),
-    [activeRoomParticipants, room.hostId],
+    () => {
+      const participants = activeRoomParticipants
+        .filter((participant) => participant.userId !== room.hostId)
+        .slice(0, 7);
+      if (
+        handRaised &&
+        !isHost &&
+        !participants.some((participant) => participant.userId === userId)
+      ) {
+        participants.push({
+          userId,
+          name: profile.name,
+          color: profile.color,
+          microphoneEnabled: false,
+          pendingSeat: true,
+        });
+      }
+      return participants;
+    },
+    [activeRoomParticipants, handRaised, isHost, profile.color, profile.name, room.hostId, userId],
   );
   const micOn = liveVoice.enabled && liveVoice.microphoneEnabled;
   const voiceStatusInfo =
@@ -4843,6 +4764,22 @@ function Room({
       clearInterval(interval);
     };
   }, [liveVoice.participantCount, liveVoice.status, room.id, room.persisted]);
+
+  useEffect(() => {
+    if (!isHost || !room.persisted || !onHostPresenceChange) return undefined;
+    const setPresence = (isActive) =>
+      onHostPresenceChange(room.id, isActive).catch(() => undefined);
+    setPresence(true);
+    const heartbeat = setInterval(() => setPresence(true), 20_000);
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      setPresence(nextState === "active");
+    });
+    return () => {
+      clearInterval(heartbeat);
+      subscription.remove();
+      setPresence(false);
+    };
+  }, [isHost, onHostPresenceChange, room.id, room.persisted]);
 
   useEffect(() => {
     if (!messagesReady || room.persisted) return;
@@ -5025,7 +4962,7 @@ function Room({
     ],
   );
 
-  const toggleHand = () => {
+  const toggleHand = async () => {
     if (roomLocked && !isHost) {
       Alert.alert(
         "Oda kilitli",
@@ -5035,14 +4972,23 @@ function Room({
     }
     const nextState = !handRaised;
     setHandRaised(nextState);
+    if (room.persisted) {
+      try {
+        await setRoomHandRaise({ roomId: room.id, raised: nextState });
+      } catch {
+        setHandRaised(!nextState);
+        Alert.alert("İstek gönderilemedi", "Bağlantını kontrol edip tekrar dene.");
+        return;
+      }
+    }
     setMessages((current) => [
       ...current,
       {
         id: `hand-${Date.now()}`,
         system: true,
         text: nextState
-          ? "Konusma istegin ev sahibine iletildi."
-          : "Konusma istegin geri cekildi.",
+          ? "Koltuk isteğin ev sahibine iletildi."
+          : "Koltuk isteğin geri çekildi.",
       },
     ]);
   };
@@ -5285,7 +5231,10 @@ function Room({
               {room.title}
             </Text>
           </View>
-          <IconButton icon="ellipsis-horizontal" onPress={handleOpenSettings} />
+          <View style={styles.roomHeaderActions}>
+            <IconButton icon="ellipsis-horizontal" onPress={handleOpenSettings} />
+            <IconButton icon="exit-outline" onPress={leaveRoom} />
+          </View>
         </View>
         <View style={styles.liveActionBar}>
           <Pressable
@@ -5343,37 +5292,6 @@ function Room({
             </View>
           )}
         </View>
-        <Pressable
-          disabled={liveVoice.status !== "error"}
-          onPress={liveVoice.reconnect}
-          style={[styles.roomVoiceStatus, voiceStatusInfo.style]}
-          accessibilityRole={liveVoice.status === "error" ? "button" : undefined}
-          accessibilityLabel={
-            liveVoice.status === "error"
-              ? "Ses bağlantısını yeniden dene"
-              : undefined
-          }
-        >
-          <Ionicons
-            name={voiceStatusInfo.icon}
-            size={17}
-            color={COLORS.primary}
-          />
-          <View style={styles.roomVoiceStatusCopy}>
-            <Text style={styles.roomVoiceStatusTitle}>
-              {voiceStatusInfo.title}
-            </Text>
-            <Text numberOfLines={1} style={styles.roomVoiceStatusDescription}>
-              {voiceStatusInfo.description}
-            </Text>
-          </View>
-          {liveVoice.status === "error" ? (
-            <View style={styles.roomVoiceRetry}>
-              <Ionicons name="refresh" size={17} color={COLORS.primary} />
-              <Text style={styles.roomVoiceRetryText}>Yeniden dene</Text>
-            </View>
-          ) : null}
-        </Pressable>
         <LiveParticipantList
           participants={activeRoomParticipants}
           canModerate={canModerate}
@@ -5420,9 +5338,8 @@ function Room({
                   ))}
                 </View>
               </View>
-              {roomSeatParticipants.length ? (
-                <View style={styles.seatGrid}>
-                  {roomSeatParticipants.map((participant) => (
+              <View style={styles.seatGrid}>
+                  {[...roomSeatParticipants, ...Array.from({ length: Math.max(0, 7 - roomSeatParticipants.length) })].map((participant, index) => participant ? (
                     <View style={styles.seat} key={participant.userId}>
                       <View
                         style={[
@@ -5441,22 +5358,27 @@ function Room({
                         )}
                       </View>
                       <Text style={styles.seatName} numberOfLines={1}>
-                        {participant.name}
+                        {participant.pendingSeat ? "İsteğin sırada" : participant.name}
                       </Text>
                     </View>
+                  ) : (
+                    <Pressable
+                      key={`empty-seat-${index}`}
+                      style={[styles.seat, styles.emptySeat]}
+                      onPress={toggleHand}
+                      accessibilityRole="button"
+                      accessibilityLabel="Boş koltuğa oturma isteği gönder"
+                    >
+                      <View style={styles.emptySeatAvatar}>
+                        <Ionicons name="add" size={20} color={COLORS.primary} />
+                      </View>
+                      <Text style={styles.seatName}>Boş koltuk</Text>
+                    </Pressable>
                   ))}
                 </View>
-              ) : (
-                <View style={styles.emptyStage}>
-                  <View style={styles.emptyStageIcon}>
-                    <Ionicons name="mic-outline" size={20} color={COLORS.primary} />
-                  </View>
-                  <Text style={styles.emptyStageTitle}>Sahne seni bekliyor</Text>
-                  <Text style={styles.emptyStageText}>
-                    Konuşmak için el kaldır; katılanlar burada görünür.
-                  </Text>
-                </View>
-              )}
+              <Text style={styles.stageHint}>
+                Dinleyici olarak katılabilirsin. Konuşmak için boş bir koltuğa dokun.
+              </Text>
             </LinearGradient>
           </View>
           <Pressable
@@ -5504,32 +5426,16 @@ function Room({
             />
           </View>
         </ScrollView>
-        <View style={styles.roomControls}>
-          <RoomControl
-            icon={micOn ? "mic" : "mic-off"}
-            label={micOn ? "Yayinda" : "Mikrofon"}
-            active={micOn}
-            onPress={toggleMicrophone}
-          />
-          <RoomControl
-            icon="volume-high"
-            label="Hoparlor"
-            active={speakerOn}
-            onPress={handleToggleSpeaker}
-          />
-          <RoomControl
-            icon="bar-chart-outline"
-            label="Anket"
-            active={Boolean(roomPoll)}
-            onPress={handleOpenPoll}
-          />
-          <RoomControl icon="share-outline" label="Davet" onPress={shareRoom} />
-          <RoomControl
-            icon="exit-outline"
-            label="Cik"
-            danger
-            onPress={leaveRoom}
-          />
+        <View style={styles.roomFloatingControls}>
+          <Pressable style={[styles.roomFloatingButton, micOn && styles.roomFloatingButtonActive]} onPress={toggleMicrophone} accessibilityLabel="Mikrofon">
+            <Ionicons name={micOn ? "mic" : "mic-off"} size={20} color={micOn ? COLORS.primaryInk : COLORS.text} />
+          </Pressable>
+          <Pressable style={[styles.roomFloatingButton, speakerOn && styles.roomFloatingButtonActive]} onPress={handleToggleSpeaker} accessibilityLabel="Hoparlör">
+            <Ionicons name="volume-high" size={20} color={speakerOn ? COLORS.primaryInk : COLORS.text} />
+          </Pressable>
+          <Pressable style={styles.roomFloatingButton} onPress={handleOpenGift} accessibilityLabel="Hediye gönder">
+            <Ionicons name="gift-outline" size={20} color={COLORS.text} />
+          </Pressable>
         </View>
       </KeyboardAvoidingView>
       <RoomSettingsSheet
@@ -5542,6 +5448,7 @@ function Room({
         onToggleChatLock={toggleChatLock}
         onReportRoom={reportRoom}
         onBlockHost={handleBlockHost}
+        onInvite={shareRoom}
         onDismiss={handleCloseSettings}
       />
       <GiftSheet
@@ -5687,12 +5594,6 @@ const AppSettingsSheet = memo(function AppSettingsSheet({
   onOpenAccount,
 }) {
   const options = [
-    {
-      key: "roomReminders",
-      icon: "calendar-outline",
-      title: "Oda hatirlatmalari",
-      description: "Planladigin odalar yaklasirken bildir",
-    },
     {
       key: "chatNotifications",
       icon: "chatbubble-outline",
@@ -5924,11 +5825,15 @@ export default function App() {
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("discover");
   const [room, setRoom] = useState(null);
-  const [roomJoined, setRoomJoined] = useState(false);
   const [roomPreferences, setRoomPreferences] = useState({
     microphoneEnabled: false,
     speakerEnabled: true,
   });
+
+  useEffect(() => {
+    clearAllReminders().catch(() => undefined);
+    AsyncStorage.removeItem(REMINDER_ROOM_IDS_KEY).catch(() => undefined);
+  }, []);
   const [createOpen, setCreateOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
@@ -6290,6 +6195,17 @@ export default function App() {
     };
     if (supabase && authSession?.user) {
       try {
+        const existingRoom = await getHostedRoom(authSession.user.id);
+        if (existingRoom) {
+          const liveRoom = await setRemoteRoomPresence(existingRoom.id, true);
+          setRooms((currentRooms) => [
+            liveRoom,
+            ...currentRooms.filter((item) => item.id !== liveRoom.id),
+          ]);
+          setCreateOpen(false);
+          openRoom(liveRoom);
+          return;
+        }
         const savedRoom = await createRemoteRoom({
           room: userRoom,
           userId: authSession.user.id,
@@ -6827,10 +6743,44 @@ export default function App() {
       ).catch(() => undefined);
       return nextRecentRooms;
     });
-    setRoomJoined(false);
     setRoomPreferences({ microphoneEnabled: false, speakerEnabled: true });
     setRoom(nextRoom);
   };
+
+  const setHostRoomPresence = useCallback(
+    async (roomId, isActive) => {
+      if (!supabase || !authSession?.user) return;
+      const updatedRoom = await setRemoteRoomPresence(roomId, isActive);
+      setRooms((currentRooms) =>
+        isActive
+          ? [updatedRoom, ...currentRooms.filter((item) => item.id !== roomId)]
+          : currentRooms.filter((item) => item.id !== roomId),
+      );
+      setRoom((currentRoom) =>
+        currentRoom?.id === roomId ? updatedRoom : currentRoom,
+      );
+    },
+    [authSession?.user],
+  );
+
+  useEffect(() => {
+    if (!supabase || !authSession?.user) return undefined;
+    let active = true;
+    const refreshLiveRooms = () =>
+      listRooms("live")
+        .then((liveRooms) => {
+          if (active) setRooms(liveRooms);
+        })
+        .catch(() => undefined);
+    const channel = supabase
+      .channel("live-room-discovery")
+      .on("postgres_changes", { event: "*", schema: "public", table: "rooms" }, refreshLiveRooms)
+      .subscribe();
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
+  }, [authSession?.user?.id]);
 
   useEffect(() => {
     if (Platform.OS === "web" || !authSession?.user) return undefined;
@@ -6868,7 +6818,9 @@ export default function App() {
   }, [authSession?.user?.id]);
 
   const leaveCurrentRoom = () => {
-    setRoomJoined(false);
+    if (room?.persisted && room.hostId === authSession?.user?.id) {
+      setHostRoomPresence(room.id, false).catch(() => undefined);
+    }
     setRoom(null);
   };
 
@@ -7221,7 +7173,6 @@ export default function App() {
   if (room)
     return (
       <View style={styles.app}>
-        {roomJoined ? (
           <Room
             room={room}
             profile={profile}
@@ -7235,19 +7186,8 @@ export default function App() {
             onToggleFollowHost={toggleFollowHost}
             initialSpeakerOn={roomPreferences.speakerEnabled}
             initialMicrophoneOn={roomPreferences.microphoneEnabled}
+            onHostPresenceChange={setHostRoomPresence}
           />
-        ) : (
-          <RoomLobby
-            room={room}
-            profile={profile}
-            autoJoinMuted={appSettings.autoJoinMuted}
-            onLeave={leaveCurrentRoom}
-            onJoin={(preferences) => {
-              setRoomPreferences(preferences);
-              setRoomJoined(true);
-            }}
-          />
-        )}
       </View>
     );
 
@@ -7258,18 +7198,12 @@ export default function App() {
         profile={profile}
         favoriteRoomIds={favoriteRoomIds}
         recentRoomIds={recentRoomIds}
-        scheduledRooms={scheduledRooms}
-        reminderRoomIds={reminderRoomIds}
         notificationCount={notifications.length}
         currentUserId={authSession?.user?.id}
         onOpenNotifications={handleOpenNotifications}
         onOpenRoom={openRoom}
         onCreate={handleOpenCreate}
-        onOpenSchedule={handleOpenSchedule}
         onToggleFavorite={toggleFavorite}
-        onToggleReminder={toggleReminder}
-        onCancelScheduledRoom={cancelScheduledRoom}
-        onStartScheduledRoom={startScheduledRoom}
       />
     ),
     inbox: (
@@ -7308,11 +7242,6 @@ export default function App() {
         visible={createOpen}
         onDismiss={handleCloseCreate}
         onCreate={createRoom}
-      />
-      <ScheduleRoomSheet
-        visible={scheduleOpen}
-        onDismiss={handleCloseSchedule}
-        onSchedule={scheduleRoom}
       />
       <ProfileEditor
         visible={profileEditorOpen}
@@ -10645,23 +10574,23 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    minHeight: 84,
-    paddingHorizontal: 10,
+    minHeight: 74,
+    paddingHorizontal: 8,
     paddingTop: 10,
-    paddingBottom: Platform.OS === "ios" ? 16 : 10,
+    paddingBottom: 10,
     backgroundColor: "rgba(16,17,28,0.97)",
     borderTopWidth: 1,
     borderTopColor: COLORS.lineSoft,
-    flexDirection: "row",
-    justifyContent: "space-around",
     ...ELEVATION.raised,
   },
+  tabRow: { flex: 1, justifyContent: "space-between" },
   tabItem: {
-    minWidth: 72,
-    minHeight: 54,
+    flex: 1,
+    minWidth: 0,
+    minHeight: 50,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 6,
+    paddingHorizontal: 2,
     borderRadius: 16,
   },
   tabItemActive: {
@@ -10854,4 +10783,45 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginTop: 14,
   },
+  roomHeaderActions: { flexDirection: "row", alignItems: "center", gap: 2 },
+  roomFloatingControls: {
+    position: "absolute",
+    right: 16,
+    bottom: 18,
+    gap: 10,
+    alignItems: "center",
+  },
+  roomFloatingButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(28,31,44,0.96)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    ...ELEVATION.card,
+  },
+  roomFloatingButtonActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  emptySeat: { justifyContent: "flex-start" },
+  emptySeatAvatar: {
+    width: 55,
+    height: 55,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(181,255,120,0.10)",
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "rgba(181,255,120,0.55)",
+  },
+  stageHint: {
+    color: "rgba(255,255,255,0.72)",
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: "center",
+    marginTop: 18,
+  },
+  createRoomSheetScroll: { flexGrow: 0, maxHeight: "92%", width: "100%" },
+  createRoomSheetContent: { flexGrow: 1, justifyContent: "flex-end" },
 });

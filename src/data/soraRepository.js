@@ -39,12 +39,16 @@ export const mapRoom = (room) => {
 
 export const listRooms = async (state = "live") => {
   const client = requireClient();
+  const query = client
+    .from("rooms")
+    .select(ROOM_SELECT)
+    .eq("state", state)
+    .order(state === "scheduled" ? "starts_at" : "created_at", { ascending: state === "scheduled", nullsFirst: false });
+  if (state === "live") {
+    query.gte("last_active_at", new Date(Date.now() - 90_000).toISOString());
+  }
   const [{ data, error }, { data: blocks, error: blocksError }] = await Promise.all([
-    client
-      .from("rooms")
-      .select(ROOM_SELECT)
-      .eq("state", state)
-      .order(state === "scheduled" ? "starts_at" : "created_at", { ascending: state === "scheduled", nullsFirst: false }),
+    query,
     client.from("user_blocks").select("blocked_id"),
   ]);
   throwIfError(error);
@@ -105,6 +109,36 @@ export const deleteRoom = async (roomId) => {
   const client = requireClient();
   const { error } = await client.from("rooms").delete().eq("id", roomId);
   throwIfError(error);
+};
+
+export const getHostedRoom = async (userId) => {
+  const client = requireClient();
+  const { data, error } = await client
+    .from("rooms")
+    .select(ROOM_SELECT)
+    .eq("host_id", userId)
+    .in("state", ["live", "inactive"])
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  throwIfError(error);
+  return data ? mapRoom(data) : null;
+};
+
+export const setRoomPresence = async (roomId, isActive) => {
+  const client = requireClient();
+  const { data, error } = await client
+    .from("rooms")
+    .update({
+      state: isActive ? "live" : "inactive",
+      listener_count: isActive ? 1 : 0,
+      last_active_at: new Date().toISOString(),
+    })
+    .eq("id", roomId)
+    .select(ROOM_SELECT)
+    .single();
+  throwIfError(error);
+  return mapRoom(data);
 };
 
 export const startScheduledRoom = async (roomId) => {

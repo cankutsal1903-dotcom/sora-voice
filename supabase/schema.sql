@@ -68,13 +68,14 @@ create table if not exists public.rooms (
   theme_colors jsonb not null default '["#5140BD", "#252458"]'::jsonb,
   accent_color text not null default '#D698FF',
   listener_count integer not null default 0 check (listener_count >= 0),
-  state text not null default 'live' check (state in ('live', 'scheduled', 'ended')),
+  state text not null default 'live' check (state in ('live', 'scheduled', 'ended', 'inactive')),
   starts_at timestamptz,
   schedule_label text not null default '' check (char_length(schedule_label) <= 48),
   room_locked boolean not null default false,
   chat_locked boolean not null default false,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  last_active_at timestamptz not null default now()
 );
 
 alter table public.rooms add column if not exists schedule_label text not null default '' check (char_length(schedule_label) <= 48);
@@ -82,6 +83,8 @@ alter table public.rooms add column if not exists schedule_label text not null d
 create index if not exists rooms_state_created_at_idx on public.rooms(state, created_at desc);
 create index if not exists rooms_state_starts_at_idx on public.rooms(state, starts_at asc);
 create index if not exists rooms_host_id_idx on public.rooms(host_id);
+create unique index if not exists rooms_one_live_room_per_host_idx on public.rooms(host_id) where state = 'live';
+create index if not exists rooms_live_activity_idx on public.rooms(last_active_at desc) where state = 'live';
 
 alter table public.rooms enable row level security;
 drop policy if exists "Rooms are readable" on public.rooms;
