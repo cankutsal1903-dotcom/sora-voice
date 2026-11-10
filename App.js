@@ -18,7 +18,11 @@ import {
   View,
   FlatList,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaProvider,
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -5762,7 +5766,7 @@ const DataControlsSheet = memo(function DataControlsSheet({
   );
 });
 
-export default function App() {
+function AppContent() {
   const [rooms, setRooms] = useState(SEEDED_ROOMS);
   const [scheduledRooms, setScheduledRooms] = useState(SEEDED_SCHEDULED_ROOMS);
   const [reminderRoomIds, setReminderRoomIds] = useState([]);
@@ -7262,6 +7266,14 @@ export default function App() {
       />
       <Onboarding visible={onboardingOpen} onComplete={completeOnboarding} />
     </View>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AppContent />
+    </SafeAreaProvider>
   );
 }
 
