@@ -803,6 +803,24 @@ function Discover({
           </View>
         </Reveal>
 
+        <Reveal delay={70} distance={10}>
+          <View style={styles.discoverLiveSummary}>
+            <View style={styles.discoverLiveCopy}>
+              <View style={styles.discoverLiveLabel}>
+                <LivePulse size={7} />
+                <Text style={styles.discoverLiveLabelText}>CANLI AKIŞ</Text>
+              </View>
+              <Text style={styles.discoverLiveTitle}>
+                Sohbete bir yerden katıl.
+              </Text>
+            </View>
+            <View style={styles.discoverLiveCount}>
+              <Text style={styles.discoverLiveNumber}>{rooms.length}</Text>
+              <Text style={styles.discoverLiveCountText}>ODA</Text>
+            </View>
+          </View>
+        </Reveal>
+
         <Reveal delay={90}>
           <Pressable
             onPress={() => onOpenRoom(featuredRoom)}
@@ -878,7 +896,7 @@ function Discover({
           </Pressable>
         </Reveal>
 
-        <Text style={styles.sectionTitle}>Nasıl hissettiriyor?</Text>
+        <Text style={styles.sectionTitle}>Sohbetini seç</Text>
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -7488,7 +7506,7 @@ const styles = StyleSheet.create({
     marginTop: 29,
     marginBottom: 12,
   },
-  categoryList: { gap: 8 },
+  categoryList: { gap: 8, paddingRight: 20, paddingBottom: 3 },
   categoryChip: {
     height: 38,
     flexDirection: "row",
@@ -10396,6 +10414,66 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "900",
   },
+  discoverLiveSummary: {
+    minHeight: 94,
+    marginTop: 22,
+    paddingVertical: 16,
+    paddingLeft: 17,
+    paddingRight: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 14,
+    borderRadius: 23,
+    backgroundColor: "#151B29",
+    borderWidth: 1,
+    borderColor: "rgba(181,255,120,0.15)",
+    ...ELEVATION.card,
+  },
+  discoverLiveCopy: { flex: 1, minWidth: 0 },
+  discoverLiveLabel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 7,
+  },
+  discoverLiveLabelText: {
+    color: COLORS.primary,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.1,
+  },
+  discoverLiveTitle: {
+    color: COLORS.text,
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: "900",
+    letterSpacing: -0.35,
+  },
+  discoverLiveCount: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(181,255,120,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(181,255,120,0.20)",
+  },
+  discoverLiveNumber: {
+    color: COLORS.primary,
+    fontSize: 22,
+    lineHeight: 24,
+    fontWeight: "900",
+  },
+  discoverLiveCountText: {
+    color: "rgba(181,255,120,0.72)",
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.9,
+    marginTop: 1,
+  },
+  featurePressable: { marginTop: 13 },
   featureCardModern: {
     minHeight: 244,
     overflow: "hidden",
