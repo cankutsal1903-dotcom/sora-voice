@@ -3895,26 +3895,37 @@ function CreateRoomSheet({ visible, onDismiss, onCreate }) {
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("Sohbet");
   const [description, setDescription] = useState("");
-  const create = () => {
+  const [submitting, setSubmitting] = useState(false);
+  const create = async () => {
+    if (submitting) return;
     const cleanTitle = title.trim();
     if (!cleanTitle) {
       Alert.alert("Oda adı gerekli", "Devam etmek için odana bir ad ver.");
       return;
     }
     const theme = ROOM_THEMES[0];
-    onCreate({
-      id: `room-${Date.now()}`,
-      title: cleanTitle,
-      category,
-      listeners: 1,
-      colors: theme.colors,
-      accent: theme.accent,
-      description:
-        description.trim().slice(0, 90) || "Yeni başlayan bir sohbet.",
-    });
-    setTitle("");
-    setDescription("");
-    setCategory("Sohbet");
+    setSubmitting(true);
+    try {
+      const created = await onCreate({
+        id: `room-${Date.now()}`,
+        title: cleanTitle,
+        category,
+        listeners: 1,
+        colors: theme.colors,
+        accent: theme.accent,
+        description:
+          description.trim().slice(0, 90) || "Yeni başlayan bir sohbet.",
+      });
+      if (created) {
+        setTitle("");
+        setDescription("");
+        setCategory("Sohbet");
+      }
+    } catch {
+      Alert.alert("Oda oluşturulamadı", "Bağlantıyı kontrol edip tekrar dene.");
+    } finally {
+      setSubmitting(false);
+    }
   };
   return (
     <Modal
@@ -3981,12 +3992,14 @@ function CreateRoomSheet({ visible, onDismiss, onCreate }) {
             maxLength={90}
             multiline
           />
-          <Pressable onPress={create}>
+          <Pressable onPress={create} disabled={submitting}>
             <LinearGradient
               colors={BRAND_GRADIENT}
               style={styles.createSubmit}
             >
-              <Text style={styles.createSubmitText}>Odayı oluştur</Text>
+              <Text style={styles.createSubmitText}>
+                {submitting ? "Oda açılıyor..." : "Odayı oluştur"}
+              </Text>
               <Ionicons
                 name="arrow-forward"
                 size={20}
@@ -4470,6 +4483,11 @@ function Room({
     [activeRoomParticipants, handRaised, isHost, profile.color, profile.name, room.hostId, userId],
   );
   const micOn = liveVoice.enabled && liveVoice.microphoneEnabled;
+  const roomVoiceLabel = liveVoice.status === "connected"
+    ? "CANLI"
+    : liveVoice.status === "connecting" || liveVoice.status === "reconnecting"
+      ? "SES BAĞLANIYOR"
+      : "SES BAĞLANTISI YOK";
   const voiceStatusInfo =
     liveVoice.status === "connected"
       ? {
@@ -4636,6 +4654,12 @@ function Room({
     if (!isHost || !room.persisted || !onHostPresenceChange) return undefined;
     const setPresence = (isActive) =>
       onHostPresenceChange(room.id, isActive).catch(() => undefined);
+    if (liveVoice.status !== "connected") {
+      if (["error", "disconnected", "local"].includes(liveVoice.status)) {
+        setPresence(false);
+      }
+      return undefined;
+    }
     setPresence(true);
     const heartbeat = setInterval(() => setPresence(true), 20_000);
     const subscription = AppState.addEventListener("change", (nextState) => {
@@ -4646,7 +4670,7 @@ function Room({
       subscription.remove();
       setPresence(false);
     };
-  }, [isHost, onHostPresenceChange, room.id, room.persisted]);
+  }, [isHost, liveVoice.status, onHostPresenceChange, room.id, room.persisted]);
 
   useEffect(() => {
     if (!messagesReady || room.persisted) return;
@@ -5067,7 +5091,7 @@ function Room({
             </View>
             <View style={styles.roomHeaderText}>
               <Text style={styles.roomHeaderEyebrow} numberOfLines={1}>
-                {room.category.toUpperCase()} · CANLI
+                {room.category.toUpperCase()} · {roomVoiceLabel}
               </Text>
               <Text style={styles.roomHeaderTitle} numberOfLines={1}>
                 {room.title}
@@ -5097,6 +5121,18 @@ function Room({
             />
           </View>
         </View>
+        {liveVoice.status === "error" && (
+          <View style={[styles.roomVoiceStatus, voiceStatusInfo.style]}>
+            <Ionicons name={voiceStatusInfo.icon} size={18} color={COLORS.text} />
+            <View style={styles.roomVoiceStatusCopy}>
+              <Text style={styles.roomVoiceStatusTitle}>{voiceStatusInfo.title}</Text>
+              <Text style={styles.roomVoiceStatusDescription}>{voiceStatusInfo.description}</Text>
+            </View>
+            <Pressable style={styles.roomVoiceRetry} onPress={liveVoice.reconnect}>
+              <Text style={styles.roomVoiceRetryText}>Yeniden dene</Text>
+            </Pressable>
+          </View>
+        )}
         <ScrollView
           contentContainerStyle={styles.roomScroll}
           keyboardShouldPersistTaps="handled"
@@ -5115,8 +5151,12 @@ function Room({
               <View style={styles.roomHeroHalo} />
               <View style={styles.roomStageTopRow}>
                 <View style={styles.roomLive}>
-                  <LivePulse size={6} />
-                  <Text style={styles.roomLiveText}>CANLI · {Math.max(liveVoice.participantCount, activeRoomParticipants.length)} KİŞİ</Text>
+                  {liveVoice.status === "connected" ? <LivePulse size={6} /> : null}
+                  <Text style={styles.roomLiveText}>
+                    {liveVoice.status === "connected"
+                      ? `CANLI · ${Math.max(liveVoice.participantCount, activeRoomParticipants.length)} KİŞİ`
+                      : roomVoiceLabel}
+                  </Text>
                 </View>
                 <View style={styles.roomStageSignature}>
                   <AudioBars color="rgba(255,255,255,0.74)" />
@@ -5980,6 +6020,34 @@ function AppContent() {
     });
   };
 
+  const resumeHostedRoom = async (existingRoom) => {
+    try {
+      const liveRoom = existingRoom.state === "live"
+        ? existingRoom
+        : await setRemoteRoomPresence(existingRoom.id, true);
+      setRooms((currentRooms) => [
+        liveRoom,
+        ...currentRooms.filter((item) => item.id !== liveRoom.id),
+      ]);
+      setCreateOpen(false);
+      openRoom(liveRoom);
+    } catch (error) {
+      console.error("Room resume failed", error);
+      Alert.alert("Odaya girilemedi", "Bağlantıyı kontrol edip tekrar dene.");
+    }
+  };
+
+  const promptHostedRoom = (existingRoom) => {
+    Alert.alert(
+      "Zaten bir odan var",
+      `“${existingRoom.title}” odana dönebilirsin. Aynı anda yalnızca bir odan olabilir.`,
+      [
+        { text: "Vazgeç", style: "cancel" },
+        { text: "Odama dön", onPress: () => { resumeHostedRoom(existingRoom); } },
+      ],
+    );
+  };
+
   const createRoom = async (newRoom) => {
     const userRoom = {
       ...newRoom,
@@ -5991,16 +6059,8 @@ function AppContent() {
       try {
         const existingRoom = await getHostedRoom(authSession.user.id);
         if (existingRoom) {
-          const liveRoom = existingRoom.state === "live"
-            ? existingRoom
-            : await setRemoteRoomPresence(existingRoom.id, true);
-          setRooms((currentRooms) => [
-            liveRoom,
-            ...currentRooms.filter((item) => item.id !== liveRoom.id),
-          ]);
-          setCreateOpen(false);
-          openRoom(liveRoom);
-          return;
+          promptHostedRoom(existingRoom);
+          return false;
         }
         const savedRoom = await createRemoteRoom({
           room: userRoom,
@@ -6012,14 +6072,15 @@ function AppContent() {
         ]);
         setCreateOpen(false);
         openRoom(savedRoom);
+        return true;
       } catch (error) {
         console.error("Room creation failed", error);
         Alert.alert(
           "Oda oluşturulamadı",
           "Bağlantıyı kontrol edip tekrar dene.",
         );
+        return false;
       }
-      return;
     }
     setRooms((currentRooms) => {
       const storedRooms = [
@@ -6033,6 +6094,7 @@ function AppContent() {
     });
     setCreateOpen(false);
     openRoom(userRoom);
+    return true;
   };
 
   const activateReminder = async (scheduledRoom) => {
@@ -6898,7 +6960,22 @@ function AppContent() {
     () => setNotificationsOpen(true),
     [],
   );
-  const handleOpenCreate = useCallback(() => setCreateOpen(true), []);
+  const handleOpenCreate = async () => {
+    if (supabase && authSession?.user) {
+      try {
+        const existingRoom = await getHostedRoom(authSession.user.id);
+        if (existingRoom) {
+          promptHostedRoom(existingRoom);
+          return;
+        }
+      } catch (error) {
+        console.error("Room lookup failed", error);
+        Alert.alert("Odalar yüklenemedi", "Bağlantıyı kontrol edip tekrar dene.");
+        return;
+      }
+    }
+    setCreateOpen(true);
+  };
   const handleOpenSchedule = useCallback(() => setScheduleOpen(true), []);
   const handleOpenProfileEditor = useCallback(
     () => setProfileEditorOpen(true),
