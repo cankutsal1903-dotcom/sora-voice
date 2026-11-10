@@ -3783,6 +3783,7 @@ const LiveParticipantList = memo(function LiveParticipantList({
   onModerate,
   onReport,
   onBlock,
+  compact = false,
 }) {
   const [visible, setVisible] = useState(false);
   const [workingId, setWorkingId] = useState(null);
@@ -3808,34 +3809,48 @@ const LiveParticipantList = memo(function LiveParticipantList({
   if (participants.length === 0) return null;
   return (
     <>
-      <Pressable onPress={() => setVisible(true)} style={styles.audienceBar}>
-        <View style={styles.audienceAvatars}>
-          {participants.slice(0, 4).map((participant, index) => (
-            <View
-              key={participant.userId}
-              style={[
-                styles.audienceAvatar,
-                {
-                  backgroundColor: participant.color,
-                  marginLeft: index ? -8 : 0,
-                },
-              ]}
-            >
-              <Text style={styles.audienceInitial}>
-                {participant.name.charAt(0).toUpperCase()}
+      <Pressable
+        onPress={() => setVisible(true)}
+        accessibilityRole="button"
+        accessibilityLabel={`${participants.length} katılımcıyı gör`}
+        style={compact ? styles.roomAudienceButton : styles.audienceBar}
+      >
+        {compact ? (
+          <>
+            <Ionicons name="people-outline" size={17} color={COLORS.primary} />
+            <Text style={styles.roomAudienceCount}>{participants.length}</Text>
+          </>
+        ) : (
+          <>
+            <View style={styles.audienceAvatars}>
+              {participants.slice(0, 4).map((participant, index) => (
+                <View
+                  key={participant.userId}
+                  style={[
+                    styles.audienceAvatar,
+                    {
+                      backgroundColor: participant.color,
+                      marginLeft: index ? -8 : 0,
+                    },
+                  ]}
+                >
+                  <Text style={styles.audienceInitial}>
+                    {participant.name.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              ))}
+            </View>
+            <View style={styles.audienceCopy}>
+              <Text style={styles.audienceTitle}>
+                Odada {participants.length} kişi
+              </Text>
+              <Text style={styles.audienceSubtitle}>
+                Katılımcıları ve rolleri gör
               </Text>
             </View>
-          ))}
-        </View>
-        <View style={styles.audienceCopy}>
-          <Text style={styles.audienceTitle}>
-            Odada {participants.length} kişi
-          </Text>
-          <Text style={styles.audienceSubtitle}>
-            Katılımcıları ve rolleri gör
-          </Text>
-        </View>
-        <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
+            <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
+          </>
+        )}
       </Pressable>
       <Modal
         transparent
@@ -4527,13 +4542,9 @@ function Room({
 }) {
   const [speakerOn, setSpeakerOn] = useState(initialSpeakerOn);
   const [handRaised, setHandRaised] = useState(false);
-  const [reactions, setReactions] = useState({ "👏": 2, "❤️": 4, "🔥": 1 });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState(null);
   const [giftOpen, setGiftOpen] = useState(false);
-  const [pollOpen, setPollOpen] = useState(false);
-  const [roomPoll, setRoomPoll] = useState(null);
-  const [selectedPollOption, setSelectedPollOption] = useState(null);
   const [roomLocked, setRoomLocked] = useState(Boolean(room.roomLocked));
   const [chatLocked, setChatLocked] = useState(Boolean(room.chatLocked));
   const isHost = room.hostId
@@ -4822,11 +4833,9 @@ function Room({
     () => setSpeakerOn((value) => !value),
     [],
   );
-  const handleOpenPoll = useCallback(() => setPollOpen(true), []);
   const handleOpenSettings = useCallback(() => setSettingsOpen(true), []);
   const handleOpenGift = useCallback(() => setGiftOpen(true), []);
   const handleCloseGift = useCallback(() => setGiftOpen(false), []);
-  const handleClosePoll = useCallback(() => setPollOpen(false), []);
   const handleCloseSettings = useCallback(() => setSettingsOpen(false), []);
   const handleCloseReport = useCallback(() => setReportTarget(null), []);
   const handleSendGiftFromSheet = useCallback(
@@ -5009,37 +5018,6 @@ function Room({
           : "Koltuk isteğin geri çekildi.",
       },
     ]);
-  };
-
-  const addReaction = (emoji) =>
-    setReactions((current) => ({
-      ...current,
-      [emoji]: (current[emoji] || 0) + 1,
-    }));
-
-  const createPoll = (poll) => {
-    setRoomPoll(poll);
-    setSelectedPollOption(null);
-    setMessages((current) => [
-      ...current,
-      {
-        id: `poll-${Date.now()}`,
-        system: true,
-        text: `Yeni anket basladi: ${poll.question}`,
-      },
-    ]);
-    setPollOpen(false);
-  };
-
-  const votePoll = (optionIndex) => {
-    if (selectedPollOption !== null || !roomPoll) return;
-    setRoomPoll((currentPoll) => ({
-      ...currentPoll,
-      votes: currentPoll.votes.map((count, index) =>
-        index === optionIndex ? count + 1 : count,
-      ),
-    }));
-    setSelectedPollOption(optionIndex);
   };
 
   const toggleRoomLock = () =>
@@ -5240,85 +5218,47 @@ function Room({
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <View style={styles.roomHeader}>
-          <IconButton icon="chevron-back" onPress={leaveRoom} />
-          <View style={styles.roomHeaderText}>
-            <Text style={styles.roomHeaderEyebrow}>
-              {room.category.toUpperCase()} · CANLI ODA
-            </Text>
-            <Text style={styles.roomHeaderTitle} numberOfLines={1}>
-              {room.title}
-            </Text>
+          <View style={styles.roomIdentity}>
+            <View style={styles.roomIdentityAvatar}>
+              <Avatar
+                label={room.initials}
+                color={room.accent}
+                size={36}
+                bordered
+              />
+            </View>
+            <View style={styles.roomHeaderText}>
+              <Text style={styles.roomHeaderEyebrow} numberOfLines={1}>
+                {room.category.toUpperCase()} · CANLI
+              </Text>
+              <Text style={styles.roomHeaderTitle} numberOfLines={1}>
+                {room.title}
+              </Text>
+            </View>
           </View>
           <View style={styles.roomHeaderActions}>
-            <IconButton icon="ellipsis-horizontal" onPress={handleOpenSettings} />
-            <IconButton icon="exit-outline" onPress={leaveRoom} />
+            <LiveParticipantList
+              compact
+              participants={activeRoomParticipants}
+              canModerate={canModerate}
+              isHost={isHost}
+              currentUserId={userId}
+              onModerate={manageParticipant}
+              onReport={reportParticipant}
+              onBlock={blockParticipant}
+            />
+            <IconButton
+              icon="ellipsis-horizontal"
+              onPress={handleOpenSettings}
+              accessibilityLabel="Oda seçenekleri"
+            />
+            <IconButton
+              icon="exit-outline"
+              onPress={leaveRoom}
+              accessibilityLabel="Odadan çık"
+            />
           </View>
         </View>
-        <View style={styles.liveActionBar}>
-          <Pressable
-            onPress={toggleHand}
-            style={[styles.handStatus, handRaised && styles.handStatusActive]}
-          >
-            <Ionicons
-              name={handRaised ? "hand-left" : "hand-left-outline"}
-              size={15}
-              color={handRaised ? COLORS.primaryInk : COLORS.primary}
-            />
-            <Text
-              style={[
-                styles.handStatusText,
-                handRaised && styles.handStatusTextActive,
-              ]}
-            >
-              {handRaised ? "Elin sirada" : "El kaldir"}
-            </Text>
-          </Pressable>
-          {room.hostId && !isHost ? (
-            <Pressable
-              onPress={onToggleFollowHost}
-              style={[
-                styles.followHostButton,
-                isFollowingHost && styles.followHostButtonActive,
-              ]}
-            >
-              <Ionicons
-                name={isFollowingHost ? "heart" : "heart-outline"}
-                size={14}
-                color={isFollowingHost ? COLORS.primaryInk : COLORS.primary}
-              />
-              <Text
-                style={[
-                  styles.followHostText,
-                  isFollowingHost && styles.followHostTextActive,
-                ]}
-              >
-                {isFollowingHost ? "Takiptesin" : "Takip et"}
-              </Text>
-            </Pressable>
-          ) : (
-            <View style={styles.reactionTray}>
-              {Object.entries(reactions).map(([emoji, count]) => (
-                <Pressable
-                  key={emoji}
-                  onPress={() => addReaction(emoji)}
-                  style={styles.reactionButton}
-                >
-                  <Text style={styles.reactionEmoji}>{emoji}</Text>
-                  <Text style={styles.reactionCount}>{count}</Text>
-                </Pressable>
-              ))}
-            </View>
-          )}
-        </View>
-        <LiveParticipantList
-          participants={activeRoomParticipants}
-          canModerate={canModerate}
-          isHost={isHost}
-          currentUserId={userId}
-          onModerate={manageParticipant}
-          onReport={reportParticipant}
-          onBlock={blockParticipant}
-        />
         <ScrollView
           contentContainerStyle={styles.roomScroll}
           keyboardShouldPersistTaps="handled"
@@ -5334,10 +5274,16 @@ function Room({
               ]}
             >
               <View style={styles.roomHeroOrb} />
-                <Text style={styles.roomLive}>
-                  <Text style={styles.liveDot}>●</Text>{" "}
-                  {Math.max(liveVoice.participantCount, activeRoomParticipants.length)} kişi bağlı
-                </Text>
+              <View style={styles.roomHeroHalo} />
+              <View style={styles.roomStageTopRow}>
+                <View style={styles.roomLive}>
+                  <LivePulse size={6} />
+                  <Text style={styles.roomLiveText}>CANLI · {Math.max(liveVoice.participantCount, activeRoomParticipants.length)} KİŞİ</Text>
+                </View>
+                <View style={styles.roomStageSignature}>
+                  <AudioBars color="rgba(255,255,255,0.74)" />
+                </View>
+              </View>
               <View style={styles.hostArea}>
                 <View style={styles.hostCrown}>
                   <Ionicons name="sparkles" size={16} color="#FFD86B" />
@@ -5345,82 +5291,83 @@ function Room({
                 <Avatar
                   label={room.initials}
                   color="#E8C477"
-                  size={84}
+                  size={78}
                   bordered
                 />
                 <Text style={styles.hostName}>{room.host}</Text>
-                <Text style={styles.hostRole}>EV SAHIBI</Text>
+                <Text style={styles.hostRole}>ODAYI YÖNETİYOR</Text>
                 <View style={styles.voiceMeter}>
                   {[13, 23, 16, 28, 18, 11].map((height, index) => (
                     <View key={index} style={[styles.meterBar, { height }]} />
                   ))}
                 </View>
+                {room.hostId && !isHost && (
+                  <Pressable
+                    onPress={onToggleFollowHost}
+                    style={[
+                      styles.stageFollowButton,
+                      isFollowingHost && styles.stageFollowButtonActive,
+                    ]}
+                  >
+                    <Ionicons
+                      name={isFollowingHost ? "heart" : "heart-outline"}
+                      size={13}
+                      color={isFollowingHost ? COLORS.primaryInk : "#FFFFFF"}
+                    />
+                    <Text
+                      style={[
+                        styles.stageFollowText,
+                        isFollowingHost && styles.stageFollowTextActive,
+                      ]}
+                    >
+                      {isFollowingHost ? "Takiptesin" : "Takip et"}
+                    </Text>
+                  </Pressable>
+                )}
               </View>
               <View style={styles.seatGrid}>
-                  {[...roomSeatParticipants, ...Array.from({ length: Math.max(0, 7 - roomSeatParticipants.length) })].map((participant, index) => participant ? (
-                    <View style={styles.seat} key={participant.userId}>
-                      <View
-                        style={[
-                          styles.seatAvatar,
-                          { backgroundColor: participant.color },
-                          participant.microphoneEnabled && styles.seatAvatarSpeaking,
-                        ]}
-                      >
-                        <Text style={styles.seatInitial}>
-                          {participant.name?.charAt(0)?.toUpperCase() || "?"}
-                        </Text>
-                        {!participant.microphoneEnabled && (
-                          <View style={styles.seatMuted}>
-                            <Ionicons name="mic-off" size={10} color={COLORS.pink} />
-                          </View>
-                        )}
-                      </View>
-                      <Text style={styles.seatName} numberOfLines={1}>
-                        {participant.pendingSeat ? "İsteğin sırada" : participant.name}
-                      </Text>
-                    </View>
-                  ) : (
-                    <Pressable
-                      key={`empty-seat-${index}`}
-                      style={[styles.seat, styles.emptySeat]}
-                      onPress={toggleHand}
-                      accessibilityRole="button"
-                      accessibilityLabel="Boş koltuğa oturma isteği gönder"
+                {[...roomSeatParticipants, ...Array.from({ length: Math.max(0, 7 - roomSeatParticipants.length) })].map((participant, index) => participant ? (
+                  <View style={styles.seat} key={participant.userId}>
+                    <View
+                      style={[
+                        styles.seatAvatar,
+                        { backgroundColor: participant.color },
+                        participant.microphoneEnabled && styles.seatAvatarSpeaking,
+                      ]}
                     >
-                      <View style={styles.emptySeatAvatar}>
-                        <Ionicons name="add" size={20} color={COLORS.primary} />
-                      </View>
-                      <Text style={styles.seatName}>Boş koltuk</Text>
-                    </Pressable>
-                  ))}
-                </View>
+                      <Text style={styles.seatInitial}>
+                        {participant.name?.charAt(0)?.toUpperCase() || "?"}
+                      </Text>
+                      {!participant.microphoneEnabled && (
+                        <View style={styles.seatMuted}>
+                          <Ionicons name="mic-off" size={10} color={COLORS.pink} />
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.seatName} numberOfLines={1}>
+                      {participant.pendingSeat ? "İsteğin sırada" : participant.name}
+                    </Text>
+                  </View>
+                ) : (
+                  <Pressable
+                    key={`empty-seat-${index}`}
+                    style={[styles.seat, styles.emptySeat]}
+                    onPress={toggleHand}
+                    accessibilityRole="button"
+                    accessibilityLabel="Boş koltuğa oturma isteği gönder"
+                  >
+                    <View style={styles.emptySeatAvatar}>
+                      <Ionicons name="add" size={20} color={COLORS.primary} />
+                    </View>
+                    <Text style={styles.seatName}>Boş koltuk</Text>
+                  </Pressable>
+                ))}
+              </View>
               <Text style={styles.stageHint}>
                 Dinleyici olarak katılabilirsin. Konuşmak için boş bir koltuğa dokun.
               </Text>
             </LinearGradient>
           </View>
-          <Pressable
-            onPress={toggleHand}
-            style={[styles.raiseHand, handRaised && styles.raiseHandActive]}
-            accessibilityRole="button"
-            accessibilityLabel={
-              handRaised ? "Konuşma isteğini geri çek" : "Konuşmak için el kaldır"
-            }
-          >
-            <Ionicons
-              name={handRaised ? "checkmark-circle" : "hand-left-outline"}
-              size={17}
-              color={handRaised ? COLORS.primaryInk : COLORS.primary}
-            />
-            <Text
-              style={[
-                styles.raiseHandText,
-                handRaised && styles.raiseHandTextActive,
-              ]}
-            >
-              {handRaised ? "İsteğin gönderildi" : "Konuşmak için el kaldır"}
-            </Text>
-          </Pressable>
           <View style={styles.chatPanel}>
             <View style={styles.chatPanelHead}>
               <View>
@@ -5474,15 +5421,6 @@ function Room({
         coins={coins}
         onDismiss={handleCloseGift}
         onSend={handleSendGiftFromSheet}
-      />
-      <PollSheet
-        visible={pollOpen}
-        poll={roomPoll}
-        isHost={isHost}
-        hasVoted={selectedPollOption !== null}
-        onDismiss={handleClosePoll}
-        onCreate={createPoll}
-        onVote={votePoll}
       />
       <ReportSheet target={reportTarget} onDismiss={handleCloseReport} />
     </SafeAreaView>
@@ -9981,22 +9919,65 @@ const styles = StyleSheet.create({
     opacity: 0.82,
   },
   roomHeader: {
-    height: 68,
-    paddingHorizontal: 16,
+    minHeight: 72,
+    paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#151722",
+    backgroundColor: "#0F1220",
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.05)",
+    borderBottomColor: "rgba(255,255,255,0.07)",
   },
-  roomHeaderText: { alignItems: "center", flex: 1, marginHorizontal: 12 },
+  roomIdentity: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  roomIdentityAvatar: {
+    width: 42,
+    height: 42,
+    padding: 3,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  roomHeaderText: {
+    alignItems: "flex-start",
+    flex: 1,
+    minWidth: 0,
+    marginLeft: 10,
+    marginRight: 8,
+  },
+  roomHeaderEyebrow: {
+    color: "#B9FF7A",
+    fontSize: 8,
+    letterSpacing: 1.15,
+    fontWeight: "900",
+    marginBottom: 3,
+  },
   roomHeaderTitle: {
-    color: COLORS.text,
-    fontSize: 14,
+    color: "#FFFFFF",
+    fontSize: 14.5,
     fontWeight: "900",
     letterSpacing: -0.2,
   },
+  roomHeaderActions: { flexDirection: "row", alignItems: "center", gap: 2 },
+  roomAudienceButton: {
+    minWidth: 42,
+    height: 38,
+    paddingHorizontal: 9,
+    gap: 4,
+    borderRadius: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(185,255,122,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(185,255,122,0.20)",
+  },
+  roomAudienceCount: { color: "#E7FFD1", fontSize: 11, fontWeight: "900" },
   liveActionBar: {
     minHeight: 55,
     paddingHorizontal: 16,
@@ -10032,42 +10013,70 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.05)",
   },
-  roomScroll: { paddingHorizontal: 16, paddingTop: 13, paddingBottom: 16 },
+  roomScroll: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 116 },
   roomHero: {
-    borderRadius: 28,
+    borderRadius: 30,
     overflow: "hidden",
+    ...ELEVATION.card,
   },
   roomHeroGradient: {
-    minHeight: 392,
-    padding: 19,
+    minHeight: 440,
+    padding: 17,
     overflow: "hidden",
     position: "relative",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(255,255,255,0.16)",
   },
-  roomHeroGradientEmpty: { minHeight: 344 },
+  roomHeroGradientEmpty: { minHeight: 420 },
   roomHeroOrb: {
-    width: 315,
-    height: 315,
-    borderRadius: 158,
-    backgroundColor: "rgba(220,196,255,0.17)",
+    width: 360,
+    height: 360,
+    borderRadius: 180,
+    backgroundColor: "rgba(207,255,143,0.14)",
     position: "absolute",
-    top: -116,
-    left: "7%",
+    top: -155,
+    left: "-12%",
+  },
+  roomHeroHalo: {
+    width: 235,
+    height: 235,
+    borderRadius: 118,
+    backgroundColor: "rgba(119,101,255,0.21)",
+    position: "absolute",
+    right: -92,
+    bottom: 64,
+  },
+  roomStageTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   roomLive: {
-    alignSelf: "center",
-    overflow: "hidden",
-    color: "#F2F0FB",
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 0.9,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 11,
-    backgroundColor: "rgba(13,15,27,0.24)",
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: "rgba(10,13,25,0.28)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.13)",
   },
-  hostArea: { alignItems: "center", marginTop: 18, paddingBottom: 10 },
+  roomLiveText: {
+    color: "#F5F5FA",
+    fontSize: 9,
+    letterSpacing: 0.9,
+    fontWeight: "900",
+  },
+  roomStageSignature: {
+    height: 32,
+    minWidth: 62,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    justifyContent: "center",
+    backgroundColor: "rgba(10,13,25,0.18)",
+  },
+  hostArea: { alignItems: "center", marginTop: 12, paddingBottom: 6 },
   hostCrown: {
     width: 29,
     height: 29,
@@ -10088,7 +10097,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   hostRole: {
-    color: "#EEE7FF",
+    color: "rgba(255,255,255,0.76)",
     fontSize: 9,
     letterSpacing: 1.25,
     fontWeight: "900",
@@ -10105,22 +10114,40 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(15,16,27,0.21)",
   },
   meterBar: { width: 3, borderRadius: 3, backgroundColor: "#D4FF89" },
+  stageFollowButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 11,
+    backgroundColor: "rgba(8,11,23,0.25)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+  stageFollowButtonActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  stageFollowText: { color: "#FFFFFF", fontSize: 10, fontWeight: "900" },
+  stageFollowTextActive: { color: COLORS.primaryInk },
   seatGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
-    columnGap: 18,
-    rowGap: 16,
-    marginTop: 12,
-    paddingTop: 16,
+    columnGap: 10,
+    rowGap: 15,
+    marginTop: 10,
+    paddingTop: 15,
     borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.12)",
+    borderTopColor: "rgba(255,255,255,0.16)",
   },
-  seat: { width: "23%", alignItems: "center" },
+  seat: { width: "22%", alignItems: "center" },
   seatAvatar: {
-    width: 55,
-    height: 55,
-    borderRadius: 19,
+    width: 53,
+    height: 53,
+    borderRadius: 27,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1.5,
@@ -10132,7 +10159,12 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: "#D4FF89",
   },
-  seatName: { color: "#F1EFF9", fontSize: 10, fontWeight: "700", marginTop: 7 },
+  seatName: {
+    color: "#F7F6FB",
+    fontSize: 9.5,
+    fontWeight: "800",
+    marginTop: 7,
+  },
   emptyStage: {
     alignItems: "center",
     marginTop: 18,
@@ -10185,12 +10217,12 @@ const styles = StyleSheet.create({
   },
   raiseHandTextActive: { color: COLORS.primaryInk },
   chatPanel: {
-    backgroundColor: "#1B1D29",
-    borderRadius: 21,
+    backgroundColor: "#151929",
+    borderRadius: 23,
     padding: 14,
-    marginTop: 14,
+    marginTop: 12,
     borderWidth: 1,
-    borderColor: "#303342",
+    borderColor: "rgba(255,255,255,0.08)",
   },
   chatPanelHead: {
     flexDirection: "row",
@@ -10206,7 +10238,7 @@ const styles = StyleSheet.create({
   },
   composer: {
     borderTopWidth: 1,
-    borderTopColor: "#323544",
+    borderTopColor: "rgba(255,255,255,0.08)",
     paddingTop: 10,
     flexDirection: "row",
     alignItems: "center",
@@ -10864,28 +10896,28 @@ const styles = StyleSheet.create({
   roomHeaderActions: { flexDirection: "row", alignItems: "center", gap: 2 },
   roomFloatingControls: {
     position: "absolute",
-    right: 16,
-    bottom: 18,
-    gap: 10,
+    right: 18,
+    bottom: 22,
+    gap: 8,
     alignItems: "center",
   },
   roomFloatingButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(28,31,44,0.96)",
+    backgroundColor: "rgba(18,21,37,0.96)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(255,255,255,0.16)",
     ...ELEVATION.card,
   },
   roomFloatingButtonActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   emptySeat: { justifyContent: "flex-start" },
   emptySeatAvatar: {
-    width: 55,
-    height: 55,
-    borderRadius: 28,
+    width: 53,
+    height: 53,
+    borderRadius: 27,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(181,255,120,0.10)",
@@ -10894,11 +10926,12 @@ const styles = StyleSheet.create({
     borderColor: "rgba(181,255,120,0.55)",
   },
   stageHint: {
-    color: "rgba(255,255,255,0.72)",
-    fontSize: 12,
-    lineHeight: 17,
+    color: "rgba(255,255,255,0.79)",
+    fontSize: 11,
+    lineHeight: 16,
     textAlign: "center",
-    marginTop: 18,
+    marginTop: 16,
+    paddingHorizontal: 14,
   },
   createRoomSheetScroll: { flexGrow: 0, maxHeight: "92%", width: "100%" },
   createRoomSheetContent: { flexGrow: 1, justifyContent: "flex-end" },
