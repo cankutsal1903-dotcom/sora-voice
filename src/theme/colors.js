@@ -1,51 +1,52 @@
 /**
- * Sora Design System - Modern Color Palette
- * Tüm uygulama boyunca tutarlı renk kullanımı için merkezi tema
+ * Sora Design System — Clubhouse-inspired Color Palette
+ * Cream/warm white backgrounds, near-black text, yellow accent.
  */
 
 export const COLORS = {
   // Backgrounds
-  background: '#F0F3F4',
-  surface: '#FFFFFF',
-  surfaceRaised: '#F7F9FA',
-  raised: '#EAEEF1',
-  line: '#E1E6EA',
+  background: "#F9F6F1",
+  surface: "#FFFFFF",
+  surfaceRaised: "#F4F1EC",
+  raised: "#EDE9E2",
+  line: "#E8E3DC",
+  lineSoft: "#F0EDE8",
 
   // Text
-  text: '#11161C',
-  textSecondary: '#4B5462',
-  muted: '#8A93A3',
-  mutedDark: '#6B7482',
+  text: "#1A1410",
+  textSecondary: "#5C5047",
+  muted: "#9C9088",
+  mutedDark: "#7A706A",
 
-  // Primary Brand
-  primary: '#01D9A8',
-  primaryInk: '#04211B',
-  primaryDark: '#00A985',
-  primaryLight: '#4FE8C4',
+  // Primary Brand — warm yellow (Clubhouse-style)
+  primary: "#F5C842",
+  primaryInk: "#1A1410",
+  primaryDark: "#D4A820",
+  primaryLight: "#FAD96A",
 
   // Accent Colors
-  accent: '#3B9DF8',
-  accentPurple: '#8B5CF6',
-  accentPink: '#F0568C',
+  accent: "#3A85F5",
+  accentPurple: "#7C5CBF",
+  accentPink: "#E05C7A",
 
   // Status
-  danger: '#E5486B',
-  dangerDark: '#C2294A',
-  warning: '#E0A93A',
-  success: '#01D9A8',
+  danger: "#D94F4F",
+  dangerDark: "#B53030",
+  warning: "#E0943A",
+  success: "#4CA96A",
 
   // Gradients
   gradients: {
-    primary: ['#01D9A8', '#16C7C0'],
-    purple: ['#A98BF5', '#E4DBFF'],
-    ocean: ['#63C7E8', '#CFEAF6'],
-    sunset: ['#FF9DB0', '#FFE0E6'],
-    forest: ['#5FD6B4', '#DDF7EF'],
+    primary: ["#1A1410", "#2D2520"],
+    warm: ["#F5C842", "#E8A020"],
+    ocean: ["#167A91", "#273D79"],
+    sunset: ["#B85B69", "#5B294C"],
+    forest: ["#2B806F", "#23443F"],
   },
 
   // Overlays
-  overlay: 'rgba(12,17,22,0.45)',
-  overlayLight: 'rgba(12,17,22,0.30)',
+  overlay: "rgba(26,20,16,0.48)",
+  overlayLight: "rgba(26,20,16,0.28)",
 };
 
 export const THEME = {
@@ -54,6 +55,7 @@ export const THEME = {
     md: 14,
     lg: 18,
     xl: 24,
+    pill: 100,
   },
   spacing: {
     xs: 4,
@@ -65,12 +67,13 @@ export const THEME = {
   typography: {
     kicker: {
       fontSize: 10,
-      fontWeight: '900',
+      fontWeight: "900",
       letterSpacing: 1.6,
+      textTransform: "uppercase",
     },
     heading: {
       fontSize: 30,
-      fontWeight: '900',
+      fontWeight: "900",
       letterSpacing: -1.1,
     },
     body: {

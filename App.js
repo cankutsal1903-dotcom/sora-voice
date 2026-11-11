@@ -98,46 +98,45 @@ import { installGlobalErrorReporting } from "./src/observability/errorReporting"
 import { InboxScreen } from "./src/screens/InboxScreen";
 import { CommunityScreen } from "./src/screens/CommunityScreen";
 
-// Marka paleti. Uygulama simgesi, acilis ekrani ve bildirim rengiyle
-// (app.json -> #B5FF78) ayni ailede tutulur; boylece logo ile arayuz
-// birbirinden kopuk gorunmez.
+// Clubhouse-inspired palette: cream/white backgrounds, near-black text,
+// warm yellow accent, clean minimal surfaces.
 const COLORS = {
-  background: "#F0F3F4",
+  background: "#F9F6F1",
   surface: "#FFFFFF",
-  surfaceRaised: "#F7F9FA",
-  surfaceHigh: "#EAEEF1",
-  line: "#E1E6EA",
-  lineSoft: "#EDF0F3",
-  text: "#11161C",
-  textSecondary: "#4B5462",
-  muted: "#8A93A3",
-  primary: "#01D9A8",
-  primaryInk: "#04211B",
-  primarySoft: "rgba(1,217,168,0.14)",
-  pink: "#F0568C",
-  purple: "#8B5CF6",
-  accent: "#3B9DF8",
-  warning: "#E0A93A",
-  danger: "#E5486B",
-  overlay: "rgba(12,17,22,0.45)",
+  surfaceRaised: "#F4F1EC",
+  surfaceHigh: "#EDE9E2",
+  line: "#E8E3DC",
+  lineSoft: "#F0EDE8",
+  text: "#1A1410",
+  textSecondary: "#5C5047",
+  muted: "#9C9088",
+  primary: "#F5C842",
+  primaryInk: "#1A1410",
+  primarySoft: "rgba(245,200,66,0.18)",
+  pink: "#E05C7A",
+  purple: "#7C5CBF",
+  accent: "#3A85F5",
+  warning: "#E0943A",
+  danger: "#D94F4F",
+  overlay: "rgba(26,20,16,0.48)",
 };
 
-// Birincil butonlar, secili durumlar ve vurgu kartlari tek gradyani kullanir.
-const BRAND_GRADIENT = [COLORS.primary, "#16C7C0"];
+// Birincil butonlar siyah veya sarı; gradient kaldırıldı (Clubhouse flat).
+const BRAND_GRADIENT = ["#1A1410", "#2D2520"];
 // Kartlarda kullanilan yumusak derinlik golgesi (Android'de elevation).
 const ELEVATION = {
   card: {
-    shadowColor: "#0B1A24",
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: "#1A1410",
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
     elevation: 2,
   },
   raised: {
-    shadowColor: "#0B1A24",
-    shadowOpacity: 0.14,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
+    shadowColor: "#1A1410",
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
     elevation: 4,
   },
 };
@@ -496,7 +495,7 @@ function Onboarding({ visible, onComplete }) {
   return (
     <Modal visible={visible} animationType="fade" onRequestClose={onComplete}>
       <LinearGradient
-        colors={["#201A42", "#101522", "#080A10"]}
+        colors={["#1A1410", "#2D2520"]}
         style={styles.onboardingScreen}
       >
         <SafeAreaView style={styles.onboardingSafe}>
@@ -689,7 +688,7 @@ function Discover({
           />
         </View>
         <LinearGradient
-          colors={["#30245C", "#171B36", "#102720"]}
+          colors={["#1A1410", "#2D2520"]}
           style={styles.discoverEmptyHero}
         >
           <View style={styles.discoverEmptyGlow} />
@@ -697,10 +696,14 @@ function Discover({
             <View style={styles.discoverEmptySeat}>
               <Ionicons name="mic-outline" size={25} color={COLORS.primary} />
             </View>
-            <View style={[styles.discoverEmptySeat, styles.discoverEmptySeatSide]}>
+            <View
+              style={[styles.discoverEmptySeat, styles.discoverEmptySeatSide]}
+            >
               <Ionicons name="add" size={22} color={COLORS.textSecondary} />
             </View>
-            <View style={[styles.discoverEmptySeat, styles.discoverEmptySeatSide]}>
+            <View
+              style={[styles.discoverEmptySeat, styles.discoverEmptySeatSide]}
+            >
               <Ionicons name="add" size={22} color={COLORS.textSecondary} />
             </View>
           </View>
@@ -708,7 +711,8 @@ function Discover({
             <Text style={styles.discoverEmptyLabel}>SAHNE HAZIR</Text>
             <Text style={styles.discoverEmptyTitle}>İlk sesi sen başlat.</Text>
             <Text style={styles.discoverEmptyDescription}>
-              Şu anda açık oda yok. Bir oda aç, sohbet başladığında burada görünsün.
+              Şu anda açık oda yok. Bir oda aç, sohbet başladığında burada
+              görünsün.
             </Text>
           </View>
           <Pressable
@@ -718,13 +722,18 @@ function Discover({
             onPress={onCreate}
           >
             <Text style={styles.discoverEmptyButtonText}>Oda aç</Text>
-            <Ionicons name="arrow-forward" size={20} color={COLORS.primaryInk} />
+            <Ionicons
+              name="arrow-forward"
+              size={20}
+              color={COLORS.primaryInk}
+            />
           </Pressable>
         </LinearGradient>
         <View style={styles.discoverEmptyNote}>
           <Ionicons name="headset-outline" size={18} color={COLORS.primary} />
           <Text style={styles.discoverEmptyNoteText}>
-            Odaya herkes dinleyici olarak katılabilir. Konuşmak isteyenler koltuğa geçer.
+            Odaya herkes dinleyici olarak katılabilir. Konuşmak isteyenler
+            koltuğa geçer.
           </Text>
         </View>
       </ScrollView>
@@ -789,11 +798,7 @@ function Discover({
                 accessibilityRole="button"
                 accessibilityLabel="Aramayı temizle"
               >
-                <Ionicons
-                  name="close-circle"
-                  size={17}
-                  color={COLORS.muted}
-                />
+                <Ionicons name="close-circle" size={17} color={COLORS.muted} />
               </Pressable>
             )}
           </View>
@@ -807,7 +812,7 @@ function Discover({
             style={styles.featurePressable}
           >
             <LinearGradient
-              colors={[...featuredRoom.colors, "#171923"]}
+              colors={[...featuredRoom.colors, "#1A1410"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.featureCardModern}
@@ -910,9 +915,7 @@ function Discover({
             <Text style={[styles.sectionTitle, styles.discoverListTitle]}>
               {favoritesOnly ? "Favori odalar" : "Şimdi canlı"}
             </Text>
-            <Text style={styles.listCount}>
-              {visibleRooms.length} oda açık
-            </Text>
+            <Text style={styles.listCount}>{visibleRooms.length} oda açık</Text>
           </View>
           <Pressable
             onPress={handleToggleFavoritesFilter}
@@ -1097,10 +1100,7 @@ function ScheduleAgenda({
             })}
           </ScrollView>
           <Pressable onPress={onPlan}>
-            <LinearGradient
-              colors={BRAND_GRADIENT}
-              style={styles.createSubmit}
-            >
+            <LinearGradient colors={BRAND_GRADIENT} style={styles.createSubmit}>
               <Text style={styles.createSubmitText}>Yeni bulusma planla</Text>
               <Ionicons name="add" size={21} color={COLORS.primaryInk} />
             </LinearGradient>
@@ -1138,7 +1138,7 @@ const RoomCard = memo(function RoomCard({
           ]}
         >
           <LinearGradient
-            colors={[...room.colors, "#161829"]}
+            colors={[...room.colors, "#1A1410"]}
             style={styles.roomArtwork}
           >
             <View
@@ -1152,7 +1152,9 @@ const RoomCard = memo(function RoomCard({
               </View>
               <View style={styles.roomArtworkCount}>
                 <Ionicons name="people" size={12} color="#FFFFFF" />
-                <Text style={styles.roomArtworkCountText}>{room.listeners}</Text>
+                <Text style={styles.roomArtworkCountText}>
+                  {room.listeners}
+                </Text>
               </View>
             </View>
             <View style={styles.roomArtworkMonogram}>
@@ -1167,8 +1169,14 @@ const RoomCard = memo(function RoomCard({
           </LinearGradient>
           <View style={styles.roomDetails}>
             <View style={styles.roomHostRow}>
-              <Avatar label={room.host?.charAt(0) || "S"} color={room.accent} size={25} />
-              <Text style={styles.roomHostName} numberOfLines={1}>{room.host}</Text>
+              <Avatar
+                label={room.host?.charAt(0) || "S"}
+                color={room.accent}
+                size={25}
+              />
+              <Text style={styles.roomHostName} numberOfLines={1}>
+                {room.host}
+              </Text>
               <Ionicons name="arrow-forward" size={15} color={COLORS.primary} />
             </View>
             <Text style={styles.roomCategory}>{room.category}</Text>
@@ -1698,7 +1706,7 @@ function Community({ onNotify }) {
         />
       </View>
       <LinearGradient
-        colors={["#2B3648", "#1E2233"]}
+        colors={["#1A1410", "#2D2520"]}
         style={styles.communityBanner}
       >
         <Text style={styles.communityIcon}>✦</Text>
@@ -1918,10 +1926,7 @@ function CreateCommunitySheet({ visible, onDismiss, onCreate }) {
             ))}
           </View>
           <Pressable onPress={create}>
-            <LinearGradient
-              colors={BRAND_GRADIENT}
-              style={styles.createSubmit}
-            >
+            <LinearGradient colors={BRAND_GRADIENT} style={styles.createSubmit}>
               <Text style={styles.createSubmitText}>Toplulugu olustur</Text>
               <Ionicons name="people" size={20} color={COLORS.primaryInk} />
             </LinearGradient>
@@ -2148,7 +2153,7 @@ function Profile({
       <Reveal distance={12}>
         <View style={styles.profileCover}>
           <LinearGradient
-            colors={["#6647B9", "#262044", "#121621"]}
+            colors={["#1A1410", "#2D2520", "#1A1410"]}
             style={StyleSheet.absoluteFill}
           />
           <View style={styles.profileCoverOrbOne} />
@@ -2507,7 +2512,9 @@ const RoomSettingsSheet = memo(function RoomSettingsSheet({
             </View>
             <View style={styles.settingContent}>
               <Text style={styles.settingTitle}>Davet et</Text>
-              <Text style={styles.settingDescription}>Oda bağlantısını paylaş</Text>
+              <Text style={styles.settingDescription}>
+                Oda bağlantısını paylaş
+              </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
           </Pressable>
@@ -2912,7 +2919,7 @@ const WalletSheet = memo(function WalletSheet({
           >
             <Text style={styles.kicker}>KREDİ CÜZDANI</Text>
             <LinearGradient
-              colors={["#7051D3", "#302A62"]}
+              colors={["#1A1410", "#2D2520"]}
               style={styles.walletBalanceCard}
             >
               <View>
@@ -3426,10 +3433,7 @@ const RoomLobby = memo(function RoomLobby({
           <Pressable
             onPress={() => onJoin({ microphoneEnabled, speakerEnabled })}
           >
-            <LinearGradient
-              colors={BRAND_GRADIENT}
-              style={styles.lobbyJoin}
-            >
+            <LinearGradient colors={BRAND_GRADIENT} style={styles.lobbyJoin}>
               <View>
                 <Text style={styles.lobbyJoinTitle}>Odaya katıl</Text>
                 <Text style={styles.lobbyJoinSubtitle}>
@@ -3945,70 +3949,76 @@ function CreateRoomSheet({ visible, onDismiss, onCreate }) {
           contentContainerStyle={styles.createRoomSheetContent}
           keyboardShouldPersistTaps="handled"
         >
-        <View style={[styles.sheet, styles.createRoomSheet, { paddingBottom: Math.max(insets.bottom, 24) + 16 }]}>
-          <View style={styles.sheetHandle} />
-          <Pressable onPress={onDismiss} style={styles.sheetClose}>
-            <Ionicons name="close" size={20} color={COLORS.text} />
-          </Pressable>
-          <Text style={styles.kicker}>YENİ SESLİ ODA</Text>
-          <Text style={styles.sheetTitle}>Bir oda aç.</Text>
-          <Text style={styles.fieldLabel}>KATEGORİ</Text>
-          <View style={styles.sheetCategories}>
-            {CATEGORIES.slice(1).map((item) => (
-              <Pressable
-                key={item.name}
-                onPress={() => setCategory(item.name)}
-                style={[
-                  styles.sheetCategory,
-                  category === item.name && styles.sheetCategoryActive,
-                ]}
-              >
-                <Text
+          <View
+            style={[
+              styles.sheet,
+              styles.createRoomSheet,
+              { paddingBottom: Math.max(insets.bottom, 24) + 16 },
+            ]}
+          >
+            <View style={styles.sheetHandle} />
+            <Pressable onPress={onDismiss} style={styles.sheetClose}>
+              <Ionicons name="close" size={20} color={COLORS.text} />
+            </Pressable>
+            <Text style={styles.kicker}>YENİ SESLİ ODA</Text>
+            <Text style={styles.sheetTitle}>Bir oda aç.</Text>
+            <Text style={styles.fieldLabel}>KATEGORİ</Text>
+            <View style={styles.sheetCategories}>
+              {CATEGORIES.slice(1).map((item) => (
+                <Pressable
+                  key={item.name}
+                  onPress={() => setCategory(item.name)}
                   style={[
-                    styles.sheetCategoryText,
-                    category === item.name && styles.sheetCategoryTextActive,
+                    styles.sheetCategory,
+                    category === item.name && styles.sheetCategoryActive,
                   ]}
                 >
-                  {item.label}
+                  <Text
+                    style={[
+                      styles.sheetCategoryText,
+                      category === item.name && styles.sheetCategoryTextActive,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={styles.fieldLabel}>ODA ADI</Text>
+            <TextInput
+              value={title}
+              onChangeText={setTitle}
+              placeholder="Örn. Kahve arası"
+              placeholderTextColor={COLORS.muted}
+              style={styles.sheetInput}
+              maxLength={36}
+            />
+            <Text style={styles.fieldLabel}>KISA AÇIKLAMA</Text>
+            <TextInput
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Odanın konusunu anlat"
+              placeholderTextColor={COLORS.muted}
+              style={styles.sheetInput}
+              maxLength={90}
+              multiline
+            />
+            <Pressable onPress={create} disabled={submitting}>
+              <LinearGradient
+                colors={BRAND_GRADIENT}
+                style={styles.createSubmit}
+              >
+                <Text style={styles.createSubmitText}>
+                  {submitting ? "Oda açılıyor..." : "Odayı oluştur"}
                 </Text>
-              </Pressable>
-            ))}
+                <Ionicons
+                  name="arrow-forward"
+                  size={20}
+                  color={COLORS.primaryInk}
+                />
+              </LinearGradient>
+            </Pressable>
           </View>
-          <Text style={styles.fieldLabel}>ODA ADI</Text>
-          <TextInput
-            value={title}
-            onChangeText={setTitle}
-            placeholder="Örn. Kahve arası"
-            placeholderTextColor={COLORS.muted}
-            style={styles.sheetInput}
-            maxLength={36}
-          />
-          <Text style={styles.fieldLabel}>KISA AÇIKLAMA</Text>
-          <TextInput
-            value={description}
-            onChangeText={setDescription}
-            placeholder="Odanın konusunu anlat"
-            placeholderTextColor={COLORS.muted}
-            style={styles.sheetInput}
-            maxLength={90}
-            multiline
-          />
-          <Pressable onPress={create} disabled={submitting}>
-            <LinearGradient
-              colors={BRAND_GRADIENT}
-              style={styles.createSubmit}
-            >
-              <Text style={styles.createSubmitText}>
-                {submitting ? "Oda açılıyor..." : "Odayı oluştur"}
-              </Text>
-              <Ionicons
-                name="arrow-forward"
-                size={20}
-                color={COLORS.primaryInk}
-              />
-            </LinearGradient>
-          </Pressable>
-        </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
@@ -4101,10 +4111,7 @@ function ScheduleRoomSheet({ visible, onDismiss, onSchedule }) {
             ))}
           </View>
           <Pressable onPress={schedule}>
-            <LinearGradient
-              colors={BRAND_GRADIENT}
-              style={styles.createSubmit}
-            >
+            <LinearGradient colors={BRAND_GRADIENT} style={styles.createSubmit}>
               <Text style={styles.createSubmitText}>Odayi planla</Text>
               <Ionicons
                 name="calendar-outline"
@@ -4473,34 +4480,40 @@ function Room({
         }),
     [blockedUserIds, isHost, liveVoice.participants, roomMembers, userId],
   );
-  const roomSeatParticipants = useMemo(
-    () => {
-      const participants = activeRoomParticipants
-        .filter((participant) => participant.userId !== room.hostId)
-        .slice(0, 7);
-      if (
-        handRaised &&
-        !isHost &&
-        !participants.some((participant) => participant.userId === userId)
-      ) {
-        participants.push({
-          userId,
-          name: profile.name,
-          color: profile.color,
-          microphoneEnabled: false,
-          pendingSeat: true,
-        });
-      }
-      return participants;
-    },
-    [activeRoomParticipants, handRaised, isHost, profile.color, profile.name, room.hostId, userId],
-  );
+  const roomSeatParticipants = useMemo(() => {
+    const participants = activeRoomParticipants
+      .filter((participant) => participant.userId !== room.hostId)
+      .slice(0, 7);
+    if (
+      handRaised &&
+      !isHost &&
+      !participants.some((participant) => participant.userId === userId)
+    ) {
+      participants.push({
+        userId,
+        name: profile.name,
+        color: profile.color,
+        microphoneEnabled: false,
+        pendingSeat: true,
+      });
+    }
+    return participants;
+  }, [
+    activeRoomParticipants,
+    handRaised,
+    isHost,
+    profile.color,
+    profile.name,
+    room.hostId,
+    userId,
+  ]);
   const micOn = liveVoice.enabled && liveVoice.microphoneEnabled;
-  const roomVoiceLabel = liveVoice.status === "connected"
-    ? "CANLI"
-    : liveVoice.status === "connecting" || liveVoice.status === "reconnecting"
-      ? "SES BAĞLANIYOR"
-      : "SES BAĞLANTISI YOK";
+  const roomVoiceLabel =
+    liveVoice.status === "connected"
+      ? "CANLI"
+      : liveVoice.status === "connecting" || liveVoice.status === "reconnecting"
+        ? "SES BAĞLANIYOR"
+        : "SES BAĞLANTISI YOK";
   const voiceStatusInfo =
     liveVoice.status === "connected"
       ? {
@@ -4526,8 +4539,7 @@ function Room({
                 liveVoice.status === "disconnected"
                   ? "Ses bağlantısı kesildi"
                   : "Ses bağlantısı kurulamadı",
-              description:
-                "Bağlantını kontrol et ve yeniden dene.",
+              description: "Bağlantını kontrol et ve yeniden dene.",
               style: styles.roomVoiceError,
             }
           : {
@@ -4882,7 +4894,10 @@ function Room({
         await setRoomHandRaise({ roomId: room.id, raised: nextState });
       } catch {
         setHandRaised(!nextState);
-        Alert.alert("İstek gönderilemedi", "Bağlantını kontrol edip tekrar dene.");
+        Alert.alert(
+          "İstek gönderilemedi",
+          "Bağlantını kontrol edip tekrar dene.",
+        );
         return;
       }
     }
@@ -5140,12 +5155,23 @@ function Room({
         {(liveVoice.status === "error" ||
           liveVoice.status === "disconnected") && (
           <View style={[styles.roomVoiceStatus, voiceStatusInfo.style]}>
-            <Ionicons name={voiceStatusInfo.icon} size={18} color={COLORS.text} />
+            <Ionicons
+              name={voiceStatusInfo.icon}
+              size={18}
+              color={COLORS.text}
+            />
             <View style={styles.roomVoiceStatusCopy}>
-              <Text style={styles.roomVoiceStatusTitle}>{voiceStatusInfo.title}</Text>
-              <Text style={styles.roomVoiceStatusDescription}>{voiceStatusInfo.description}</Text>
+              <Text style={styles.roomVoiceStatusTitle}>
+                {voiceStatusInfo.title}
+              </Text>
+              <Text style={styles.roomVoiceStatusDescription}>
+                {voiceStatusInfo.description}
+              </Text>
             </View>
-            <Pressable style={styles.roomVoiceRetry} onPress={retryVoiceConnection}>
+            <Pressable
+              style={styles.roomVoiceRetry}
+              onPress={retryVoiceConnection}
+            >
               <Text style={styles.roomVoiceRetryText}>Yeniden dene</Text>
             </Pressable>
           </View>
@@ -5168,7 +5194,9 @@ function Room({
               <View style={styles.roomHeroHalo} />
               <View style={styles.roomStageTopRow}>
                 <View style={styles.roomLive}>
-                  {liveVoice.status === "connected" ? <LivePulse size={6} /> : null}
+                  {liveVoice.status === "connected" ? (
+                    <LivePulse size={6} />
+                  ) : null}
                   <Text style={styles.roomLiveText}>
                     {liveVoice.status === "connected"
                       ? `CANLI · ${Math.max(liveVoice.participantCount, activeRoomParticipants.length)} KİŞİ`
@@ -5221,45 +5249,60 @@ function Room({
                 )}
               </View>
               <View style={styles.seatGrid}>
-                {[...roomSeatParticipants, ...Array.from({ length: Math.max(0, 7 - roomSeatParticipants.length) })].map((participant, index) => participant ? (
-                  <View style={styles.seat} key={participant.userId}>
-                    <View
-                      style={[
-                        styles.seatAvatar,
-                        { backgroundColor: participant.color },
-                        participant.microphoneEnabled && styles.seatAvatarSpeaking,
-                      ]}
-                    >
-                      <Text style={styles.seatInitial}>
-                        {participant.name?.charAt(0)?.toUpperCase() || "?"}
+                {[
+                  ...roomSeatParticipants,
+                  ...Array.from({
+                    length: Math.max(0, 7 - roomSeatParticipants.length),
+                  }),
+                ].map((participant, index) =>
+                  participant ? (
+                    <View style={styles.seat} key={participant.userId}>
+                      <View
+                        style={[
+                          styles.seatAvatar,
+                          { backgroundColor: participant.color },
+                          participant.microphoneEnabled &&
+                            styles.seatAvatarSpeaking,
+                        ]}
+                      >
+                        <Text style={styles.seatInitial}>
+                          {participant.name?.charAt(0)?.toUpperCase() || "?"}
+                        </Text>
+                        {!participant.microphoneEnabled && (
+                          <View style={styles.seatMuted}>
+                            <Ionicons
+                              name="mic-off"
+                              size={10}
+                              color={COLORS.pink}
+                            />
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.seatName} numberOfLines={1}>
+                        {participant.pendingSeat
+                          ? "İsteğin sırada"
+                          : participant.name}
                       </Text>
-                      {!participant.microphoneEnabled && (
-                        <View style={styles.seatMuted}>
-                          <Ionicons name="mic-off" size={10} color={COLORS.pink} />
-                        </View>
-                      )}
                     </View>
-                    <Text style={styles.seatName} numberOfLines={1}>
-                      {participant.pendingSeat ? "İsteğin sırada" : participant.name}
-                    </Text>
-                  </View>
-                ) : (
-                  <Pressable
-                    key={`empty-seat-${index}`}
-                    style={[styles.seat, styles.emptySeat]}
-                    onPress={toggleHand}
-                    accessibilityRole="button"
-                    accessibilityLabel="Boş koltuğa oturma isteği gönder"
-                  >
-                    <View style={styles.emptySeatAvatar}>
-                      <Ionicons name="add" size={20} color={COLORS.primary} />
-                    </View>
-                    <Text style={styles.seatName}>Boş koltuk</Text>
-                  </Pressable>
-                ))}
+                  ) : (
+                    <Pressable
+                      key={`empty-seat-${index}`}
+                      style={[styles.seat, styles.emptySeat]}
+                      onPress={toggleHand}
+                      accessibilityRole="button"
+                      accessibilityLabel="Boş koltuğa oturma isteği gönder"
+                    >
+                      <View style={styles.emptySeatAvatar}>
+                        <Ionicons name="add" size={20} color={COLORS.primary} />
+                      </View>
+                      <Text style={styles.seatName}>Boş koltuk</Text>
+                    </Pressable>
+                  ),
+                )}
               </View>
               <Text style={styles.stageHint}>
-                Dinleyici olarak katılabilirsin. Konuşmak için boş bir koltuğa dokun.
+                Dinleyici olarak katılabilirsin. Konuşmak için boş bir koltuğa
+                dokun.
               </Text>
             </LinearGradient>
           </View>
@@ -5287,13 +5330,39 @@ function Room({
           </View>
         </ScrollView>
         <View style={styles.roomFloatingControls}>
-          <Pressable style={[styles.roomFloatingButton, micOn && styles.roomFloatingButtonActive]} onPress={toggleMicrophone} accessibilityLabel="Mikrofon">
-            <Ionicons name={micOn ? "mic" : "mic-off"} size={20} color={micOn ? COLORS.primaryInk : COLORS.text} />
+          <Pressable
+            style={[
+              styles.roomFloatingButton,
+              micOn && styles.roomFloatingButtonActive,
+            ]}
+            onPress={toggleMicrophone}
+            accessibilityLabel="Mikrofon"
+          >
+            <Ionicons
+              name={micOn ? "mic" : "mic-off"}
+              size={20}
+              color={micOn ? COLORS.primaryInk : COLORS.text}
+            />
           </Pressable>
-          <Pressable style={[styles.roomFloatingButton, speakerOn && styles.roomFloatingButtonActive]} onPress={handleToggleSpeaker} accessibilityLabel="Hoparlör">
-            <Ionicons name="volume-high" size={20} color={speakerOn ? COLORS.primaryInk : COLORS.text} />
+          <Pressable
+            style={[
+              styles.roomFloatingButton,
+              speakerOn && styles.roomFloatingButtonActive,
+            ]}
+            onPress={handleToggleSpeaker}
+            accessibilityLabel="Hoparlör"
+          >
+            <Ionicons
+              name="volume-high"
+              size={20}
+              color={speakerOn ? COLORS.primaryInk : COLORS.text}
+            />
           </Pressable>
-          <Pressable style={styles.roomFloatingButton} onPress={handleOpenGift} accessibilityLabel="Hediye gönder">
+          <Pressable
+            style={styles.roomFloatingButton}
+            onPress={handleOpenGift}
+            accessibilityLabel="Hediye gönder"
+          >
             <Ionicons name="gift-outline" size={20} color={COLORS.text} />
           </Pressable>
         </View>
@@ -5422,10 +5491,7 @@ function ProfileEditor({ visible, profile, onDismiss, onSave }) {
             ))}
           </View>
           <Pressable onPress={save}>
-            <LinearGradient
-              colors={BRAND_GRADIENT}
-              style={styles.createSubmit}
-            >
+            <LinearGradient colors={BRAND_GRADIENT} style={styles.createSubmit}>
               <Text style={styles.createSubmitText}>Degisiklikleri kaydet</Text>
               <Ionicons name="checkmark" size={20} color={COLORS.primaryInk} />
             </LinearGradient>
@@ -5816,7 +5882,8 @@ function AppContent() {
     const nextProfile = {
       ...DEFAULT_PROFILE,
       name: displayName,
-      handle: metadata.handle || seed || `sora${String(user.id || "").slice(0, 6)}`,
+      handle:
+        metadata.handle || seed || `sora${String(user.id || "").slice(0, 6)}`,
     };
     setProfile(nextProfile);
     AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(nextProfile)).catch(
@@ -6058,7 +6125,12 @@ function AppContent() {
       `“${existingRoom.title}” odana dönebilirsin. Aynı anda yalnızca bir odan olabilir.`,
       [
         { text: "Vazgeç", style: "cancel" },
-        { text: "Odama dön", onPress: () => { resumeHostedRoom(existingRoom); } },
+        {
+          text: "Odama dön",
+          onPress: () => {
+            resumeHostedRoom(existingRoom);
+          },
+        },
       ],
     );
   };
@@ -6648,7 +6720,11 @@ function AppContent() {
         .catch(() => undefined);
     const channel = supabase
       .channel("live-room-discovery")
-      .on("postgres_changes", { event: "*", schema: "public", table: "rooms" }, refreshLiveRooms)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "rooms" },
+        refreshLiveRooms,
+      )
       .subscribe();
     return () => {
       active = false;
@@ -6985,7 +7061,10 @@ function AppContent() {
         }
       } catch (error) {
         console.error("Room lookup failed", error);
-        Alert.alert("Odalar yüklenemedi", "Bağlantıyı kontrol edip tekrar dene.");
+        Alert.alert(
+          "Odalar yüklenemedi",
+          "Bağlantıyı kontrol edip tekrar dene.",
+        );
         return;
       }
     }
@@ -7062,21 +7141,21 @@ function AppContent() {
   if (room)
     return (
       <View style={styles.app}>
-          <Room
-            room={room}
-            profile={profile}
-            userId={authSession?.user?.id}
-            accessToken={authSession?.access_token}
-            coins={walletBalance}
-            onSendGift={sendGift}
-            onLeave={leaveCurrentRoom}
-            onUpdateRoom={updateRoomSettings}
-            isFollowingHost={followedUserIds.includes(room.hostId)}
-            onToggleFollowHost={toggleFollowHost}
-            initialSpeakerOn={roomPreferences.speakerEnabled}
-            initialMicrophoneOn={roomPreferences.microphoneEnabled}
-            onHostPresenceChange={setHostRoomPresence}
-          />
+        <Room
+          room={room}
+          profile={profile}
+          userId={authSession?.user?.id}
+          accessToken={authSession?.access_token}
+          coins={walletBalance}
+          onSendGift={sendGift}
+          onLeave={leaveCurrentRoom}
+          onUpdateRoom={updateRoomSettings}
+          isFollowingHost={followedUserIds.includes(room.hostId)}
+          onToggleFollowHost={toggleFollowHost}
+          initialSpeakerOn={roomPreferences.speakerEnabled}
+          initialMicrophoneOn={roomPreferences.microphoneEnabled}
+          onHostPresenceChange={setHostRoomPresence}
+        />
       </View>
     );
 
@@ -7096,14 +7175,9 @@ function AppContent() {
       />
     ),
     inbox: (
-      <InboxScreen
-        currentUserId={authSession?.user?.id}
-        profile={profile}
-      />
+      <InboxScreen currentUserId={authSession?.user?.id} profile={profile} />
     ),
-    community: (
-      <CommunityScreen currentUserId={authSession?.user?.id} />
-    ),
+    community: <CommunityScreen currentUserId={authSession?.user?.id} />,
     profile: (
       <Profile
         profile={profile}
@@ -7216,44 +7290,44 @@ const styles = StyleSheet.create({
   discoverScroll: { flex: 1 },
   pageContent: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 104 },
   topBar: {
-    height: 48,
+    height: 56,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 23,
+    marginBottom: 20,
   },
   brand: { flexDirection: "row", alignItems: "center", gap: 8 },
   brandMark: {
-    width: 31,
-    height: 31,
-    borderRadius: 11,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.text,
   },
   brandMarkText: {
-    color: COLORS.primaryInk,
-    fontSize: 19,
+    color: COLORS.primary,
+    fontSize: 18,
     fontWeight: "900",
-    marginTop: -2,
+    marginTop: -1,
   },
   brandText: {
     color: COLORS.text,
-    fontSize: 20,
-    fontWeight: "800",
-    letterSpacing: -0.7,
+    fontSize: 21,
+    fontWeight: "900",
+    letterSpacing: -0.8,
   },
-  topActions: { flexDirection: "row", gap: 9 },
+  topActions: { flexDirection: "row", gap: 8 },
   iconButton: {
-    width: 39,
-    height: 39,
-    borderRadius: 14,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: COLORS.surfaceRaised,
     position: "relative",
   },
-  iconButtonSubtle: { backgroundColor: "rgba(15,16,27,0.05)" },
+  iconButtonSubtle: { backgroundColor: "rgba(26,20,16,0.06)" },
   iconBadge: {
     position: "absolute",
     top: 9,
@@ -7271,20 +7345,20 @@ const styles = StyleSheet.create({
     gap: 10,
     backgroundColor: COLORS.surfaceRaised,
     borderWidth: 1,
-    borderColor: COLORS.lineSoft,
-    borderRadius: 17,
+    borderColor: COLORS.line,
+    borderRadius: 14,
     paddingHorizontal: 14,
-    height: 50,
+    height: 48,
     marginBottom: 18,
   },
   searchBoxFocused: {
-    borderColor: "rgba(1,217,168,0.45)",
-    backgroundColor: COLORS.surfaceHigh,
+    borderColor: "rgba(245,200,66,0.60)",
+    backgroundColor: COLORS.surface,
   },
   searchInput: {
     flex: 1,
     color: COLORS.text,
-    fontSize: 14.5,
+    fontSize: 14,
     paddingVertical: 0,
   },
   greetingRow: {
@@ -7294,80 +7368,86 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   kicker: {
-    color: COLORS.primary,
+    color: COLORS.muted,
     fontSize: 10,
     fontWeight: "800",
-    letterSpacing: 1.4,
-    marginBottom: 7,
+    letterSpacing: 1.6,
+    marginBottom: 5,
+    textTransform: "uppercase",
   },
   heroHeading: {
     color: COLORS.text,
-    fontSize: 29,
-    fontWeight: "800",
-    letterSpacing: -1.1,
-    lineHeight: 33,
+    fontSize: 30,
+    fontWeight: "900",
+    letterSpacing: -1.2,
+    lineHeight: 34,
   },
   newRoomButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingVertical: 11,
-    paddingHorizontal: 13,
-    backgroundColor: COLORS.primary,
-    borderRadius: 13,
-  },
-  newRoomText: { color: COLORS.primaryInk, fontSize: 13, fontWeight: "800" },
-  featureCard: {
-    height: 207,
-    overflow: "hidden",
+    gap: 5,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: COLORS.text,
     borderRadius: 24,
+  },
+  newRoomText: { color: COLORS.primary, fontSize: 13, fontWeight: "900" },
+  featureCard: {
+    height: 210,
+    overflow: "hidden",
+    borderRadius: 22,
     padding: 20,
     position: "relative",
+    backgroundColor: COLORS.text,
   },
   featureGlowOne: {
     position: "absolute",
-    width: 168,
-    height: 168,
-    borderRadius: 84,
-    backgroundColor: "#B987F5",
-    opacity: 0.55,
-    top: -54,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: COLORS.primary,
+    opacity: 0.18,
+    top: -60,
     right: -30,
   },
   featureGlowTwo: {
     position: "absolute",
-    width: 75,
-    height: 75,
-    borderRadius: 38,
-    backgroundColor: "#E985C6",
-    bottom: -23,
-    right: 48,
-    opacity: 0.82,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: COLORS.primary,
+    bottom: -20,
+    right: 50,
+    opacity: 0.28,
   },
   featureContent: { flex: 1, justifyContent: "space-between" },
   liveText: {
-    color: "#E9E4FD",
+    color: COLORS.primary,
     fontSize: 10,
-    letterSpacing: 1,
-    fontWeight: "800",
+    letterSpacing: 1.2,
+    fontWeight: "900",
   },
   liveDot: { color: COLORS.pink },
   featureTitle: {
-    color: COLORS.text,
-    fontSize: 27,
-    letterSpacing: -0.7,
-    fontWeight: "800",
+    color: "#FFFFFF",
+    fontSize: 26,
+    letterSpacing: -0.8,
+    fontWeight: "900",
     marginBottom: 4,
   },
-  featureSubtitle: { color: "#D1CCEC", fontSize: 12, maxWidth: 210 },
+  featureSubtitle: {
+    color: "rgba(255,255,255,0.68)",
+    fontSize: 13,
+    maxWidth: 220,
+  },
   featureFooter: { flexDirection: "row", alignItems: "center", gap: 10 },
   stackAvatars: { flexDirection: "row" },
-  featureListeners: { color: "#DEDAF3", fontSize: 11 },
+  featureListeners: { color: "rgba(255,255,255,0.72)", fontSize: 11 },
   featureSound: {
     position: "absolute",
-    right: 24,
-    bottom: 30,
-    height: 75,
+    right: 22,
+    bottom: 28,
+    height: 70,
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
@@ -7375,140 +7455,81 @@ const styles = StyleSheet.create({
   soundBar: {
     width: 4,
     borderRadius: 4,
-    backgroundColor: "#FFFFFF",
-    opacity: 0.76,
+    backgroundColor: COLORS.primary,
+    opacity: 0.8,
   },
   sectionTitle: {
     color: COLORS.text,
-    fontSize: 18,
-    fontWeight: "800",
-    letterSpacing: -0.4,
-    marginTop: 29,
+    fontSize: 19,
+    fontWeight: "900",
+    letterSpacing: -0.5,
+    marginTop: 28,
     marginBottom: 12,
   },
   categoryList: { gap: 8, paddingRight: 20, paddingBottom: 3 },
   categoryChip: {
-    height: 38,
+    height: 40,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    backgroundColor: COLORS.surfaceRaised,
+    borderWidth: 1,
+    borderColor: COLORS.line,
   },
-  categoryChipActive: { backgroundColor: COLORS.primary },
-  categoryText: { color: COLORS.muted, fontSize: 12, fontWeight: "700" },
-  categoryTextActive: { color: COLORS.primaryInk },
+  categoryChipActive: {
+    backgroundColor: COLORS.text,
+    borderColor: COLORS.text,
+  },
+  categoryText: { color: COLORS.muted, fontSize: 13, fontWeight: "700" },
+  categoryTextActive: { color: COLORS.primary },
   listHeading: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-end",
-    marginTop: 28,
-    marginBottom: 13,
+    marginTop: 24,
+    marginBottom: 12,
   },
-  listHeading: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginTop: 28,
-    marginBottom: 13,
-  },
-  listHeading: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginTop: 28,
-    marginBottom: 13,
-  },
-  listHeading: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginTop: 28,
-    marginBottom: 13,
-  },
-  listHeading: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginTop: 28,
-    marginBottom: 13,
-  },
-  listHeading: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginTop: 28,
-    marginBottom: 13,
-  },
-  listHeading: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginTop: 28,
-    marginBottom: 13,
-  },
-  listHeading: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginTop: 28,
-    marginBottom: 13,
-  },
-  listHeading: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginTop: 28,
-    marginBottom: 13,
-  },
-  listHeading: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginTop: 28,
-    marginBottom: 13,
-  },
-  listCount: { color: COLORS.muted, fontSize: 11 },
-  showAll: { color: COLORS.primary, fontSize: 12, fontWeight: "700" },
-  roomList: { gap: 11 },
+  listCount: { color: COLORS.muted, fontSize: 12 },
+  showAll: { color: COLORS.text, fontSize: 12, fontWeight: "800" },
+  roomList: { gap: 10 },
   roomCard: {
     minHeight: 96,
-    borderRadius: 22,
+    borderRadius: 18,
     backgroundColor: COLORS.surface,
-    padding: 13,
+    padding: 14,
     flexDirection: "row",
     alignItems: "center",
-    gap: 13,
+    gap: 14,
     borderWidth: 1,
-    borderColor: COLORS.lineSoft,
+    borderColor: COLORS.line,
     ...ELEVATION.card,
   },
   roomCardPressed: {
     backgroundColor: COLORS.surfaceRaised,
-    borderColor: COLORS.line,
     transform: [{ scale: 0.988 }],
   },
   roomArtwork: {
-    width: 72,
-    height: 72,
-    borderRadius: 20,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     overflow: "hidden",
     justifyContent: "center",
     alignItems: "center",
   },
   roomArtworkOrb: {
     position: "absolute",
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-    right: -16,
-    bottom: -16,
-    opacity: 0.85,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    right: -14,
+    bottom: -14,
+    opacity: 0.7,
   },
   roomArtworkInitial: {
     color: "#FFFFFF",
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: "900",
     letterSpacing: -0.5,
   },
@@ -7522,12 +7543,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 7,
-    marginBottom: 5,
+    marginBottom: 4,
   },
   roomName: {
     color: COLORS.text,
     fontSize: 15,
-    fontWeight: "800",
+    fontWeight: "900",
     letterSpacing: -0.3,
     maxWidth: 138,
   },
@@ -7535,18 +7556,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: COLORS.primarySoft,
+    backgroundColor: COLORS.text,
     paddingVertical: 3,
     paddingHorizontal: 7,
-    borderRadius: 7,
-    borderWidth: 1,
-    borderColor: "rgba(1,217,168,0.24)",
+    borderRadius: 10,
   },
   pillDot: {
     width: 4,
     height: 4,
-    borderRadius: 3,
-    backgroundColor: COLORS.pink,
+    borderRadius: 2,
+    backgroundColor: COLORS.primary,
   },
   livePillText: {
     color: COLORS.primary,
@@ -7556,9 +7575,9 @@ const styles = StyleSheet.create({
   },
   roomDescription: {
     color: COLORS.muted,
-    fontSize: 11.5,
+    fontSize: 12,
     lineHeight: 16,
-    marginBottom: 9,
+    marginBottom: 8,
   },
   roomBottom: {
     flexDirection: "row",
@@ -7566,36 +7585,38 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   miniPeople: { flexDirection: "row", gap: 3, alignItems: "center" },
-  listenerCount: { color: "#C0C2D1", fontSize: 10 },
-  roomCategory: { color: COLORS.primary, fontSize: 10, fontWeight: "800" },
+  listenerCount: { color: COLORS.muted, fontSize: 11 },
+  roomCategory: { color: COLORS.muted, fontSize: 10, fontWeight: "800" },
   roomCategoryPill: {
     paddingVertical: 3,
     paddingHorizontal: 8,
-    borderRadius: 7,
-    backgroundColor: "rgba(1,217,168,0.10)",
+    borderRadius: 10,
+    backgroundColor: COLORS.surfaceRaised,
+    borderWidth: 1,
+    borderColor: COLORS.line,
   },
   emptyState: { alignItems: "center", paddingTop: 44, paddingHorizontal: 24 },
   emptyIcon: {
-    width: 62,
-    height: 62,
-    borderRadius: 22,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: COLORS.primarySoft,
+    backgroundColor: COLORS.surfaceRaised,
     borderWidth: 1,
-    borderColor: "rgba(1,217,168,0.18)",
+    borderColor: COLORS.line,
   },
   emptyTitle: {
     color: COLORS.text,
-    fontSize: 16,
-    fontWeight: "800",
+    fontSize: 17,
+    fontWeight: "900",
     marginTop: 14,
     textAlign: "center",
   },
   emptyDescription: {
     color: COLORS.muted,
-    fontSize: 12.5,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
     marginTop: 6,
     textAlign: "center",
     maxWidth: 260,
@@ -7608,7 +7629,7 @@ const styles = StyleSheet.create({
     height: 77,
     paddingHorizontal: 9,
     paddingTop: 9,
-    backgroundColor: "#161824",
+    backgroundColor: COLORS.surface,
     borderTopWidth: 1,
     borderTopColor: COLORS.line,
     flexDirection: "row",
@@ -7620,10 +7641,10 @@ const styles = StyleSheet.create({
     width: 45,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: 11,
+    borderRadius: 14,
     position: "relative",
   },
-  tabIconWrapActive: { backgroundColor: "rgba(1,217,168,0.14)" },
+  tabIconWrapActive: { backgroundColor: COLORS.primarySoft },
   tabBadge: {
     width: 7,
     height: 7,
@@ -7638,155 +7659,163 @@ const styles = StyleSheet.create({
   tabLabel: {
     color: COLORS.muted,
     fontSize: 10,
-    fontWeight: "600",
+    fontWeight: "700",
     marginTop: 3,
   },
-  tabLabelActive: { color: COLORS.primary },
+  tabLabelActive: { color: COLORS.text },
   screenHeading: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginTop: 8,
-    marginBottom: 26,
+    marginBottom: 24,
   },
   pageTitle: {
     color: COLORS.text,
-    fontSize: 29,
-    letterSpacing: -1,
-    fontWeight: "800",
+    fontSize: 30,
+    letterSpacing: -1.1,
+    fontWeight: "900",
   },
   inboxFilter: {
-    height: 47,
+    height: 46,
     borderRadius: 14,
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.surfaceRaised,
     borderWidth: 1,
     borderColor: COLORS.line,
     paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginBottom: 23,
+    marginBottom: 20,
   },
   inboxFilterText: { color: COLORS.muted, fontSize: 13 },
   inboxCaption: {
     color: COLORS.muted,
     fontSize: 10,
-    letterSpacing: 1.2,
-    fontWeight: "800",
-    marginBottom: 7,
+    letterSpacing: 1.3,
+    fontWeight: "900",
+    marginBottom: 8,
   },
   chatRow: {
-    height: 76,
+    minHeight: 76,
+    paddingVertical: 12,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 13,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.line,
+    borderBottomColor: COLORS.lineSoft,
   },
   chatText: { flex: 1, minWidth: 0 },
   chatTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 5,
+    marginBottom: 4,
   },
-  chatName: { color: COLORS.text, fontSize: 14, fontWeight: "800" },
-  chatTime: { color: COLORS.muted, fontSize: 10 },
+  chatName: { color: COLORS.text, fontSize: 15, fontWeight: "900" },
+  chatTime: { color: COLORS.muted, fontSize: 11 },
   chatBottom: { flexDirection: "row", alignItems: "center", gap: 8 },
-  chatPreview: { flex: 1, color: COLORS.muted, fontSize: 12 },
+  chatPreview: { flex: 1, color: COLORS.muted, fontSize: 13 },
   unreadBubble: {
-    backgroundColor: COLORS.primary,
-    width: 17,
-    height: 17,
-    borderRadius: 9,
+    backgroundColor: COLORS.text,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
-  unreadText: { color: COLORS.primaryInk, fontWeight: "800", fontSize: 9 },
+  unreadText: { color: COLORS.primary, fontWeight: "900", fontSize: 10 },
   communityBanner: {
-    borderRadius: 21,
+    borderRadius: 20,
     padding: 18,
-    minHeight: 112,
+    minHeight: 110,
     flexDirection: "row",
     alignItems: "center",
-    gap: 15,
+    gap: 14,
+    backgroundColor: COLORS.text,
   },
-  communityIcon: { color: COLORS.primary, fontSize: 35 },
+  communityIcon: { color: COLORS.primary, fontSize: 32 },
   communityBannerText: { flex: 1 },
   communityBannerTitle: {
     color: "#FFFFFF",
     fontSize: 17,
-    fontWeight: "800",
-    marginBottom: 5,
+    fontWeight: "900",
+    marginBottom: 4,
   },
-  communityBannerCopy: { color: "#BBC0D0", fontSize: 11, lineHeight: 16 },
+  communityBannerCopy: {
+    color: "rgba(255,255,255,0.65)",
+    fontSize: 12,
+    lineHeight: 17,
+  },
   groupCard: {
-    height: 102,
-    borderRadius: 20,
-    padding: 15,
+    height: 100,
+    borderRadius: 18,
+    padding: 14,
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 11,
+    marginBottom: 10,
   },
   groupIcon: {
-    width: 49,
-    height: 49,
+    width: 48,
+    height: 48,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: 17,
-    backgroundColor: "rgba(255,255,255,0.14)",
+    borderRadius: 24,
+    backgroundColor: "rgba(255,255,255,0.18)",
   },
   groupText: { marginLeft: 12, flex: 1 },
   groupName: {
     color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "800",
+    fontSize: 16,
+    fontWeight: "900",
     marginBottom: 4,
   },
-  groupMembers: { color: "#D5D2EC", fontSize: 11 },
+  groupMembers: { color: "rgba(255,255,255,0.72)", fontSize: 12 },
   joinButton: {
-    paddingHorizontal: 13,
+    paddingHorizontal: 14,
     paddingVertical: 9,
     backgroundColor: COLORS.primary,
-    borderRadius: 11,
+    borderRadius: 20,
   },
   joinedButton: {
-    backgroundColor: "rgba(255,255,255,0.16)",
+    backgroundColor: "rgba(255,255,255,0.18)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.25)",
+    borderColor: "rgba(255,255,255,0.30)",
   },
-  joinButtonText: { color: COLORS.primaryInk, fontSize: 11, fontWeight: "800" },
+  joinButtonText: { color: COLORS.primaryInk, fontSize: 12, fontWeight: "900" },
   joinedButtonText: { color: "#fff" },
   profileCover: {
     marginHorizontal: -20,
-    height: 142,
+    height: 150,
     overflow: "hidden",
     alignItems: "flex-end",
     paddingRight: 20,
     paddingTop: 13,
+    backgroundColor: COLORS.text,
   },
-  profileSummary: { marginTop: -43, alignItems: "center" },
+  profileSummary: { marginTop: -50, alignItems: "center" },
   avatar: {
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
   },
   avatarText: {
-    color: "#0B0C14",
+    color: "#FFFFFF",
     fontWeight: "900",
     letterSpacing: -0.5,
   },
   avatarBorder: {
-    borderWidth: 3,
+    borderWidth: 4,
     borderColor: COLORS.background,
   },
   profileName: {
     color: COLORS.text,
-    fontSize: 21,
-    fontWeight: "800",
-    marginTop: 9,
+    fontSize: 22,
+    fontWeight: "900",
+    marginTop: 10,
+    letterSpacing: -0.5,
   },
-  handle: { color: COLORS.muted, fontSize: 12, marginTop: 3 },
+  handle: { color: COLORS.muted, fontSize: 13, marginTop: 3 },
   profileStats: {
     flexDirection: "row",
     marginTop: 22,
@@ -7794,128 +7823,136 @@ const styles = StyleSheet.create({
     justifyContent: "space-evenly",
   },
   profileStat: { alignItems: "center" },
-  profileStatNumber: { color: COLORS.text, fontSize: 17, fontWeight: "800" },
-  profileStatLabel: { color: COLORS.muted, fontSize: 10, marginTop: 3 },
+  profileStatNumber: { color: COLORS.text, fontSize: 18, fontWeight: "900" },
+  profileStatLabel: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
   profileLevel: {
-    padding: 13,
+    padding: 14,
     flexDirection: "row",
     alignItems: "center",
-    gap: 11,
-    marginTop: 25,
-    borderRadius: 17,
-    backgroundColor: COLORS.surface,
+    gap: 12,
+    marginTop: 24,
+    borderRadius: 16,
+    backgroundColor: COLORS.surfaceRaised,
+    borderWidth: 1,
+    borderColor: COLORS.line,
   },
   levelIcon: {
-    width: 39,
-    height: 39,
-    borderRadius: 14,
-    backgroundColor: "#3A3542",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.text,
     justifyContent: "center",
     alignItems: "center",
   },
   levelText: { flex: 1 },
   levelTitle: {
     color: COLORS.text,
-    fontSize: 12,
-    fontWeight: "800",
-    marginBottom: 4,
+    fontSize: 13,
+    fontWeight: "900",
+    marginBottom: 3,
   },
-  levelDescription: { color: COLORS.muted, fontSize: 10 },
+  levelDescription: { color: COLORS.muted, fontSize: 11 },
   profileSection: {
     color: COLORS.muted,
     fontSize: 10,
-    letterSpacing: 1.2,
-    fontWeight: "800",
-    marginTop: 27,
-    marginBottom: 8,
+    letterSpacing: 1.4,
+    fontWeight: "900",
+    marginTop: 28,
+    marginBottom: 9,
   },
   actionList: {
     borderRadius: 18,
     overflow: "hidden",
     backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.line,
   },
   actionRow: {
-    height: 61,
+    height: 62,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 13,
+    gap: 13,
+    paddingHorizontal: 14,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.line,
+    borderBottomColor: COLORS.lineSoft,
   },
   actionIcon: {
-    width: 35,
-    height: 35,
-    borderRadius: 11,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: COLORS.surfaceRaised,
     justifyContent: "center",
     alignItems: "center",
   },
-  actionTitle: { flex: 1, color: COLORS.text, fontSize: 13, fontWeight: "700" },
-  roomScreen: { flex: 1, backgroundColor: "#0B0E16" },
+  actionTitle: { flex: 1, color: COLORS.text, fontSize: 14, fontWeight: "700" },
+  roomScreen: { flex: 1, backgroundColor: COLORS.background },
   roomHeader: {
-    height: 61,
+    height: 62,
     paddingHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    backgroundColor: COLORS.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.line,
   },
   roomHeaderText: { alignItems: "center", flex: 1, marginHorizontal: 9 },
   roomHeaderEyebrow: {
-    color: COLORS.primary,
+    color: COLORS.muted,
     fontSize: 9,
-    letterSpacing: 1,
-    fontWeight: "800",
-    marginBottom: 3,
+    letterSpacing: 1.1,
+    fontWeight: "900",
+    marginBottom: 2,
   },
-  roomHeaderTitle: { color: COLORS.text, fontSize: 15, fontWeight: "800" },
+  roomHeaderTitle: { color: COLORS.text, fontSize: 15, fontWeight: "900" },
   roomScroll: { paddingHorizontal: 16, paddingBottom: 10 },
-  roomHero: { borderRadius: 25, overflow: "hidden" },
+  roomHero: { borderRadius: 24, overflow: "hidden" },
   roomHeroGradient: {
-    minHeight: 412,
+    minHeight: 420,
     padding: 18,
     overflow: "hidden",
     position: "relative",
+    backgroundColor: COLORS.text,
   },
   roomHeroOrb: {
-    width: 290,
-    height: 290,
-    borderRadius: 145,
-    backgroundColor: "rgba(197,156,255,0.22)",
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: "rgba(245,200,66,0.15)",
     position: "absolute",
     top: -90,
     left: "13%",
   },
   roomLive: {
     textAlign: "center",
-    color: "#DED9F3",
+    color: COLORS.primary,
     fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 0.8,
+    fontWeight: "900",
+    letterSpacing: 0.9,
   },
   hostArea: { alignItems: "center", marginTop: 20 },
   hostCrown: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: "#3D3558",
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: COLORS.primary,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: -7,
-    marginLeft: 54,
+    marginBottom: -8,
+    marginLeft: 56,
     zIndex: 1,
   },
   hostName: {
-    color: COLORS.text,
-    fontSize: 15,
-    fontWeight: "800",
-    marginTop: 9,
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "900",
+    marginTop: 10,
   },
   hostRole: {
-    color: "#D6D1E7",
+    color: "rgba(255,255,255,0.65)",
     fontSize: 9,
     letterSpacing: 1.1,
-    fontWeight: "800",
+    fontWeight: "900",
     marginTop: 3,
   },
   voiceMeter: {
@@ -7935,19 +7972,19 @@ const styles = StyleSheet.create({
   },
   seat: { width: "22%", alignItems: "center" },
   seatAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 18,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-    backgroundColor: "rgba(19,21,35,0.4)",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.22)",
+    backgroundColor: "rgba(255,255,255,0.12)",
     position: "relative",
   },
   seatAvatarSpeaking: { borderWidth: 3, borderColor: COLORS.primary },
-  seatInitial: { color: "#1F2130", fontSize: 20, fontWeight: "900" },
-  seatName: { color: "#ECEAF6", fontSize: 10, marginTop: 6 },
+  seatInitial: { color: "#FFFFFF", fontSize: 20, fontWeight: "900" },
+  seatName: { color: "rgba(255,255,255,0.88)", fontSize: 10, marginTop: 6 },
   seatMuted: {
     position: "absolute",
     right: -4,
@@ -7955,7 +7992,7 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: "#302936",
+    backgroundColor: COLORS.surfaceRaised,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -7967,16 +8004,16 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     marginTop: 14,
     borderWidth: 1,
-    borderColor: "#4B4E63",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 22,
+    borderColor: "rgba(255,255,255,0.22)",
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    borderRadius: 24,
   },
-  raiseHandText: { color: "#E9E9F0", fontSize: 12, fontWeight: "700" },
+  raiseHandText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
   chatPanel: {
     backgroundColor: COLORS.surface,
-    borderRadius: 19,
-    padding: 13,
+    borderRadius: 18,
+    padding: 14,
     marginTop: 16,
     borderWidth: 1,
     borderColor: COLORS.line,
@@ -7989,14 +8026,14 @@ const styles = StyleSheet.create({
   chatPanelTitle: {
     color: COLORS.muted,
     fontSize: 9,
-    letterSpacing: 1.2,
-    fontWeight: "800",
+    letterSpacing: 1.3,
+    fontWeight: "900",
   },
-  clearChat: { color: COLORS.primary, fontSize: 10, fontWeight: "700" },
-  messageList: { minHeight: 61, gap: 5 },
-  messageText: { color: "#D9D9E3", fontSize: 11, lineHeight: 15 },
+  clearChat: { color: COLORS.text, fontSize: 10, fontWeight: "800" },
+  messageList: { minHeight: 60, gap: 5 },
+  messageText: { color: COLORS.textSecondary, fontSize: 12, lineHeight: 16 },
   systemMessage: { color: COLORS.muted, fontStyle: "italic" },
-  messageUser: { color: COLORS.primary, fontWeight: "800" },
+  messageUser: { color: COLORS.text, fontWeight: "900" },
   composer: {
     borderTopWidth: 1,
     borderTopColor: COLORS.line,
@@ -8006,9 +8043,9 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   composerGift: {
-    width: 31,
-    height: 31,
-    borderRadius: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: COLORS.surfaceRaised,
@@ -8016,16 +8053,16 @@ const styles = StyleSheet.create({
   composerInput: {
     flex: 1,
     paddingVertical: 6,
-    color: "#F1F3F5",
-    fontSize: 12,
+    color: COLORS.text,
+    fontSize: 13,
   },
   sendButton: {
-    width: 31,
-    height: 31,
-    borderRadius: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.text,
   },
   roomControls: {
     height: 72,
@@ -8034,19 +8071,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderTopWidth: 1,
     borderTopColor: COLORS.line,
-    backgroundColor: "#161824",
+    backgroundColor: COLORS.surface,
   },
   roomControl: { width: 66, alignItems: "center" },
   roomControlIcon: {
-    width: 37,
-    height: 37,
-    borderRadius: 13,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: COLORS.surfaceRaised,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: COLORS.line,
   },
-  roomControlActive: { backgroundColor: COLORS.primary },
-  roomControlDanger: { backgroundColor: "#392A36" },
+  roomControlActive: { backgroundColor: COLORS.text, borderColor: COLORS.text },
+  roomControlDanger: {
+    backgroundColor: "rgba(217,79,79,0.12)",
+    borderColor: "rgba(217,79,79,0.30)",
+  },
   roomControlLabel: { color: COLORS.muted, fontSize: 9, marginTop: 4 },
   roomControlLabelActive: { color: COLORS.primary },
   modalOverlay: {
@@ -8067,7 +8109,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 4,
     borderRadius: 4,
-    backgroundColor: "#5A5D6F",
+    backgroundColor: COLORS.line,
     position: "absolute",
     alignSelf: "center",
     top: 10,
@@ -8098,56 +8140,66 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sheetInput: {
-    height: 47,
-    borderRadius: 12,
-    backgroundColor: COLORS.surfaceHigh,
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: COLORS.surfaceRaised,
     borderWidth: 1,
     borderColor: COLORS.line,
     color: COLORS.text,
-    paddingHorizontal: 13,
-    fontSize: 14,
-    marginBottom: 19,
+    paddingHorizontal: 14,
+    fontSize: 15,
+    marginBottom: 18,
   },
-  sheetCategories: { flexDirection: "row", gap: 7, marginBottom: 25 },
+  sheetCategories: {
+    flexDirection: "row",
+    gap: 7,
+    marginBottom: 24,
+    flexWrap: "wrap",
+  },
   sheetCategory: {
-    paddingVertical: 9,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    backgroundColor: COLORS.surfaceHigh,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: COLORS.surfaceRaised,
     borderWidth: 1,
     borderColor: COLORS.line,
   },
   sheetCategoryActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.text,
+    borderColor: COLORS.text,
   },
-  sheetCategoryText: { color: COLORS.textSecondary, fontSize: 11, fontWeight: "700" },
-  sheetCategoryTextActive: { color: COLORS.primaryInk },
+  sheetCategoryText: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  sheetCategoryTextActive: { color: COLORS.primary },
   createSubmit: {
-    height: 52,
-    borderRadius: 13,
+    height: 54,
+    borderRadius: 27,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
+    backgroundColor: COLORS.text,
   },
   createSubmitText: {
-    color: COLORS.primaryInk,
-    fontSize: 14,
-    fontWeight: "800",
+    color: COLORS.primary,
+    fontSize: 15,
+    fontWeight: "900",
   },
   favoriteFilter: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
     borderWidth: 1,
-    borderColor: "#455447",
-    borderRadius: 11,
-    paddingHorizontal: 9,
+    borderColor: COLORS.line,
+    borderRadius: 20,
+    paddingHorizontal: 10,
     paddingVertical: 7,
   },
   liveActionBar: {
-    minHeight: 49,
+    minHeight: 50,
     paddingHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
@@ -8161,7 +8213,7 @@ const styles = StyleSheet.create({
     alignItems: "baseline",
     justifyContent: "space-between",
   },
-  recentHint: { color: COLORS.primary, fontSize: 10, fontWeight: "800" },
+  recentHint: { color: COLORS.text, fontSize: 10, fontWeight: "900" },
   recentList: { gap: 11, paddingBottom: 2 },
   recentRoom: { width: 124 },
   recentArtwork: {
@@ -8185,10 +8237,10 @@ const styles = StyleSheet.create({
     borderRadius: 39,
     right: -19,
     bottom: -21,
-    opacity: 0.82,
+    opacity: 0.72,
   },
-  recentName: { color: COLORS.text, fontSize: 12, fontWeight: "800" },
-  recentMeta: { color: COLORS.muted, fontSize: 10, marginTop: 3 },
+  recentName: { color: COLORS.text, fontSize: 12, fontWeight: "900" },
+  recentMeta: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
   inboxSearchInput: {
     flex: 1,
     color: COLORS.text,
@@ -8198,25 +8250,26 @@ const styles = StyleSheet.create({
   directMessageOverlay: { flex: 1, backgroundColor: COLORS.background },
   directMessageSheet: { flex: 1, paddingTop: Platform.OS === "ios" ? 54 : 19 },
   directMessageHeader: {
-    height: 64,
+    height: 66,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.line,
     paddingHorizontal: 17,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+    backgroundColor: COLORS.surface,
   },
   directBack: {
-    width: 34,
-    height: 34,
+    width: 36,
+    height: 36,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: 12,
+    borderRadius: 18,
     backgroundColor: COLORS.surfaceRaised,
   },
   directHeaderText: { flex: 1 },
-  directName: { color: COLORS.text, fontSize: 15, fontWeight: "800" },
-  directStatus: { color: COLORS.primary, fontSize: 10, marginTop: 2 },
+  directName: { color: COLORS.text, fontSize: 15, fontWeight: "900" },
+  directStatus: { color: COLORS.muted, fontSize: 10, marginTop: 2 },
   directMessages: {
     flexGrow: 1,
     padding: 17,
@@ -8227,19 +8280,22 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     maxWidth: "80%",
     backgroundColor: COLORS.surfaceRaised,
-    borderRadius: 15,
+    borderRadius: 18,
     borderBottomLeftRadius: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: COLORS.line,
   },
   directBubbleOwn: {
     alignSelf: "flex-end",
-    backgroundColor: COLORS.primary,
-    borderBottomLeftRadius: 15,
+    backgroundColor: COLORS.text,
+    borderColor: COLORS.text,
+    borderBottomLeftRadius: 18,
     borderBottomRightRadius: 4,
   },
-  directBubbleText: { color: COLORS.text, fontSize: 13, lineHeight: 18 },
-  directBubbleTextOwn: { color: COLORS.primaryInk },
+  directBubbleText: { color: COLORS.text, fontSize: 14, lineHeight: 20 },
+  directBubbleTextOwn: { color: COLORS.primary },
   directComposer: {
     flexDirection: "row",
     alignItems: "center",
@@ -8253,61 +8309,66 @@ const styles = StyleSheet.create({
   },
   directInput: {
     flex: 1,
-    height: 42,
-    paddingHorizontal: 13,
-    borderRadius: 14,
+    height: 44,
+    paddingHorizontal: 14,
+    borderRadius: 22,
     color: COLORS.text,
     backgroundColor: COLORS.surfaceRaised,
-    fontSize: 13,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    fontSize: 14,
   },
   directSend: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.text,
   },
   handStatus: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     borderWidth: 1,
-    borderColor: "#4B4E63",
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    borderColor: COLORS.line,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: COLORS.surfaceRaised,
   },
   handStatusActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.text,
+    borderColor: COLORS.text,
   },
-  handStatusText: { color: COLORS.primary, fontSize: 10, fontWeight: "800" },
-  handStatusTextActive: { color: COLORS.primaryInk },
+  handStatusText: { color: COLORS.text, fontSize: 11, fontWeight: "800" },
+  handStatusTextActive: { color: COLORS.primary },
   reactionTray: { flexDirection: "row", alignItems: "center", gap: 5 },
   reactionButton: {
-    minWidth: 36,
-    height: 30,
-    paddingHorizontal: 6,
-    borderRadius: 10,
+    minWidth: 38,
+    height: 32,
+    paddingHorizontal: 8,
+    borderRadius: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 2,
+    gap: 3,
     backgroundColor: COLORS.surfaceRaised,
+    borderWidth: 1,
+    borderColor: COLORS.line,
   },
-  reactionEmoji: { fontSize: 12 },
-  reactionCount: { color: COLORS.text, fontSize: 9, fontWeight: "800" },
+  reactionEmoji: { fontSize: 13 },
+  reactionCount: { color: COLORS.text, fontSize: 10, fontWeight: "900" },
   favoriteFilterActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.text,
+    borderColor: COLORS.text,
   },
   favoriteFilterText: {
-    color: COLORS.primary,
-    fontSize: 10,
+    color: COLORS.text,
+    fontSize: 11,
     fontWeight: "800",
   },
-  favoriteFilterTextActive: { color: COLORS.primaryInk },
+  favoriteFilterTextActive: { color: COLORS.primary },
   roomCardMain: {
     flex: 1,
     flexDirection: "row",
@@ -8333,11 +8394,11 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: Platform.OS === "ios" ? 61 : 27,
     paddingHorizontal: 14,
-    backgroundColor: "rgba(5,6,11,0.38)",
+    backgroundColor: "rgba(26,20,16,0.42)",
   },
   notificationSheet: {
     maxHeight: "70%",
-    borderRadius: 23,
+    borderRadius: 22,
     padding: 16,
     backgroundColor: COLORS.surface,
     borderWidth: 1,
@@ -8351,60 +8412,60 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.line,
   },
-  notificationTitle: { color: COLORS.text, fontSize: 17, fontWeight: "800" },
-  notificationSubtitle: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
-  notificationClear: { color: COLORS.primary, fontSize: 12, fontWeight: "800" },
+  notificationTitle: { color: COLORS.text, fontSize: 18, fontWeight: "900" },
+  notificationSubtitle: { color: COLORS.muted, fontSize: 12, marginTop: 3 },
+  notificationClear: { color: COLORS.text, fontSize: 12, fontWeight: "900" },
   notificationList: { paddingTop: 4 },
   notificationRow: {
     flexDirection: "row",
     gap: 11,
     paddingVertical: 13,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.line,
+    borderBottomColor: COLORS.lineSoft,
   },
   notificationIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
   },
   notificationText: { flex: 1 },
   notificationMessage: {
     color: COLORS.text,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "700",
-    lineHeight: 17,
+    lineHeight: 18,
   },
-  notificationTime: { color: COLORS.muted, fontSize: 10, marginTop: 3 },
+  notificationTime: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
   notificationEmpty: { alignItems: "center", paddingVertical: 37, gap: 9 },
-  notificationEmptyText: { color: COLORS.muted, fontSize: 12 },
+  notificationEmptyText: { color: COLORS.muted, fontSize: 13 },
   settingsCaption: {
     color: COLORS.muted,
     fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 1.15,
+    fontWeight: "900",
+    letterSpacing: 1.3,
     marginBottom: 9,
   },
   settingsDataCaption: { marginTop: 20 },
   settingRow: {
-    minHeight: 71,
-    paddingVertical: 10,
+    minHeight: 72,
+    paddingVertical: 12,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.line,
+    borderBottomColor: COLORS.lineSoft,
   },
   settingIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 13,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: COLORS.surfaceRaised,
   },
-  settingIconActive: { backgroundColor: COLORS.primary },
+  settingIconActive: { backgroundColor: COLORS.text },
   settingContent: { flex: 1 },
   settingTitle: { color: COLORS.text, fontSize: 13, fontWeight: "800" },
   settingDescription: { color: COLORS.muted, fontSize: 10, marginTop: 3 },
@@ -8421,27 +8482,34 @@ const styles = StyleSheet.create({
   },
   dataNotice: {
     minHeight: 64,
-    padding: 13,
+    padding: 14,
     borderRadius: 16,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: "rgba(1,217,168,0.12)",
+    backgroundColor: COLORS.surfaceRaised,
     borderWidth: 1,
-    borderColor: "rgba(1,217,168,0.30)",
+    borderColor: COLORS.line,
     marginTop: -8,
-    marginBottom: 13,
+    marginBottom: 14,
   },
-  dataNoticeText: { flex: 1, color: COLORS.textSecondary, fontSize: 11, lineHeight: 16 },
+  dataNoticeText: {
+    flex: 1,
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
+  },
   dataSummary: {
-    minHeight: 77,
+    minHeight: 80,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-around",
     marginBottom: 12,
-    paddingVertical: 12,
-    borderRadius: 17,
+    paddingVertical: 14,
+    borderRadius: 18,
     backgroundColor: COLORS.surfaceRaised,
+    borderWidth: 1,
+    borderColor: COLORS.line,
   },
   dataSummaryItem: {
     flex: 1,
@@ -8449,12 +8517,12 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: COLORS.line,
   },
-  dataSummaryValue: { color: COLORS.text, fontSize: 17, fontWeight: "900" },
+  dataSummaryValue: { color: COLORS.text, fontSize: 18, fontWeight: "900" },
   dataSummaryLabel: {
     color: COLORS.muted,
-    fontSize: 8,
+    fontSize: 9,
     fontWeight: "900",
-    letterSpacing: 0.8,
+    letterSpacing: 0.9,
     marginTop: 4,
   },
   dataAction: {
@@ -8464,15 +8532,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.line,
+    borderBottomColor: COLORS.lineSoft,
   },
   dataActionIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 13,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(1,217,168,0.14)",
+    backgroundColor: COLORS.surfaceRaised,
+    borderWidth: 1,
+    borderColor: COLORS.line,
   },
   dataDestructiveAction: {
     minHeight: 69,
@@ -8482,14 +8552,20 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   dataDestructiveIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 13,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#392A36",
+    backgroundColor: "rgba(217,79,79,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(217,79,79,0.22)",
   },
-  dataDestructiveTitle: { color: COLORS.pink, fontSize: 13, fontWeight: "800" },
+  dataDestructiveTitle: {
+    color: COLORS.danger,
+    fontSize: 13,
+    fontWeight: "800",
+  },
   dataFootnote: {
     color: COLORS.muted,
     fontSize: 10,
@@ -8504,7 +8580,12 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     backgroundColor: COLORS.surfaceRaised,
   },
-  roomRuleText: { flex: 1, color: COLORS.textSecondary, fontSize: 12, lineHeight: 17 },
+  roomRuleText: {
+    flex: 1,
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
+  },
   reportButton: {
     marginTop: 15,
     flexDirection: "row",
@@ -8514,9 +8595,10 @@ const styles = StyleSheet.create({
     height: 45,
     borderRadius: 13,
     borderWidth: 1,
-    borderColor: "#573D4C",
+    borderColor: "rgba(217,79,79,0.30)",
+    backgroundColor: "rgba(217,79,79,0.06)",
   },
-  reportButtonText: { color: COLORS.pink, fontSize: 12, fontWeight: "800" },
+  reportButtonText: { color: COLORS.danger, fontSize: 12, fontWeight: "800" },
   audienceBar: {
     minHeight: 61,
     marginTop: 15,
@@ -8524,7 +8606,7 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.surfaceRaised,
     borderWidth: 1,
     borderColor: COLORS.line,
   },
@@ -8532,14 +8614,14 @@ const styles = StyleSheet.create({
   audienceAvatar: {
     width: 29,
     height: 29,
-    borderRadius: 10,
+    borderRadius: 15,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: COLORS.surface,
+    borderColor: COLORS.background,
   },
   audienceInitial: {
-    color: COLORS.primaryInk,
+    color: "#FFFFFF",
     fontSize: 11,
     fontWeight: "900",
   },
@@ -8621,14 +8703,18 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
   },
-  onboardingScreen: { flex: 1 },
+  onboardingScreen: { flex: 1, backgroundColor: COLORS.text },
   onboardingSafe: { flex: 1, paddingHorizontal: 24, paddingVertical: 18 },
   onboardingSkip: {
     alignSelf: "flex-end",
     paddingHorizontal: 8,
     paddingVertical: 8,
   },
-  onboardingSkipText: { color: "#D3D2E3", fontSize: 13, fontWeight: "800" },
+  onboardingSkipText: {
+    color: "rgba(255,255,255,0.65)",
+    fontSize: 13,
+    fontWeight: "800",
+  },
   onboardingContent: {
     flex: 1,
     alignItems: "center",
@@ -8636,58 +8722,59 @@ const styles = StyleSheet.create({
     paddingBottom: 25,
   },
   onboardingIcon: {
-    width: 100,
-    height: 100,
-    borderRadius: 35,
+    width: 108,
+    height: 108,
+    borderRadius: 54,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(1,217,168,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(1,217,168,0.28)",
-    marginBottom: 29,
+    backgroundColor: "rgba(245,200,66,0.18)",
+    borderWidth: 2,
+    borderColor: "rgba(245,200,66,0.40)",
+    marginBottom: 32,
   },
   onboardingKicker: {
     color: COLORS.primary,
     fontSize: 10,
     fontWeight: "900",
-    letterSpacing: 1.45,
-    marginBottom: 12,
+    letterSpacing: 1.6,
+    marginBottom: 14,
   },
   onboardingTitle: {
-    color: "#F7F8FC",
-    fontSize: 33,
+    color: "#FFFFFF",
+    fontSize: 34,
     fontWeight: "900",
-    letterSpacing: -1.25,
+    letterSpacing: -1.3,
     textAlign: "center",
   },
   onboardingCopy: {
     maxWidth: 290,
-    color: "#CACADA",
-    fontSize: 14,
+    color: "rgba(255,255,255,0.65)",
+    fontSize: 15,
     textAlign: "center",
-    lineHeight: 21,
-    marginTop: 13,
+    lineHeight: 22,
+    marginTop: 14,
   },
-  onboardingFooter: { gap: 21, paddingBottom: 12 },
+  onboardingFooter: { gap: 22, paddingBottom: 12 },
   onboardingDots: { flexDirection: "row", justifyContent: "center", gap: 7 },
   onboardingDot: {
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: "#55576B",
+    backgroundColor: "rgba(255,255,255,0.22)",
   },
-  onboardingDotActive: { width: 23, backgroundColor: COLORS.primary },
+  onboardingDotActive: { width: 24, backgroundColor: COLORS.primary },
   onboardingNext: {
-    height: 54,
-    paddingHorizontal: 18,
-    borderRadius: 16,
+    height: 56,
+    paddingHorizontal: 20,
+    borderRadius: 28,
+    backgroundColor: COLORS.primary,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
   onboardingNextText: {
     color: COLORS.primaryInk,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "900",
   },
   lobbyScreen: { flex: 1, backgroundColor: COLORS.background },
@@ -8697,8 +8784,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    backgroundColor: COLORS.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.line,
   },
-  lobbyHeaderTitle: { color: COLORS.text, fontSize: 15, fontWeight: "800" },
+  lobbyHeaderTitle: { color: COLORS.text, fontSize: 16, fontWeight: "900" },
   lobbyHeaderSpacer: { width: 39 },
   lobbyContent: { flex: 1, paddingHorizontal: 20, paddingTop: 11 },
   lobbyArtwork: {
@@ -8727,16 +8817,16 @@ const styles = StyleSheet.create({
     letterSpacing: 0.75,
   },
   lobbyHost: {
-    color: "#F5F5FA",
-    fontSize: 16,
+    color: "#FFFFFF",
+    fontSize: 17,
     fontWeight: "900",
     marginTop: 10,
   },
   lobbyHostRole: {
-    color: "#D8D4E8",
+    color: "rgba(255,255,255,0.65)",
     fontSize: 9,
     letterSpacing: 1.1,
-    fontWeight: "800",
+    fontWeight: "900",
     marginTop: 3,
   },
   lobbyTitle: {
@@ -8761,7 +8851,12 @@ const styles = StyleSheet.create({
     gap: 9,
     backgroundColor: COLORS.surface,
   },
-  lobbyNoticeText: { flex: 1, color: COLORS.textSecondary, fontSize: 11, lineHeight: 16 },
+  lobbyNoticeText: {
+    flex: 1,
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    lineHeight: 16,
+  },
   lobbyCheckRow: { flexDirection: "row", gap: 9, marginTop: 10 },
   lobbyCheckButton: {
     flex: 1,
@@ -8810,16 +8905,17 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   lobbyJoin: {
-    height: 61,
+    height: 62,
     paddingHorizontal: 17,
-    borderRadius: 17,
+    borderRadius: 31,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    backgroundColor: COLORS.text,
   },
-  lobbyJoinTitle: { color: COLORS.primaryInk, fontSize: 15, fontWeight: "900" },
+  lobbyJoinTitle: { color: COLORS.primary, fontSize: 15, fontWeight: "900" },
   lobbyJoinSubtitle: {
-    color: "#42602B",
+    color: "rgba(245,200,66,0.70)",
     fontSize: 10,
     fontWeight: "700",
     marginTop: 2,
@@ -8881,7 +8977,9 @@ const styles = StyleSheet.create({
     borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#38394C",
+    backgroundColor: COLORS.surfaceRaised,
+    borderWidth: 1,
+    borderColor: COLORS.line,
   },
   communityEventDay: {
     color: COLORS.primary,
@@ -8931,15 +9029,17 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   coinPill: {
-    height: 31,
+    height: 32,
     paddingHorizontal: 10,
-    borderRadius: 10,
+    borderRadius: 16,
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    backgroundColor: "#383544",
+    backgroundColor: COLORS.primarySoft,
+    borderWidth: 1,
+    borderColor: "rgba(245,200,66,0.35)",
   },
-  coinPillText: { color: "#F4D168", fontSize: 12, fontWeight: "900" },
+  coinPillText: { color: COLORS.text, fontSize: 13, fontWeight: "900" },
   giftHint: {
     color: COLORS.muted,
     fontSize: 11,
@@ -8993,29 +9093,29 @@ const styles = StyleSheet.create({
   streakCard: {
     minHeight: 76,
     marginTop: 12,
-    padding: 13,
+    padding: 14,
     borderRadius: 17,
     flexDirection: "row",
     alignItems: "center",
     gap: 11,
-    backgroundColor: "#352B25",
+    backgroundColor: COLORS.surfaceRaised,
     borderWidth: 1,
-    borderColor: "#614838",
+    borderColor: COLORS.line,
   },
   streakIcon: {
-    width: 39,
-    height: 39,
-    borderRadius: 13,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#F7B45A",
+    backgroundColor: COLORS.primary,
   },
   streakCopy: { flex: 1 },
-  streakTitle: { color: COLORS.text, fontSize: 12, fontWeight: "900" },
+  streakTitle: { color: COLORS.text, fontSize: 13, fontWeight: "900" },
   streakDescription: {
-    color: "#D4BCAB",
-    fontSize: 10,
-    lineHeight: 14,
+    color: COLORS.muted,
+    fontSize: 11,
+    lineHeight: 15,
     marginTop: 3,
   },
   streakDots: { flexDirection: "row", gap: 3 },
@@ -9023,56 +9123,57 @@ const styles = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 3,
-    backgroundColor: "#6B5446",
+    backgroundColor: COLORS.line,
   },
-  streakDotActive: { backgroundColor: "#F7B45A" },
+  streakDotActive: { backgroundColor: COLORS.primary },
   dailyRewardIcon: {
-    width: 39,
-    height: 39,
-    borderRadius: 13,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: COLORS.primary,
   },
   dailyRewardCopy: { flex: 1 },
-  dailyRewardTitle: { color: COLORS.text, fontSize: 12, fontWeight: "900" },
+  dailyRewardTitle: { color: COLORS.text, fontSize: 13, fontWeight: "900" },
   dailyRewardDescription: {
     color: COLORS.textSecondary,
-    fontSize: 10,
-    lineHeight: 14,
+    fontSize: 11,
+    lineHeight: 15,
     marginTop: 3,
   },
-  dailyRewardAmount: { color: COLORS.primary, fontSize: 12, fontWeight: "900" },
+  dailyRewardAmount: { color: COLORS.text, fontSize: 13, fontWeight: "900" },
   walletBalanceCard: {
-    minHeight: 128,
-    padding: 19,
-    borderRadius: 20,
+    minHeight: 130,
+    padding: 20,
+    borderRadius: 22,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 25,
+    backgroundColor: COLORS.text,
   },
   walletBalanceLabel: {
-    color: "#D9D4FC",
+    color: "rgba(255,255,255,0.60)",
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 1,
   },
   walletBalanceAmount: {
     color: "#FFFFFF",
-    fontSize: 31,
+    fontSize: 32,
     fontWeight: "900",
-    letterSpacing: -0.8,
+    letterSpacing: -0.9,
     marginTop: 7,
   },
-  walletBalanceUnit: { color: "#D9D4FC", fontSize: 13, letterSpacing: 0 },
+  walletBalanceUnit: { color: "rgba(255,255,255,0.60)", fontSize: 13 },
   walletBalanceIcon: {
-    width: 53,
-    height: 53,
-    borderRadius: 18,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.13)",
+    backgroundColor: "rgba(245,200,66,0.18)",
   },
   walletRewardRow: {
     minHeight: 74,
@@ -9081,33 +9182,35 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.line,
+    borderBottomColor: COLORS.lineSoft,
   },
   walletRewardIcon: {
-    width: 39,
-    height: 39,
-    borderRadius: 13,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#3C3740",
+    backgroundColor: COLORS.surfaceRaised,
+    borderWidth: 1,
+    borderColor: COLORS.line,
   },
   walletClaimButton: {
-    minWidth: 59,
-    height: 32,
-    paddingHorizontal: 9,
+    minWidth: 60,
+    height: 34,
+    paddingHorizontal: 10,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: 10,
-    backgroundColor: COLORS.primary,
+    borderRadius: 17,
+    backgroundColor: COLORS.text,
   },
   walletClaimButtonDisabled: {
     backgroundColor: COLORS.surfaceRaised,
     borderWidth: 1,
-    borderColor: "#4B4E63",
+    borderColor: COLORS.line,
   },
   walletClaimText: {
-    color: COLORS.primaryInk,
-    fontSize: 10,
+    color: COLORS.primary,
+    fontSize: 11,
     fontWeight: "900",
   },
   walletClaimTextDisabled: { color: COLORS.muted },
@@ -9199,7 +9302,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
   },
-  transferOptionText: { color: COLORS.textSecondary, fontSize: 11, fontWeight: "800" },
+  transferOptionText: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    fontWeight: "800",
+  },
   transferOptionTextActive: { color: COLORS.primaryInk },
   transferQuickAmount: {
     paddingHorizontal: 10,
@@ -9348,14 +9455,14 @@ const styles = StyleSheet.create({
     height: 31,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: 10,
-    backgroundColor: "#352A36",
+    borderRadius: 15,
+    backgroundColor: "rgba(217,79,79,0.08)",
     borderWidth: 1,
-    borderColor: "#5A3D4C",
+    borderColor: "rgba(217,79,79,0.22)",
   },
   participantBlockButtonActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.text,
+    borderColor: COLORS.text,
   },
   safetyNotice: {
     padding: 14,
@@ -9364,11 +9471,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
-    backgroundColor: "rgba(1,217,168,0.12)",
+    backgroundColor: COLORS.surfaceRaised,
     borderWidth: 1,
-    borderColor: "rgba(1,217,168,0.30)",
+    borderColor: COLORS.line,
   },
-  safetyNoticeText: { flex: 1, color: COLORS.textSecondary, fontSize: 11, lineHeight: 16 },
+  safetyNoticeText: {
+    flex: 1,
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    lineHeight: 16,
+  },
   blockedUserRow: {
     minHeight: 58,
     paddingVertical: 8,
@@ -9442,14 +9554,14 @@ const styles = StyleSheet.create({
     opacity: 0.72,
   },
   badgeCardUnlocked: {
-    backgroundColor: "rgba(1,217,168,0.10)",
-    borderColor: "rgba(1,217,168,0.30)",
+    backgroundColor: COLORS.primarySoft,
+    borderColor: "rgba(245,200,66,0.35)",
     opacity: 1,
   },
   badgeIcon: {
     width: 34,
     height: 34,
-    borderRadius: 12,
+    borderRadius: 17,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: COLORS.surfaceRaised,
@@ -9465,9 +9577,9 @@ const styles = StyleSheet.create({
   badgeStatus: { color: COLORS.muted, fontSize: 9, marginTop: 3 },
   profileBio: {
     maxWidth: 280,
-    color: "#C7C9D5",
-    fontSize: 11,
-    lineHeight: 16,
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
     textAlign: "center",
     marginTop: 9,
   },
@@ -9627,9 +9739,9 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#342630",
+    backgroundColor: "rgba(217,79,79,0.08)",
     borderWidth: 1,
-    borderColor: "#5A3545",
+    borderColor: "rgba(217,79,79,0.22)",
   },
   levelTitleRow: {
     flexDirection: "row",
@@ -9642,7 +9754,7 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 4,
     overflow: "hidden",
-    backgroundColor: "#3D4050",
+    backgroundColor: COLORS.line,
     marginTop: 8,
   },
   levelProgressFill: {
@@ -9687,7 +9799,7 @@ const styles = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 3,
-    backgroundColor: "#FF9DAD",
+    backgroundColor: COLORS.primary,
   },
   followedLiveText: {
     color: "#FFFFFF",
@@ -9713,9 +9825,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 9,
-    backgroundColor: "rgba(1,217,168,0.10)",
+    backgroundColor: COLORS.primarySoft,
     borderWidth: 1,
-    borderColor: "rgba(1,217,168,0.26)",
+    borderColor: "rgba(245,200,66,0.30)",
   },
   profileSocialIcon: {
     width: 27,
@@ -9731,7 +9843,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "900",
   },
-  profileSocialHint: { color: COLORS.textSecondary, fontSize: 9, fontWeight: "700" },
+  profileSocialHint: {
+    color: COLORS.textSecondary,
+    fontSize: 9,
+    fontWeight: "700",
+  },
   chatHistoryHint: { color: COLORS.muted, fontSize: 9, marginTop: 3 },
   voiceReadiness: {
     minHeight: 58,
@@ -9743,9 +9859,18 @@ const styles = StyleSheet.create({
     gap: 10,
     borderWidth: 1,
   },
-  voiceReadinessDemo: { backgroundColor: COLORS.surfaceRaised, borderColor: COLORS.line },
-  voiceReadinessReady: { backgroundColor: "rgba(1,217,168,0.10)", borderColor: "rgba(1,217,168,0.30)" },
-  voiceReadinessOffline: { backgroundColor: "rgba(229,72,107,0.10)", borderColor: "rgba(229,72,107,0.28)" },
+  voiceReadinessDemo: {
+    backgroundColor: COLORS.surfaceRaised,
+    borderColor: COLORS.line,
+  },
+  voiceReadinessReady: {
+    backgroundColor: "rgba(80,160,100,0.10)",
+    borderColor: "rgba(80,160,100,0.28)",
+  },
+  voiceReadinessOffline: {
+    backgroundColor: "rgba(217,79,79,0.08)",
+    borderColor: "rgba(217,79,79,0.22)",
+  },
   voiceReadinessText: { flex: 1 },
   voiceReadinessTitle: { color: COLORS.text, fontSize: 11, fontWeight: "900" },
   voiceReadinessDescription: {
@@ -9785,7 +9910,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#FF9DAD",
+    backgroundColor: COLORS.primary,
   },
   featureLiveLabel: {
     color: "#FFFFFF",
@@ -9865,7 +9990,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#0F1220",
+    backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.07)",
   },
@@ -9926,8 +10051,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.05)",
-    backgroundColor: "#151722",
+    borderBottomColor: COLORS.line,
+    backgroundColor: COLORS.surface,
   },
   handStatus: {
     flexDirection: "row",
@@ -9938,7 +10063,7 @@ const styles = StyleSheet.create({
     borderRadius: 13,
     paddingHorizontal: 11,
     paddingVertical: 8,
-    backgroundColor: "#1B2222",
+    backgroundColor: COLORS.surfaceRaised,
   },
   reactionTray: { flexDirection: "row", alignItems: "center", gap: 6 },
   reactionButton: {
@@ -9950,9 +10075,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 3,
-    backgroundColor: "#222531",
+    backgroundColor: COLORS.surfaceRaised,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.05)",
+    borderColor: COLORS.line,
   },
   roomScroll: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 116 },
   roomHero: {
@@ -10022,14 +10147,14 @@ const styles = StyleSheet.create({
     width: 29,
     height: 29,
     borderRadius: 15,
-    backgroundColor: "#41375D",
+    backgroundColor: COLORS.primary,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: -9,
     marginLeft: 59,
     zIndex: 1,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.24)",
+    borderWidth: 2,
+    borderColor: COLORS.text,
   },
   hostName: {
     color: "#F5F5FA",
@@ -10054,7 +10179,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: "rgba(15,16,27,0.21)",
   },
-  meterBar: { width: 3, borderRadius: 3, backgroundColor: "#D4FF89" },
+  meterBar: { width: 3, borderRadius: 3, backgroundColor: COLORS.primary },
   stageFollowButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -10147,18 +10272,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 13,
     borderRadius: 16,
-    backgroundColor: "#1D2930",
+    backgroundColor: COLORS.surfaceRaised,
     borderWidth: 1,
-    borderColor: "#3E6255",
+    borderColor: COLORS.line,
   },
-  raiseHandText: { color: COLORS.primary, fontSize: 12, fontWeight: "900" },
+  raiseHandText: { color: COLORS.text, fontSize: 12, fontWeight: "900" },
   raiseHandActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.text,
+    borderColor: COLORS.text,
   },
-  raiseHandTextActive: { color: COLORS.primaryInk },
+  raiseHandTextActive: { color: COLORS.primary },
   chatPanel: {
-    backgroundColor: "#151929",
+    backgroundColor: COLORS.text,
     borderRadius: 23,
     padding: 14,
     marginTop: 12,
@@ -10191,7 +10316,7 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#292B39",
+    backgroundColor: COLORS.surfaceRaised,
   },
   sendButton: {
     width: 34,
@@ -10210,23 +10335,26 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     alignItems: "center",
     borderTopWidth: 1,
-    borderTopColor: "#2B2E3D",
-    backgroundColor: "#151722",
+    borderTopColor: COLORS.line,
+    backgroundColor: COLORS.surface,
   },
   roomControl: { width: 61, alignItems: "center" },
   roomControlIcon: {
     width: 42,
     height: 42,
-    borderRadius: 15,
-    backgroundColor: "#282A38",
+    borderRadius: 21,
+    backgroundColor: COLORS.surfaceRaised,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.05)",
+    borderColor: COLORS.line,
   },
-  roomControlDanger: { backgroundColor: "#3D2934", borderColor: "#613542" },
+  roomControlDanger: {
+    backgroundColor: "rgba(217,79,79,0.10)",
+    borderColor: "rgba(217,79,79,0.26)",
+  },
   roomControlLabel: {
-    color: "#A7ABBC",
+    color: COLORS.muted,
     fontSize: 9,
     fontWeight: "700",
     marginTop: 5,
@@ -10234,11 +10362,10 @@ const styles = StyleSheet.create({
   brandMark: {
     width: 34,
     height: 34,
-    borderRadius: 12,
+    borderRadius: 17,
     overflow: "hidden",
-    backgroundColor: "#050509",
-    borderWidth: 1,
-    borderColor: "rgba(1,217,168,0.28)",
+    backgroundColor: COLORS.text,
+    borderWidth: 0,
   },
   brandLogo: { width: "100%", height: "100%" },
   onboardingLogo: { width: 92, height: 92, borderRadius: 28 },
@@ -10253,12 +10380,24 @@ const styles = StyleSheet.create({
     gap: 10,
     borderWidth: 1,
   },
-  roomVoiceConnected: { backgroundColor: "#223128", borderColor: "#3F654B" },
-  roomVoiceConnecting: { backgroundColor: "#272B3A", borderColor: "#414968" },
-  roomVoiceError: { backgroundColor: "#37282E", borderColor: "#694653" },
-  roomVoiceLocal: { backgroundColor: "#222531", borderColor: "#353947" },
+  roomVoiceConnected: {
+    backgroundColor: "rgba(80,160,100,0.12)",
+    borderColor: "rgba(80,160,100,0.30)",
+  },
+  roomVoiceConnecting: {
+    backgroundColor: COLORS.surfaceRaised,
+    borderColor: COLORS.line,
+  },
+  roomVoiceError: {
+    backgroundColor: "rgba(217,79,79,0.08)",
+    borderColor: "rgba(217,79,79,0.26)",
+  },
+  roomVoiceLocal: {
+    backgroundColor: COLORS.surfaceRaised,
+    borderColor: COLORS.line,
+  },
   roomVoiceStatusCopy: { flex: 1 },
-  roomVoiceStatusTitle: { color: "#F5F5FA", fontSize: 11, fontWeight: "900" },
+  roomVoiceStatusTitle: { color: COLORS.text, fontSize: 11, fontWeight: "900" },
   roomVoiceStatusDescription: { color: "#B9BDCA", fontSize: 10, marginTop: 3 },
   roomVoiceRetry: {
     minHeight: 32,
@@ -10269,24 +10408,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 5,
   },
-  roomVoiceRetryText: { color: COLORS.primary, fontSize: 10, fontWeight: "900" },
+  roomVoiceRetryText: {
+    color: COLORS.primary,
+    fontSize: 10,
+    fontWeight: "900",
+  },
   followHostButton: {
-    minHeight: 31,
-    paddingHorizontal: 11,
-    borderRadius: 11,
+    minHeight: 32,
+    paddingHorizontal: 12,
+    borderRadius: 16,
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
     borderWidth: 1,
-    borderColor: "#476B51",
-    backgroundColor: "#1E2B24",
+    borderColor: COLORS.line,
+    backgroundColor: COLORS.surfaceRaised,
   },
   followHostButtonActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.text,
+    borderColor: COLORS.text,
   },
-  followHostText: { color: COLORS.primary, fontSize: 10, fontWeight: "900" },
-  followHostTextActive: { color: COLORS.primaryInk },
+  followHostText: { color: COLORS.text, fontSize: 11, fontWeight: "900" },
+  followHostTextActive: { color: COLORS.primary },
   memberSheet: { maxHeight: "82%" },
   memberHint: {
     color: COLORS.muted,
@@ -10379,7 +10522,7 @@ const styles = StyleSheet.create({
     width: 260,
     height: 260,
     borderRadius: 130,
-    backgroundColor: "rgba(1,217,168,0.10)",
+    backgroundColor: "rgba(245,200,66,0.12)",
     top: -112,
     right: -92,
   },
@@ -10393,20 +10536,20 @@ const styles = StyleSheet.create({
   discoverEmptySeat: {
     width: 80,
     height: 80,
-    borderRadius: 27,
+    borderRadius: 40,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(1,217,168,0.17)",
-    borderWidth: 1,
-    borderColor: "rgba(1,217,168,0.48)",
+    backgroundColor: "rgba(245,200,66,0.18)",
+    borderWidth: 2,
+    borderColor: "rgba(245,200,66,0.45)",
     transform: [{ rotate: "-5deg" }],
   },
   discoverEmptySeatSide: {
     width: 62,
     height: 62,
-    borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.07)",
-    borderColor: "rgba(255,255,255,0.17)",
+    borderRadius: 31,
+    backgroundColor: "rgba(255,255,255,0.10)",
+    borderColor: "rgba(255,255,255,0.20)",
     transform: [{ rotate: "5deg" }],
   },
   discoverEmptyCopy: { marginBottom: 22 },
@@ -10513,9 +10656,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 14,
     borderRadius: 23,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: "rgba(1,217,168,0.22)",
+    backgroundColor: COLORS.text,
+    borderWidth: 0,
     ...ELEVATION.card,
   },
   discoverLiveCopy: { flex: 1, minWidth: 0 },
@@ -10532,7 +10674,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.1,
   },
   discoverLiveTitle: {
-    color: COLORS.text,
+    color: "#FFFFFF",
     fontSize: 17,
     lineHeight: 22,
     fontWeight: "900",
@@ -10541,12 +10683,10 @@ const styles = StyleSheet.create({
   discoverLiveCount: {
     width: 56,
     height: 56,
-    borderRadius: 18,
+    borderRadius: 28,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(1,217,168,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(1,217,168,0.20)",
+    backgroundColor: "rgba(245,200,66,0.18)",
   },
   discoverLiveNumber: {
     color: COLORS.primary,
@@ -10555,7 +10695,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   discoverLiveCountText: {
-    color: "rgba(1,217,168,0.72)",
+    color: "rgba(245,200,66,0.80)",
     fontSize: 9,
     fontWeight: "900",
     letterSpacing: 0.9,
@@ -10732,7 +10872,12 @@ const styles = StyleSheet.create({
   },
   roomDetails: { paddingHorizontal: 3, paddingTop: 10, paddingBottom: 4 },
   roomHostRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  roomHostName: { flex: 1, color: COLORS.text, fontSize: 12, fontWeight: "800" },
+  roomHostName: {
+    flex: 1,
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: "800",
+  },
   roomTitleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -10770,7 +10915,11 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: 10,
   },
-  listenerCount: { color: COLORS.textSecondary, fontSize: 12, fontWeight: "700" },
+  listenerCount: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    fontWeight: "700",
+  },
   roomCategoryPill: {
     borderRadius: 9,
     paddingHorizontal: 8,
@@ -11040,7 +11189,10 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.16)",
     ...ELEVATION.card,
   },
-  roomFloatingButtonActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  roomFloatingButtonActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
   emptySeat: { justifyContent: "flex-start" },
   emptySeatAvatar: {
     width: 53,
