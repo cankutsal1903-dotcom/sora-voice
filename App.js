@@ -671,6 +671,8 @@ function Discover({
   if (!featuredRoom) {
     return (
       <ScrollView
+        key="empty"
+        style={styles.discoverScroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.pageContent}
       >
@@ -732,12 +734,11 @@ function Discover({
   return (
     <>
       <ScrollView
+        key="rooms"
+        style={styles.discoverScroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.pageContent}
         keyboardShouldPersistTaps="handled"
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={10}
-        windowSize={10}
       >
         <Reveal distance={10}>
           <View style={styles.topBar}>
@@ -7208,6 +7209,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     paddingTop: Platform.OS === "android" ? 8 : 0,
   },
+  discoverScroll: { flex: 1 },
   pageContent: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 104 },
   topBar: {
     height: 48,
