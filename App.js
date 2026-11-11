@@ -4436,6 +4436,18 @@ function Room({
     accessToken,
     startWithMicrophone: initialMicrophoneOn,
   });
+  const retryVoiceConnection = async () => {
+    if (isHost && room.persisted && onHostPresenceChange) {
+      try {
+        await onHostPresenceChange(room.id, true);
+      } catch (error) {
+        console.error("Room voice retry failed", error);
+        Alert.alert("Oda açılamadı", "Bağlantıyı kontrol edip tekrar dene.");
+        return;
+      }
+    }
+    liveVoice.reconnect();
+  };
   const [roomMembers, setRoomMembers] = useState([]);
   const [blockedUserIds, setBlockedUserIds] = useState([]);
   const canModerate = isHost || ["host", "moderator"].includes(liveVoice.role);
@@ -5128,7 +5140,7 @@ function Room({
               <Text style={styles.roomVoiceStatusTitle}>{voiceStatusInfo.title}</Text>
               <Text style={styles.roomVoiceStatusDescription}>{voiceStatusInfo.description}</Text>
             </View>
-            <Pressable style={styles.roomVoiceRetry} onPress={liveVoice.reconnect}>
+            <Pressable style={styles.roomVoiceRetry} onPress={retryVoiceConnection}>
               <Text style={styles.roomVoiceRetryText}>Yeniden dene</Text>
             </Pressable>
           </View>
@@ -6022,9 +6034,7 @@ function AppContent() {
 
   const resumeHostedRoom = async (existingRoom) => {
     try {
-      const liveRoom = existingRoom.state === "live"
-        ? existingRoom
-        : await setRemoteRoomPresence(existingRoom.id, true);
+      const liveRoom = await setRemoteRoomPresence(existingRoom.id, true);
       setRooms((currentRooms) => [
         liveRoom,
         ...currentRooms.filter((item) => item.id !== liveRoom.id),
