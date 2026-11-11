@@ -26,6 +26,7 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
   useEffect(() => {
     let active = true;
     let connectedRoom;
+    let tokenFetchController;
 
     const updateParticipants = () => {
       if (!active || !connectedRoom) return;
@@ -48,10 +49,20 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
         return;
       }
       if (!userId || !accessToken) {
-        throw new Error("Canlı odaya katılmak için oturum açmalısın.");
+        setState({
+          ...initialState,
+          status: "error",
+          error: "Canlı odaya katılmak için oturum açmalısın.",
+        });
+        return;
       }
 
       setState({ ...initialState, status: "connecting" });
+      tokenFetchController = new AbortController();
+      const tokenFetchTimeout = setTimeout(
+        () => tokenFetchController.abort(),
+        12_000,
+      );
       try {
         const response = await fetch(`${tokenServerUrl}/token`, {
           method: "POST",
@@ -60,6 +71,7 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
             name: profile.name,
             roomName,
           }),
+          signal: tokenFetchController.signal,
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || !payload.token || !payload.serverUrl) {
@@ -104,18 +116,26 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
         updateParticipants();
       } catch (error) {
         if (active) {
+          const aborted = error?.name === "AbortError";
           setState({
             ...initialState,
             status: "error",
-            error: error instanceof Error ? error.message : "Ses bağlantısı kurulamadı.",
+            error: aborted
+              ? "Ses sunucusuna ulaşılamadı. Bağlantını kontrol edip yeniden dene."
+              : error instanceof Error
+                ? error.message
+                : "Ses bağlantısı kurulamadı.",
           });
         }
+      } finally {
+        clearTimeout(tokenFetchTimeout);
       }
     };
 
     connect();
     return () => {
       active = false;
+      tokenFetchController?.abort();
       if (connectedRoom) {
         connectedRoom.off(RoomEvent.ParticipantConnected, updateParticipants);
         connectedRoom.off(RoomEvent.ParticipantDisconnected, updateParticipants);

@@ -16,7 +16,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_TOKEN_SERVER_URL": "http://192.168.1.40:3001",
+        "EXPO_PUBLIC_TOKEN_SERVER_URL": "http://192.168.1.33:3001",
         "EXPO_PUBLIC_SUPABASE_URL": "https://eziwbekavrhbqrovbgwa.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_-G4IyIqCxn_vCsXvJb2n3g_HI6kPDG-",
         "EXPO_PUBLIC_EAS_PROJECT_ID": "eaa65edd-9980-4db9-950a-9ecb047f0ad7",
@@ -34,7 +34,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_TOKEN_SERVER_URL": "http://192.168.1.40:3001",
+        "EXPO_PUBLIC_TOKEN_SERVER_URL": "http://192.168.1.33:3001",
         "EXPO_PUBLIC_SUPABASE_URL": "https://eziwbekavrhbqrovbgwa.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_-G4IyIqCxn_vCsXvJb2n3g_HI6kPDG-",
         "EXPO_PUBLIC_EAS_PROJECT_ID": "eaa65edd-9980-4db9-950a-9ecb047f0ad7",
@@ -51,7 +51,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_TOKEN_SERVER_URL": "http://192.168.1.40:3001",
+        "EXPO_PUBLIC_TOKEN_SERVER_URL": "http://192.168.1.33:3001",
         "EXPO_PUBLIC_SUPABASE_URL": "https://eziwbekavrhbqrovbgwa.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_-G4IyIqCxn_vCsXvJb2n3g_HI6kPDG-",
         "EXPO_PUBLIC_EAS_PROJECT_ID": "eaa65edd-9980-4db9-950a-9ecb047f0ad7",

@@ -4519,10 +4519,13 @@ function Room({
             description: "Güvenli ses oturumu hazırlanıyor",
             style: styles.roomVoiceConnecting,
           }
-        : liveVoice.status === "error"
+        : liveVoice.status === "error" || liveVoice.status === "disconnected"
           ? {
               icon: "warning-outline",
-              title: "Ses bağlantısı kurulamadı",
+              title:
+                liveVoice.status === "disconnected"
+                  ? "Ses bağlantısı kesildi"
+                  : "Ses bağlantısı kurulamadı",
               description:
                 "Bağlantını kontrol et ve yeniden dene.",
               style: styles.roomVoiceError,
@@ -5134,7 +5137,8 @@ function Room({
             />
           </View>
         </View>
-        {liveVoice.status === "error" && (
+        {(liveVoice.status === "error" ||
+          liveVoice.status === "disconnected") && (
           <View style={[styles.roomVoiceStatus, voiceStatusInfo.style]}>
             <Ionicons name={voiceStatusInfo.icon} size={18} color={COLORS.text} />
             <View style={styles.roomVoiceStatusCopy}>
