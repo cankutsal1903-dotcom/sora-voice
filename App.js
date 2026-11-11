@@ -102,43 +102,43 @@ import { CommunityScreen } from "./src/screens/CommunityScreen";
 // (app.json -> #B5FF78) ayni ailede tutulur; boylece logo ile arayuz
 // birbirinden kopuk gorunmez.
 const COLORS = {
-  background: "#07080E",
-  surface: "#10111C",
-  surfaceRaised: "#171A27",
-  surfaceHigh: "#1F2231",
-  line: "#262A3B",
-  lineSoft: "#1C1F2C",
-  text: "#F7F8FC",
-  textSecondary: "#C7CBDA",
-  muted: "#9AA0B4",
-  primary: "#B5FF78",
-  primaryInk: "#0A160A",
-  primarySoft: "rgba(181,255,120,0.14)",
-  pink: "#FF7BA7",
+  background: "#F0F3F4",
+  surface: "#FFFFFF",
+  surfaceRaised: "#F7F9FA",
+  surfaceHigh: "#EAEEF1",
+  line: "#E1E6EA",
+  lineSoft: "#EDF0F3",
+  text: "#11161C",
+  textSecondary: "#4B5462",
+  muted: "#8A93A3",
+  primary: "#01D9A8",
+  primaryInk: "#04211B",
+  primarySoft: "rgba(1,217,168,0.14)",
+  pink: "#F0568C",
   purple: "#8B5CF6",
-  accent: "#59C5FF",
-  warning: "#F4D168",
-  danger: "#FF7BA7",
-  overlay: "rgba(4,5,9,0.74)",
+  accent: "#3B9DF8",
+  warning: "#E0A93A",
+  danger: "#E5486B",
+  overlay: "rgba(12,17,22,0.45)",
 };
 
 // Birincil butonlar, secili durumlar ve vurgu kartlari tek gradyani kullanir.
-const BRAND_GRADIENT = [COLORS.primary, "#7BEF5A"];
+const BRAND_GRADIENT = [COLORS.primary, "#16C7C0"];
 // Kartlarda kullanilan yumusak derinlik golgesi (Android'de elevation).
 const ELEVATION = {
   card: {
-    shadowColor: "#000000",
-    shadowOpacity: 0.42,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 5,
+    shadowColor: "#0B1A24",
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
   raised: {
-    shadowColor: "#000000",
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 9,
+    shadowColor: "#0B1A24",
+    shadowOpacity: 0.14,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
   },
 };
 
@@ -3311,7 +3311,7 @@ const RoomLobby = memo(function RoomLobby({
             };
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="dark-content" />
       <View style={styles.lobbyScreen}>
         <View style={styles.lobbyHeader}>
           <IconButton icon="chevron-back" onPress={onLeave} />
@@ -5090,7 +5090,7 @@ function Room({
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="dark-content" />
       <KeyboardAvoidingView
         style={styles.roomScreen}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -7123,7 +7123,7 @@ function AppContent() {
   return (
     <View style={styles.app}>
       <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="light-content" />
+        <StatusBar barStyle="dark-content" />
         {screens[activeTab]}
         <BottomNavigation active={activeTab} onChange={setActiveTab} />
       </SafeAreaView>
@@ -7253,7 +7253,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surfaceRaised,
     position: "relative",
   },
-  iconButtonSubtle: { backgroundColor: "rgba(15,16,27,0.28)" },
+  iconButtonSubtle: { backgroundColor: "rgba(15,16,27,0.05)" },
   iconBadge: {
     position: "absolute",
     top: 9,
@@ -7278,7 +7278,7 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   searchBoxFocused: {
-    borderColor: "rgba(181,255,120,0.45)",
+    borderColor: "rgba(1,217,168,0.45)",
     backgroundColor: COLORS.surfaceHigh,
   },
   searchInput: {
@@ -7540,7 +7540,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     borderRadius: 7,
     borderWidth: 1,
-    borderColor: "rgba(181,255,120,0.24)",
+    borderColor: "rgba(1,217,168,0.24)",
   },
   pillDot: {
     width: 4,
@@ -7572,7 +7572,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     paddingHorizontal: 8,
     borderRadius: 7,
-    backgroundColor: "rgba(181,255,120,0.10)",
+    backgroundColor: "rgba(1,217,168,0.10)",
   },
   emptyState: { alignItems: "center", paddingTop: 44, paddingHorizontal: 24 },
   emptyIcon: {
@@ -7583,7 +7583,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: COLORS.primarySoft,
     borderWidth: 1,
-    borderColor: "rgba(181,255,120,0.18)",
+    borderColor: "rgba(1,217,168,0.18)",
   },
   emptyTitle: {
     color: COLORS.text,
@@ -7623,7 +7623,7 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     position: "relative",
   },
-  tabIconWrapActive: { backgroundColor: "rgba(181,255,120,0.10)" },
+  tabIconWrapActive: { backgroundColor: "rgba(1,217,168,0.14)" },
   tabBadge: {
     width: 7,
     height: 7,
@@ -7714,7 +7714,7 @@ const styles = StyleSheet.create({
   communityIcon: { color: COLORS.primary, fontSize: 35 },
   communityBannerText: { flex: 1 },
   communityBannerTitle: {
-    color: COLORS.text,
+    color: "#FFFFFF",
     fontSize: 17,
     fontWeight: "800",
     marginBottom: 5,
@@ -7738,7 +7738,7 @@ const styles = StyleSheet.create({
   },
   groupText: { marginLeft: 12, flex: 1 },
   groupName: {
-    color: COLORS.text,
+    color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "800",
     marginBottom: 4,
@@ -7852,7 +7852,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   actionTitle: { flex: 1, color: COLORS.text, fontSize: 13, fontWeight: "700" },
-  roomScreen: { flex: 1, backgroundColor: COLORS.background },
+  roomScreen: { flex: 1, backgroundColor: "#0B0E16" },
   roomHeader: {
     height: 61,
     paddingHorizontal: 16,
@@ -8016,7 +8016,7 @@ const styles = StyleSheet.create({
   composerInput: {
     flex: 1,
     paddingVertical: 6,
-    color: COLORS.text,
+    color: "#F1F3F5",
     fontSize: 12,
   },
   sendButton: {
@@ -8056,7 +8056,7 @@ const styles = StyleSheet.create({
   },
   modalDismiss: { flex: 1 },
   sheet: {
-    backgroundColor: "#202230",
+    backgroundColor: COLORS.surface,
     paddingHorizontal: 22,
     paddingTop: 29,
     paddingBottom: Platform.OS === "ios" ? 35 : 26,
@@ -8091,7 +8091,7 @@ const styles = StyleSheet.create({
     marginBottom: 23,
   },
   fieldLabel: {
-    color: "#AEB1C2",
+    color: COLORS.textSecondary,
     fontSize: 10,
     fontWeight: "800",
     letterSpacing: 1,
@@ -8100,9 +8100,9 @@ const styles = StyleSheet.create({
   sheetInput: {
     height: 47,
     borderRadius: 12,
-    backgroundColor: "#292B3A",
+    backgroundColor: COLORS.surfaceHigh,
     borderWidth: 1,
-    borderColor: "#3B3E4F",
+    borderColor: COLORS.line,
     color: COLORS.text,
     paddingHorizontal: 13,
     fontSize: 14,
@@ -8113,15 +8113,15 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 10,
     borderRadius: 10,
-    backgroundColor: "#292B3A",
+    backgroundColor: COLORS.surfaceHigh,
     borderWidth: 1,
-    borderColor: "#3B3E4F",
+    borderColor: COLORS.line,
   },
   sheetCategoryActive: {
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
   },
-  sheetCategoryText: { color: "#BEC0CF", fontSize: 11, fontWeight: "700" },
+  sheetCategoryText: { color: COLORS.textSecondary, fontSize: 11, fontWeight: "700" },
   sheetCategoryTextActive: { color: COLORS.primaryInk },
   createSubmit: {
     height: 52,
@@ -8154,7 +8154,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     borderBottomWidth: 1,
     borderBottomColor: COLORS.line,
-    backgroundColor: "#161824",
+    backgroundColor: COLORS.surface,
   },
   recentHeading: {
     flexDirection: "row",
@@ -8249,7 +8249,7 @@ const styles = StyleSheet.create({
     paddingBottom: Platform.OS === "ios" ? 28 : 12,
     borderTopWidth: 1,
     borderTopColor: COLORS.line,
-    backgroundColor: "#161824",
+    backgroundColor: COLORS.surface,
   },
   directInput: {
     flex: 1,
@@ -8339,9 +8339,9 @@ const styles = StyleSheet.create({
     maxHeight: "70%",
     borderRadius: 23,
     padding: 16,
-    backgroundColor: "#202230",
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: "#3B3E4F",
+    borderColor: COLORS.line,
   },
   notificationHeader: {
     flexDirection: "row",
@@ -8426,13 +8426,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: "#26322C",
+    backgroundColor: "rgba(1,217,168,0.12)",
     borderWidth: 1,
-    borderColor: "#405C45",
+    borderColor: "rgba(1,217,168,0.30)",
     marginTop: -8,
     marginBottom: 13,
   },
-  dataNoticeText: { flex: 1, color: "#C2D5C4", fontSize: 11, lineHeight: 16 },
+  dataNoticeText: { flex: 1, color: COLORS.textSecondary, fontSize: 11, lineHeight: 16 },
   dataSummary: {
     minHeight: 77,
     flexDirection: "row",
@@ -8472,7 +8472,7 @@ const styles = StyleSheet.create({
     borderRadius: 13,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#26322C",
+    backgroundColor: "rgba(1,217,168,0.14)",
   },
   dataDestructiveAction: {
     minHeight: 69,
@@ -8504,7 +8504,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     backgroundColor: COLORS.surfaceRaised,
   },
-  roomRuleText: { flex: 1, color: "#C8CAD7", fontSize: 12, lineHeight: 17 },
+  roomRuleText: { flex: 1, color: COLORS.textSecondary, fontSize: 12, lineHeight: 17 },
   reportButton: {
     marginTop: 15,
     flexDirection: "row",
@@ -8641,9 +8641,9 @@ const styles = StyleSheet.create({
     borderRadius: 35,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(181,255,120,0.12)",
+    backgroundColor: "rgba(1,217,168,0.12)",
     borderWidth: 1,
-    borderColor: "rgba(181,255,120,0.28)",
+    borderColor: "rgba(1,217,168,0.28)",
     marginBottom: 29,
   },
   onboardingKicker: {
@@ -8654,7 +8654,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   onboardingTitle: {
-    color: COLORS.text,
+    color: "#F7F8FC",
     fontSize: 33,
     fontWeight: "900",
     letterSpacing: -1.25,
@@ -8727,7 +8727,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.75,
   },
   lobbyHost: {
-    color: COLORS.text,
+    color: "#F5F5FA",
     fontSize: 16,
     fontWeight: "900",
     marginTop: 10,
@@ -8761,7 +8761,7 @@ const styles = StyleSheet.create({
     gap: 9,
     backgroundColor: COLORS.surface,
   },
-  lobbyNoticeText: { flex: 1, color: "#C9CBD7", fontSize: 11, lineHeight: 16 },
+  lobbyNoticeText: { flex: 1, color: COLORS.textSecondary, fontSize: 11, lineHeight: 16 },
   lobbyCheckRow: { flexDirection: "row", gap: 9, marginTop: 10 },
   lobbyCheckButton: {
     flex: 1,
@@ -8772,7 +8772,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 6,
     borderRadius: 13,
-    backgroundColor: "#202331",
+    backgroundColor: COLORS.surfaceRaised,
     borderWidth: 1,
     borderColor: COLORS.line,
   },
@@ -8801,7 +8801,7 @@ const styles = StyleSheet.create({
     paddingBottom: Platform.OS === "ios" ? 24 : 17,
     borderTopWidth: 1,
     borderTopColor: COLORS.line,
-    backgroundColor: "#161824",
+    backgroundColor: COLORS.surface,
   },
   lobbyProfile: {
     color: COLORS.muted,
@@ -8977,7 +8977,7 @@ const styles = StyleSheet.create({
     gap: 3,
     marginTop: 4,
   },
-  giftCostText: { color: "#E2C96C", fontSize: 10, fontWeight: "800" },
+  giftCostText: { color: "#9A6A00", fontSize: 10, fontWeight: "800" },
   dailyRewardCard: {
     minHeight: 76,
     marginTop: 12,
@@ -8986,9 +8986,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 11,
-    backgroundColor: "#26322C",
+    backgroundColor: "rgba(1,217,168,0.10)",
     borderWidth: 1,
-    borderColor: "#405C45",
+    borderColor: "rgba(1,217,168,0.26)",
   },
   streakCard: {
     minHeight: 76,
@@ -9037,7 +9037,7 @@ const styles = StyleSheet.create({
   dailyRewardCopy: { flex: 1 },
   dailyRewardTitle: { color: COLORS.text, fontSize: 12, fontWeight: "900" },
   dailyRewardDescription: {
-    color: "#B9C8BA",
+    color: COLORS.textSecondary,
     fontSize: 10,
     lineHeight: 14,
     marginTop: 3,
@@ -9123,9 +9123,9 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     padding: 14,
     marginBottom: 17,
-    backgroundColor: "#202D35",
+    backgroundColor: COLORS.surfaceRaised,
     borderWidth: 1,
-    borderColor: "#35515D",
+    borderColor: COLORS.line,
   },
   transferCardHeader: {
     flexDirection: "row",
@@ -9136,20 +9136,20 @@ const styles = StyleSheet.create({
   transferTitle: { color: COLORS.text, fontSize: 14, fontWeight: "900" },
   transferSubtitle: { color: COLORS.muted, fontSize: 10, marginTop: 4 },
   transferStatus: {
-    backgroundColor: "#3E3926",
+    backgroundColor: "rgba(224,169,58,0.16)",
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 8,
   },
-  transferStatusText: { color: "#F4D168", fontSize: 9, fontWeight: "900" },
+  transferStatusText: { color: "#9A6A00", fontSize: 9, fontWeight: "900" },
   transferHint: {
-    color: "#BAC9D0",
+    color: COLORS.textSecondary,
     fontSize: 11,
     lineHeight: 16,
     marginTop: 8,
   },
   transferLabel: {
-    color: "#83B9D1",
+    color: COLORS.muted,
     fontSize: 9,
     fontWeight: "900",
     letterSpacing: 0.8,
@@ -9158,7 +9158,7 @@ const styles = StyleSheet.create({
   },
   transferValue: { color: COLORS.text, fontSize: 12, fontWeight: "700" },
   transferIban: {
-    color: "#FFFFFF",
+    color: COLORS.text,
     fontSize: 13,
     fontWeight: "900",
     letterSpacing: 0.7,
@@ -9178,7 +9178,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 5,
     borderRadius: 10,
-    backgroundColor: "#263A45",
+    backgroundColor: COLORS.surfaceHigh,
   },
   transferActionText: {
     color: COLORS.primary,
@@ -9192,23 +9192,23 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#46606B",
+    borderColor: COLORS.line,
     alignItems: "center",
   },
   transferOptionActive: {
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
   },
-  transferOptionText: { color: "#C1D1D7", fontSize: 11, fontWeight: "800" },
+  transferOptionText: { color: COLORS.textSecondary, fontSize: 11, fontWeight: "800" },
   transferOptionTextActive: { color: COLORS.primaryInk },
   transferQuickAmount: {
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 9,
-    backgroundColor: "#263A45",
+    backgroundColor: COLORS.surfaceHigh,
   },
   transferQuickAmountText: {
-    color: "#D3E1E5",
+    color: COLORS.textSecondary,
     fontSize: 10,
     fontWeight: "800",
   },
@@ -9216,8 +9216,8 @@ const styles = StyleSheet.create({
     height: 46,
     borderRadius: 11,
     borderWidth: 1,
-    borderColor: "#46606B",
-    backgroundColor: "#19252C",
+    borderColor: COLORS.line,
+    backgroundColor: COLORS.surfaceHigh,
     color: COLORS.text,
     paddingHorizontal: 12,
     marginTop: 9,
@@ -9259,7 +9259,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#253239",
+    backgroundColor: COLORS.surfaceHigh,
   },
   transferHistoryStatus: {
     maxWidth: 78,
@@ -9318,7 +9318,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.line,
   },
-  communityMeetingRowSaved: { backgroundColor: "rgba(181,255,120,0.05)" },
+  communityMeetingRowSaved: { backgroundColor: "rgba(1,217,168,0.05)" },
   communityMeetingDate: {
     width: 42,
     height: 42,
@@ -9364,11 +9364,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
-    backgroundColor: "#26322C",
+    backgroundColor: "rgba(1,217,168,0.12)",
     borderWidth: 1,
-    borderColor: "#405C45",
+    borderColor: "rgba(1,217,168,0.30)",
   },
-  safetyNoticeText: { flex: 1, color: "#C9D8CB", fontSize: 11, lineHeight: 16 },
+  safetyNoticeText: { flex: 1, color: COLORS.textSecondary, fontSize: 11, lineHeight: 16 },
   blockedUserRow: {
     minHeight: 58,
     paddingVertical: 8,
@@ -9391,7 +9391,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#4B4E63",
+    borderColor: COLORS.line,
   },
   unblockButtonText: { color: COLORS.primary, fontSize: 10, fontWeight: "800" },
   safetyEmpty: { alignItems: "center", paddingVertical: 24, gap: 8 },
@@ -9442,8 +9442,8 @@ const styles = StyleSheet.create({
     opacity: 0.72,
   },
   badgeCardUnlocked: {
-    backgroundColor: "#26322C",
-    borderColor: "#405C45",
+    backgroundColor: "rgba(1,217,168,0.10)",
+    borderColor: "rgba(1,217,168,0.30)",
     opacity: 1,
   },
   badgeIcon: {
@@ -9495,7 +9495,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     left: 0,
-    backgroundColor: "rgba(181,255,120,0.16)",
+    backgroundColor: "rgba(1,217,168,0.16)",
   },
   pollOptionText: {
     color: COLORS.text,
@@ -9556,7 +9556,7 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   roomThemeOptionSelected: {
-    backgroundColor: "#292B3A",
+    backgroundColor: COLORS.surfaceHigh,
     borderColor: COLORS.primary,
   },
   roomThemePreview: {
@@ -9594,7 +9594,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 13,
-    backgroundColor: "#283B2B",
+    backgroundColor: "rgba(1,217,168,0.14)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -9637,7 +9637,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 9,
   },
-  levelPoints: { color: "#ECD06D", fontSize: 9, fontWeight: "900" },
+  levelPoints: { color: "#9A6A00", fontSize: 9, fontWeight: "900" },
   levelProgressTrack: {
     height: 4,
     borderRadius: 4,
@@ -9713,9 +9713,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 9,
-    backgroundColor: "#26322C",
+    backgroundColor: "rgba(1,217,168,0.10)",
     borderWidth: 1,
-    borderColor: "#405C45",
+    borderColor: "rgba(1,217,168,0.26)",
   },
   profileSocialIcon: {
     width: 27,
@@ -9731,7 +9731,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "900",
   },
-  profileSocialHint: { color: "#B9C8BA", fontSize: 9, fontWeight: "700" },
+  profileSocialHint: { color: COLORS.textSecondary, fontSize: 9, fontWeight: "700" },
   chatHistoryHint: { color: COLORS.muted, fontSize: 9, marginTop: 3 },
   voiceReadiness: {
     minHeight: 58,
@@ -9743,9 +9743,9 @@ const styles = StyleSheet.create({
     gap: 10,
     borderWidth: 1,
   },
-  voiceReadinessDemo: { backgroundColor: "#222633", borderColor: "#353949" },
-  voiceReadinessReady: { backgroundColor: "#26322C", borderColor: "#405C45" },
-  voiceReadinessOffline: { backgroundColor: "#35272E", borderColor: "#5C3D4A" },
+  voiceReadinessDemo: { backgroundColor: COLORS.surfaceRaised, borderColor: COLORS.line },
+  voiceReadinessReady: { backgroundColor: "rgba(1,217,168,0.10)", borderColor: "rgba(1,217,168,0.30)" },
+  voiceReadinessOffline: { backgroundColor: "rgba(229,72,107,0.10)", borderColor: "rgba(229,72,107,0.28)" },
   voiceReadinessText: { flex: 1 },
   voiceReadinessTitle: { color: COLORS.text, fontSize: 11, fontWeight: "900" },
   voiceReadinessDescription: {
@@ -10032,7 +10032,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.24)",
   },
   hostName: {
-    color: COLORS.text,
+    color: "#F5F5FA",
     fontSize: 16,
     fontWeight: "900",
     marginTop: 10,
@@ -10238,7 +10238,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "#050509",
     borderWidth: 1,
-    borderColor: "rgba(181,255,120,0.28)",
+    borderColor: "rgba(1,217,168,0.28)",
   },
   brandLogo: { width: "100%", height: "100%" },
   onboardingLogo: { width: 92, height: 92, borderRadius: 28 },
@@ -10258,13 +10258,13 @@ const styles = StyleSheet.create({
   roomVoiceError: { backgroundColor: "#37282E", borderColor: "#694653" },
   roomVoiceLocal: { backgroundColor: "#222531", borderColor: "#353947" },
   roomVoiceStatusCopy: { flex: 1 },
-  roomVoiceStatusTitle: { color: COLORS.text, fontSize: 11, fontWeight: "900" },
+  roomVoiceStatusTitle: { color: "#F5F5FA", fontSize: 11, fontWeight: "900" },
   roomVoiceStatusDescription: { color: "#B9BDCA", fontSize: 10, marginTop: 3 },
   roomVoiceRetry: {
     minHeight: 32,
     paddingHorizontal: 9,
     borderRadius: 10,
-    backgroundColor: "rgba(181,255,120,0.12)",
+    backgroundColor: "rgba(1,217,168,0.12)",
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
@@ -10317,7 +10317,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: COLORS.primarySoft,
     borderWidth: 1,
-    borderColor: "rgba(181,255,120,0.18)",
+    borderColor: "rgba(1,217,168,0.18)",
   },
   memberRemoveAction: {
     backgroundColor: "rgba(255,123,167,0.13)",
@@ -10379,7 +10379,7 @@ const styles = StyleSheet.create({
     width: 260,
     height: 260,
     borderRadius: 130,
-    backgroundColor: "rgba(181,255,120,0.10)",
+    backgroundColor: "rgba(1,217,168,0.10)",
     top: -112,
     right: -92,
   },
@@ -10396,9 +10396,9 @@ const styles = StyleSheet.create({
     borderRadius: 27,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(181,255,120,0.17)",
+    backgroundColor: "rgba(1,217,168,0.17)",
     borderWidth: 1,
-    borderColor: "rgba(181,255,120,0.48)",
+    borderColor: "rgba(1,217,168,0.48)",
     transform: [{ rotate: "-5deg" }],
   },
   discoverEmptySeatSide: {
@@ -10418,7 +10418,7 @@ const styles = StyleSheet.create({
     marginBottom: 9,
   },
   discoverEmptyTitle: {
-    color: COLORS.text,
+    color: "#F7F8FC",
     fontSize: 30,
     lineHeight: 35,
     fontWeight: "900",
@@ -10463,10 +10463,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#1B2230",
+    backgroundColor: COLORS.surface,
     position: "relative",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
+    borderColor: COLORS.line,
   },
   kicker: {
     color: COLORS.primary,
@@ -10513,9 +10513,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 14,
     borderRadius: 23,
-    backgroundColor: "#151B29",
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: "rgba(181,255,120,0.15)",
+    borderColor: "rgba(1,217,168,0.22)",
     ...ELEVATION.card,
   },
   discoverLiveCopy: { flex: 1, minWidth: 0 },
@@ -10544,9 +10544,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(181,255,120,0.12)",
+    backgroundColor: "rgba(1,217,168,0.12)",
     borderWidth: 1,
-    borderColor: "rgba(181,255,120,0.20)",
+    borderColor: "rgba(1,217,168,0.20)",
   },
   discoverLiveNumber: {
     color: COLORS.primary,
@@ -10555,7 +10555,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   discoverLiveCountText: {
-    color: "rgba(181,255,120,0.72)",
+    color: "rgba(1,217,168,0.72)",
     fontSize: 9,
     fontWeight: "900",
     letterSpacing: 0.9,
@@ -10572,7 +10572,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.12)",
   },
   featureTitle: {
-    color: COLORS.text,
+    color: "#FFFFFF",
     fontSize: 25,
     letterSpacing: -0.8,
     fontWeight: "900",
@@ -10616,7 +10616,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.04)",
+    borderColor: COLORS.line,
   },
   categoryText: { color: COLORS.muted, fontSize: 13, fontWeight: "800" },
   listCount: { color: COLORS.muted, fontSize: 13, lineHeight: 18 },
@@ -10756,7 +10756,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     borderRadius: 9,
     borderWidth: 1,
-    borderColor: "rgba(181,255,120,0.26)",
+    borderColor: "rgba(1,217,168,0.30)",
   },
   livePillText: {
     color: COLORS.primary,
@@ -10777,7 +10777,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     backgroundColor: COLORS.primarySoft,
     borderWidth: 1,
-    borderColor: "rgba(181,255,120,0.18)",
+    borderColor: "rgba(1,217,168,0.18)",
   },
   roomCategory: {
     color: COLORS.textSecondary,
@@ -10816,9 +10816,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 7,
     paddingBottom: 10,
-    backgroundColor: "rgba(16,17,28,0.97)",
+    backgroundColor: "rgba(255,255,255,0.98)",
     borderTopWidth: 1,
-    borderTopColor: COLORS.lineSoft,
+    borderTopColor: COLORS.line,
     ...ELEVATION.raised,
   },
   tabRow: { flexDirection: "row", alignItems: "center", width: "100%" },
@@ -10859,7 +10859,7 @@ const styles = StyleSheet.create({
     borderRadius: 120,
     top: -118,
     right: -52,
-    backgroundColor: "rgba(181,255,120,0.16)",
+    backgroundColor: "rgba(1,217,168,0.16)",
   },
   profileCoverOrbTwo: {
     position: "absolute",
@@ -10924,10 +10924,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: COLORS.primary,
   },
-  handle: { color: "#A9ADBE", fontSize: 14, marginTop: 4 },
+  handle: { color: COLORS.muted, fontSize: 14, marginTop: 4 },
   profileBio: {
     maxWidth: 310,
-    color: "#C8CBD7",
+    color: COLORS.textSecondary,
     fontSize: 14,
     lineHeight: 20,
     textAlign: "center",
@@ -10946,9 +10946,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 17,
-    backgroundColor: "#1B1E2A",
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
+    borderColor: COLORS.line,
   },
   profileStatNumber: { color: COLORS.text, fontSize: 19, fontWeight: "900" },
   profileStatLabel: {
@@ -10964,9 +10964,9 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 22,
     borderRadius: 20,
-    backgroundColor: "#1C1F2C",
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: "rgba(181,255,120,0.13)",
+    borderColor: "rgba(1,217,168,0.22)",
   },
   levelTitle: {
     color: COLORS.text,
@@ -10976,7 +10976,7 @@ const styles = StyleSheet.create({
   },
   levelDescription: { color: COLORS.muted, fontSize: 12, lineHeight: 17 },
   profileSection: {
-    color: "#AEB3C4",
+    color: COLORS.muted,
     fontSize: 12,
     letterSpacing: 1.15,
     fontWeight: "900",
@@ -10986,9 +10986,9 @@ const styles = StyleSheet.create({
   actionList: {
     borderRadius: 20,
     overflow: "hidden",
-    backgroundColor: "#1B1E2A",
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
+    borderColor: COLORS.line,
   },
   actionRow: {
     minHeight: 68,
@@ -10997,13 +10997,13 @@ const styles = StyleSheet.create({
     gap: 13,
     paddingHorizontal: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "#2B2E3D",
+    borderBottomColor: COLORS.line,
   },
   actionIcon: {
     width: 40,
     height: 40,
     borderRadius: 14,
-    backgroundColor: "#292C3B",
+    backgroundColor: COLORS.surfaceHigh,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -11012,7 +11012,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#090A12",
+    backgroundColor: COLORS.background,
   },
   authBootLogo: { width: 120, height: 120, borderRadius: 38 },
   authBootText: {
@@ -11048,10 +11048,10 @@ const styles = StyleSheet.create({
     borderRadius: 27,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(181,255,120,0.10)",
+    backgroundColor: "rgba(1,217,168,0.10)",
     borderWidth: 1,
     borderStyle: "dashed",
-    borderColor: "rgba(181,255,120,0.55)",
+    borderColor: "rgba(1,217,168,0.55)",
   },
   stageHint: {
     color: "rgba(255,255,255,0.79)",
@@ -11067,8 +11067,8 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 600,
     alignSelf: "center",
-    backgroundColor: "#171B29",
+    backgroundColor: COLORS.surface,
     borderTopWidth: 1,
-    borderColor: "rgba(255,255,255,0.11)",
+    borderColor: COLORS.line,
   },
 });

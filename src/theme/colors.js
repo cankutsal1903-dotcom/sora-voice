@@ -5,47 +5,47 @@
 
 export const COLORS = {
   // Backgrounds
-  background: '#090A12',
-  surface: '#10111C',
-  surfaceRaised: '#1A1C29',
-  raised: '#242735',
-  line: '#303344',
+  background: '#F0F3F4',
+  surface: '#FFFFFF',
+  surfaceRaised: '#F7F9FA',
+  raised: '#EAEEF1',
+  line: '#E1E6EA',
 
   // Text
-  text: '#F7F7FB',
-  textSecondary: '#C5C7D3',
-  muted: '#9699AC',
-  mutedDark: '#73778B',
+  text: '#11161C',
+  textSecondary: '#4B5462',
+  muted: '#8A93A3',
+  mutedDark: '#6B7482',
 
   // Primary Brand
-  primary: '#7AF6A5',
-  primaryInk: '#172117',
-  primaryDark: '#6DAF48',
-  primaryLight: '#B5FF78',
+  primary: '#01D9A8',
+  primaryInk: '#04211B',
+  primaryDark: '#00A985',
+  primaryLight: '#4FE8C4',
 
   // Accent Colors
-  accent: '#3B82F6',
+  accent: '#3B9DF8',
   accentPurple: '#8B5CF6',
-  accentPink: '#EC4899',
+  accentPink: '#F0568C',
 
   // Status
-  danger: '#FF7BA7',
-  dangerDark: '#FF9FBA',
-  warning: '#F4D168',
-  success: '#7AF6A5',
+  danger: '#E5486B',
+  dangerDark: '#C2294A',
+  warning: '#E0A93A',
+  success: '#01D9A8',
 
   // Gradients
   gradients: {
-    primary: ['#7AF6A5', '#8CE958'],
-    purple: ['#6647B9', '#262044'],
-    ocean: ['#167A91', '#273D79'],
-    sunset: ['#B85B69', '#5B294C'],
-    forest: ['#2B806F', '#23443F'],
+    primary: ['#01D9A8', '#16C7C0'],
+    purple: ['#A98BF5', '#E4DBFF'],
+    ocean: ['#63C7E8', '#CFEAF6'],
+    sunset: ['#FF9DB0', '#FFE0E6'],
+    forest: ['#5FD6B4', '#DDF7EF'],
   },
 
   // Overlays
-  overlay: 'rgba(4,5,9,0.72)',
-  overlayLight: 'rgba(5,6,11,0.64)',
+  overlay: 'rgba(12,17,22,0.45)',
+  overlayLight: 'rgba(12,17,22,0.30)',
 };
 
 export const THEME = {

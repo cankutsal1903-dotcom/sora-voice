@@ -5,7 +5,7 @@
     "version": "1.0.2",
 
     "description": "Canlı sesli odalar, topluluk sohbeti ve güvenli etkileşim için Sora.",
-    "primaryColor": "#10111C",
+    "primaryColor": "#01D9A8",
     "icon": "./assets/images/sora-logo.png",
     "splash": {
       "image": "./assets/images/sora-logo.png",
@@ -13,7 +13,7 @@
       "backgroundColor": "#050509"
     },
     "orientation": "portrait",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "scheme": "sora",
     "plugins": [
       "expo-font",
@@ -26,7 +26,7 @@
         "expo-notifications",
         {
           "icon": "./assets/images/sora-logo.png",
-          "color": "#B5FF78",
+          "color": "#01D9A8",
           "defaultChannel": "sora-default",
           "sounds": []
         }
@@ -48,7 +48,7 @@
       ],
       "notification": {
         "channelId": "sora-default",
-        "color": "#B5FF78"
+        "color": "#01D9A8"
       },
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/sora-logo.png",
