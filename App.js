@@ -6726,19 +6726,13 @@ function AppContent() {
     });
   };
 
-  const resumeHostedRoom = async (existingRoom) => {
-    try {
-      const liveRoom = await setRemoteRoomPresence(existingRoom.id, true);
-      setRooms((currentRooms) => [
-        liveRoom,
-        ...currentRooms.filter((item) => item.id !== liveRoom.id),
-      ]);
-      setCreateOpen(false);
-      openRoom(liveRoom);
-    } catch (error) {
-      console.error("Room resume failed", error);
-      Alert.alert("Odaya girilemedi", "Bağlantıyı kontrol edip tekrar dene.");
-    }
+  const resumeHostedRoom = (existingRoom) => {
+    // Odayı ağ çağrısını beklemeden hemen aç; "canlı" durumu arka planda güncellenir.
+    setCreateOpen(false);
+    openRoom(existingRoom);
+    setHostRoomPresence(existingRoom.id, true).catch((error) => {
+      console.warn("Room presence sync failed", error);
+    });
   };
 
   const promptHostedRoom = (existingRoom) => {
@@ -12280,6 +12274,7 @@ const styles = StyleSheet.create({
   roomOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "#11131A",
+    zIndex: 10,
   },
   roomOverlayHidden: { display: "none" },
   roomBubble: {
