@@ -8,6 +8,7 @@ const initialState = {
   status: "idle",
   participantCount: 0,
   participants: [],
+  activeSpeakerIds: [],
   role: "listener",
   mutedByModerator: false,
   microphoneEnabled: false,
@@ -84,6 +85,13 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
         connectedRoom.on(RoomEvent.ParticipantDisconnected, updateParticipants);
         connectedRoom.on(RoomEvent.TrackMuted, updateParticipants);
         connectedRoom.on(RoomEvent.TrackUnmuted, updateParticipants);
+        connectedRoom.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
+          if (!active) return;
+          setState((current) => ({
+            ...current,
+            activeSpeakerIds: speakers.map((speaker) => speaker.identity),
+          }));
+        });
         connectedRoom.on(RoomEvent.Reconnecting, () => {
           if (active) setState((current) => ({ ...current, status: "reconnecting" }));
         });
@@ -91,7 +99,7 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
           if (active) setState((current) => ({ ...current, status: "connected" }));
         });
         connectedRoom.on(RoomEvent.Disconnected, () => {
-          if (active) setState((current) => ({ ...current, status: "disconnected", microphoneEnabled: false }));
+          if (active) setState((current) => ({ ...current, status: "disconnected", microphoneEnabled: false, activeSpeakerIds: [] }));
         });
 
         await AudioSession.startAudioSession();
