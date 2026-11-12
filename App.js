@@ -1,7 +1,16 @@
-import { useEffect, useMemo, useState, useCallback, memo } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useCallback,
+  useRef,
+  memo,
+} from "react";
 import {
   Alert,
+  Animated,
   AppState,
+  Easing,
   Image,
   KeyboardAvoidingView,
   Linking,
@@ -2019,6 +2028,7 @@ function Profile({
   coins,
   favoriteCount,
   hostedRoomCount,
+  myRooms = [],
   dailyRewardClaimed,
   adminRole,
   onEdit,
@@ -2031,6 +2041,8 @@ function Profile({
   const [recentActivity, setRecentActivity] = useState([]);
   const [activityStreak, setActivityStreak] = useState(1);
   const [followedCount, setFollowedCount] = useState(0);
+  const [followedNames, setFollowedNames] = useState([]);
+  const [profileTab, setProfileTab] = useState("rooms");
   const openSafetyCenter = useCallback(() => setSafetyOpen(true), []);
   const actions = useMemo(
     () => [
@@ -2064,7 +2076,10 @@ function Profile({
     AsyncStorage.getItem(FOLLOWED_USERS_KEY)
       .then((savedNames) => {
         const parsedNames = JSON.parse(savedNames || "[]");
-        if (Array.isArray(parsedNames)) setFollowedCount(parsedNames.length);
+        if (Array.isArray(parsedNames)) {
+          setFollowedCount(parsedNames.length);
+          setFollowedNames(parsedNames);
+        }
       })
       .catch(() => undefined);
   }, []);
@@ -2151,213 +2166,269 @@ function Profile({
       updateCellsBatchingPeriod={50}
     >
       <Reveal distance={12}>
-        <View style={styles.profileCover}>
+        <View style={styles.pfCover}>
           <LinearGradient
             colors={["#1A1410", "#2D2520", "#1A1410"]}
             style={StyleSheet.absoluteFill}
           />
-          <View style={styles.profileCoverOrbOne} />
-          <View style={styles.profileCoverOrbTwo} />
-          <View style={styles.profileCoverBrand}>
-            <Image
-              source={SORA_LOGO}
-              style={styles.profileCoverLogo}
-              fadeDuration={0}
-              accessibilityLabel="Sora logosu"
-            />
-            <View>
-              <Text style={styles.profileCoverBrandText}>SORA PROFIL</Text>
-              <Text style={styles.profileCoverBrandSubtext}>
-                sesin burada iz bırakır
-              </Text>
+          <View style={styles.pfCoverOrbOne} />
+          <View style={styles.pfCoverOrbTwo} />
+          <View style={styles.pfCoverTopRow}>
+            <View style={styles.pfBrandChip}>
+              <Image
+                source={SORA_LOGO}
+                style={styles.pfBrandLogo}
+                fadeDuration={0}
+                accessibilityLabel="Sora logosu"
+              />
+              <Text style={styles.pfBrandChipText}>SORA</Text>
+            </View>
+            <View style={styles.pfCoverActions}>
+              <Pressable
+                onPress={shareProfile}
+                style={styles.pfIconBtn}
+                accessibilityLabel="Profili paylaş"
+              >
+                <Ionicons name="share-outline" size={18} color="#FFFFFF" />
+              </Pressable>
+              <Pressable
+                onPress={onOpenSettings}
+                style={styles.pfIconBtn}
+                accessibilityLabel="Profil ayarlarını aç"
+              >
+                <Ionicons name="settings-outline" size={18} color="#FFFFFF" />
+              </Pressable>
             </View>
           </View>
-          <View style={styles.profileCoverActions}>
-            <IconButton
-              icon="share-outline"
-              accessibilityLabel="Profili paylaş"
-              subtle
-              onPress={shareProfile}
-            />
-            <IconButton
-              icon="settings-outline"
-              accessibilityLabel="Profil ayarlarını aç"
-              subtle
-              onPress={onOpenSettings}
-            />
+          <View style={styles.pfCoverBottom}>
+            <View style={styles.pfCoverStat}>
+              <Ionicons name="flame" size={13} color="#FFD86B" />
+              <Text style={styles.pfCoverStatText}>
+                {activityStreak} gün seri
+              </Text>
+            </View>
+            <View style={styles.pfCoverStat}>
+              <Ionicons name="medal-outline" size={13} color="#FFD86B" />
+              <Text style={styles.pfCoverStatText}>
+                {badges.filter((badge) => badge.unlocked).length}/{badges.length}{" "}
+                rozet
+              </Text>
+            </View>
           </View>
         </View>
       </Reveal>
       <Reveal delay={70} distance={14}>
-        <View style={styles.profileSummary}>
-          <View style={styles.profileAvatarShell}>
-            <Avatar
-              label={profile.name.charAt(0).toUpperCase()}
-              color={profile.color}
-              size={84}
-              bordered
-            />
+        <View style={styles.pfIdentity}>
+          <View style={styles.pfAvatarWrap}>
+            <View style={styles.pfAvatarRing}>
+              <Avatar
+                label={profile.name.charAt(0).toUpperCase()}
+                color={profile.color}
+                size={88}
+                bordered
+              />
+            </View>
+            <View style={styles.pfLevelBadge}>
+              <Text style={styles.pfLevelBadgeText}>L{level}</Text>
+            </View>
           </View>
-          <View style={styles.profileNameRow}>
-            <Text style={styles.profileName}>{profile.name}</Text>
-          </View>
-          <Text style={styles.handle}>@{profile.handle}</Text>
-          {profile.bio ? (
-            <Text style={styles.profileBio}>{profile.bio}</Text>
-          ) : (
-            <Text style={styles.profileBio}>
-              Sora topluluğunda sesini paylaşmaya hazır.
-            </Text>
-          )}
-          <View style={styles.profileStats}>
-            <ProfileStat number={String(favoriteCount)} label="Favori" />
-            <ProfileStat number={String(hostedRoomCount)} label="Oda" />
-            <ProfileStat number={String(coins)} label="Kredi" />
+          <Text style={styles.pfName}>{profile.name}</Text>
+          <Text style={styles.pfHandle}>@{profile.handle}</Text>
+          <Text style={styles.pfBio} numberOfLines={3}>
+            {profile.bio || "Sora topluluğunda sesini paylaşmaya hazır."}
+          </Text>
+          <View style={styles.pfIdentityActions}>
+            <Pressable onPress={onEdit} style={styles.pfPrimaryBtn}>
+              <Ionicons
+                name="create-outline"
+                size={16}
+                color={COLORS.primaryInk}
+              />
+              <Text style={styles.pfPrimaryBtnText}>Profili düzenle</Text>
+            </Pressable>
+            <Pressable
+              onPress={shareProfile}
+              style={styles.pfSecondaryBtn}
+              accessibilityLabel="Profili paylaş"
+            >
+              <Ionicons name="share-social-outline" size={17} color="#FFFFFF" />
+            </Pressable>
           </View>
         </View>
       </Reveal>
-      {followedCount > 0 && (
-        <View style={styles.profileSocialSummary}>
-          <View style={styles.profileSocialIcon}>
-            <Ionicons name="heart" size={16} color={COLORS.primaryInk} />
-          </View>
-          <Text style={styles.profileSocialText}>
-            {followedCount} sesi takip ediyorsun
-          </Text>
-          <Text style={styles.profileSocialHint}>
-            Canli odalari kesfette gor
-          </Text>
+      <Reveal delay={120} distance={14}>
+        <View style={styles.pfStatsStrip}>
+          <ProfileStat number={String(favoriteCount)} label="Favori" />
+          <View style={styles.pfStatDivider} />
+          <ProfileStat number={String(hostedRoomCount)} label="Oda" />
+          <View style={styles.pfStatDivider} />
+          <ProfileStat number={String(coins)} label="Kredi" />
         </View>
-      )}
-      <View style={styles.profileLevel}>
-        <View style={styles.levelIcon}>
-          <Ionicons name="sparkles" size={20} color="#ECD06D" />
-        </View>
-        <View style={styles.levelText}>
-          <View style={styles.levelTitleRow}>
-            <Text style={styles.levelTitle}>
-              Seviye {String(level).padStart(2, "0")} - {levelName}
-            </Text>
-            <Text style={styles.levelPoints}>{levelProgress}/50</Text>
+      </Reveal>
+      <Reveal delay={150} distance={14}>
+        <View style={styles.pfLevelCard}>
+          <View style={styles.pfLevelHead}>
+            <View style={styles.pfLevelIcon}>
+              <Ionicons name="sparkles" size={18} color="#ECD06D" />
+            </View>
+            <View style={styles.pfLevelInfo}>
+              <Text style={styles.pfLevelTitle}>
+                Seviye {String(level).padStart(2, "0")} · {levelName}
+              </Text>
+              <Text style={styles.pfLevelDesc} numberOfLines={1}>
+                {levelProgress
+                  ? "Odalar, favoriler ve serin seni ileri taşır."
+                  : "Yeni seviyeye hoş geldin, ritmi koru."}
+              </Text>
+            </View>
+            <Text style={styles.pfLevelPoints}>{levelProgress}/50</Text>
           </View>
-          <Text style={styles.levelDescription}>
-            {levelProgress
-              ? "Odalar, favoriler ve serin seni ileri tasir."
-              : "Yeni seviyeye hos geldin, ritmi koru."}
-          </Text>
-          <View style={styles.levelProgressTrack}>
+          <View style={styles.pfProgressTrack}>
             <View
               style={[
-                styles.levelProgressFill,
+                styles.pfProgressFill,
                 { width: `${levelProgress || 4}%` },
               ]}
             />
           </View>
         </View>
-      </View>
-      <View style={styles.streakCard}>
-        <View style={styles.streakIcon}>
-          <Ionicons name="flame" size={20} color="#2A1A0E" />
-        </View>
-        <View style={styles.streakCopy}>
-          <Text style={styles.streakTitle}>{activityStreak} gunluk seri</Text>
-          <Text style={styles.streakDescription}>
-            {activityStreak >= 7
-              ? "Harika gidiyorsun, seriyi koru."
-              : `${7 - Math.min(activityStreak, 7)} gun daha devam et, haftayi tamamla.`}
-          </Text>
-        </View>
-        <View style={styles.streakDots}>
-          {[0, 1, 2, 3, 4, 5, 6].map((day) => (
-            <View
-              key={day}
-              style={[
-                styles.streakDot,
-                day < Math.min(activityStreak, 7) && styles.streakDotActive,
-              ]}
-            />
-          ))}
-        </View>
-      </View>
-      <Pressable
-        onPress={dailyRewardClaimed ? onOpenWallet : onClaimDailyReward}
-        style={styles.dailyRewardCard}
-      >
-        <View style={styles.dailyRewardIcon}>
-          <Ionicons
-            name={dailyRewardClaimed ? "checkmark" : "gift-outline"}
-            size={20}
-            color={COLORS.primaryInk}
-          />
-        </View>
-        <View style={styles.dailyRewardCopy}>
-          <Text style={styles.dailyRewardTitle}>
-            {dailyRewardClaimed ? "Gunluk odul alindi" : "Gunluk odulun hazir"}
-          </Text>
-          <Text style={styles.dailyRewardDescription}>
-            {dailyRewardClaimed
-              ? "Yarin tekrar 75 kredi kazanabilirsin."
-              : "Bugun giris yaptigin icin 75 kredi kazan."}
-          </Text>
-        </View>
-        <Text style={styles.dailyRewardAmount}>
-          {dailyRewardClaimed ? "Tamam" : "+75"}
-        </Text>
-      </Pressable>
-      {recentActivity.length > 0 && (
-        <>
-          <Text style={styles.profileSection}>SON DINLEDIKLERIN</Text>
-          <FlatList
-            data={recentActivity}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-            renderItem={({ item }) => (
-              <View style={styles.activityRow}>
-                <View
-                  style={[
-                    styles.activityAvatar,
-                    { backgroundColor: item.color || COLORS.purple },
-                  ]}
-                >
-                  <Text style={styles.activityAvatarText}>
-                    {item.initials || item.title.charAt(0)}
-                  </Text>
-                </View>
-                <View style={styles.activityInfo}>
-                  <Text style={styles.activityTitle} numberOfLines={1}>
-                    {item.title}
-                  </Text>
-                  <Text style={styles.activityMeta}>
-                    {item.category} · {item.visitedAt}
-                  </Text>
-                </View>
-                <Ionicons
-                  name="headset-outline"
-                  size={18}
-                  color={COLORS.muted}
-                />
-              </View>
-            )}
-          />
-        </>
-      )}
-      <Text style={styles.profileSection}>ROZETLER</Text>
-      <FlatList
-        data={badges}
-        keyExtractor={(item) => item.id}
-        scrollEnabled={false}
-        numColumns={3}
-        renderItem={({ item: badge }) => (
-          <View
-            style={[
-              styles.badgeCard,
-              badge.unlocked && styles.badgeCardUnlocked,
-            ]}
+      </Reveal>
+      <Reveal delay={180} distance={14}>
+        <View style={styles.pfChipRow}>
+          <View style={styles.pfChip}>
+            <Ionicons name="heart" size={15} color={COLORS.pink} />
+            <Text style={styles.pfChipText}>{followedCount} takip</Text>
+          </View>
+          <Pressable
+            onPress={dailyRewardClaimed ? onOpenWallet : onClaimDailyReward}
+            style={[styles.pfChip, !dailyRewardClaimed && styles.pfChipAccent]}
           >
+            <Ionicons
+              name={dailyRewardClaimed ? "checkmark" : "gift-outline"}
+              size={15}
+              color={dailyRewardClaimed ? COLORS.muted : COLORS.primaryInk}
+            />
+            <Text
+              style={[
+                styles.pfChipText,
+                !dailyRewardClaimed && styles.pfChipTextAccent,
+              ]}
+            >
+              {dailyRewardClaimed ? "Ödül alındı" : "Günlük +75"}
+            </Text>
+          </Pressable>
+        </View>
+      </Reveal>
+      <Reveal delay={200} distance={14}>
+        <View style={styles.pfTabs}>
+          <Pressable
+            onPress={() => setProfileTab("rooms")}
+            style={[styles.pfTab, profileTab === "rooms" && styles.pfTabActive]}
+            accessibilityRole="button"
+            accessibilityLabel="Odalarım sekmesi"
+          >
+            <Text
+              style={[
+                styles.pfTabText,
+                profileTab === "rooms" && styles.pfTabTextActive,
+              ]}
+            >
+              Odalarım
+            </Text>
+            <View style={styles.pfTabBadge}>
+              <Text style={styles.pfTabBadgeText}>{myRooms.length}</Text>
+            </View>
+          </Pressable>
+          <Pressable
+            onPress={() => setProfileTab("following")}
+            style={[
+              styles.pfTab,
+              profileTab === "following" && styles.pfTabActive,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Takip ettiklerim sekmesi"
+          >
+            <Text
+              style={[
+                styles.pfTabText,
+                profileTab === "following" && styles.pfTabTextActive,
+              ]}
+            >
+              Takip ettiklerim
+            </Text>
+            <View style={styles.pfTabBadge}>
+              <Text style={styles.pfTabBadgeText}>{followedNames.length}</Text>
+            </View>
+          </Pressable>
+        </View>
+      </Reveal>
+      {profileTab === "rooms" ? (
+        myRooms.length ? (
+          myRooms.map((item) => (
+            <View key={item.id} style={styles.pfActivityRow}>
+              <View
+                style={[
+                  styles.pfActivityAvatar,
+                  { backgroundColor: item.accent || COLORS.purple },
+                ]}
+              >
+                <Text style={styles.pfActivityAvatarText}>
+                  {item.initials || item.title.charAt(0)}
+                </Text>
+              </View>
+              <View style={styles.pfActivityInfo}>
+                <Text style={styles.pfActivityTitle} numberOfLines={1}>
+                  {item.title}
+                </Text>
+                <Text style={styles.pfActivityMeta}>
+                  {item.category} · {item.listeners ?? 0} dinleyici
+                </Text>
+              </View>
+              <Ionicons name="mic-outline" size={18} color={COLORS.muted} />
+            </View>
+          ))
+        ) : (
+          <View style={styles.pfEmpty}>
+            <Ionicons name="mic-off-outline" size={16} color={COLORS.muted} />
+            <Text style={styles.pfEmptyText}>Henüz bir oda açmadın.</Text>
+          </View>
+        )
+      ) : followedNames.length ? (
+        followedNames.map((name) => (
+          <View key={name} style={styles.pfActivityRow}>
             <View
               style={[
-                styles.badgeIcon,
-                badge.unlocked && styles.badgeIconUnlocked,
+                styles.pfActivityAvatar,
+                { backgroundColor: COLORS.purple },
+              ]}
+            >
+              <Text style={styles.pfActivityAvatarText}>
+                {name.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+            <View style={styles.pfActivityInfo}>
+              <Text style={styles.pfActivityTitle} numberOfLines={1}>
+                {name}
+              </Text>
+              <Text style={styles.pfActivityMeta}>Takip ediliyor</Text>
+            </View>
+            <Ionicons name="heart" size={16} color={COLORS.pink} />
+          </View>
+        ))
+      ) : (
+        <View style={styles.pfEmpty}>
+          <Ionicons name="heart-outline" size={16} color={COLORS.muted} />
+          <Text style={styles.pfEmptyText}>Henüz kimseyi takip etmiyorsun.</Text>
+        </View>
+      )}
+      <Text style={styles.pfSection}>ROZETLER</Text>
+      <View style={styles.pfBadgeRow}>
+        {badges.map((badge) => (
+          <View key={badge.id} style={styles.pfBadge}>
+            <View
+              style={[
+                styles.pfBadgeIcon,
+                badge.unlocked && styles.pfBadgeIconOn,
               ]}
             >
               <Ionicons
@@ -2366,40 +2437,58 @@ function Profile({
                 color={badge.unlocked ? COLORS.primaryInk : COLORS.muted}
               />
             </View>
-            <Text
-              style={[
-                styles.badgeTitle,
-                badge.unlocked && styles.badgeTitleUnlocked,
-              ]}
-            >
+            <Text style={styles.pfBadgeText} numberOfLines={1}>
               {badge.title}
             </Text>
-            <Text style={styles.badgeStatus}>
-              {badge.unlocked ? "Kazanildi" : "Kilitli"}
-            </Text>
           </View>
-        )}
-      />
-      <Text style={styles.profileSection}>HESABIN</Text>
-      <FlatList
-        data={actions}
-        keyExtractor={(item) => item[1]}
-        scrollEnabled={false}
-        renderItem={({ item: [icon, title, action] }) => (
+        ))}
+      </View>
+      {recentActivity.length > 0 && (
+        <>
+          <Text style={styles.pfSection}>SON DİNLEDİKLERİN</Text>
+          {recentActivity.map((item) => (
+            <View key={item.id} style={styles.pfActivityRow}>
+              <View
+                style={[
+                  styles.pfActivityAvatar,
+                  { backgroundColor: item.color || COLORS.purple },
+                ]}
+              >
+                <Text style={styles.pfActivityAvatarText}>
+                  {item.initials || item.title.charAt(0)}
+                </Text>
+              </View>
+              <View style={styles.pfActivityInfo}>
+                <Text style={styles.pfActivityTitle} numberOfLines={1}>
+                  {item.title}
+                </Text>
+                <Text style={styles.pfActivityMeta}>
+                  {item.category} · {item.visitedAt}
+                </Text>
+              </View>
+              <Ionicons name="headset-outline" size={18} color={COLORS.muted} />
+            </View>
+          ))}
+        </>
+      )}
+      <Text style={styles.pfSection}>HESABIN</Text>
+      <View style={styles.pfMenu}>
+        {actions.map(([icon, title, action]) => (
           <Pressable
+            key={title}
             accessibilityRole="button"
             accessibilityLabel={title}
             onPress={action}
-            style={styles.actionRow}
+            style={styles.pfMenuRow}
           >
-            <View style={styles.actionIcon}>
-              <Ionicons name={icon} size={20} color={COLORS.text} />
+            <View style={styles.pfMenuIcon}>
+              <Ionicons name={icon} size={19} color={COLORS.text} />
             </View>
-            <Text style={styles.actionTitle}>{title}</Text>
+            <Text style={styles.pfMenuTitle}>{title}</Text>
             <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
           </Pressable>
-        )}
-      />
+        ))}
+      </View>
       <SecureSafetyCenterSheet
         visible={safetyOpen}
         onDismiss={() => setSafetyOpen(false)}
@@ -2674,6 +2763,189 @@ const GiftSheet = memo(function GiftSheet({
               </Pressable>
             ))}
           </View>
+        </View>
+      </View>
+    </Modal>
+  );
+});
+
+const GIFT_FLIGHT_LANES = [0, 1, 2, 3, 4];
+
+/* Odaya hediye gonderildiginde yukari dogru ucan hediye animasyonu. */
+const GiftFlight = memo(function GiftFlight({ gift }) {
+  const progress = useRef(new Animated.Value(0)).current;
+  const [activeGift, setActiveGift] = useState(null);
+
+  useEffect(() => {
+    if (!gift) return undefined;
+    setActiveGift(gift);
+    progress.setValue(0);
+    const animation = Animated.timing(progress, {
+      toValue: 1,
+      duration: 1600,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    animation.start(({ finished }) => {
+      if (finished) setActiveGift(null);
+    });
+    return () => animation.stop();
+  }, [gift, progress]);
+
+  if (!activeGift) return null;
+
+  const bannerOpacity = progress.interpolate({
+    inputRange: [0, 0.15, 0.7, 1],
+    outputRange: [0, 1, 1, 0],
+  });
+
+  return (
+    <View pointerEvents="none" style={styles.giftFlightLayer}>
+      {GIFT_FLIGHT_LANES.map((lane) => {
+        const translateY = progress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [240, -320],
+        });
+        const translateX = progress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [(lane - 2) * 16, (lane - 2) * 70],
+        });
+        const opacity = progress.interpolate({
+          inputRange: [0, 0.12, 0.8, 1],
+          outputRange: [0, 1, 1, 0],
+        });
+        const scale = progress.interpolate({
+          inputRange: [0, 0.25, 1],
+          outputRange: [0.5, 1.15, 0.85],
+        });
+        const rotate = progress.interpolate({
+          inputRange: [0, 1],
+          outputRange: ["0deg", `${(lane - 2) * 20}deg`],
+        });
+        return (
+          <Animated.View
+            key={`gift-lane-${lane}`}
+            style={[
+              styles.giftFlyer,
+              {
+                backgroundColor: activeGift.color || COLORS.purple,
+                opacity,
+                transform: [
+                  { translateY },
+                  { translateX },
+                  { scale },
+                  { rotate },
+                ],
+              },
+            ]}
+          >
+            <Ionicons name={activeGift.icon} size={22} color="#FFFFFF" />
+          </Animated.View>
+        );
+      })}
+      <Animated.View
+        style={[styles.giftFlyerBanner, { opacity: bannerOpacity }]}
+      >
+        <Ionicons name="sparkles" size={14} color="#FFD86B" />
+        <Text style={styles.giftFlyerBannerText}>
+          {activeGift.name} gönderildi
+        </Text>
+      </Animated.View>
+    </View>
+  );
+});
+
+/* Bir koltuga/katilimciya uzun basinca acilan kullanici menusu. */
+const ParticipantActionSheet = memo(function ParticipantActionSheet({
+  participant,
+  isFollowing,
+  canBlock,
+  onToggleFollow,
+  onBlock,
+  onReport,
+  onDismiss,
+}) {
+  if (!participant) return null;
+  return (
+    <Modal
+      transparent
+      visible
+      animationType="slide"
+      onRequestClose={onDismiss}
+    >
+      <View style={styles.modalOverlay}>
+        <Pressable style={styles.modalDismiss} onPress={onDismiss} />
+        <View style={styles.sheet}>
+          <View style={styles.sheetHandle} />
+          <Pressable onPress={onDismiss} style={styles.sheetClose}>
+            <Ionicons name="close" size={18} color={COLORS.text} />
+          </Pressable>
+          <View style={styles.participantSheetHead}>
+            <View
+              style={[
+                styles.participantSheetAvatar,
+                { backgroundColor: participant.color || COLORS.accent },
+              ]}
+            >
+              <Text style={styles.participantSheetInitial}>
+                {participant.name?.charAt(0)?.toUpperCase() || "?"}
+              </Text>
+            </View>
+            <View style={styles.participantSheetInfo}>
+              <Text style={styles.participantSheetName} numberOfLines={1}>
+                {participant.name}
+              </Text>
+              <Text style={styles.participantSheetRole}>
+                {participant.role === "host" ? "Ev sahibi" : "Dinleyici"}
+              </Text>
+            </View>
+          </View>
+          <Pressable onPress={onToggleFollow} style={styles.settingRow}>
+            <View
+              style={[styles.settingIcon, isFollowing && styles.settingIconActive]}
+            >
+              <Ionicons
+                name={isFollowing ? "heart" : "heart-outline"}
+                size={18}
+                color={isFollowing ? COLORS.primaryInk : COLORS.primary}
+              />
+            </View>
+            <View style={styles.settingContent}>
+              <Text style={styles.settingTitle}>
+                {isFollowing ? "Takipten çık" : "Takip et"}
+              </Text>
+              <Text style={styles.settingDescription}>
+                Bu kişinin odalarını takip et
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
+          </Pressable>
+          <Pressable onPress={onReport} style={styles.settingRow}>
+            <View style={styles.settingIcon}>
+              <Ionicons name="flag-outline" size={18} color={COLORS.pink} />
+            </View>
+            <View style={styles.settingContent}>
+              <Text style={styles.settingTitle}>Raporla</Text>
+              <Text style={styles.settingDescription}>
+                Topluluk kurallarına aykırı davranış
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
+          </Pressable>
+          {canBlock ? (
+            <Pressable onPress={onBlock} style={styles.settingRow}>
+              <View style={styles.settingIcon}>
+                <Ionicons name="ban-outline" size={18} color={COLORS.danger} />
+              </View>
+              <View style={styles.settingContent}>
+                <Text style={styles.settingTitle}>Engelle</Text>
+                <Text style={styles.settingDescription}>
+                  Mesajlarını gizle ve takibi kaldır
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
+            </Pressable>
+          ) : null}
         </View>
       </View>
     </Modal>
@@ -4404,6 +4676,9 @@ function Room({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState(null);
   const [giftOpen, setGiftOpen] = useState(false);
+  const [giftFlight, setGiftFlight] = useState(null);
+  const [selectedParticipant, setSelectedParticipant] = useState(null);
+  const [followedParticipantNames, setFollowedParticipantNames] = useState([]);
   const [roomLocked, setRoomLocked] = useState(Boolean(room.roomLocked));
   const [chatLocked, setChatLocked] = useState(Boolean(room.chatLocked));
   const isHost = room.hostId
@@ -4732,9 +5007,19 @@ function Room({
     (gift) => {
       onSendGift(gift);
       setGiftOpen(false);
+      setGiftFlight({ ...gift, stamp: Date.now() });
     },
     [onSendGift],
   );
+
+  useEffect(() => {
+    AsyncStorage.getItem(FOLLOWED_USERS_KEY)
+      .then((savedNames) => {
+        const parsedNames = JSON.parse(savedNames || "[]");
+        if (Array.isArray(parsedNames)) setFollowedParticipantNames(parsedNames);
+      })
+      .catch(() => undefined);
+  }, []);
 
   const toggleMicrophone = useCallback(async () => {
     if (liveVoice.enabled) {
@@ -5037,6 +5322,59 @@ function Room({
     blockParticipant({ userId: room.hostId, name: room.host });
   }, [blockParticipant, room.hostId, room.host]);
 
+  const openParticipantMenu = useCallback(
+    (participant) => {
+      if (!participant?.userId || participant.userId === userId) return;
+      setSelectedParticipant(participant);
+    },
+    [userId],
+  );
+  const closeParticipantMenu = useCallback(
+    () => setSelectedParticipant(null),
+    [],
+  );
+  const selectedIsHostParticipant = Boolean(
+    selectedParticipant && selectedParticipant.userId === room.hostId,
+  );
+  const selectedIsFollowing = selectedIsHostParticipant
+    ? isFollowingHost
+    : selectedParticipant
+      ? followedParticipantNames.includes(selectedParticipant.name)
+      : false;
+  const handleSelectedFollow = useCallback(() => {
+    if (!selectedParticipant) return;
+    if (selectedParticipant.userId === room.hostId) {
+      onToggleFollowHost?.();
+      return;
+    }
+    setFollowedParticipantNames((current) => {
+      const name = selectedParticipant.name;
+      const nextNames = current.includes(name)
+        ? current.filter((item) => item !== name)
+        : [...current, name];
+      AsyncStorage.setItem(
+        FOLLOWED_USERS_KEY,
+        JSON.stringify(nextNames),
+      ).catch(() => undefined);
+      return nextNames;
+    });
+  }, [onToggleFollowHost, room.hostId, selectedParticipant]);
+  const handleSelectedBlock = useCallback(() => {
+    const participant = selectedParticipant;
+    setSelectedParticipant(null);
+    if (participant) blockParticipant(participant);
+  }, [blockParticipant, selectedParticipant]);
+  const handleSelectedReport = useCallback(() => {
+    const participant = selectedParticipant;
+    setSelectedParticipant(null);
+    if (participant)
+      setReportTarget({
+        name: `${participant.name} kullanıcısı`,
+        userId: participant.userId,
+        roomId: room.id,
+      });
+  }, [room.id, selectedParticipant]);
+
   const manageParticipant = useCallback(
     async (participant, action) => {
       if (!room.persisted) throw new Error("Bu örnek oda yönetilemez.");
@@ -5103,217 +5441,286 @@ function Room({
         ? `${messages.length} mesaj · Bağlantı kesildi`
         : `${messages.length} mesaj · Bağlanıyor`;
 
+  /* ── WePlay / Hazan tarzı oda düzeni ─────────────────────────── */
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView style={styles.roomScreen}>
+      <StatusBar barStyle="light-content" backgroundColor="#11131A" />
       <KeyboardAvoidingView
-        style={styles.roomScreen}
+        style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <View style={styles.roomHeader}>
-          <View style={styles.roomIdentity}>
-            <View style={styles.roomIdentityAvatar}>
-              <Avatar
-                label={room.initials}
-                color={room.accent}
-                size={36}
-                bordered
-              />
-            </View>
-            <View style={styles.roomHeaderText}>
-              <Text style={styles.roomHeaderEyebrow} numberOfLines={1}>
-                {room.category.toUpperCase()} · {roomVoiceLabel}
-              </Text>
-              <Text style={styles.roomHeaderTitle} numberOfLines={1}>
-                {room.title}
-              </Text>
-            </View>
+        {/* ── Üst bar ── */}
+        <View style={styles.roomTopBar}>
+          <Pressable
+            onPress={leaveRoom}
+            style={styles.roomTopBarBack}
+            accessibilityLabel="Odadan çık"
+          >
+            <Ionicons name="chevron-down" size={22} color="#FFFFFF" />
+          </Pressable>
+          <View style={{ flex: 1, alignItems: "center" }}>
+            <Text style={styles.roomTopBarCategory}>
+              {room.category.toUpperCase()}
+            </Text>
+            <Text style={styles.roomTopBarTitle} numberOfLines={1}>
+              {room.title}
+            </Text>
           </View>
-          <View style={styles.roomHeaderActions}>
-            <LiveParticipantList
-              compact
-              participants={activeRoomParticipants}
-              canModerate={canModerate}
-              isHost={isHost}
-              currentUserId={userId}
-              onModerate={manageParticipant}
-              onReport={reportParticipant}
-              onBlock={blockParticipant}
-            />
-            <IconButton
-              icon="ellipsis-horizontal"
-              onPress={handleOpenSettings}
-              accessibilityLabel="Oda seçenekleri"
-            />
-            <IconButton
-              icon="exit-outline"
-              onPress={leaveRoom}
-              accessibilityLabel="Odadan çık"
-            />
-          </View>
+          <Pressable
+            onPress={handleOpenSettings}
+            style={styles.roomTopBarMore}
+            accessibilityLabel="Oda seçenekleri"
+          >
+            <Ionicons name="ellipsis-horizontal" size={20} color="#FFFFFF" />
+          </Pressable>
         </View>
-        {(liveVoice.status === "error" ||
-          liveVoice.status === "disconnected") && (
-          <View style={[styles.roomVoiceStatus, voiceStatusInfo.style]}>
-            <Ionicons
-              name={voiceStatusInfo.icon}
-              size={18}
-              color={COLORS.text}
-            />
-            <View style={styles.roomVoiceStatusCopy}>
-              <Text style={styles.roomVoiceStatusTitle}>
-                {voiceStatusInfo.title}
-              </Text>
-              <Text style={styles.roomVoiceStatusDescription}>
-                {voiceStatusInfo.description}
-              </Text>
-            </View>
+
+        {/* ── Canlı bant ── */}
+        <View style={styles.roomLiveBand}>
+          <View style={styles.roomLivePill}>
+            {liveVoice.status === "connected" ? (
+              <LivePulse size={5} color={COLORS.primary} />
+            ) : null}
+            <Text style={styles.roomLivePillText}>
+              {liveVoice.status === "connected"
+                ? `CANLI · ${Math.max(liveVoice.participantCount, activeRoomParticipants.length)} kişi`
+                : roomVoiceLabel}
+            </Text>
+          </View>
+          {(liveVoice.status === "error" ||
+            liveVoice.status === "disconnected") && (
             <Pressable
-              style={styles.roomVoiceRetry}
+              style={styles.roomRetryPill}
               onPress={retryVoiceConnection}
             >
-              <Text style={styles.roomVoiceRetryText}>Yeniden dene</Text>
+              <Ionicons name="refresh" size={12} color={COLORS.primary} />
+              <Text style={styles.roomRetryText}>Yeniden bağlan</Text>
             </Pressable>
-          </View>
-        )}
+          )}
+          <AudioBars color="rgba(255,255,255,0.55)" compact />
+        </View>
+
+        {/* ── Ana içerik: sahne + sohbet ── */}
         <ScrollView
-          contentContainerStyle={styles.roomScroll}
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.roomBody}
           keyboardShouldPersistTaps="handled"
-          removeClippedSubviews
-          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={false}
         >
-          <View style={styles.roomHero}>
-            <LinearGradient
-              colors={room.colors}
-              style={[
-                styles.roomHeroGradient,
-                !roomSeatParticipants.length && styles.roomHeroGradientEmpty,
-              ]}
-            >
-              <View style={styles.roomHeroOrb} />
-              <View style={styles.roomHeroHalo} />
-              <View style={styles.roomStageTopRow}>
-                <View style={styles.roomLive}>
-                  {liveVoice.status === "connected" ? (
-                    <LivePulse size={6} />
-                  ) : null}
-                  <Text style={styles.roomLiveText}>
-                    {liveVoice.status === "connected"
-                      ? `CANLI · ${Math.max(liveVoice.participantCount, activeRoomParticipants.length)} KİŞİ`
-                      : roomVoiceLabel}
+          {/* HOST alanı */}
+          <View style={styles.roomStage}>
+            {room.description ? (
+              <Text style={styles.roomTopic} numberOfLines={2}>
+                {room.description}
+              </Text>
+            ) : null}
+            {/* Host */}
+            <View style={styles.roomHostSlot}>
+              <View style={styles.roomHostAvatarWrap}>
+                {micOn && isHost ? (
+                  <View style={styles.roomSpeakingRing} />
+                ) : null}
+                <View
+                  style={[
+                    styles.roomHostAvatar,
+                    { backgroundColor: room.accent || "#E8C477" },
+                  ]}
+                >
+                  <Text style={styles.roomHostInitial}>
+                    {room.initials || room.host?.charAt(0) || "S"}
                   </Text>
                 </View>
-                <View style={styles.roomStageSignature}>
-                  <AudioBars color="rgba(255,255,255,0.74)" />
+                <View style={styles.roomHostCrown}>
+                  <Ionicons name="sparkles" size={11} color="#FFD86B" />
                 </View>
               </View>
-              <View style={styles.hostArea}>
-                <View style={styles.hostCrown}>
-                  <Ionicons name="sparkles" size={16} color="#FFD86B" />
-                </View>
-                <Avatar
-                  label={room.initials}
-                  color="#E8C477"
-                  size={78}
-                  bordered
-                />
-                <Text style={styles.hostName}>{room.host}</Text>
-                <Text style={styles.hostRole}>ODAYI YÖNETİYOR</Text>
-                <View style={styles.voiceMeter}>
-                  {[13, 23, 16, 28, 18, 11].map((height, index) => (
-                    <View key={index} style={[styles.meterBar, { height }]} />
-                  ))}
-                </View>
-                {room.hostId && !isHost && (
-                  <Pressable
-                    onPress={onToggleFollowHost}
+              <Text style={styles.roomStageHostName} numberOfLines={1}>
+                {room.host}
+              </Text>
+              <Text style={styles.roomHostTag}>Ev sahibi</Text>
+              {room.hostId && !isHost && (
+                <Pressable
+                  onPress={onToggleFollowHost}
+                  style={[
+                    styles.roomFollowBtn,
+                    isFollowingHost && styles.roomFollowBtnActive,
+                  ]}
+                >
+                  <Text
                     style={[
-                      styles.stageFollowButton,
-                      isFollowingHost && styles.stageFollowButtonActive,
+                      styles.roomFollowBtnText,
+                      isFollowingHost && styles.roomFollowBtnTextActive,
                     ]}
                   >
-                    <Ionicons
-                      name={isFollowingHost ? "heart" : "heart-outline"}
-                      size={13}
-                      color={isFollowingHost ? COLORS.primaryInk : "#FFFFFF"}
-                    />
-                    <Text
+                    {isFollowingHost ? "Takipte" : "Takip et"}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+
+            {/* Koltuktaki konuşmacılar grid */}
+            <View style={styles.roomSectionRow}>
+              <Text style={styles.roomSectionTitle}>SAHNEDEKİLER</Text>
+              <Text style={styles.roomSectionCount}>
+                {roomSeatParticipants.length}/6
+              </Text>
+            </View>
+            <View style={styles.roomSpeakerGrid}>
+              {[
+                ...roomSeatParticipants,
+                ...Array.from({
+                  length: Math.max(0, 6 - roomSeatParticipants.length),
+                }),
+              ].map((participant, index) =>
+                participant ? (
+                  <Pressable
+                    style={styles.roomSpeakerSlot}
+                    key={participant.userId}
+                    delayLongPress={260}
+                    onLongPress={() => openParticipantMenu(participant)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${participant.name} kullanıcı menüsü`}
+                  >
+                    <View
                       style={[
-                        styles.stageFollowText,
-                        isFollowingHost && styles.stageFollowTextActive,
+                        styles.roomSpeakerAvatar,
+                        { backgroundColor: participant.color },
+                        participant.microphoneEnabled &&
+                          styles.roomSpeakerAvatarActive,
                       ]}
                     >
-                      {isFollowingHost ? "Takiptesin" : "Takip et"}
+                      <Text style={styles.roomSpeakerInitial}>
+                        {participant.name?.charAt(0)?.toUpperCase() || "?"}
+                      </Text>
+                      {participant.microphoneEnabled ? (
+                        <View style={styles.roomMicOnBadge}>
+                          <Ionicons name="mic" size={9} color="#11131A" />
+                        </View>
+                      ) : (
+                        <View style={styles.roomMicOffBadge}>
+                          <Ionicons
+                            name="mic-off"
+                            size={9}
+                            color="rgba(255,255,255,0.7)"
+                          />
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.roomSpeakerName} numberOfLines={1}>
+                      {participant.pendingSeat ? "Bekliyor" : participant.name}
                     </Text>
                   </Pressable>
-                )}
-              </View>
-              <View style={styles.seatGrid}>
-                {[
-                  ...roomSeatParticipants,
-                  ...Array.from({
-                    length: Math.max(0, 7 - roomSeatParticipants.length),
-                  }),
-                ].map((participant, index) =>
-                  participant ? (
-                    <View style={styles.seat} key={participant.userId}>
-                      <View
-                        style={[
-                          styles.seatAvatar,
-                          { backgroundColor: participant.color },
-                          participant.microphoneEnabled &&
-                            styles.seatAvatarSpeaking,
-                        ]}
-                      >
-                        <Text style={styles.seatInitial}>
-                          {participant.name?.charAt(0)?.toUpperCase() || "?"}
-                        </Text>
-                        {!participant.microphoneEnabled && (
-                          <View style={styles.seatMuted}>
-                            <Ionicons
-                              name="mic-off"
-                              size={10}
-                              color={COLORS.pink}
-                            />
-                          </View>
-                        )}
-                      </View>
-                      <Text style={styles.seatName} numberOfLines={1}>
-                        {participant.pendingSeat
-                          ? "İsteğin sırada"
-                          : participant.name}
-                      </Text>
+                ) : (
+                  <Pressable
+                    key={`empty-${index}`}
+                    style={styles.roomSpeakerSlot}
+                    onPress={toggleHand}
+                    accessibilityRole="button"
+                    accessibilityLabel="Boş koltuğa otur"
+                  >
+                    <View style={styles.roomEmptySeat}>
+                      <Ionicons
+                        name="add"
+                        size={22}
+                        color="rgba(255,255,255,0.35)"
+                      />
                     </View>
-                  ) : (
-                    <Pressable
-                      key={`empty-seat-${index}`}
-                      style={[styles.seat, styles.emptySeat]}
-                      onPress={toggleHand}
-                      accessibilityRole="button"
-                      accessibilityLabel="Boş koltuğa oturma isteği gönder"
-                    >
-                      <View style={styles.emptySeatAvatar}>
-                        <Ionicons name="add" size={20} color={COLORS.primary} />
-                      </View>
-                      <Text style={styles.seatName}>Boş koltuk</Text>
-                    </Pressable>
-                  ),
-                )}
-              </View>
-              <Text style={styles.stageHint}>
-                Dinleyici olarak katılabilirsin. Konuşmak için boş bir koltuğa
-                dokun.
-              </Text>
-            </LinearGradient>
+                    <Text style={styles.roomSpeakerName}>Boş</Text>
+                  </Pressable>
+                ),
+              )}
+            </View>
+
+            {/* El kaldır butonu */}
+            {!isHost && (
+              <Pressable
+                onPress={toggleHand}
+                style={[
+                  styles.roomHandBtn,
+                  handRaised && styles.roomHandBtnActive,
+                ]}
+                accessibilityLabel={
+                  handRaised
+                    ? "El kaldırma isteğini geri çek"
+                    : "El kaldır, konuş"
+                }
+              >
+                <Text style={styles.roomHandBtnEmoji}>✋</Text>
+                <Text
+                  style={[
+                    styles.roomHandBtnText,
+                    handRaised && { color: "#11131A" },
+                  ]}
+                >
+                  {handRaised ? "İsteğin iletildi" : "El kaldır"}
+                </Text>
+              </Pressable>
+            )}
           </View>
-          <View style={styles.chatPanel}>
-            <View style={styles.chatPanelHead}>
-              <View>
-                <Text style={styles.chatPanelTitle}>ODA SOHBETİ</Text>
-                <Text style={styles.chatHistoryHint}>{chatStatusText}</Text>
+
+          {/* Odadakiler */}
+          {activeRoomParticipants.length > 0 && (
+            <View style={styles.roomAudienceCard}>
+              <View style={styles.roomChatHead}>
+                <Text style={styles.roomChatTitle}>Odadakiler</Text>
+                <Text style={styles.roomChatCount}>
+                  {Math.max(
+                    liveVoice.participantCount,
+                    activeRoomParticipants.length,
+                  )}{" "}
+                  kişi
+                </Text>
               </View>
-              <Pressable onPress={clearRoomChat}>
-                <Text style={styles.clearChat}>Gizle</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.roomAudienceRow}
+                keyboardShouldPersistTaps="handled"
+              >
+                {activeRoomParticipants.map((participant) => (
+                  <Pressable
+                    key={participant.userId}
+                    style={styles.roomAudienceItem}
+                    delayLongPress={260}
+                    onLongPress={() => openParticipantMenu(participant)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${participant.name} kullanıcı menüsü`}
+                  >
+                    <View
+                      style={[
+                        styles.roomAudienceAvatar,
+                        { backgroundColor: participant.color },
+                      ]}
+                    >
+                      <Text style={styles.roomAudienceInitial}>
+                        {participant.name?.charAt(0)?.toUpperCase() || "?"}
+                      </Text>
+                      {participant.role === "host" ? (
+                        <View style={styles.roomAudienceCrown}>
+                          <Ionicons name="star" size={8} color="#11131A" />
+                        </View>
+                      ) : null}
+                    </View>
+                    <Text style={styles.roomAudienceName} numberOfLines={1}>
+                      {participant.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Sohbet */}
+          <View style={styles.roomChatBox}>
+            <View style={styles.roomChatHead}>
+              <Text style={styles.roomChatTitle}>Sohbet</Text>
+              <Text style={styles.roomChatCount}>{chatStatusText}</Text>
+              <Pressable onPress={clearRoomChat} hitSlop={8}>
+                <Ionicons
+                  name="trash-outline"
+                  size={15}
+                  color="rgba(255,255,255,0.4)"
+                />
               </Pressable>
             </View>
             <RoomMessageList
@@ -5329,44 +5736,77 @@ function Room({
             />
           </View>
         </ScrollView>
-        <View style={styles.roomFloatingControls}>
+
+        {/* ── Alt kontrol barı (WePlay tarzı) ── */}
+        <View style={styles.roomControlBar}>
+          {/* Mikrofon */}
           <Pressable
-            style={[
-              styles.roomFloatingButton,
-              micOn && styles.roomFloatingButtonActive,
-            ]}
+            style={[styles.roomCtrlBtn, micOn && styles.roomCtrlBtnOn]}
             onPress={toggleMicrophone}
             accessibilityLabel="Mikrofon"
           >
             <Ionicons
               name={micOn ? "mic" : "mic-off"}
-              size={20}
-              color={micOn ? COLORS.primaryInk : COLORS.text}
+              size={22}
+              color={micOn ? "#11131A" : "#FFFFFF"}
             />
+            <Text style={[styles.roomCtrlLabel, micOn && { color: "#11131A" }]}>
+              Mikrofon
+            </Text>
           </Pressable>
+
+          {/* Hoparlör */}
           <Pressable
-            style={[
-              styles.roomFloatingButton,
-              speakerOn && styles.roomFloatingButtonActive,
-            ]}
+            style={[styles.roomCtrlBtn, speakerOn && styles.roomCtrlBtnOn]}
             onPress={handleToggleSpeaker}
             accessibilityLabel="Hoparlör"
           >
             <Ionicons
-              name="volume-high"
-              size={20}
-              color={speakerOn ? COLORS.primaryInk : COLORS.text}
+              name={speakerOn ? "volume-high" : "volume-mute"}
+              size={22}
+              color={speakerOn ? "#11131A" : "#FFFFFF"}
             />
+            <Text
+              style={[styles.roomCtrlLabel, speakerOn && { color: "#11131A" }]}
+            >
+              Ses
+            </Text>
           </Pressable>
+
+          {/* Hediye */}
           <Pressable
-            style={styles.roomFloatingButton}
+            style={styles.roomCtrlBtn}
             onPress={handleOpenGift}
             accessibilityLabel="Hediye gönder"
           >
-            <Ionicons name="gift-outline" size={20} color={COLORS.text} />
+            <Ionicons name="gift-outline" size={22} color="#FFD86B" />
+            <Text style={styles.roomCtrlLabel}>Hediye</Text>
+          </Pressable>
+
+          {/* Paylaş */}
+          <Pressable
+            style={styles.roomCtrlBtn}
+            onPress={shareRoom}
+            accessibilityLabel="Odayı paylaş"
+          >
+            <Ionicons name="share-social-outline" size={22} color="#FFFFFF" />
+            <Text style={styles.roomCtrlLabel}>Paylaş</Text>
+          </Pressable>
+
+          {/* Çıkış — büyük kırmızı */}
+          <Pressable
+            style={styles.roomLeaveBtn}
+            onPress={leaveRoom}
+            accessibilityLabel="Odadan çık"
+          >
+            <Ionicons name="exit-outline" size={22} color="#FFFFFF" />
+            <Text style={styles.roomCtrlLabel}>Çık</Text>
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      <GiftFlight gift={giftFlight} />
+
       <RoomSettingsSheet
         visible={settingsOpen}
         isHost={canModerate}
@@ -5387,6 +5827,15 @@ function Room({
         onSend={handleSendGiftFromSheet}
       />
       <ReportSheet target={reportTarget} onDismiss={handleCloseReport} />
+      <ParticipantActionSheet
+        participant={selectedParticipant}
+        isFollowing={selectedIsFollowing}
+        canBlock={Boolean(room.persisted && selectedParticipant?.userId)}
+        onToggleFollow={handleSelectedFollow}
+        onBlock={handleSelectedBlock}
+        onReport={handleSelectedReport}
+        onDismiss={closeParticipantMenu}
+      />
     </SafeAreaView>
   );
 }
@@ -7042,10 +7491,11 @@ function AppContent() {
   // Bir donem buradaki ifadeler hook'lardan onceydi; marka ekrani kapanip
   // kosullar degisince hook sayisi degisiyor ve uygulama
   // "Rendered more hooks than during the previous render" ile cokuyordu.
-  const hostedRoomCount = useMemo(
-    () => rooms.filter((item) => item.host === profile.name).length,
+  const myHostedRooms = useMemo(
+    () => rooms.filter((item) => item.host === profile.name),
     [rooms, profile.name],
   );
+  const hostedRoomCount = myHostedRooms.length;
 
   const handleOpenNotifications = useCallback(
     () => setNotificationsOpen(true),
@@ -7184,6 +7634,7 @@ function AppContent() {
         coins={walletBalance}
         favoriteCount={favoriteRoomIds.length}
         hostedRoomCount={hostedRoomCount}
+        myRooms={myHostedRooms}
         dailyRewardClaimed={dailyRewardClaimed}
         adminRole={adminRole}
         onEdit={handleOpenProfileEditor}
@@ -11223,4 +11674,734 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: COLORS.line,
   },
+
+  /* ══ WePlay / Hazan tarzı oda ekranı (koyu tema) ══════════════════ */
+  roomScreen: { flex: 1, backgroundColor: "#11131A" },
+  roomTopBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  roomTopBarBack: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  roomTopBarMore: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  roomTopBarCategory: {
+    color: "#FFD86B",
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1.6,
+  },
+  roomTopBarTitle: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "900",
+    marginTop: 2,
+  },
+  roomLiveBand: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  roomLivePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  roomLivePillText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.6,
+  },
+  roomRetryPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(245,200,66,0.16)",
+  },
+  roomRetryText: { color: COLORS.primary, fontSize: 10, fontWeight: "800" },
+  roomBody: {
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 28,
+    gap: 16,
+  },
+  roomStage: {
+    borderRadius: 26,
+    paddingVertical: 22,
+    paddingHorizontal: 14,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+    alignItems: "center",
+  },
+  roomHostSlot: { alignItems: "center", marginBottom: 22 },
+  roomHostAvatarWrap: { alignItems: "center", justifyContent: "center" },
+  roomSpeakingRing: {
+    position: "absolute",
+    width: 94,
+    height: 94,
+    borderRadius: 47,
+    borderWidth: 2,
+    borderColor: "#FFD86B",
+  },
+  roomHostAvatar: {
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255,216,107,0.9)",
+  },
+  roomHostInitial: { color: "#11131A", fontSize: 30, fontWeight: "900" },
+  roomHostCrown: {
+    position: "absolute",
+    top: -6,
+    right: 0,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#1B1E27",
+    borderWidth: 1,
+    borderColor: "rgba(255,216,107,0.7)",
+  },
+  roomStageHostName: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "900",
+    marginTop: 10,
+  },
+  roomHostTag: {
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 10,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  roomFollowBtn: {
+    marginTop: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.28)",
+  },
+  roomFollowBtnActive: {
+    backgroundColor: "rgba(255,216,107,0.16)",
+    borderColor: "rgba(255,216,107,0.6)",
+  },
+  roomFollowBtnText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
+  roomFollowBtnTextActive: { color: "#FFD86B" },
+  roomSpeakerGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 16,
+    width: "100%",
+  },
+  roomSpeakerSlot: { width: 62, alignItems: "center", gap: 6 },
+  roomSpeakerAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  roomSpeakerAvatarActive: { borderColor: "#FFD86B" },
+  roomSpeakerInitial: { color: "#11131A", fontSize: 20, fontWeight: "900" },
+  roomMicOnBadge: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFD86B",
+  },
+  roomMicOffBadge: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#2A2E3A",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+  roomSpeakerName: {
+    color: "rgba(255,255,255,0.75)",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  roomEmptySeat: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "rgba(255,255,255,0.22)",
+  },
+  roomHandBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 20,
+    paddingHorizontal: 22,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+  },
+  roomHandBtnActive: { backgroundColor: "#FFD86B", borderColor: "#FFD86B" },
+  roomHandBtnEmoji: { fontSize: 14 },
+  roomHandBtnText: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
+  roomChatBox: {
+    borderRadius: 22,
+    padding: 12,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+  roomChatHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 6,
+  },
+  roomChatTitle: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
+  roomChatCount: {
+    flex: 1,
+    color: "rgba(255,255,255,0.45)",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  roomControlBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    backgroundColor: "#171A22",
+    borderTopWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  roomCtrlBtn: {
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  roomCtrlBtnOn: { backgroundColor: "rgba(255,216,107,0.16)" },
+  roomCtrlLabel: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 9,
+    fontWeight: "800",
+  },
+  roomLeaveBtn: {
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: "rgba(217,79,79,0.9)",
+  },
+  roomTopic: {
+    color: "rgba(255,255,255,0.66)",
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: "center",
+    marginBottom: 18,
+    paddingHorizontal: 10,
+  },
+  roomSectionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    marginBottom: 12,
+    paddingHorizontal: 2,
+  },
+  roomSectionTitle: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.2,
+  },
+  roomSectionCount: { color: "#FFD86B", fontSize: 10, fontWeight: "900" },
+  roomAudienceCard: {
+    borderRadius: 22,
+    padding: 12,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+  roomAudienceRow: { gap: 14, paddingRight: 8 },
+  roomAudienceItem: { alignItems: "center", gap: 6, width: 56 },
+  roomAudienceAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  roomAudienceInitial: { color: "#11131A", fontSize: 16, fontWeight: "900" },
+  roomAudienceCrown: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFD86B",
+  },
+  roomAudienceName: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 9,
+    fontWeight: "700",
+  },
+  giftFlightLayer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    zIndex: 40,
+  },
+  giftFlyer: {
+    position: "absolute",
+    bottom: 168,
+    left: "50%",
+    marginLeft: -22,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.4)",
+    shadowColor: "#000000",
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
+  giftFlyerBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 196,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "rgba(17,19,26,0.85)",
+    borderWidth: 1,
+    borderColor: "rgba(255,216,107,0.4)",
+  },
+  giftFlyerBannerText: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
+  participantSheetHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 6,
+    marginBottom: 12,
+  },
+  participantSheetAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  participantSheetInitial: { color: "#11131A", fontSize: 20, fontWeight: "900" },
+  participantSheetInfo: { flex: 1 },
+  participantSheetName: { color: COLORS.text, fontSize: 16, fontWeight: "900" },
+  participantSheetRole: {
+    color: COLORS.muted,
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  // Koyu oda içinde sohbet metinleri okunur olsun.
+  composerGift: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  composerInput: {
+    flex: 1,
+    paddingVertical: 6,
+    color: "#FFFFFF",
+    fontSize: 13,
+  },
+  messageText: { color: "rgba(255,255,255,0.78)", fontSize: 12, lineHeight: 16 },
+  messageUser: { color: "#FFFFFF", fontWeight: "900" },
+  messageReportButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+
+  /* ══ WePlay / Hazan tarzı profil ekranı ══════════════════════════ */
+  pfCover: {
+    height: 178,
+    borderRadius: 26,
+    overflow: "hidden",
+    padding: 16,
+    justifyContent: "space-between",
+  },
+  pfCoverOrbOne: {
+    position: "absolute",
+    top: -40,
+    right: -30,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: "rgba(245,200,66,0.22)",
+  },
+  pfCoverOrbTwo: {
+    position: "absolute",
+    bottom: -50,
+    left: -20,
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    backgroundColor: "rgba(124,92,191,0.26)",
+  },
+  pfCoverTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  pfBrandChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.12)",
+  },
+  pfBrandLogo: { width: 20, height: 20, borderRadius: 6 },
+  pfBrandChipText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1.2,
+  },
+  pfCoverActions: { flexDirection: "row", gap: 8 },
+  pfCoverBottom: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  pfCoverStat: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.12)",
+  },
+  pfCoverStatText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800" },
+  pfIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.14)",
+  },
+  pfIdentity: { alignItems: "center", marginTop: -46, paddingHorizontal: 12 },
+  pfAvatarWrap: { position: "relative" },
+  pfAvatarRing: {
+    padding: 4,
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.background,
+  },
+  pfLevelBadge: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    minWidth: 32,
+    height: 24,
+    paddingHorizontal: 7,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.primary,
+    borderWidth: 3,
+    borderColor: COLORS.background,
+  },
+  pfLevelBadgeText: {
+    color: COLORS.primaryInk,
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  pfName: { color: COLORS.text, fontSize: 22, fontWeight: "900", marginTop: 12 },
+  pfHandle: {
+    color: COLORS.muted,
+    fontSize: 13,
+    fontWeight: "700",
+    marginTop: 3,
+  },
+  pfBio: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: "center",
+    marginTop: 10,
+  },
+  pfIdentityActions: { flexDirection: "row", gap: 8, marginTop: 14 },
+  pfPrimaryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: COLORS.primary,
+  },
+  pfPrimaryBtnText: { color: COLORS.primaryInk, fontSize: 13, fontWeight: "900" },
+  pfSecondaryBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.text,
+  },
+  pfStatsStrip: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 20,
+    paddingVertical: 14,
+    borderRadius: 20,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    ...ELEVATION.card,
+  },
+  pfStatDivider: { width: 1, height: 28, backgroundColor: COLORS.line },
+  pfLevelCard: {
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 20,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    ...ELEVATION.card,
+  },
+  pfLevelHead: { flexDirection: "row", alignItems: "center", gap: 10 },
+  pfLevelIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(236,208,109,0.18)",
+  },
+  pfLevelInfo: { flex: 1 },
+  pfLevelTitle: { color: COLORS.text, fontSize: 14, fontWeight: "900" },
+  pfLevelDesc: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
+  pfLevelPoints: { color: "#9A6A00", fontSize: 12, fontWeight: "900" },
+  pfProgressTrack: {
+    height: 8,
+    borderRadius: 999,
+    marginTop: 12,
+    backgroundColor: COLORS.surfaceHigh,
+    overflow: "hidden",
+  },
+  pfProgressFill: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: COLORS.primary,
+  },
+  pfChipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 },
+  pfChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  pfChipAccent: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  pfChipText: { color: COLORS.text, fontSize: 12, fontWeight: "800" },
+  pfChipTextAccent: { color: COLORS.primaryInk },
+  pfSection: {
+    color: COLORS.muted,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1.4,
+    marginTop: 26,
+    marginBottom: 10,
+  },
+  pfBadgeRow: { flexDirection: "row", gap: 10 },
+  pfBadge: {
+    flex: 1,
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 18,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  pfBadgeIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.surfaceHigh,
+  },
+  pfBadgeIconOn: { backgroundColor: COLORS.primary },
+  pfBadgeText: { color: COLORS.textSecondary, fontSize: 10, fontWeight: "800" },
+  pfActivityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    marginBottom: 8,
+    borderRadius: 16,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  pfActivityAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pfActivityAvatarText: { color: "#FFFFFF", fontSize: 15, fontWeight: "900" },
+  pfActivityInfo: { flex: 1 },
+  pfActivityTitle: { color: COLORS.text, fontSize: 13, fontWeight: "800" },
+  pfActivityMeta: { color: COLORS.muted, fontSize: 11, marginTop: 2 },
+  pfTabs: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 18,
+    padding: 5,
+    borderRadius: 18,
+    backgroundColor: COLORS.surfaceHigh,
+  },
+  pfTab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingVertical: 11,
+    borderRadius: 14,
+  },
+  pfTabActive: {
+    backgroundColor: COLORS.surface,
+    ...ELEVATION.card,
+  },
+  pfTabText: { color: COLORS.textSecondary, fontSize: 13, fontWeight: "800" },
+  pfTabTextActive: { color: COLORS.text },
+  pfTabBadge: {
+    minWidth: 22,
+    paddingHorizontal: 6,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.primarySoft,
+  },
+  pfTabBadgeText: { color: COLORS.primaryInk, fontSize: 11, fontWeight: "900" },
+  pfEmpty: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 14,
+    marginTop: 4,
+    borderRadius: 16,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  pfEmptyText: { color: COLORS.muted, fontSize: 12, fontWeight: "700" },
+  pfMenu: {
+    borderRadius: 20,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    overflow: "hidden",
+  },
+  pfMenuRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.lineSoft,
+  },
+  pfMenuIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.surfaceRaised,
+  },
+  pfMenuTitle: { flex: 1, color: COLORS.text, fontSize: 14, fontWeight: "800" },
 });
