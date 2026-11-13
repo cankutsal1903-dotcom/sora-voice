@@ -5699,7 +5699,7 @@ function Room({
                     >
                       <View style={styles.roomAvatarWrap}>
                         {participant.isSpeaking ? (
-                          <SpeakingRing size={index === 0 ? 86 : 60} color="#FFD86B" />
+                          <SpeakingRing size={index === 0 ? 86 : 70} color="#FFD86B" />
                         ) : null}
                         <View
                           style={[
@@ -5759,8 +5759,8 @@ function Room({
                       <View style={styles.roomEmptySeat}>
                         <Ionicons
                           name="mic-outline"
-                          size={20}
-                          color="rgba(255,255,255,0.35)"
+                          size={26}
+                          color="rgba(235,228,255,0.6)"
                         />
                       </View>
                       <Text style={styles.roomEmptySeatLabel}>{index + 1}</Text>
@@ -12270,9 +12270,9 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   roomSpeakerAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
@@ -12315,9 +12315,9 @@ const styles = StyleSheet.create({
     maxWidth: "100%",
   },
   roomEmptySeat: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(196,181,255,0.09)",
