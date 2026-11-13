@@ -9325,7 +9325,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: COLORS.surfaceRaised,
   },
-  settingIconActive: { backgroundColor: COLORS.text },
+  settingIconActive: {
+    backgroundColor: COLORS.primarySoft,
+    borderWidth: 1,
+    borderColor: "rgba(245,196,52,0.45)",
+  },
   settingContent: { flex: 1 },
   settingTitle: { color: COLORS.text, fontSize: 13, fontWeight: "800" },
   settingDescription: { color: COLORS.muted, fontSize: 10, marginTop: 3 },
