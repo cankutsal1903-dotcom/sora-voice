@@ -5699,7 +5699,7 @@ function Room({
                     >
                       <View style={styles.roomAvatarWrap}>
                         {participant.isSpeaking ? (
-                          <SpeakingRing size={index === 0 ? 86 : 74} color="#FFD86B" />
+                          <SpeakingRing size={index === 0 ? 98 : 78} color="#FFD86B" />
                         ) : null}
                         <View
                           style={[
@@ -5742,11 +5742,13 @@ function Room({
                       <Text style={styles.roomSpeakerName} numberOfLines={1}>
                         {participant.pendingSeat
                           ? "Bekliyor"
-                          : participant.name}
+                          : index === 0 ? `1 · ${participant.name}` : participant.name}
                       </Text>
-                      <Text style={styles.roomSpeakerRole} numberOfLines={1}>
-                        {index === 0 ? "1 · Ev sahibi" : participant.isSpeaking ? "Konuşuyor" : `${index + 1}`}
-                      </Text>
+                      {index !== 0 && (
+                        <Text style={styles.roomSpeakerRole} numberOfLines={1}>
+                          {participant.isSpeaking ? "Konuşuyor" : `${index + 1}`}
+                        </Text>
+                      )}
                     </Pressable>
                   ) : (
                     <Pressable
@@ -11875,14 +11877,14 @@ const styles = StyleSheet.create({
   },
   roomHostStageSlot: {
     width: "100%",
-    minHeight: 120,
-    paddingTop: 4,
-    paddingBottom: 6,
+    minHeight: 106,
+    paddingTop: 0,
+    paddingBottom: 0,
   },
   roomHostStageAvatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     borderWidth: 3,
   },
   roomHostStageInitial: {
@@ -12141,15 +12143,13 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   roomSurface: {
-    marginTop: "auto",
-    marginBottom: "auto",
     paddingHorizontal: 2,
-    paddingTop: 12,
+    paddingTop: 20,
     paddingBottom: 6,
   },
   roomBody: {
     flexGrow: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     paddingTop: 2,
     paddingBottom: 8,
     gap: 10,
@@ -12190,7 +12190,7 @@ const styles = StyleSheet.create({
     borderTopColor: "rgba(255,255,255,0.08)",
   },
   roomChatSection: {
-    marginTop: 0,
+    marginTop: 12,
     paddingHorizontal: 8,
     paddingTop: 8,
     paddingBottom: 4,
@@ -12260,21 +12260,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
-    columnGap: 6,
+    columnGap: 0,
     rowGap: 10,
     width: "100%",
   },
   roomSpeakerSlot: {
-    width: "22%",
+    width: "25%",
     minHeight: 84,
     alignItems: "center",
     paddingVertical: 4,
     gap: 5,
   },
   roomSpeakerAvatar: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+    width: 66,
+    height: 66,
+    borderRadius: 33,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
@@ -12317,9 +12317,9 @@ const styles = StyleSheet.create({
     maxWidth: "100%",
   },
   roomEmptySeat: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+    width: 66,
+    height: 66,
+    borderRadius: 33,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(196,181,255,0.09)",
