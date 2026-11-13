@@ -5699,7 +5699,7 @@ function Room({
                     >
                       <View style={styles.roomAvatarWrap}>
                         {participant.isSpeaking ? (
-                          <SpeakingRing size={index === 0 ? 104 : 88} color="#FFD86B" />
+                          <SpeakingRing size={index === 0 ? 86 : 60} color="#FFD86B" />
                         ) : null}
                         <View
                           style={[
@@ -5759,7 +5759,7 @@ function Room({
                       <View style={styles.roomEmptySeat}>
                         <Ionicons
                           name="mic-outline"
-                          size={26}
+                          size={20}
                           color="rgba(255,255,255,0.35)"
                         />
                       </View>
@@ -11875,18 +11875,18 @@ const styles = StyleSheet.create({
   },
   roomHostStageSlot: {
     width: "100%",
-    minHeight: 151,
-    paddingTop: 8,
-    paddingBottom: 12,
+    minHeight: 120,
+    paddingTop: 4,
+    paddingBottom: 6,
   },
   roomHostStageAvatar: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     borderWidth: 3,
   },
   roomHostStageInitial: {
-    fontSize: 34,
+    fontSize: 28,
   },
   roomConnectionNotice: {
     flexDirection: "row",
@@ -11973,7 +11973,7 @@ const styles = StyleSheet.create({
   },
   roomSpeakerRole: {
     color: "#F5D994",
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: "700",
   },
   roomEmptySeatLabel: {
@@ -12258,21 +12258,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
-    columnGap: 14,
-    rowGap: 16,
+    columnGap: 6,
+    rowGap: 10,
     width: "100%",
   },
   roomSpeakerSlot: {
-    width: "28%",
-    minHeight: 110,
+    width: "18%",
+    minHeight: 84,
     alignItems: "center",
-    paddingVertical: 6,
-    gap: 7,
+    paddingVertical: 4,
+    gap: 5,
   },
   roomSpeakerAvatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
@@ -12281,16 +12281,16 @@ const styles = StyleSheet.create({
   roomSpeakerAvatarActive: { borderColor: "#FFD86B" },
   roomSpeakerInitial: {
     color: "#171A32",
-    fontSize: 27,
+    fontSize: 20,
     fontWeight: "900",
   },
   roomMicOnBadge: {
     position: "absolute",
     bottom: -2,
     right: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#FFD86B",
@@ -12299,9 +12299,9 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: -2,
     right: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#2A2E3A",
@@ -12310,14 +12310,14 @@ const styles = StyleSheet.create({
   },
   roomSpeakerName: {
     color: "#FAF7FF",
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "700",
     maxWidth: "100%",
   },
   roomEmptySeat: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(196,181,255,0.09)",
