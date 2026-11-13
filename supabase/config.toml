@@ -1,2 +1,5 @@
 [functions.notify-room-live]
 verify_jwt = false
+
+[functions.livekit-token]
+verify_jwt = false
