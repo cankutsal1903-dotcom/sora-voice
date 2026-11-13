@@ -12294,7 +12294,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   roomOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "#11131A",
     zIndex: 10,
   },
