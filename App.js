@@ -5879,7 +5879,7 @@ function Room({
                       <View style={styles.roomAvatarWrap}>
                         {participant.isSpeaking ? (
 
-                          <SpeakingRing size={index === 0 ? 86 : 74} color="#FFD86B" />
+                          <SpeakingRing size={index === 0 ? 98 : 78} color="#FFD86B" />
                         ) : null}
                         <View
                           style={[
@@ -5921,11 +5921,14 @@ function Room({
                       <Text style={styles.roomSpeakerName} numberOfLines={1}>
                         {participant.pendingSeat
                           ? "Bekliyor"
-                          : participant.name}
+
+                          : index === 0 ? `1 · ${participant.name}` : participant.name}
                       </Text>
-                      <Text style={styles.roomSpeakerRole} numberOfLines={1}>
-                        {participant.role === "host" ? "Ev sahibi" : participant.isSpeaking ? "Konuşuyor" : "Konuşmacı"}
-                      </Text>
+                      {index !== 0 && (
+                        <Text style={styles.roomSpeakerRole} numberOfLines={1}>
+                          {participant.isSpeaking ? "Konuşuyor" : `${index + 1}`}
+                        </Text>
+                      )}
                     </Pressable>
                   ) : (
                     <Pressable
@@ -12075,6 +12078,57 @@ const styles = StyleSheet.create({
     borderColor: COLORS.line,
   },
 
+
+  roomHeaderRoom: {
+    flex: 1,
+  },
+  roomHostStageSlot: {
+    width: "100%",
+    minHeight: 106,
+    paddingTop: 0,
+    paddingBottom: 0,
+  },
+  roomHostStageAvatar: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    borderWidth: 3,
+  },
+  roomHostStageInitial: {
+    fontSize: 28,
+  },
+  roomConnectionNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingBottom: 4,
+    flexWrap: "wrap",
+  },
+  roomConnectionText: {
+    color: "#D5C7F0",
+    fontSize: 9,
+    fontWeight: "600",
+  },
+  roomComposerDock: {
+    paddingHorizontal: 16,
+    paddingTop: 2,
+    paddingBottom: 6,
+    backgroundColor: "rgba(12,16,34,0.5)",
+  },
+  roomAtmosphereGlow: {
+    position: "absolute",
+    top: 70,
+    right: -90,
+    width: 310,
+    height: 310,
+    borderRadius: 155,
+  },
+  roomAtmosphereSparkle: {
+    position: "absolute",
+    right: "16%",
+    top: "30%",
+  },
   /* ══ WePlay / Hazan tarzı oda ekranı (koyu tema) ══════════════════ */
   roomHeaderBrand: {
     flex: 1,
@@ -12299,23 +12353,17 @@ const styles = StyleSheet.create({
   },
   roomSurface: {
 
-    borderRadius: 24,
-    padding: 16,
-    backgroundColor: "#1B2229",
-    borderWidth: 1,
-    borderColor: "rgba(233,223,185,0.12)",
-    overflow: "hidden",
-    marginTop: "auto",
-    marginBottom: "auto",
-    paddingTop: 12,
+    paddingHorizontal: 2,
+    paddingTop: 20,
     paddingBottom: 6,
   },
   roomBody: {
     flexGrow: 1,
-    paddingHorizontal: 18,
-    paddingTop: 4,
-    paddingBottom: 24,
-    gap: 16,
+
+    paddingHorizontal: 8,
+    paddingTop: 2,
+    paddingBottom: 8,
+    gap: 10,
   },
   roomStage: {
     width: "100%",
@@ -12355,11 +12403,10 @@ const styles = StyleSheet.create({
   },
   roomChatSection: {
 
-    borderRadius: 24,
-    padding: 16,
-    backgroundColor: "#181F27",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.075)",
+    marginTop: 12,
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    paddingBottom: 4,
     minHeight: 104,
   },
   roomHostSlot: { alignItems: "center", marginBottom: 22 },
@@ -12431,13 +12478,14 @@ const styles = StyleSheet.create({
   roomSpeakerGridRow: {
     flexDirection: "row",
     justifyContent: "center",
-    columnGap: 8,
-    rowGap: 12,
+
+    columnGap: 0,
+    rowGap: 10,
     width: "100%",
   },
   roomSpeakerSlot: {
-    width: "22%",
-    minHeight: 94,
+    width: "25%",
+    minHeight: 84,
     alignItems: "center",
     paddingVertical: 5,
     gap: 5,
@@ -12445,9 +12493,9 @@ const styles = StyleSheet.create({
   },
   roomSpeakerAvatar: {
 
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+    width: 66,
+    height: 66,
+    borderRadius: 33,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
@@ -12487,9 +12535,9 @@ const styles = StyleSheet.create({
   },
 
   roomEmptySeat: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+    width: 66,
+    height: 66,
+    borderRadius: 33,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#2F80ED",
