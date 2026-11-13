@@ -12298,14 +12298,20 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   roomSurface: {
+
     borderRadius: 24,
     padding: 16,
     backgroundColor: "#1B2229",
     borderWidth: 1,
     borderColor: "rgba(233,223,185,0.12)",
     overflow: "hidden",
+    marginTop: "auto",
+    marginBottom: "auto",
+    paddingTop: 12,
+    paddingBottom: 6,
   },
   roomBody: {
+    flexGrow: 1,
     paddingHorizontal: 18,
     paddingTop: 4,
     paddingBottom: 24,
@@ -12348,12 +12354,13 @@ const styles = StyleSheet.create({
     borderTopColor: "rgba(255,255,255,0.08)",
   },
   roomChatSection: {
+
     borderRadius: 24,
     padding: 16,
     backgroundColor: "#181F27",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.075)",
-    minHeight: 176,
+    minHeight: 104,
   },
   roomHostSlot: { alignItems: "center", marginBottom: 22 },
   roomHostAvatarWrap: { alignItems: "center", justifyContent: "center" },
