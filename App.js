@@ -4778,7 +4778,7 @@ const RoomMessageList = memo(function RoomMessageList({
   );
 });
 
-const ROOM_STAGE_CAPACITY = 10;
+const ROOM_STAGE_CAPACITY = 9;
 
 function Room({
   room,
@@ -5745,7 +5745,7 @@ function Room({
                           : participant.name}
                       </Text>
                       <Text style={styles.roomSpeakerRole} numberOfLines={1}>
-                        {participant.role === "host" ? "Ev sahibi" : participant.isSpeaking ? "Konuşuyor" : "Konuşmacı"}
+                        {index === 0 ? "1 · Ev sahibi" : participant.isSpeaking ? "Konuşuyor" : `${index + 1}`}
                       </Text>
                     </Pressable>
                   ) : (
@@ -5763,7 +5763,7 @@ function Room({
                           color="rgba(255,255,255,0.35)"
                         />
                       </View>
-                      <Text style={styles.roomEmptySeatLabel}>{index}</Text>
+                      <Text style={styles.roomEmptySeatLabel}>{index + 1}</Text>
                     </Pressable>
                   ),
                 )}
@@ -12263,7 +12263,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   roomSpeakerSlot: {
-    width: "18%",
+    width: "22%",
     minHeight: 84,
     alignItems: "center",
     paddingVertical: 4,
