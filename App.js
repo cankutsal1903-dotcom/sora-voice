@@ -5878,7 +5878,8 @@ function Room({
                     >
                       <View style={styles.roomAvatarWrap}>
                         {participant.isSpeaking ? (
-                          <SpeakingRing size={64} color="#FFD86B" />
+
+                          <SpeakingRing size={index === 0 ? 86 : 74} color="#FFD86B" />
                         ) : null}
                         <View
                           style={[
@@ -5936,9 +5937,10 @@ function Room({
                     >
                       <View style={styles.roomEmptySeat}>
                         <Ionicons
-                          name="add"
-                          size={22}
-                          color="rgba(255,255,255,0.35)"
+
+                          name="mic-outline"
+                          size={28}
+                          color="rgba(235,228,255,0.6)"
                         />
                       </View>
                       <Text style={styles.roomEmptySeatLabel}>Katıl</Text>
@@ -12435,9 +12437,10 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   roomSpeakerAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+
+    width: 62,
+    height: 62,
+    borderRadius: 31,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
@@ -12475,13 +12478,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     maxWidth: "100%",
   },
-  roomSeatNumberBadge: {
-    position: "absolute",
-    top: -4,
-    left: -4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+
+  roomEmptySeat: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#2F80ED",
