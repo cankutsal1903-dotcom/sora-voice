@@ -12141,6 +12141,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   roomSurface: {
+    marginTop: "auto",
+    marginBottom: "auto",
     paddingHorizontal: 2,
     paddingTop: 12,
     paddingBottom: 6,
@@ -12188,7 +12190,7 @@ const styles = StyleSheet.create({
     borderTopColor: "rgba(255,255,255,0.08)",
   },
   roomChatSection: {
-    marginTop: "auto",
+    marginTop: 0,
     paddingHorizontal: 8,
     paddingTop: 8,
     paddingBottom: 4,
