@@ -2907,17 +2907,17 @@ const RoomSettingsSheet = memo(function RoomSettingsSheet({
                   ]}
                 >
                   <Ionicons
-                    name={roomLocked ? "lock-closed" : "lock-open-outline"}
+                    name={roomLocked ? "mic-off-outline" : "list-outline"}
                     size={18}
                     color={roomLocked ? COLORS.primaryInk : COLORS.primary}
                   />
                 </View>
                 <View style={styles.settingContent}>
-                  <Text style={styles.settingTitle}>Konusma istekleri</Text>
+                  <Text style={styles.settingTitle}>Mikrofon sırası</Text>
                   <Text style={styles.settingDescription}>
                     {roomLocked
-                      ? "Yeni istekler kapali"
-                      : "Dinleyiciler el kaldirabilir"}
+                      ? "Yeni sıra istekleri kapalı"
+                      : "Dinleyiciler sıraya girebilir"}
                   </Text>
                 </View>
                 <Text
@@ -2926,7 +2926,7 @@ const RoomSettingsSheet = memo(function RoomSettingsSheet({
                     roomLocked && styles.settingStateActive,
                   ]}
                 >
-                  {roomLocked ? "Kapali" : "Acik"}
+                  {roomLocked ? "Kapalı" : "Açık"}
                 </Text>
               </Pressable>
               <Pressable onPress={onToggleChatLock} style={styles.settingRow}>
@@ -5449,8 +5449,8 @@ function Room({
   const toggleHand = async () => {
     if (roomLocked && !isHost) {
       Alert.alert(
-        "Oda kilitli",
-        "Ev sahibi su an yeni konusma isteklerini kapatti.",
+        "Mikrofon sırası kapalı",
+        "Ev sahibi şu an yeni sıra isteklerini kapattı.",
       );
       return;
     }
@@ -5474,8 +5474,8 @@ function Room({
         id: `hand-${Date.now()}`,
         system: true,
         text: nextState
-          ? "Koltuk isteğin ev sahibine iletildi."
-          : "Koltuk isteğin geri çekildi.",
+          ? "Mikrofon sırasına girdin."
+          : "Mikrofon sırasından çıktın.",
       },
     ]);
   };
@@ -5981,18 +5981,22 @@ function Room({
                     ]}
                     accessibilityLabel={
                       handRaised
-                        ? "El kaldırma isteğini geri çek"
-                        : "El kaldır, konuş"
+                        ? "Mikrofon sırasından çık"
+                        : "Mikrofon sırasına gir"
                     }
                   >
-                    <Text style={styles.roomHandBtnEmoji}>✋</Text>
+                    <Ionicons
+                      name={handRaised ? "remove-circle-outline" : "list-outline"}
+                      size={17}
+                      color={handRaised ? "#11131A" : "#FFD86B"}
+                    />
                     <Text
                       style={[
                         styles.roomHandBtnText,
                         handRaised && { color: "#11131A" },
                       ]}
                     >
-                      {handRaised ? "İsteğin iletildi" : "El kaldır"}
+                      {handRaised ? "Sıradan çık" : "Mikrofon sırasına gir"}
                     </Text>
                   </Pressable>
                 </View>
@@ -8955,7 +8959,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     paddingHorizontal: 22,
     paddingTop: 29,
-    paddingBottom: Platform.OS === "ios" ? 35 : 26,
+    // Modal pencereleri SafeAreaView'in dışında açılır; Android gezinme
+    // çubuğunun üstünde içerik için sabit bir güvenlik payı bırak.
+    paddingBottom: Platform.OS === "ios" ? 35 : 52,
     borderTopLeftRadius: 29,
     borderTopRightRadius: 29,
   },
@@ -12392,8 +12398,14 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 16,
     paddingTop: 14,
+    paddingHorizontal: 10,
+    paddingBottom: 10,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.045)",
     borderTopWidth: 1,
     borderTopColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
   },
   roomAudienceSection: {
     marginTop: 20,
@@ -12408,6 +12420,10 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 4,
     minHeight: 104,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
   },
   roomHostSlot: { alignItems: "center", marginBottom: 22 },
   roomHostAvatarWrap: { alignItems: "center", justifyContent: "center" },
@@ -12566,7 +12582,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     minHeight: 44,
     borderRadius: 13,
-    backgroundColor: "rgba(255,216,107,0.1)",
+    flex: 1,
+    backgroundColor: "rgba(255,216,107,0.12)",
     borderWidth: 1,
     borderColor: "rgba(255,216,107,0.22)",
   },
