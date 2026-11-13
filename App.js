@@ -7294,20 +7294,27 @@ function AppContent() {
   };
 
   const openRoom = (nextRoom) => {
-    setRecentRoomIds((currentRecentRooms) => {
-      const nextRecentRooms = [
-        nextRoom.id,
-        ...currentRecentRooms.filter((roomId) => roomId !== nextRoom.id),
-      ].slice(0, 8);
-      AsyncStorage.setItem(
-        RECENT_ROOMS_KEY,
-        JSON.stringify(nextRecentRooms),
-      ).catch(() => undefined);
-      return nextRecentRooms;
-    });
+    if (!nextRoom || typeof nextRoom.id !== "string" || !nextRoom.id) {
+      Alert.alert("Oda açılamadı", "Oda bilgisi geçersiz. Tekrar dene.");
+      return;
+    }
+
+    setRoom(nextRoom);
     setRoomPreferences({ microphoneEnabled: false, speakerEnabled: true });
     setRoomMinimized(false);
-    setRoom(nextRoom);
+
+    const currentRecentRooms = Array.isArray(recentRoomIds)
+      ? recentRoomIds
+      : [];
+    const nextRecentRooms = [
+      nextRoom.id,
+      ...currentRecentRooms.filter((roomId) => roomId !== nextRoom.id),
+    ].slice(0, 8);
+    setRecentRoomIds(nextRecentRooms);
+    AsyncStorage.setItem(
+      RECENT_ROOMS_KEY,
+      JSON.stringify(nextRecentRooms),
+    ).catch((error) => console.warn("Recent room history save failed", error));
   };
 
   const setHostRoomPresence = useCallback(
