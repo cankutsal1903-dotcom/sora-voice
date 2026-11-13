@@ -4778,7 +4778,7 @@ const RoomMessageList = memo(function RoomMessageList({
   );
 });
 
-const ROOM_STAGE_CAPACITY = 7;
+const ROOM_STAGE_CAPACITY = 10;
 
 function Room({
   room,
@@ -4889,7 +4889,7 @@ function Room({
   const roomSeatParticipants = useMemo(() => {
     const participants = activeRoomParticipants
       .filter((participant) => participant.userId !== room.hostId)
-      .slice(0, 7);
+      .slice(0, ROOM_STAGE_CAPACITY - 1);
     if (
       handRaised &&
       !isHost &&
@@ -5763,7 +5763,7 @@ function Room({
                           color="rgba(255,255,255,0.35)"
                         />
                       </View>
-                      <Text style={styles.roomEmptySeatLabel}>{index + 1}. koltuk</Text>
+                      <Text style={styles.roomEmptySeatLabel}>{index}</Text>
                     </Pressable>
                   ),
                 )}
