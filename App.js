@@ -68,13 +68,17 @@ import {
   listRoomMessages,
   listRooms,
   listWalletTransactions,
+  sendRoomGift,
+  listRoomGiftCatalog,
+  listProfileItems,
+  purchaseProfileItem,
+  activateProfileItem,
   sendRoomMessage,
   setFollowing,
   setRoomHandRaise,
   setUserBlocked,
   startScheduledRoom as startRemoteScheduledRoom,
   setRoomPresence as setRemoteRoomPresence,
-  spendWalletCredit,
   updateRoom as updateRemoteRoom,
 } from "./src/data/soraRepository";
 import {
@@ -325,6 +329,20 @@ const GIFT_CATALOG = [
   { id: "crown", icon: "crown", name: "Tac", cost: 120, color: "#E9B94D" },
   { id: "rocket", icon: "rocket", name: "Roket", cost: 300, color: "#54BBD3" },
 ];
+const createRequestUuid = () => {
+  return globalThis.crypto?.randomUUID?.() || `xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`.replace(/[xy]/g, (c) => {
+    const r = Math.floor(Math.random() * 16);
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+};
+const PROFILE_ITEM_APPEARANCE = {
+  frame_sky: { color: "#58BCEB", width: 3 },
+  frame_amber: { color: "#E5B94F", width: 3 },
+  frame_lilac: { color: "#A78BFA", width: 3 },
+  theme_ocean: { background: "#E7F6FC", accent: "#258FB8" },
+  theme_midnight: { background: "#E8EAF5", accent: "#5B63B8" },
+  theme_sunrise: { background: "#FFF1E6", accent: "#D98257" },
+};
 const DEFAULT_CHATS = [
   {
     id: "ece",
@@ -2219,9 +2237,9 @@ function Profile({
         </View>
       </Reveal>
       <Reveal delay={70} distance={14}>
-        <View style={styles.pfIdentity}>
+        <View style={[styles.pfIdentity, { backgroundColor: PROFILE_ITEM_APPEARANCE[profile.activeProfileThemeId]?.background || COLORS.surface, borderRadius: 18 }]}>
           <View style={styles.pfAvatarWrap}>
-            <View style={styles.pfAvatarRing}>
+            <View style={[styles.pfAvatarRing, profile.activeFrameId && { borderWidth: PROFILE_ITEM_APPEARANCE[profile.activeFrameId]?.width || 3, borderColor: PROFILE_ITEM_APPEARANCE[profile.activeFrameId]?.color || COLORS.primary }]}>
               <Avatar
                 label={profile.name.charAt(0).toUpperCase()}
                 color={profile.color}
@@ -2716,9 +2734,43 @@ const RoomSettingsSheet = memo(function RoomSettingsSheet({
 const GiftSheet = memo(function GiftSheet({
   visible,
   coins,
+  gifts = GIFT_CATALOG,
+  recipients = [],
   onDismiss,
   onSend,
 }) {
+  const [recipientId, setRecipientId] = useState(null);
+  const [sending, setSending] = useState(false);
+  const sendingRef = useRef(false);
+  const requestIdRef = useRef(null);
+  const requestFingerprintRef = useRef(null);
+  useEffect(() => {
+    if (visible) setRecipientId(recipients[0]?.userId || null);
+  }, [visible, recipients]);
+  const selectedRecipient = recipients.find((item) => item.userId === recipientId);
+  const confirmSend = (gift) => {
+    if (!selectedRecipient) {
+      Alert.alert("Alıcı seç", "Hediyeyi göndereceğin kişiyi seç.");
+      return;
+    }
+    Alert.alert("Hediyeyi onayla", `${selectedRecipient.name} kişisine ${gift.name} · ${gift.cost} kredi gönderilsin mi?`, [
+      { text: "Vazgeç", style: "cancel" },
+      { text: "Gönder", onPress: async () => {
+        if (sendingRef.current) return;
+        sendingRef.current = true;
+        const fingerprint = `${gift.id}:${selectedRecipient.userId}`;
+        if (requestFingerprintRef.current !== fingerprint) {
+          requestIdRef.current = createRequestUuid();
+          requestFingerprintRef.current = fingerprint;
+        }
+        setSending(true);
+        try {
+          const sent = await onSend(gift, selectedRecipient, requestIdRef.current);
+          if (sent) { requestIdRef.current = null; requestFingerprintRef.current = null; }
+        } finally { sendingRef.current = false; setSending(false); }
+      } },
+    ]);
+  };
   return (
     <Modal
       transparent
@@ -2741,14 +2793,20 @@ const GiftSheet = memo(function GiftSheet({
               <Text style={styles.coinPillText}>{coins}</Text>
             </View>
           </View>
-          <Text style={styles.giftHint}>
-            Hediye oda sohbetinde gorunur. Bakiye bu cihazda saklanir.
-          </Text>
+          <Text style={styles.giftHint}>Önce odadaki alıcıyı seç. Göndermeden önce hediye ve toplam kredi için onay istenir.</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+            {recipients.map((recipient) => (
+              <Pressable key={recipient.userId} onPress={() => setRecipientId(recipient.userId)} style={[styles.transferOption, recipientId === recipient.userId && styles.transferOptionActive]}>
+                <Text style={[styles.transferOptionText, recipientId === recipient.userId && styles.transferOptionTextActive]}>{recipient.name}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
           <View style={styles.giftGrid}>
-            {GIFT_CATALOG.map((gift) => (
+            {gifts.map((gift) => (
               <Pressable
                 key={gift.id}
-                onPress={() => onSend(gift)}
+                disabled={sending}
+                onPress={() => confirmSend(gift)}
                 style={styles.giftCard}
               >
                 <View
@@ -3225,6 +3283,8 @@ const PollSheet = memo(function PollSheet({
 const WalletSheet = memo(function WalletSheet({
   visible,
   coins,
+  promoCoins = 0,
+  paidCoins = 0,
   dailyRewardClaimed,
   onDismiss,
   onClaimDailyReward,
@@ -3320,6 +3380,7 @@ const WalletSheet = memo(function WalletSheet({
                 <Text style={styles.walletBalanceAmount}>
                   {coins} <Text style={styles.walletBalanceUnit}>kredi</Text>
                 </Text>
+                <Text style={styles.walletActivityTime}>Promosyon {promoCoins} · Satın alınan {paidCoins}</Text>
               </View>
               <View style={styles.walletBalanceIcon}>
                 <Ionicons name="diamond" size={28} color="#F5D978" />
@@ -3365,7 +3426,12 @@ const WalletSheet = memo(function WalletSheet({
               </Pressable>
             </View>
             <Text style={styles.settingsCaption}>IBAN İLE KREDİ YÜKLE</Text>
-            {pendingRequest ? (
+            {Platform.OS !== "web" ? (
+              <View style={styles.transferCard}>
+                <Text style={styles.transferTitle}>{Platform.OS === "android" ? "Google Play ile kredi yükleme" : "App Store üzerinden kredi yükleme"}</Text>
+                <Text style={styles.transferHint}>Mağaza ürün kimlikleri ve sunucu doğrulaması henüz yapılandırılmadı. Satın alma şu an kapalı; mağazadan ürün adı ve yerel fiyat alınmadan işlem başlatılmaz.</Text>
+              </View>
+            ) : pendingRequest ? (
               <View style={styles.transferCard}>
                 <View style={styles.transferCardHeader}>
                   <View>
@@ -4798,6 +4864,7 @@ function Room({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState(null);
   const [giftOpen, setGiftOpen] = useState(false);
+  const [roomGiftCatalog, setRoomGiftCatalog] = useState(GIFT_CATALOG);
   const [giftFlight, setGiftFlight] = useState(null);
   const [selectedParticipant, setSelectedParticipant] = useState(null);
   const [followedParticipantNames, setFollowedParticipantNames] = useState([]);
@@ -4877,6 +4944,14 @@ function Room({
         }),
     [blockedUserIds, isHost, liveVoice.participants, roomMembers, userId],
   );
+  useEffect(() => {
+    if (!room.persisted || !supabase) return;
+    let active = true;
+    listRoomGiftCatalog().then((catalog) => {
+      if (active && catalog.length) setRoomGiftCatalog(catalog);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [room.persisted]);
   const roomSeatParticipants = useMemo(() => {
     const participants = activeRoomParticipants
       .filter((participant) => participant.userId !== room.hostId)
@@ -5160,12 +5235,13 @@ function Room({
   const handleCloseSettings = useCallback(() => setSettingsOpen(false), []);
   const handleCloseReport = useCallback(() => setReportTarget(null), []);
   const handleSendGiftFromSheet = useCallback(
-    (gift) => {
-      onSendGift(gift);
+    async (gift, recipient, requestId) => {
+      const sent = await onSendGift({ gift, recipient, roomId: room.id, requestId });
+      if (!sent) return;
       setGiftOpen(false);
-      setGiftFlight({ ...gift, stamp: Date.now() });
+      setGiftFlight({ ...gift, recipientName: recipient.name, stamp: Date.now() });
     },
-    [onSendGift],
+    [onSendGift, room.id],
   );
 
   useEffect(() => {
@@ -5995,6 +6071,8 @@ function Room({
       <GiftSheet
         visible={giftOpen}
         coins={coins}
+        gifts={roomGiftCatalog}
+        recipients={activeRoomParticipants.filter((participant) => participant.userId !== userId)}
         onDismiss={handleCloseGift}
         onSend={handleSendGiftFromSheet}
       />
@@ -6012,11 +6090,15 @@ function Room({
   );
 }
 
-function ProfileEditor({ visible, profile, onDismiss, onSave }) {
+function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh }) {
   const [name, setName] = useState(profile.name);
   const [handle, setHandle] = useState(profile.handle);
   const [bio, setBio] = useState(profile.bio || "");
   const [color, setColor] = useState(profile.color);
+  const [profileItems, setProfileItems] = useState([]);
+  const [ownedItemIds, setOwnedItemIds] = useState([]);
+  const [previewItemId, setPreviewItemId] = useState(null);
+  const [itemBusy, setItemBusy] = useState(null);
   const colors = ["#E6A577", "#8FC7EF", "#C891D9", "#A9D479", "#F08E99"];
 
   useEffect(() => {
@@ -6027,6 +6109,41 @@ function ProfileEditor({ visible, profile, onDismiss, onSave }) {
       setColor(profile.color);
     }
   }, [profile, visible]);
+
+  useEffect(() => {
+    if (!visible || !supabase) return;
+    listProfileItems().then(({ items, ownedIds }) => {
+      setProfileItems(items);
+      setOwnedItemIds(ownedIds);
+    }).catch(() => Alert.alert("Ürünler yüklenemedi", "Bağlantını kontrol edip yeniden dene."));
+  }, [visible]);
+
+  const activePreview = profileItems.find((item) => item.id === previewItemId);
+  const handleProfileItem = (item) => {
+    if (ownedItemIds.includes(item.id)) {
+      setItemBusy(item.id);
+      activateProfileItem(item.id).then(() => {
+        onSave({ ...profile, ...(item.item_type === "frame" ? { activeFrameId: item.id } : { activeProfileThemeId: item.id }) });
+        onDismiss();
+      }).catch(() => Alert.alert("Ürün etkinleştirilemedi", "Biraz sonra yeniden dene.")).finally(() => setItemBusy(null));
+      return;
+    }
+    Alert.alert("Önizleme ve satın alma", `${item.name} · ${item.cost} kredi. Satın almak istiyor musun?`, [
+      { text: "Vazgeç", style: "cancel" },
+      { text: "Satın al", onPress: async () => {
+        if (itemBusy) return;
+        setItemBusy(item.id);
+        try {
+          await purchaseProfileItem({ itemId: item.id, requestId: createRequestUuid() });
+          setOwnedItemIds((ids) => [...ids, item.id]);
+          await onBalanceRefresh?.();
+          Alert.alert("Ürün alındı", "Profilinden etkinleştirebilirsin.");
+        } catch (error) {
+          Alert.alert(error?.message?.includes("Insufficient") ? "Bakiye yetersiz" : "Satın alma tamamlanamadı", error?.message?.includes("Insufficient") ? "Bu ürün için yeterli kredin yok." : "Bağlantıyı kontrol edip tekrar dene. Bakiye düşürülmediyse yeniden deneyebilirsin.");
+        } finally { setItemBusy(null); }
+      } },
+    ]);
+  };
 
   const save = () => {
     const nextName = name.trim();
@@ -6111,6 +6228,22 @@ function ProfileEditor({ visible, profile, onDismiss, onSave }) {
               />
             ))}
           </View>
+          <Text style={styles.fieldLabel}>ÇERÇEVE VE PROFİL TEMASI</Text>
+          {activePreview ? (
+            <View style={{ padding: 12, marginBottom: 10, borderRadius: 14, backgroundColor: activePreview.appearance?.background || "#F1F7FB", borderWidth: activePreview.item_type === "frame" ? 3 : 0, borderColor: activePreview.appearance?.color || "transparent" }}>
+              <Text style={{ color: activePreview.appearance?.accent || COLORS.text, fontWeight: "800" }}>Önizleme · {activePreview.name}</Text>
+            </View>
+          ) : null}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+            {profileItems.map((item) => {
+              const owned = ownedItemIds.includes(item.id);
+              return <Pressable key={item.id} onPress={() => setPreviewItemId(item.id)} onLongPress={() => handleProfileItem(item)} style={[styles.transferOption, previewItemId === item.id && styles.transferOptionActive, { marginRight: 8 }]}>
+                <Text style={[styles.transferOptionText, previewItemId === item.id && styles.transferOptionTextActive]}>{item.name}</Text>
+                <Text style={[styles.walletActivityTime, { textAlign: "center" }]}>{owned ? "Sahipsin · dokun etkinleştir" : `${item.cost} kredi · basılı tut satın al`}</Text>
+              </Pressable>;
+            })}
+          </ScrollView>
+          {activePreview ? <Pressable disabled={Boolean(itemBusy)} onPress={() => handleProfileItem(activePreview)} style={styles.transferCreateButton}><Text style={styles.transferCreateButtonText}>{ownedItemIds.includes(activePreview.id) ? "Profili etkinleştir" : `Önizle · ${activePreview.cost} kredi`}</Text></Pressable> : null}
           <Pressable onPress={save}>
             <LinearGradient colors={BRAND_GRADIENT} style={styles.createSubmit}>
               <Text style={styles.createSubmitText}>Degisiklikleri kaydet</Text>
@@ -6355,6 +6488,8 @@ function AppContent() {
   const [profile, setProfile] = useState(DEFAULT_PROFILE);
   const [appSettings, setAppSettings] = useState(DEFAULT_APP_SETTINGS);
   const [walletBalance, setWalletBalance] = useState(SEEDED_WALLET_BALANCE);
+  const [promoWalletBalance, setPromoWalletBalance] = useState(0);
+  const [paidWalletBalance, setPaidWalletBalance] = useState(0);
   const [walletActivities, setWalletActivities] = useState([]);
   const [bankTransferRequests, setBankTransferRequests] = useState([]);
   const [dailyRewardClaimed, setDailyRewardClaimed] = useState(false);
@@ -6543,9 +6678,9 @@ function AppContent() {
     let active = true;
     const formatTransaction = (transaction) => ({
       id: transaction.id,
-      icon: transaction.type === "daily_reward" ? "gift" : "diamond",
+      icon: ["daily_reward", "promo_grant"].includes(transaction.type) ? "gift" : "diamond",
       color:
-        transaction.type === "daily_reward"
+        ["daily_reward", "promo_grant"].includes(transaction.type)
           ? "#D39C48"
           : transaction.type === "bank_transfer"
             ? "#59C5FF"
@@ -6579,6 +6714,8 @@ function AppContent() {
           setScheduledRooms([...plannedRooms, ...SEEDED_SCHEDULED_ROOMS]);
           setFollowedUserIds(follows);
           setWalletBalance(wallet.balance);
+          setPromoWalletBalance(wallet.promo_balance || 0);
+          setPaidWalletBalance(wallet.paid_balance || 0);
           setDailyRewardClaimed(
             wallet.last_daily_reward_at ===
               new Date().toISOString().slice(0, 10),
@@ -6599,7 +6736,7 @@ function AppContent() {
     let active = true;
     supabase
       .from("profiles")
-      .select("handle, display_name, bio, avatar_color")
+      .select("handle, display_name, bio, avatar_color, active_frame_id, active_profile_theme_id")
       .eq("id", user.id)
       .maybeSingle()
       .then(({ data }) => {
@@ -6609,6 +6746,8 @@ function AppContent() {
           handle: data.handle,
           bio: data.bio,
           color: data.avatar_color,
+          activeFrameId: data.active_frame_id,
+          activeProfileThemeId: data.active_profile_theme_id,
         });
       })
       .catch(() => undefined);
@@ -7057,15 +7196,17 @@ function AppContent() {
       listMyBankTransferRequests(),
     ]);
     setWalletBalance(wallet.balance);
+    setPromoWalletBalance(wallet.promo_balance || 0);
+    setPaidWalletBalance(wallet.paid_balance || 0);
     setDailyRewardClaimed(
       wallet.last_daily_reward_at === new Date().toISOString().slice(0, 10),
     );
     setWalletActivities(
       transactions.map((transaction) => ({
         id: transaction.id,
-        icon: transaction.type === "daily_reward" ? "gift" : "diamond",
+        icon: ["daily_reward", "promo_grant"].includes(transaction.type) ? "gift" : "diamond",
         color:
-          transaction.type === "daily_reward"
+          ["daily_reward", "promo_grant"].includes(transaction.type)
             ? "#D39C48"
             : transaction.type === "bank_transfer"
               ? "#59C5FF"
@@ -7102,82 +7243,46 @@ function AppContent() {
     return request;
   };
 
-  const sendGift = async (gift) => {
+  const sendGift = async ({ gift, recipient, roomId, requestId }) => {
+    if (!supabase || !authSession?.user) {
+      Alert.alert("Giriş gerekli", "Hediye göndermek için hesabınla giriş yap.");
+      return false;
+    }
+    if (!recipient?.userId || !roomId) return false;
     if (walletBalance < gift.cost) {
       Alert.alert(
         "Bakiye yetersiz",
-        `${gift.name} hediyesi icin ${gift.cost} kredi gerekiyor.`,
+        `${gift.name} hediyesi için ${gift.cost} kredi gerekiyor.`,
       );
-      return;
+      return false;
     }
-    if (supabase && authSession?.user) {
-      try {
-        const wallet = await spendWalletCredit({
-          amount: gift.cost,
-          description: `${gift.name} hediyesi`,
-          metadata: { gift_id: gift.id },
-        });
+    try {
+      const requestKey = requestId || createRequestUuid();
+      const result = await sendRoomGift({ roomId, giftId: gift.id, recipientId: recipient.userId, requestId: requestKey });
+      if (!result) throw new Error("Gift response missing");
+      setWalletBalance(result.balance);
+      setPromoWalletBalance(result.promo_balance || 0);
+      setPaidWalletBalance(result.paid_balance || 0);
+      setWalletActivities((items) => [{
+        id: `gift-${requestKey}`, icon: "diamond", color: gift.color,
+        text: `${recipient.name} kişisine ${gift.name}`, amount: -result.gift_cost,
+        time: "Şimdi",
+      }, ...items]);
+      pushNotification({ id: `gift-${requestKey}`, icon: gift.icon, color: gift.color, text: `${recipient.name} kişisine hediye gönderildi.`, time: "Şimdi" });
+      return true;
+    } catch (error) {
+      Alert.alert("Hediye gönderilemedi", error?.message?.includes("Insufficient")
+        ? "Bakiye yetersiz. Cüzdanındaki kredi miktarı yenileniyor."
+        : error?.message?.includes("membership")
+          ? "Alıcı artık bu odada değil. Oda listesini yenileyip tekrar dene."
+          : "Bağlantı hatası oluştu. Bakiye düşürülmedi; tekrar deneyebilirsin.");
+      getWallet().then((wallet) => {
         setWalletBalance(wallet.balance);
-        setWalletActivities((currentActivities) => [
-          {
-            id: `gift-${Date.now()}`,
-            icon: "diamond",
-            color: gift.color,
-            text: `${gift.name} hediyesi`,
-            amount: -gift.cost,
-            time: "Şimdi",
-          },
-          ...currentActivities,
-        ]);
-        pushNotification({
-          id: `gift-${Date.now()}`,
-          icon: gift.icon,
-          color: gift.color,
-          text: `${gift.name} hediyesi gönderildi.`,
-          time: "Şimdi",
-        });
-      } catch (error) {
-        Alert.alert(
-          "Hediye gönderilemedi",
-          error?.message?.includes("Insufficient")
-            ? "Bakiye yetersiz."
-            : "Bağlantını kontrol edip tekrar dene.",
-        );
-      }
-      return;
+        setPromoWalletBalance(wallet.promo_balance || 0);
+        setPaidWalletBalance(wallet.paid_balance || 0);
+      }).catch(() => undefined);
+      return false;
     }
-    setWalletBalance((currentBalance) => {
-      const nextBalance = currentBalance - gift.cost;
-      AsyncStorage.setItem(WALLET_BALANCE_KEY, String(nextBalance)).catch(
-        () => undefined,
-      );
-      return nextBalance;
-    });
-    setNotifications((currentNotifications) => {
-      const nextNotifications = [
-        {
-          id: `gift-${Date.now()}`,
-          icon: gift.icon,
-          color: gift.color,
-          text: `${gift.name} hediyesi gonderildi.`,
-          time: "Simdi",
-        },
-        ...currentNotifications,
-      ];
-      AsyncStorage.setItem(
-        NOTIFICATIONS_KEY,
-        JSON.stringify(nextNotifications),
-      ).catch(() => undefined);
-      return nextNotifications;
-    });
-    recordWalletActivity({
-      id: `gift-${Date.now()}`,
-      icon: gift.icon,
-      color: gift.color,
-      text: `${gift.name} hediyesi`,
-      amount: -gift.cost,
-      time: "Simdi",
-    });
   };
 
   const claimDailyReward = async () => {
@@ -7201,6 +7306,7 @@ function AppContent() {
         }
         setDailyRewardClaimed(true);
         setWalletBalance(wallet.balance);
+        setPromoWalletBalance((value) => value + DAILY_REWARD_AMOUNT);
         setWalletActivities((currentActivities) => [
           {
             id: `reward-${Date.now()}`,
@@ -7500,6 +7606,8 @@ function AppContent() {
           handle: normalizedHandle,
           bio: nextProfile.bio.trim(),
           avatar_color: nextProfile.color,
+          active_frame_id: nextProfile.activeFrameId || null,
+          active_profile_theme_id: nextProfile.activeProfileThemeId || null,
         })
         .eq("id", authSession.user.id);
       if (error) {
@@ -7854,6 +7962,7 @@ function AppContent() {
         profile={profile}
         onDismiss={handleCloseProfileEditor}
         onSave={saveProfile}
+        onBalanceRefresh={refreshWalletData}
       />
       <AppSettingsSheet
         visible={settingsOpen}
@@ -7891,6 +8000,8 @@ function AppContent() {
       <WalletSheet
         visible={walletOpen}
         coins={walletBalance}
+        promoCoins={promoWalletBalance}
+        paidCoins={paidWalletBalance}
         activities={walletActivities}
         paymentRequests={bankTransferRequests}
         authenticated={Boolean(supabase && authSession?.user)}

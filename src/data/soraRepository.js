@@ -599,9 +599,48 @@ export const setRoomHandRaise = async ({ roomId, raised }) => {
   return data;
 };
 
-export const sendRoomGift = async ({ roomId, giftId }) => {
+export const sendRoomGift = async ({ roomId, giftId, recipientId, requestId }) => {
   const client = requireClient();
-  const { data, error } = await client.rpc("send_room_gift", { p_room_id: roomId, p_gift_id: giftId });
+  const { data, error } = await client.rpc("send_room_gift", {
+    p_room_id: roomId,
+    p_gift_id: giftId,
+    p_recipient_id: recipientId,
+    p_request_id: requestId,
+  });
   throwIfError(error);
   return data?.[0] || null;
+};
+
+export const listRoomGiftCatalog = async () => {
+  const client = requireClient();
+  const { data, error } = await client.from("gift_catalog")
+    .select("id,name,icon,color,cost").eq("active", true).order("cost");
+  throwIfError(error);
+  return data || [];
+};
+
+export const listProfileItems = async () => {
+  const client = requireClient();
+  const { data: userData, error: userError } = await client.auth.getUser();
+  throwIfError(userError);
+  const [catalog, owned, profile] = await Promise.all([
+    client.from("profile_item_catalog").select("id,name,item_type,appearance,cost").eq("active", true).order("cost"),
+    client.from("user_profile_items").select("item_id"),
+    client.from("profiles").select("active_frame_id,active_profile_theme_id").eq("id", userData.user.id).maybeSingle(),
+  ]);
+  throwIfError(catalog.error); throwIfError(owned.error); throwIfError(profile.error);
+  return { items: catalog.data || [], ownedIds: (owned.data || []).map((row) => row.item_id), active: profile.data || {} };
+};
+
+export const purchaseProfileItem = async ({ itemId, requestId }) => {
+  const client = requireClient();
+  const { data, error } = await client.rpc("purchase_profile_item", { p_item_id: itemId, p_request_id: requestId });
+  throwIfError(error);
+  return data?.[0] || null;
+};
+
+export const activateProfileItem = async (itemId) => {
+  const client = requireClient();
+  const { error } = await client.rpc("activate_profile_item", { p_item_id: itemId });
+  throwIfError(error);
 };
