@@ -227,7 +227,11 @@ export const completeAuthRedirect = async (url) => {
     if (error) throw error;
   }
 
-  return { isPasswordRecovery: valueFor("type") === "recovery" };
+  const authType = valueFor("type");
+  return {
+    isPasswordRecovery: authType === "recovery",
+    isEmailConfirmation: authType === "signup" || authType === "email_change",
+  };
 };
 
 export const deleteCurrentAccount = async () => {

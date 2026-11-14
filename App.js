@@ -41,6 +41,7 @@ import * as Notifications from "expo-notifications";
 import { useLiveVoiceRoom } from "./src/voice/useLiveVoiceRoom";
 import { AuthScreen } from "./src/auth/AuthScreen";
 import { AccountSecuritySheet } from "./src/auth/AccountSecuritySheet";
+import { EmailVerificationSheet } from "./src/auth/EmailVerificationSheet";
 import { PasswordResetSheet } from "./src/auth/PasswordResetSheet";
 import {
   completeAuthRedirect,
@@ -6378,6 +6379,7 @@ function AppContent() {
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [accountSecurityOpen, setAccountSecurityOpen] = useState(false);
+  const [emailVerificationOpen, setEmailVerificationOpen] = useState(false);
   const [passwordRecoveryOpen, setPasswordRecoveryOpen] = useState(false);
   const [dataControlsOpen, setDataControlsOpen] = useState(false);
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
@@ -6450,6 +6452,7 @@ function AppContent() {
       try {
         const result = await completeAuthRedirect(url);
         if (active && result.isPasswordRecovery) setPasswordRecoveryOpen(true);
+        if (active && result.isEmailConfirmation) setEmailVerificationOpen(true);
       } catch (error) {
         if (active)
           Alert.alert(
@@ -6472,7 +6475,9 @@ function AppContent() {
           .catch(() => ({ data: {} }));
         if (data?.session) return;
         try {
-          await completeAuthRedirect(url);
+          const result = await completeAuthRedirect(url);
+          if (active && result.isPasswordRecovery) setPasswordRecoveryOpen(true);
+          if (active && result.isEmailConfirmation) setEmailVerificationOpen(true);
         } catch {
           // Basarisiz/eski callback: yoksay
         }
@@ -7771,6 +7776,11 @@ function AppContent() {
           onDismiss={() => setPasswordRecoveryOpen(false)}
           onUpdatePassword={finishPasswordRecovery}
         />
+        <EmailVerificationSheet
+          visible={emailVerificationOpen}
+          email={authSession?.user?.email}
+          onContinue={() => setEmailVerificationOpen(false)}
+        />
       </View>
     );
 
@@ -7884,6 +7894,11 @@ function AppContent() {
         visible={passwordRecoveryOpen}
         onDismiss={handleClosePasswordReset}
         onUpdatePassword={finishPasswordRecovery}
+      />
+      <EmailVerificationSheet
+        visible={emailVerificationOpen}
+        email={authSession?.user?.email}
+        onContinue={() => setEmailVerificationOpen(false)}
       />
       <DataControlsSheet
         visible={dataControlsOpen}
