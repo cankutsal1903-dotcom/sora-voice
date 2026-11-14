@@ -88,6 +88,45 @@ import {
 } from "./src/security/SafetySheets";
 import { createMessageGuard } from "./src/security/contentFilter";
 import { moderateLiveParticipant } from "./src/voice/roomModeration";
+import * as ImagePicker from "expo-image-picker";
+import * as DocumentPicker from "expo-document-picker";
+import {
+  COUPLE_SEAT_INDEX,
+  DEFAULT_ROOM_ANNOUNCEMENT,
+  FIRST_REGULAR_SEAT_INDEX,
+  ROOM_BAN_DURATIONS,
+  banRoomMember,
+  clearRoomBackground,
+  deleteRoomMusic,
+  describeRoomError,
+  getBackgroundUploadsEnabled,
+  getLatestBackgroundRequest,
+  getSignedRoomFileUrl,
+  joinRoomWithPassword,
+  leaveRoomMembership,
+  listRoomMusic,
+  musicTitleFromPath,
+  performSeatAction,
+  setRoomMusic,
+  setRoomPassword,
+  updateRoomDetails,
+  updateRoomLayout,
+  uploadRoomBackground,
+  uploadRoomMusic,
+} from "./src/room/roomApi";
+import {
+  BanDurationSheet,
+  MicRequestsSheet,
+  RoomAdminsSheet,
+  RoomLockSheet,
+  RoomMenuSheet,
+  RoomMusicSheet,
+  RoomPasswordPrompt,
+  RoomSeatsSheet,
+  RoomSettingsEditorSheet,
+  useRequestsFromMembers,
+} from "./src/room/RoomOwnerSheets";
+import { useRoomMusic } from "./src/room/useRoomMusic";
 import {
   configureNotificationChannel,
   registerPushToken,
@@ -1182,6 +1221,10 @@ const RoomCard = memo(function RoomCard({
               <AudioBars color="rgba(255,255,255,0.78)" compact />
             </View>
             <Text style={styles.roomArtworkTitle} numberOfLines={2}>
+              {room.passwordProtected ? (
+                <Ionicons name="lock-closed" size={13} color="#FFFFFF" />
+              ) : null}
+              {room.passwordProtected ? " " : ""}
               {room.title}
             </Text>
           </LinearGradient>
@@ -2527,6 +2570,8 @@ function ProfileDetailSheet({
   onToggleFollow,
   onBlock,
   onReport,
+  staffActions = [],
+  onStaffAction,
 }) {
   const insets = useSafeAreaInsets();
   const [remoteProfile, setRemoteProfile] = useState(null);
@@ -2570,9 +2615,9 @@ function ProfileDetailSheet({
     role === "host"
       ? "Oda sahibi"
       : role === "moderator"
-        ? "Moderatör"
-        : role === "speaker"
-          ? "Konuşmacı"
+        ? "Yönetici"
+        : profile?.seat !== null && profile?.seat !== undefined
+          ? "Mikrofonda"
           : "Dinleyici";
 
   return (
@@ -2777,6 +2822,40 @@ function ProfileDetailSheet({
                     <Text style={styles.profileDetailSafetyText}>Engelle</Text>
                   </Pressable>
                 ) : null}
+              </View>
+            </View>
+          ) : null}
+          {!isSelf && staffActions.length ? (
+            <View style={styles.profileStaffSection}>
+              <Text style={styles.profileDetailSectionTitle}>Oda yönetimi</Text>
+              <View style={styles.profileStaffGrid}>
+                {staffActions.map((action) => (
+                  <Pressable
+                    key={action.key}
+                    onPress={() => onStaffAction?.(action.key)}
+                    style={[
+                      styles.profileStaffButton,
+                      action.danger && styles.profileStaffButtonDanger,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={action.label}
+                  >
+                    <Ionicons
+                      name={action.icon}
+                      size={18}
+                      color={action.danger ? COLORS.danger : COLORS.primary}
+                    />
+                    <Text
+                      style={[
+                        styles.profileStaffButtonText,
+                        action.danger && { color: COLORS.danger },
+                      ]}
+                      numberOfLines={2}
+                    >
+                      {action.label}
+                    </Text>
+                  </Pressable>
+                ))}
               </View>
             </View>
           ) : null}
@@ -4778,35 +4857,36 @@ const RoomComposer = memo(function RoomComposer({
 
   const handleChange = useCallback((next) => setValue(next), []);
 
+  const hasText = Boolean(value.trim());
   return (
-    <View style={styles.composer}>
-
-      <Pressable onPress={onOpenGift} style={styles.composerGift} accessibilityRole="button" accessibilityLabel="Sohbette hediye gönder">
-        <Ionicons name="gift-outline" size={17} color="#6AA8F5" />
-      </Pressable>
+    <View style={styles.roomInputPill}>
       <TextInput
         value={value}
         onChangeText={handleChange}
         onSubmitEditing={handleSubmit}
-        placeholder="Sohbete katıl…"
-        placeholderTextColor="#8C9AA5"
+        placeholder="Bir şeyler yaz…"
+        placeholderTextColor="#8193AA"
         accessibilityLabel="Oda mesajı"
-        style={styles.composerInput}
+        style={styles.roomInputField}
         maxLength={160}
+        returnKeyType="send"
+        blurOnSubmit={false}
       />
-      <Pressable
-        disabled={sending}
-        onPress={handleSubmit}
-        style={[styles.sendButton, sending && styles.sendButtonDisabled]}
-        accessibilityRole="button"
-        accessibilityLabel={sending ? "Mesaj gönderiliyor" : "Mesajı gönder"}
-      >
-        <Ionicons
-          name={sending ? "hourglass-outline" : "send"}
-          size={15}
-          color={COLORS.primaryInk}
-        />
-      </Pressable>
+      {hasText || sending ? (
+        <Pressable
+          disabled={sending}
+          onPress={handleSubmit}
+          style={[styles.roomInputSend, sending && styles.sendButtonDisabled]}
+          accessibilityRole="button"
+          accessibilityLabel={sending ? "Mesaj gönderiliyor" : "Mesajı gönder"}
+        >
+          <Ionicons
+            name={sending ? "hourglass-outline" : "send"}
+            size={13}
+            color="#FFFFFF"
+          />
+        </Pressable>
+      ) : null}
     </View>
   );
 });
@@ -4820,23 +4900,39 @@ const RoomMessageRow = memo(function RoomMessageRow({
 
   return (
     <View style={styles.messageRow}>
-      <Text
+      <View
         style={[
-          styles.messageText,
-          styles.messageBody,
-          item.system && styles.systemMessage,
-          item.pending && styles.pendingMessage,
+          styles.messageBubble,
+          item.system && styles.messageBubbleSystem,
+          item.announcement && styles.messageBubbleAnnouncement,
         ]}
       >
-        {item.system ? (
-          item.text
-        ) : (
-          <>
-            <Text style={styles.messageUser}>{item.user}</Text> {item.text}
-            {item.pending ? " · gönderiliyor" : ""}
-          </>
-        )}
-      </Text>
+        {item.announcement ? (
+          <Ionicons
+            name="megaphone"
+            size={13}
+            color="#9CC6FF"
+            style={styles.messageAnnouncementIcon}
+          />
+        ) : null}
+        <Text
+          style={[
+            styles.messageText,
+            item.system && styles.systemMessage,
+            item.announcement && styles.announcementMessage,
+            item.pending && styles.pendingMessage,
+          ]}
+        >
+          {item.system ? (
+            item.text
+          ) : (
+            <>
+              <Text style={styles.messageUser}>{item.user}</Text> {item.text}
+              {item.pending ? " · gönderiliyor" : ""}
+            </>
+          )}
+        </Text>
+      </View>
       {canReport ? (
         <Pressable
           accessibilityLabel="Mesajı bildir"
@@ -4876,7 +4972,33 @@ const RoomMessageList = memo(function RoomMessageList({
   );
 });
 
-const ROOM_STAGE_CAPACITY = 9;
+const roomDetailsFrom = (room) => ({
+  title: room.title,
+  description: room.description || "",
+  announcement: room.announcement || DEFAULT_ROOM_ANNOUNCEMENT,
+  passwordProtected: Boolean(room.passwordProtected),
+  seatCount: room.seatCount === 13 ? 13 : 9,
+  coupleSeat: Boolean(room.coupleSeat),
+  backgroundPath: room.backgroundPath || null,
+  musicState: room.musicState || null,
+});
+
+const roomDetailsFromRow = (row) =>
+  row && row.id
+    ? {
+        title: row.title,
+        description: row.description || "",
+        announcement: row.announcement || DEFAULT_ROOM_ANNOUNCEMENT,
+        passwordProtected: Boolean(row.password_protected),
+        seatCount: row.seat_count === 13 ? 13 : 9,
+        coupleSeat: Boolean(row.couple_seat),
+        backgroundPath: row.background_path || null,
+        musicState: row.music_state || null,
+      }
+    : null;
+
+const isSeatedParticipant = (participant) =>
+  Number.isInteger(participant?.seat) && participant.seat > 0;
 
 function Room({
   room,
@@ -4916,6 +5038,28 @@ function Room({
   const [followedParticipantNames, setFollowedParticipantNames] = useState([]);
   const [roomLocked, setRoomLocked] = useState(Boolean(room.roomLocked));
   const [chatLocked, setChatLocked] = useState(Boolean(room.chatLocked));
+  const [roomDetails, setRoomDetails] = useState(() => roomDetailsFrom(room));
+  const [menuSheet, setMenuSheet] = useState(null);
+  const [banTarget, setBanTarget] = useState(null);
+  const [staffBusy, setStaffBusy] = useState(null);
+  const [backgroundUrl, setBackgroundUrl] = useState(null);
+  const [backgroundRequest, setBackgroundRequest] = useState(null);
+  const [backgroundUploadsEnabled, setBackgroundUploadsEnabled] = useState(false);
+  const [uploadingBackground, setUploadingBackground] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [musicTracks, setMusicTracks] = useState([]);
+  const [musicTracksLoading, setMusicTracksLoading] = useState(false);
+  const [musicBusy, setMusicBusy] = useState(false);
+  const chatScrollRef = useRef(null);
+  const chatNearBottomRef = useRef(true);
+  const pendingMicRef = useRef(false);
+  const selfLeavingSeatRef = useRef(false);
+  const previousSeatRef = useRef(null);
+  const previousHandRaisedAtRef = useRef(null);
+  const handWithdrawnRef = useRef(false);
+  useEffect(() => {
+    setRoomDetails((current) => ({ ...current, ...roomDetailsFrom(room) }));
+  }, [room]);
   const isHost = room.hostId
     ? room.hostId === userId
     : room.host === profile.name;
@@ -4926,7 +5070,8 @@ function Room({
             {
               id: `welcome-${room.id}`,
               system: true,
-              text: `${room.title} odasına hoş geldin.`,
+              announcement: true,
+              text: room.announcement || DEFAULT_ROOM_ANNOUNCEMENT,
               createdAt: "1970-01-01T00:00:00.000Z",
             },
           ]
@@ -4934,10 +5079,13 @@ function Room({
             {
               id: "room",
               system: true,
-              text: `${room.title} odasına hoş geldin.`,
+              announcement: true,
+              text: room.announcement || DEFAULT_ROOM_ANNOUNCEMENT,
             },
           ],
-    [room.id, room.persisted, room.title],
+    // Duyuru yalnızca odaya girerken gösterilir; sonradan değişmesi sohbeti sıfırlamaz.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [room.id, room.persisted],
   );
   const [messages, setMessages] = useState(initialMessages);
   const [messagesReady, setMessagesReady] = useState(false);
@@ -4968,7 +5116,10 @@ function Room({
   };
   const [roomMembers, setRoomMembers] = useState([]);
   const [blockedUserIds, setBlockedUserIds] = useState([]);
-  const canModerate = isHost || ["host", "moderator"].includes(liveVoice.role);
+  const myMember = roomMembers.find((member) => member.userId === userId);
+  const myRole = isHost ? "host" : myMember?.role || liveVoice.role;
+  const canModerate = isHost || myRole === "moderator";
+  const menuRole = isHost ? "owner" : canModerate ? "admin" : "member";
   const activeRoomParticipants = useMemo(
     () =>
       liveVoice.participants
@@ -4983,12 +5134,16 @@ function Room({
             name: member?.name || participant.name,
             color: member?.color || "#7FCBEA",
             role:
-              member?.role ||
-              (participant.id === userId && isHost ? "host" : "listener"),
+              participant.id === room.hostId
+                ? "host"
+                : member?.role || "listener",
             isMuted: Boolean(member?.isMuted),
+            seat: participant.id === room.hostId ? 0 : participant.seat ?? null,
+            handRaisedAt: member?.handRaisedAt || null,
+            micBannedUntil: member?.micBannedUntil || null,
           };
         }),
-    [blockedUserIds, isHost, liveVoice.participants, roomMembers, userId],
+    [blockedUserIds, liveVoice.participants, room.hostId, roomMembers],
   );
   useEffect(() => {
     if (!room.persisted || !supabase) return;
@@ -4998,68 +5153,80 @@ function Room({
     }).catch(() => undefined);
     return () => { active = false; };
   }, [room.persisted]);
-  const roomSeatParticipants = useMemo(() => {
-    const participants = activeRoomParticipants
-      .filter((participant) => participant.userId !== room.hostId)
-      .slice(0, 8);
-    if (
-      handRaised &&
-      !isHost &&
-      !participants.some((participant) => participant.userId === userId)
-    ) {
-      participants.push({
-        userId,
-        name: profile.name,
-        color: profile.color,
-        microphoneEnabled: false,
-        pendingSeat: true,
-      });
-    }
-    return participants;
-  }, [
-    activeRoomParticipants,
-    handRaised,
-    isHost,
-    profile.color,
-    profile.name,
-    room.hostId,
-    userId,
-  ]);
   const micOn = liveVoice.enabled && liveVoice.microphoneEnabled;
   const activeSpeakerIds = liveVoice.activeSpeakerIds || [];
-  const stageParticipants = useMemo(() => {
-    const hostParticipant = activeRoomParticipants.find(
+  const seatCapacity = roomDetails.seatCount === 13 ? 13 : 9;
+  const compactStage = seatCapacity > 9;
+  const hostStageParticipant = useMemo(() => {
+    const found = activeRoomParticipants.find(
       (participant) => participant.userId === room.hostId,
-    ) || {
+    );
+    const base = found || {
       userId: room.hostId || `host-${room.id}`,
       name: room.host,
       color: roomBrand.accent,
-      role: "host",
       microphoneEnabled: isHost ? micOn : false,
     };
-    const seats = [hostParticipant, ...roomSeatParticipants];
-    return seats.map((participant) => ({
-      ...participant,
-      isSpeaking: activeSpeakerIds.includes(participant.userId),
-    }));
+    return {
+      ...base,
+      role: "host",
+      seat: 0,
+      isSpeaking: activeSpeakerIds.includes(base.userId),
+    };
   }, [
     activeRoomParticipants,
     activeSpeakerIds,
     isHost,
     micOn,
-    roomBrand.accent,
     room.host,
     room.hostId,
     room.id,
-    roomSeatParticipants,
+    roomBrand.accent,
   ]);
-  const stageGrid = useMemo(() => {
-    const seats = stageParticipants.slice(0, ROOM_STAGE_CAPACITY);
-    return [
-      ...seats,
-      ...Array.from({ length: Math.max(0, ROOM_STAGE_CAPACITY - seats.length) }),
-    ];
-  }, [stageParticipants]);
+  const seatedByIndex = useMemo(() => {
+    const seats = new Map();
+    activeRoomParticipants.forEach((participant) => {
+      if (participant.userId === room.hostId || !isSeatedParticipant(participant)) return;
+      seats.set(participant.seat, {
+        ...participant,
+        isSpeaking: activeSpeakerIds.includes(participant.userId),
+      });
+    });
+    return seats;
+  }, [activeRoomParticipants, activeSpeakerIds, room.hostId]);
+  const regularSeatRows = useMemo(() => {
+    const rows = [];
+    for (let start = FIRST_REGULAR_SEAT_INDEX; start <= seatCapacity; start += 4) {
+      rows.push(
+        Array.from({ length: 4 }, (_, offset) => {
+          const index = start + offset;
+          return { index, participant: seatedByIndex.get(index) || null };
+        }),
+      );
+    }
+    return rows;
+  }, [seatCapacity, seatedByIndex]);
+  const stageParticipants = useMemo(
+    () => [hostStageParticipant, ...seatedByIndex.values()],
+    [hostStageParticipant, seatedByIndex],
+  );
+  const mySeat = isHost ? 0 : liveVoice.localSeat ?? null;
+  const iAmSeated = isHost || mySeat !== null;
+  const micRequests = useRequestsFromMembers(roomMembers, activeRoomParticipants);
+  const roomAdminCandidates = useMemo(
+    () =>
+      activeRoomParticipants.filter(
+        (participant) =>
+          participant.userId !== room.hostId && participant.userId !== userId,
+      ),
+    [activeRoomParticipants, room.hostId, userId],
+  );
+  const adminCount = roomMembers.filter((member) => member.role === "moderator").length;
+  const music = useRoomMusic({
+    musicState: roomDetails.musicState,
+    enabled: Boolean(room.persisted),
+  });
+  const musicPlaying = Boolean(roomDetails.musicState?.playing);
   const roomVoiceLabel =
     liveVoice.status === "connected"
       ? "CANLI"
@@ -5187,6 +5354,8 @@ function Room({
         (payload) => {
           setChatLocked(Boolean(payload.new.chat_locked));
           setRoomLocked(Boolean(payload.new.room_locked));
+          const nextDetails = roomDetailsFromRow(payload.new);
+          if (nextDetails) setRoomDetails((current) => ({ ...current, ...nextDetails }));
         },
       )
       .subscribe((status) => {
@@ -5213,22 +5382,19 @@ function Room({
     };
   }, [chatAccessReady, room.id, room.persisted]);
 
+  const refreshMembers = useCallback(() => {
+    if (!room.persisted) return Promise.resolve();
+    return listRoomMembers(room.id)
+      .then((members) => setRoomMembers(members))
+      .catch(() => undefined);
+  }, [room.id, room.persisted]);
+
   useEffect(() => {
     if (!room.persisted || liveVoice.status !== "connected") return undefined;
-    let active = true;
-    const refreshMembers = () =>
-      listRoomMembers(room.id)
-        .then((members) => {
-          if (active) setRoomMembers(members);
-        })
-        .catch(() => undefined);
     refreshMembers();
-    const interval = setInterval(refreshMembers, 8000);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, [liveVoice.participantCount, liveVoice.status, room.id, room.persisted]);
+    const interval = setInterval(refreshMembers, canModerate ? 5000 : 8000);
+    return () => clearInterval(interval);
+  }, [canModerate, liveVoice.participantCount, liveVoice.status, refreshMembers, room.persisted]);
 
   useEffect(() => {
     if (!isHost || !room.persisted || !onHostPresenceChange) return undefined;
@@ -5242,8 +5408,10 @@ function Room({
     }
     setPresence(true);
     const heartbeat = setInterval(() => setPresence(true), 20_000);
+    // Uygulama arka plana alındığında oda keşfette görünmeye devam eder;
+    // yalnızca odadan çıkınca ya da bağlantı kopunca pasif olur.
     const subscription = AppState.addEventListener("change", (nextState) => {
-      setPresence(nextState === "active");
+      if (nextState === "active") setPresence(true);
     });
     return () => {
       clearInterval(heartbeat);
@@ -5272,9 +5440,17 @@ function Room({
   }, [messages, messagesReady, room.id]);
 
   const handleToggleSpeaker = useCallback(
-    () => setSpeakerOn((value) => !value),
-    [],
+    () =>
+      setSpeakerOn((value) => {
+        liveVoice.setSpeakerEnabled?.(!value);
+        return !value;
+      }),
+    [liveVoice.setSpeakerEnabled],
   );
+  useEffect(() => {
+    if (liveVoice.status === "connected") liveVoice.setSpeakerEnabled?.(speakerOn);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveVoice.status]);
   const handleOpenSettings = useCallback(() => setSettingsOpen(true), []);
   const handleOpenGift = useCallback(() => setGiftOpen(true), []);
   const handleCloseGift = useCallback(() => setGiftOpen(false), []);
@@ -5299,7 +5475,56 @@ function Room({
       .catch(() => undefined);
   }, []);
 
+  const appendSystemMessage = useCallback((text) => {
+    setMessages((current) => [
+      ...current,
+      { id: `system-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, system: true, text },
+    ]);
+  }, []);
+
+  const runSeatAction = useCallback(
+    async (action, { seatIndex = null, targetUserId = null, silent = false } = {}) => {
+      if (!room.persisted) {
+        Alert.alert("Kullanılamıyor", "Örnek odalarda mikrofon yönetimi yok.");
+        return null;
+      }
+      try {
+        return await performSeatAction({
+          roomId: room.id,
+          action,
+          seatIndex,
+          targetUserId,
+          accessToken,
+        });
+      } catch (error) {
+        if (!silent) Alert.alert("İşlem yapılamadı", describeRoomError(error));
+        return null;
+      }
+    },
+    [accessToken, room.id, room.persisted],
+  );
+
   const toggleMicrophone = useCallback(async () => {
+    if (liveVoice.enabled && !isHost && !liveVoice.canPublish && !micOn) {
+      if (liveVoice.status !== "connected") {
+        Alert.alert("Bağlantı hazırlanıyor", "Mikrofon için ses odasının bağlanmasını bekle.");
+        return;
+      }
+      if (canModerate) {
+        const result = await runSeatAction("take");
+        if (result && result.seat !== null && result.seat !== undefined) pendingMicRef.current = true;
+        return;
+      }
+      if (handRaised) {
+        Alert.alert(
+          "İsteğin bekliyor",
+          "Oda sahibi ya da bir yönetici onayladığında mikrofona çıkacaksın.",
+        );
+        return;
+      }
+      toggleHandRef.current?.();
+      return;
+    }
     if (liveVoice.enabled) {
       try {
         const updated = await liveVoice.setMicrophoneEnabled(!micOn);
@@ -5320,9 +5545,79 @@ function Room({
       "Canlı ses hazır değil",
       "Konuşmak için güvenli ses sunucusuna bağlanman gerekiyor.",
     );
-  }, [liveVoice.enabled, liveVoice.setMicrophoneEnabled, micOn]);
+  }, [
+    canModerate,
+    handRaised,
+    isHost,
+    liveVoice.canPublish,
+    liveVoice.enabled,
+    liveVoice.setMicrophoneEnabled,
+    liveVoice.status,
+    micOn,
+    runSeatAction,
+  ]);
+  const toggleHandRef = useRef(null);
+
+  // Koltuğa oturtulunca (ya da indirilince) kullanıcıyı bilgilendir.
+  useEffect(() => {
+    if (isHost) return;
+    const previous = previousSeatRef.current;
+    const next = liveVoice.localSeat ?? null;
+    previousSeatRef.current = next;
+    if (previous === next) return;
+    if (previous === null && next !== null) {
+      setHandRaised(false);
+      if (!pendingMicRef.current) {
+        appendSystemMessage("Mikrofona alındın. Konuşmak için mikrofon düğmesine dokun.");
+      }
+    } else if (previous !== null && next === null) {
+      appendSystemMessage(
+        selfLeavingSeatRef.current ? "Mikrofondan indin." : "Mikrofondan indirildin.",
+      );
+      selfLeavingSeatRef.current = false;
+    }
+  }, [appendSystemMessage, isHost, liveVoice.localSeat]);
+
+  useEffect(() => {
+    if (pendingMicRef.current && liveVoice.canPublish) {
+      pendingMicRef.current = false;
+      liveVoice.setMicrophoneEnabled(true).catch(() => undefined);
+    }
+  }, [liveVoice.canPublish, liveVoice.setMicrophoneEnabled]);
+
+  // İstek onaylanınca / reddedilince el kaldırma durumunu eşitle.
+  useEffect(() => {
+    const previous = previousHandRaisedAtRef.current;
+    const next = myMember?.handRaisedAt || null;
+    previousHandRaisedAtRef.current = next;
+    if (previous && !next) {
+      setHandRaised(false);
+      if (handWithdrawnRef.current) {
+        handWithdrawnRef.current = false;
+      } else if (!iAmSeated && liveVoice.localSeat === null) {
+        appendSystemMessage("Mikrofon isteğin şu an kabul edilmedi.");
+      }
+    } else if (!previous && next && !iAmSeated) {
+      setHandRaised(true);
+    }
+  }, [appendSystemMessage, iAmSeated, liveVoice.localSeat, myMember?.handRaisedAt]);
+
+  useEffect(() => {
+    if (!liveVoice.removedByModerator) return;
+    Alert.alert("Odadan çıkarıldın", "Bir yönetici seni bu odadan uzaklaştırdı.");
+    onLeave();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveVoice.removedByModerator]);
+
+  const leaveSeat = useCallback(async () => {
+    selfLeavingSeatRef.current = true;
+    await liveVoice.setMicrophoneEnabled(false).catch(() => undefined);
+    const result = await runSeatAction("leave");
+    if (!result) selfLeavingSeatRef.current = false;
+  }, [liveVoice.setMicrophoneEnabled, runSeatAction]);
 
   const leaveRoom = async () => {
+    if (room.persisted) leaveRoomMembership(room.id).catch(() => undefined);
     await liveVoice.disconnect().catch(() => undefined);
     try {
       const savedHistory = await AsyncStorage.getItem(ROOM_HISTORY_KEY);
@@ -5455,12 +5750,10 @@ function Room({
     if (room.persisted) {
       try {
         await setRoomHandRaise({ roomId: room.id, raised: nextState });
-      } catch {
+        if (!nextState) handWithdrawnRef.current = true;
+      } catch (error) {
         setHandRaised(!nextState);
-        Alert.alert(
-          "İstek gönderilemedi",
-          "Bağlantını kontrol edip tekrar dene.",
-        );
+        Alert.alert("İstek gönderilemedi", describeRoomError(error));
         return;
       }
     }
@@ -5470,9 +5763,45 @@ function Room({
         id: `hand-${Date.now()}`,
         system: true,
         text: nextState
-          ? "Mikrofon sırasına girdin."
-          : "Mikrofon sırasından çıktın.",
+          ? "Mikrofon isteğin gönderildi. Onaylanınca mikrofona çıkacaksın."
+          : "Mikrofon isteğini geri çektin.",
       },
+    ]);
+  };
+  toggleHandRef.current = toggleHand;
+
+  const handleEmptySeatPress = (seatIndex) => {
+    if (!room.persisted) {
+      toggleHand();
+      return;
+    }
+    if (isHost) {
+      setMenuSheet("requests");
+      return;
+    }
+    if (canModerate) {
+      runSeatAction("take", { seatIndex });
+      return;
+    }
+    if (iAmSeated) {
+      Alert.alert("Zaten mikrofondasın", "Yer değiştirmek için oda sahibine ya da bir yöneticiye yaz.");
+      return;
+    }
+    if (handRaised) {
+      Alert.alert(
+        "İsteğin bekliyor",
+        "Oda sahibi ya da bir yönetici onayladığında mikrofona çıkacaksın.",
+      );
+      return;
+    }
+    toggleHand();
+  };
+
+  const handleOwnSeatPress = () => {
+    if (isHost || !iAmSeated) return;
+    Alert.alert("Mikrofon", "Mikrofondan inmek istiyor musun?", [
+      { text: "Vazgeç", style: "cancel" },
+      { text: "Mikrofondan in", style: "destructive", onPress: leaveSeat },
     ]);
   };
 
@@ -5689,6 +6018,400 @@ function Room({
     [room.id, room.persisted, accessToken],
   );
 
+  // ── Yönetici işlemleri ────────────────────────────────────────────────
+  const staffActionsFor = (participant) => {
+    if (!participant || !canModerate || !room.persisted) return [];
+    if (participant.userId === room.hostId || participant.userId === userId) return [];
+    if (!isHost && participant.role === "moderator") return [];
+    const seated = isSeatedParticipant(participant);
+    const actions = [
+      seated
+        ? { key: "kick", label: "Mikrofondan indir (10 dk)", icon: "arrow-down-circle-outline" }
+        : { key: "assign", label: "Mikrofona al", icon: "mic-outline" },
+    ];
+    if (isHost && roomDetails.coupleSeat && participant.seat !== COUPLE_SEAT_INDEX) {
+      actions.push({ key: "couple", label: "Çift koltuğuna al", icon: "heart-outline" });
+    }
+    if (isHost) {
+      actions.push(
+        participant.role === "moderator"
+          ? { key: "removeAdmin", label: "Yöneticilikten al", icon: "shield-outline" }
+          : { key: "makeAdmin", label: "Yönetici yap", icon: "shield-checkmark-outline" },
+      );
+    }
+    actions.push({ key: "ban", label: "Odadan banla", icon: "ban-outline", danger: true });
+    return actions;
+  };
+
+  const toggleAdmin = async (participant) => {
+    const nextRole = participant.role === "moderator" ? "speaker" : "moderator";
+    setStaffBusy(participant.userId);
+    try {
+      await manageParticipant(
+        participant,
+        participant.role === "moderator" ? "remove_moderator" : "make_moderator",
+      );
+      setProfileParticipant((current) =>
+        current?.userId === participant.userId ? { ...current, role: nextRole } : current,
+      );
+      appendSystemMessage(
+        nextRole === "moderator"
+          ? `${participant.name} artık yönetici.`
+          : `${participant.name} yöneticilikten alındı.`,
+      );
+    } catch (error) {
+      Alert.alert("Yetki değiştirilemedi", describeRoomError(error));
+    } finally {
+      setStaffBusy(null);
+    }
+  };
+
+  const handleStaffAction = async (key) => {
+    const participant = profileParticipant;
+    if (!participant) return;
+    if (key === "ban") {
+      setProfileParticipant(null);
+      setSelectedParticipant(null);
+      setTimeout(() => setBanTarget(participant), 300);
+      return;
+    }
+    if (key === "makeAdmin" || key === "removeAdmin") {
+      await toggleAdmin(participant);
+      return;
+    }
+    const result =
+      key === "kick"
+        ? await runSeatAction("kick", { targetUserId: participant.userId })
+        : await runSeatAction("assign", {
+            targetUserId: participant.userId,
+            seatIndex: key === "couple" ? COUPLE_SEAT_INDEX : null,
+          });
+    if (!result) return;
+    setProfileParticipant(null);
+    setSelectedParticipant(null);
+    refreshMembers();
+    if (key === "kick") {
+      appendSystemMessage(`${participant.name} mikrofondan indirildi. 10 dakika mikrofona çıkamaz.`);
+    }
+  };
+
+  const approveMicRequest = async (person) => {
+    setStaffBusy(person.userId);
+    const result = await runSeatAction("assign", { targetUserId: person.userId });
+    setStaffBusy(null);
+    if (result) {
+      setRoomMembers((current) =>
+        current.map((member) =>
+          member.userId === person.userId ? { ...member, handRaisedAt: null } : member,
+        ),
+      );
+      refreshMembers();
+    }
+  };
+
+  const rejectMicRequest = async (person) => {
+    setStaffBusy(person.userId);
+    const result = await runSeatAction("reject", { targetUserId: person.userId });
+    setStaffBusy(null);
+    if (result) {
+      setRoomMembers((current) =>
+        current.map((member) =>
+          member.userId === person.userId ? { ...member, handRaisedAt: null } : member,
+        ),
+      );
+    }
+  };
+
+  const banSelectedTarget = async (minutes) => {
+    const target = banTarget;
+    if (!target) return;
+    setStaffBusy(target.userId);
+    try {
+      await banRoomMember({
+        roomId: room.id,
+        targetUserId: target.userId,
+        minutes,
+        accessToken,
+      });
+      setRoomMembers((current) => current.filter((member) => member.userId !== target.userId));
+      const durationLabel =
+        ROOM_BAN_DURATIONS.find((option) => option.minutes === minutes)?.label || "";
+      appendSystemMessage(
+        minutes
+          ? `${target.name} odadan ${durationLabel} uzaklaştırıldı.`
+          : `${target.name} odadan kalıcı olarak uzaklaştırıldı.`,
+      );
+      setBanTarget(null);
+    } catch (error) {
+      Alert.alert("Banlanamadı", describeRoomError(error));
+    } finally {
+      setStaffBusy(null);
+    }
+  };
+
+  // ── Oda sahibi ayarları ───────────────────────────────────────────────
+  const applyRoomRow = useCallback((row) => {
+    const nextDetails = roomDetailsFromRow(row);
+    if (nextDetails) setRoomDetails((current) => ({ ...current, ...nextDetails }));
+  }, []);
+
+  useEffect(() => {
+    if (menuSheet !== "settings" || !room.persisted) return undefined;
+    let active = true;
+    getBackgroundUploadsEnabled().then((enabled) => {
+      if (active) setBackgroundUploadsEnabled(enabled);
+    });
+    getLatestBackgroundRequest(room.id).then((request) => {
+      if (active) setBackgroundRequest(request);
+    });
+    return () => {
+      active = false;
+    };
+  }, [menuSheet, room.id, room.persisted]);
+
+  useEffect(() => {
+    let active = true;
+    if (!roomDetails.backgroundPath || !room.persisted) {
+      setBackgroundUrl(null);
+      return undefined;
+    }
+    getSignedRoomFileUrl("room-backgrounds", roomDetails.backgroundPath, 6 * 3600)
+      .then((url) => {
+        if (active) setBackgroundUrl(url);
+      })
+      .catch(() => {
+        if (active) setBackgroundUrl(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [room.persisted, roomDetails.backgroundPath]);
+
+  const saveRoomDetails = async (values) => {
+    setSavingSettings(true);
+    try {
+      const row = await updateRoomDetails({ roomId: room.id, ...values });
+      applyRoomRow(row);
+      setMenuSheet(null);
+    } catch (error) {
+      Alert.alert("Kaydedilemedi", describeRoomError(error));
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const saveRoomPassword = async (pin) => {
+    setSavingSettings(true);
+    try {
+      const row = await setRoomPassword({ roomId: room.id, password: pin });
+      applyRoomRow(row);
+      setMenuSheet(null);
+      Alert.alert(
+        pin ? "Oda kilitlendi" : "Kilit kaldırıldı",
+        pin
+          ? "Yeni gelenler odaya girmek için 4 haneli şifreyi yazmalı."
+          : "Oda artık herkese açık.",
+      );
+    } catch (error) {
+      Alert.alert("Kilit değiştirilemedi", describeRoomError(error));
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const saveRoomLayout = async (layout) => {
+    setSavingSettings(true);
+    try {
+      const row = await updateRoomLayout({ roomId: room.id, ...layout, accessToken });
+      applyRoomRow(row);
+      setMenuSheet(null);
+    } catch (error) {
+      Alert.alert("Mikrofon sayısı değiştirilemedi", describeRoomError(error));
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const pickRoomBackground = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [9, 16],
+        quality: 0.8,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      if (asset.fileSize && asset.fileSize > 6 * 1024 * 1024) {
+        Alert.alert("Görsel çok büyük", "En fazla 6 MB boyutunda bir görsel seç.");
+        return;
+      }
+      setUploadingBackground(true);
+      const request = await uploadRoomBackground({ roomId: room.id, asset });
+      setBackgroundRequest(request);
+      Alert.alert(
+        "İncelemeye gönderildi",
+        "Arka plan onaylandığında odada herkes için görünecek.",
+      );
+    } catch (error) {
+      Alert.alert("Arka plan gönderilemedi", describeRoomError(error));
+    } finally {
+      setUploadingBackground(false);
+    }
+  };
+
+  const removeRoomBackground = () =>
+    Alert.alert("Arka plan kaldırılsın mı?", "Oda varsayılan arka plana döner.", [
+      { text: "Vazgeç", style: "cancel" },
+      {
+        text: "Kaldır",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            applyRoomRow(await clearRoomBackground(room.id));
+          } catch (error) {
+            Alert.alert("Kaldırılamadı", describeRoomError(error));
+          }
+        },
+      },
+    ]);
+
+  // ── Oda müziği ────────────────────────────────────────────────────────
+  const loadMusicTracks = useCallback(async () => {
+    if (!room.persisted) return;
+    setMusicTracksLoading(true);
+    try {
+      setMusicTracks(await listRoomMusic(room.id));
+    } catch {
+      setMusicTracks([]);
+    } finally {
+      setMusicTracksLoading(false);
+    }
+  }, [room.id, room.persisted]);
+
+  useEffect(() => {
+    if (menuSheet === "music" && canModerate) loadMusicTracks();
+  }, [canModerate, loadMusicTracks, menuSheet]);
+
+  const pushMusicState = async (state) => {
+    if (!room.persisted) {
+      Alert.alert("Kullanılamıyor", "Örnek odalarda müzik çalınamaz.");
+      return;
+    }
+    setMusicBusy(true);
+    try {
+      applyRoomRow(await setRoomMusic({ roomId: room.id, state }));
+    } catch (error) {
+      Alert.alert("Müzik güncellenemedi", describeRoomError(error));
+    } finally {
+      setMusicBusy(false);
+    }
+  };
+
+  const currentMusicVolume = roomDetails.musicState?.volume ?? 0.7;
+
+  const addMusicTrack = async () => {
+    if (!room.persisted) {
+      Alert.alert("Kullanılamıyor", "Örnek odalarda müzik çalınamaz.");
+      return;
+    }
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "audio/*",
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      if (asset.size && asset.size > 25 * 1024 * 1024) {
+        Alert.alert("Dosya çok büyük", "En fazla 25 MB boyutunda bir müzik dosyası seç.");
+        return;
+      }
+      setMusicBusy(true);
+      const path = await uploadRoomMusic({ roomId: room.id, asset });
+      const title = String(asset.name || "").replace(/\.[^.]+$/, "") || musicTitleFromPath(path);
+      setMusicTracks((current) => [{ path, title }, ...current]);
+      applyRoomRow(
+        await setRoomMusic({
+          roomId: room.id,
+          state: { path, title, playing: true, position_ms: 0, volume: currentMusicVolume },
+        }),
+      );
+    } catch (error) {
+      Alert.alert("Müzik eklenemedi", describeRoomError(error));
+    } finally {
+      setMusicBusy(false);
+    }
+  };
+
+  const playMusicTrack = (track) =>
+    pushMusicState({
+      path: track.path,
+      title: track.title,
+      playing: true,
+      position_ms: 0,
+      volume: currentMusicVolume,
+    });
+
+  const toggleMusicPlay = () => {
+    const state = roomDetails.musicState;
+    if (!state) return;
+    pushMusicState({ ...state, playing: !state.playing, position_ms: music.currentPositionMs() });
+  };
+
+  const stopMusic = () => pushMusicState(null);
+
+  const setMusicRoomVolume = (volume) => {
+    const state = roomDetails.musicState;
+    if (!state) return;
+    pushMusicState({ ...state, volume, position_ms: music.currentPositionMs() });
+  };
+
+  const removeMusicTrack = (track) =>
+    Alert.alert("Müzik silinsin mi?", `${track.title} oda listesinden kaldırılacak.`, [
+      { text: "Vazgeç", style: "cancel" },
+      {
+        text: "Sil",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteRoomMusic(track.path);
+            setMusicTracks((current) => current.filter((item) => item.path !== track.path));
+            if (roomDetails.musicState?.path === track.path) stopMusic();
+          } catch (error) {
+            Alert.alert("Silinemedi", describeRoomError(error));
+          }
+        },
+      },
+    ]);
+
+  const handleMenuAction = (key) => {
+    if (key === "toggleQueue") {
+      toggleRoomLock();
+      return;
+    }
+    if (key === "toggleChat") {
+      toggleChatLock();
+      return;
+    }
+    setSettingsOpen(false);
+    // Bir modal kapanırken diğerini açmak Android'de takılabildiği için bekle.
+    const openLater = (callback) => setTimeout(callback, 320);
+    if (["settings", "music", "admins", "requests", "lock", "seats"].includes(key)) {
+      if (!room.persisted && key !== "music") {
+        openLater(() =>
+          Alert.alert("Kullanılamıyor", "Bu ayar yalnızca gerçek odalarda kullanılabilir."),
+        );
+        return;
+      }
+      openLater(() => setMenuSheet(key));
+    } else if (key === "invite") openLater(shareRoom);
+    else if (key === "report") openLater(reportRoom);
+    else if (key === "blockHost") openLater(handleBlockHost);
+  };
+
+  const closeMenuSheet = useCallback(() => setMenuSheet(null), []);
+
   const shareRoom = async () => {
     try {
       await Share.share({
@@ -5700,37 +6423,156 @@ function Room({
     }
   };
 
-  const clearRoomChat = () =>
-    Alert.alert(
-      "Sohbet görünümü temizlensin mi?",
-      "Mesajlar veritabanından silinmez; yalnızca bu ekrandan gizlenir.",
-      [
-        { text: "Vazgeç", style: "cancel" },
-        {
-          text: "Gizle",
-          onPress: () =>
-            setMessages([
-              {
-                id: `clean-${Date.now()}`,
-                system: true,
-                text: "Sohbet görünümü temizlendi.",
-              },
-            ]),
-        },
-      ],
-    );
   const chatStatusText = !messagesReady
-    ? "Mesajlar yükleniyor"
-    : chatRealtimeStatus === "live"
-      ? `${messages.length} mesaj · Canlı`
-      : chatRealtimeStatus === "error" || chatRealtimeStatus === "offline"
-        ? `${messages.length} mesaj · Bağlantı kesildi`
-        : `${messages.length} mesaj · Bağlanıyor`;
-
+    ? "Mesajlar yükleniyor…"
+    : chatRealtimeStatus === "error" || chatRealtimeStatus === "offline"
+      ? "Sohbet bağlantısı kesildi"
+      : chatRealtimeStatus === "connecting"
+        ? "Sohbet bağlanıyor…"
+        : null;
 
   const audienceParticipants = activeRoomParticipants.filter(
     (participant) => !stageParticipants.some((speaker) => speaker.userId === participant.userId),
   );
+
+  const handleChatScroll = useCallback((event) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    chatNearBottomRef.current =
+      contentOffset.y + layoutMeasurement.height >= contentSize.height - 120;
+  }, []);
+  const handleChatContentSize = useCallback(() => {
+    if (chatNearBottomRef.current) chatScrollRef.current?.scrollToEnd({ animated: true });
+  }, []);
+
+  const voiceErrorText =
+    liveVoice.status === "error" && liveVoice.error
+      ? describeRoomError({ message: liveVoice.error }, roomVoiceLabel)
+      : roomVoiceLabel;
+
+  const micButtonIcon = micOn
+    ? "mic"
+    : iAmSeated
+      ? "mic-off"
+      : handRaised
+        ? "hand-left"
+        : "mic-off-outline";
+  const micButtonLabel = micOn
+    ? "Mikrofonu kapat"
+    : iAmSeated
+      ? "Mikrofonu aç"
+      : handRaised
+        ? "Mikrofon isteğin bekliyor"
+        : canModerate
+          ? "Mikrofona çık"
+          : "Mikrofon iste";
+
+  const renderStageSeat = (participant, seatIndex, variant = "regular") => {
+    const isHostSeat = variant === "host";
+    const isCoupleSeat = variant === "couple";
+    const avatarSize = isHostSeat ? 84 : compactStage ? 58 : 66;
+    const slotStyle = [
+      styles.roomSpeakerSlot,
+      isHostSeat && styles.roomHostStageSlot,
+      (isHostSeat || isCoupleSeat) && roomDetails.coupleSeat && styles.roomHostPairSlot,
+      compactStage && !isHostSeat && styles.roomSpeakerSlotCompact,
+    ];
+    if (!participant) {
+      return (
+        <Pressable
+          key={`empty-${seatIndex}`}
+          style={slotStyle}
+          onPress={() => handleEmptySeatPress(seatIndex)}
+          accessibilityRole="button"
+          accessibilityLabel={isCoupleSeat ? "Boş çift koltuğu" : `Boş ${seatIndex}. koltuk`}
+        >
+          <View
+            style={[
+              styles.roomEmptySeat,
+              { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 },
+              isCoupleSeat && styles.roomCoupleSeat,
+            ]}
+          >
+            <Ionicons
+              name={isCoupleSeat ? "heart-outline" : "mic-outline"}
+              size={compactStage ? 24 : 28}
+              color={isCoupleSeat ? "rgba(255,160,200,0.85)" : "rgba(118,175,255,0.78)"}
+            />
+          </View>
+          <Text style={[styles.roomEmptySeatLabel, isCoupleSeat && styles.roomCoupleSeatLabel]}>
+            {isCoupleSeat ? "Çift" : seatIndex}
+          </Text>
+        </Pressable>
+      );
+    }
+    const isSelfSeat = participant.userId === userId;
+    return (
+      <Pressable
+        style={slotStyle}
+        key={participant.userId}
+        delayLongPress={260}
+        onPress={() => (isSelfSeat ? handleOwnSeatPress() : openParticipantMenu(participant))}
+        onLongPress={() => openParticipantMenu(participant)}
+        accessibilityRole="button"
+        accessibilityLabel={`${participant.name} kullanıcı menüsü`}
+      >
+        <View style={styles.roomAvatarWrap}>
+          {participant.isSpeaking ? (
+            <SpeakingRing size={avatarSize + 14} color={isCoupleSeat ? "#FF8FC0" : COLORS.primary} />
+          ) : null}
+          <View
+            style={[
+              styles.roomSpeakerAvatar,
+              { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 },
+              isHostSeat && styles.roomHostStageAvatar,
+              participant.role === "host" && styles.roomSpeakerAvatarHost,
+              isCoupleSeat && styles.roomCoupleSeatAvatar,
+              participant.microphoneEnabled && styles.roomSpeakerAvatarActive,
+            ]}
+          >
+            <LinearGradient
+              colors={
+                isHostSeat
+                  ? ["#8CC8FF", "#347CE0"]
+                  : isCoupleSeat
+                    ? ["#F29AC2", "#9C4D86"]
+                    : ["#527DB8", "#203D66"]
+              }
+              style={[StyleSheet.absoluteFill, { borderRadius: avatarSize / 2 }]}
+            />
+            <Text style={[styles.roomSpeakerInitial, isHostSeat && styles.roomHostStageInitial]}>
+              {participant.name?.charAt(0)?.toUpperCase() || "?"}
+            </Text>
+            {participant.microphoneEnabled ? (
+              <View style={styles.roomMicOnBadge}>
+                <Ionicons name="mic" size={9} color="#11131A" />
+              </View>
+            ) : (
+              <View style={styles.roomMicOffBadge}>
+                <Ionicons name="mic-off" size={9} color="rgba(255,255,255,0.7)" />
+              </View>
+            )}
+          </View>
+          {participant.role === "host" ? (
+            <View style={styles.roomSpeakerCrown}>
+              <Ionicons name="sparkles" size={9} color="#11131A" />
+            </View>
+          ) : participant.role === "moderator" ? (
+            <View style={[styles.roomSpeakerCrown, styles.roomAdminBadge]}>
+              <Ionicons name="shield-checkmark" size={9} color="#11131A" />
+            </View>
+          ) : null}
+        </View>
+        <Text style={styles.roomSpeakerName} numberOfLines={1}>
+          {isHostSeat ? `1 · ${participant.name}` : participant.name}
+        </Text>
+        {!isHostSeat ? (
+          <Text style={[styles.roomSpeakerRole, isCoupleSeat && styles.roomCoupleSeatLabel]} numberOfLines={1}>
+            {participant.isSpeaking ? "Konuşuyor" : isCoupleSeat ? "Çift" : `${seatIndex}`}
+          </Text>
+        ) : null}
+      </Pressable>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.roomScreen}>
@@ -5740,6 +6582,21 @@ function Room({
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
+      {backgroundUrl ? (
+        <>
+          <Image
+            source={{ uri: backgroundUrl }}
+            style={StyleSheet.absoluteFill}
+            resizeMode="cover"
+          />
+          <LinearGradient
+            colors={["rgba(8,13,24,0.45)", "rgba(8,13,24,0.55)", "rgba(8,13,24,0.88)"]}
+            locations={[0, 0.45, 1]}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+        </>
+      ) : null}
       {minimized ? null : (
         <StatusBar barStyle="light-content" backgroundColor="#11131A" />
       )}
@@ -5747,7 +6604,7 @@ function Room({
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        {/* ── Üst bar: küçült (sol) + seçenekler (sağ) ── */}
+        {/* ── Üst bar: küçült · oda bilgisi · menü · çıkış ── */}
         <View style={styles.roomTopBar}>
           <Pressable
             onPress={onMinimize}
@@ -5757,11 +6614,17 @@ function Room({
             <Ionicons name="chevron-down" size={22} color="#FFFFFF" />
           </Pressable>
           <View style={styles.roomHeaderRoom}>
-            <Text style={styles.roomTopBarTitle} numberOfLines={1}>
-              {room.title}
-            </Text>
+            <View style={styles.roomTitleLine}>
+              {roomDetails.passwordProtected ? (
+                <Ionicons name="lock-closed" size={13} color="#A9C9F4" />
+              ) : null}
+              <Text style={styles.roomTopBarTitle} numberOfLines={1}>
+                {roomDetails.title}
+              </Text>
+            </View>
             <Text style={styles.roomHeaderCaption} numberOfLines={1}>
               {room.category || "Sohbet"} · {Math.max(liveVoice.participantCount, activeRoomParticipants.length)} kişi
+              {musicPlaying ? " · ♪ müzik" : ""}
             </Text>
           </View>
           <Pressable
@@ -5770,13 +6633,27 @@ function Room({
             accessibilityLabel="Oda seçenekleri"
           >
             <Ionicons name="ellipsis-horizontal" size={20} color="#FFFFFF" />
+            {canModerate && micRequests.length ? (
+              <View style={styles.roomTopBarBadge}>
+                <Text style={styles.roomTopBarBadgeText}>
+                  {micRequests.length > 9 ? "9+" : micRequests.length}
+                </Text>
+              </View>
+            ) : null}
+          </Pressable>
+          <Pressable
+            onPress={leaveRoom}
+            style={[styles.roomTopBarMore, styles.roomTopBarLeave]}
+            accessibilityLabel="Odadan çık"
+          >
+            <Ionicons name="power" size={18} color="#F3A9AC" />
           </Pressable>
         </View>
 
         {liveVoice.status !== "connected" && (
           <View style={styles.roomConnectionNotice}>
             <Ionicons name="radio-outline" size={13} color="#A9BEDB" />
-            <Text style={styles.roomConnectionText}>{roomVoiceLabel}</Text>
+            <Text style={styles.roomConnectionText}>{voiceErrorText}</Text>
             {["error", "disconnected", "local"].includes(liveVoice.status) && (
               <Pressable
                 style={styles.roomRetryPill}
@@ -5789,15 +6666,19 @@ function Room({
           </View>
         )}
 
-        {/* Oda kimliği, sahne ve sohbet */}
+        {/* Sahne ve sohbet tek bir akışta */}
         <ScrollView
+          ref={chatScrollRef}
           style={{ flex: 1 }}
           contentContainerStyle={styles.roomBody}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          onScroll={handleChatScroll}
+          scrollEventThrottle={64}
+          onContentSizeChange={handleChatContentSize}
         >
           <View style={styles.roomSurface}>
-            {/* Sahne: ev sahibi + konuşmacılar */}
+            {/* Sahne: oda sahibi (+ çift koltuğu) + 4'erli sıralar */}
             <View style={styles.roomStage}>
               <LinearGradient
                 colors={["rgba(47,128,237,0.16)", "rgba(82,104,174,0.035)", "rgba(47,128,237,0)"]}
@@ -5805,111 +6686,19 @@ function Room({
                 style={styles.roomStageGlow}
                 pointerEvents="none"
               />
-              <View style={styles.roomSpeakerGrid}>
-                {stageGrid.map((participant, index) =>
-                  participant ? (
-                    <Pressable
-                      style={[
-                        styles.roomSpeakerSlot,
-                        index === 0 && styles.roomHostStageSlot,
-                      ]}
-                      key={participant.userId}
-                      delayLongPress={260}
-                      onLongPress={() => openParticipantMenu(participant)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${participant.name} kullanıcı menüsü`}
-                    >
-                      <View style={styles.roomAvatarWrap}>
-                        {participant.isSpeaking ? (
-                          <SpeakingRing size={index === 0 ? 98 : 78} color={COLORS.primary} />
-                        ) : null}
-                        <View
-                          style={[
-                            styles.roomSpeakerAvatar,
-                            index === 0 && styles.roomHostStageAvatar,
-                            participant.role === "host" &&
-                              styles.roomSpeakerAvatarHost,
-                            participant.microphoneEnabled &&
-                              styles.roomSpeakerAvatarActive,
-                          ]}
-                        >
-                          <LinearGradient
-                            colors={index === 0
-                              ? ["#8CC8FF", "#347CE0"]
-                              : ["#527DB8", "#203D66"]}
-                            style={[
-                              StyleSheet.absoluteFill,
-                              { borderRadius: index === 0 ? 42 : 33 },
-                            ]}
-                          />
-                          <Text
-                            style={[
-                              styles.roomSpeakerInitial,
-                              index === 0 && styles.roomHostStageInitial,
-                            ]}
-                          >
-                            {participant.name?.charAt(0)?.toUpperCase() || "?"}
-                          </Text>
-                          {participant.microphoneEnabled ? (
-                            <View style={styles.roomMicOnBadge}>
-                              <Ionicons name="mic" size={9} color="#11131A" />
-                            </View>
-                          ) : (
-                            <View style={styles.roomMicOffBadge}>
-                              <Ionicons
-                                name="mic-off"
-                                size={9}
-                                color="rgba(255,255,255,0.7)"
-                              />
-                            </View>
-                          )}
-                        </View>
-                        {participant.role === "host" ? (
-                          <View style={styles.roomSpeakerCrown}>
-                            <Ionicons
-                              name="sparkles"
-                              size={9}
-                              color="#11131A"
-                            />
-                          </View>
-                        ) : null}
-                      </View>
-                      <Text style={styles.roomSpeakerName} numberOfLines={1}>
-                        {participant.pendingSeat
-                          ? "Bekliyor"
-                          : index === 0
-                            ? `1 · ${participant.name}`
-                            : participant.name}
-                      </Text>
-                      {index !== 0 && (
-                        <Text style={styles.roomSpeakerRole} numberOfLines={1}>
-                          {participant.isSpeaking ? "Konuşuyor" : `${index + 1}`}
-                        </Text>
-                      )}
-                    </Pressable>
-                  ) : (
-                    <Pressable
-                      key={`empty-${index}`}
-                      style={styles.roomSpeakerSlot}
-                      onPress={toggleHand}
-                      accessibilityRole="button"
-                      accessibilityLabel="Boş koltuğa otur"
-                    >
-                      <View style={styles.roomEmptySeat}>
-                        <Ionicons
-
-                          name="mic-outline"
-                          size={28}
-                          color="rgba(118,175,255,0.78)"
-                        />
-                      </View>
-                      <Text style={styles.roomEmptySeatLabel}>{index + 1}</Text>
-                    </Pressable>
-                  ),
+              <View style={styles.roomHostSeatRow}>
+                {renderStageSeat(hostStageParticipant, 0, "host")}
+                {roomDetails.coupleSeat
+                  ? renderStageSeat(seatedByIndex.get(COUPLE_SEAT_INDEX) || null, COUPLE_SEAT_INDEX, "couple")
+                  : null}
+              </View>
+              <View style={[styles.roomSpeakerGrid, compactStage && styles.roomSpeakerGridCompact]}>
+                {regularSeatRows.flat().map(({ index, participant }) =>
+                  renderStageSeat(participant, index),
                 )}
               </View>
 
-              {/* Takip / el kaldır */}
+              {/* Takip / mikrofon isteği */}
               {!isHost && (
                 <View style={styles.roomStageActions}>
                   {room.hostId ? (
@@ -5931,29 +6720,43 @@ function Room({
                     </Pressable>
                   ) : null}
                   <Pressable
-                    onPress={toggleHand}
+                    onPress={iAmSeated ? handleOwnSeatPress : canModerate ? toggleMicrophone : toggleHand}
                     style={[
                       styles.roomHandBtn,
-                      handRaised && styles.roomHandBtnActive,
+                      (handRaised || iAmSeated) && styles.roomHandBtnActive,
                     ]}
                     accessibilityLabel={
-                      handRaised
-                        ? "Mikrofon sırasından çık"
-                        : "Mikrofon sırasına gir"
+                      iAmSeated
+                        ? "Mikrofondan in"
+                        : handRaised
+                          ? "Mikrofon isteğini geri çek"
+                          : "Mikrofon iste"
                     }
                   >
                     <Ionicons
-                      name={handRaised ? "remove-circle-outline" : "list-outline"}
+                      name={
+                        iAmSeated
+                          ? "arrow-down-circle-outline"
+                          : handRaised
+                            ? "remove-circle-outline"
+                            : "hand-left-outline"
+                      }
                       size={17}
-                      color={handRaised ? "#11131A" : COLORS.primary}
+                      color={handRaised || iAmSeated ? "#11131A" : COLORS.primary}
                     />
                     <Text
                       style={[
                         styles.roomHandBtnText,
-                        handRaised && { color: "#11131A" },
+                        (handRaised || iAmSeated) && { color: "#11131A" },
                       ]}
                     >
-                      {handRaised ? "Sıradan çık" : "Mikrofon sırasına gir"}
+                      {iAmSeated
+                        ? "Mikrofondan in"
+                        : handRaised
+                          ? "İsteği geri çek"
+                          : canModerate
+                            ? "Mikrofona çık"
+                            : "Mikrofon iste"}
                     </Text>
                   </Pressable>
                 </View>
@@ -5966,8 +6769,7 @@ function Room({
                 <View style={styles.roomChatHead}>
                   <Text style={styles.roomChatTitle}>Dinleyiciler</Text>
                   <Text style={styles.roomChatCount}>
-                    {audienceParticipants.length}{" "}
-                    kişi
+                    {audienceParticipants.length} kişi
                   </Text>
                 </View>
                 <ScrollView
@@ -5996,9 +6798,9 @@ function Room({
                           <Text style={styles.roomAudienceInitial}>
                             {participant.name?.charAt(0)?.toUpperCase() || "?"}
                           </Text>
-                          {participant.role === "host" ? (
+                          {participant.role === "moderator" ? (
                             <View style={styles.roomAudienceCrown}>
-                              <Ionicons name="star" size={8} color="#11131A" />
+                              <Ionicons name="shield-checkmark" size={8} color="#11131A" />
                             </View>
                           ) : null}
                         </View>
@@ -6011,26 +6813,13 @@ function Room({
                 </ScrollView>
               </View>
             )}
-
           </View>
-          {/* Sohbet */}
-          <View style={styles.roomChatSection}>
-            <View style={styles.roomChatHead}>
-              <View style={styles.roomChatIcon}>
-                <Ionicons name="chatbubbles-outline" size={17} color={COLORS.primary} />
-              </View>
-              <View style={styles.roomChatHeading}>
-                <Text style={styles.roomChatTitle}>Sohbet</Text>
-                <Text style={styles.roomChatCount}>{chatStatusText}</Text>
-              </View>
-              <Pressable onPress={clearRoomChat} style={styles.roomChatClear} accessibilityRole="button" accessibilityLabel="Sohbet görünümünü temizle">
-                <Ionicons
-                  name="trash-outline"
-                  size={15}
-                  color="rgba(255,255,255,0.4)"
-                />
-              </Pressable>
-            </View>
+
+          {/* Sohbet: ayrı bir kutu değil, odanın akışının devamı */}
+          <View style={styles.roomChatFlow}>
+            {chatStatusText ? (
+              <Text style={styles.roomChatStatus}>{chatStatusText}</Text>
+            ) : null}
             <RoomMessageList
               messages={messages}
               canReportBase={room.persisted}
@@ -6040,110 +6829,147 @@ function Room({
           </View>
         </ScrollView>
 
-        <View style={styles.roomComposerDock}>
-          <RoomComposer
-            onSend={sendMessage}
-            onOpenGift={handleOpenGift}
-            sending={messageSending}
-          />
-        </View>
-
-        {/* Sabit oda kontrolleri */}
-        <View style={styles.roomControlBar}>
-          {/* Mikrofon */}
+        {/* Alt bar: sohbet + mikrofon + ses + müzik + hediye */}
+        <View style={styles.roomBottomBar}>
+          <RoomComposer onSend={sendMessage} sending={messageSending} />
           <Pressable
-            style={[styles.roomCtrlBtn, styles.roomMicControl]}
+            style={[
+              styles.roomBarButton,
+              micOn && styles.roomBarButtonActive,
+              !micOn && handRaised && !iAmSeated && styles.roomBarButtonPending,
+            ]}
             onPress={toggleMicrophone}
             accessibilityRole="button"
-            accessibilityLabel={micOn ? "Mikrofonu kapat" : "Mikrofonu aç"}
+            accessibilityLabel={micButtonLabel}
             accessibilityState={{ selected: micOn }}
           >
-            <View style={[styles.roomCtrlIconBubble, micOn && styles.roomCtrlIconBubbleActive]}>
-              <Ionicons
-                name={micOn ? "mic" : "mic-off"}
-                size={21}
-                color="#FFFFFF"
-              />
-            </View>
-            <Text style={[styles.roomCtrlLabel, micOn && styles.roomCtrlLabelActive]}>
-              {micOn ? "Mikrofon açık" : "Mikrofon kapalı"}
-            </Text>
+            <Ionicons
+              name={micButtonIcon}
+              size={20}
+              color={micOn ? "#FFFFFF" : iAmSeated ? "#DBE8FB" : "#8FA6C4"}
+            />
           </Pressable>
-
-          {/* Hoparlör */}
           <Pressable
-            style={styles.roomCtrlBtn}
+            style={[styles.roomBarButton, !speakerOn && styles.roomBarButtonMuted]}
             onPress={handleToggleSpeaker}
-            accessibilityLabel="Hoparlör"
             accessibilityRole="button"
+            accessibilityLabel={speakerOn ? "Oda sesini kapat" : "Oda sesini aç"}
             accessibilityState={{ selected: speakerOn }}
           >
-            <View style={[styles.roomCtrlIconBubble, speakerOn && styles.roomCtrlIconBubbleOn]}>
-              <Ionicons
-                name={speakerOn ? "volume-high" : "volume-mute"}
-                size={21}
-                color={speakerOn ? COLORS.primary : "#DBE8FB"}
-              />
-            </View>
-            <Text
-              style={[styles.roomCtrlLabel, speakerOn && styles.roomCtrlLabelActive]}
-            >
-              Ses
-            </Text>
+            <Ionicons
+              name={speakerOn ? "volume-high" : "volume-mute"}
+              size={20}
+              color={speakerOn ? "#DBE8FB" : "#F3A9AC"}
+            />
           </Pressable>
-
-          {/* Hediye */}
           <Pressable
-            style={styles.roomCtrlBtn}
+            style={[styles.roomBarButton, musicPlaying && styles.roomBarButtonOn]}
+            onPress={() => setMenuSheet("music")}
+            accessibilityRole="button"
+            accessibilityLabel="Müzik"
+          >
+            <Ionicons
+              name={musicPlaying ? "musical-notes" : "musical-notes-outline"}
+              size={19}
+              color={musicPlaying ? COLORS.primaryLight : "#DBE8FB"}
+            />
+          </Pressable>
+          <Pressable
+            style={[styles.roomBarButton, styles.roomBarGift]}
             onPress={handleOpenGift}
+            accessibilityRole="button"
             accessibilityLabel="Hediye gönder"
           >
-            <View style={styles.roomCtrlIconBubble}>
-              <Ionicons name="gift-outline" size={21} color="#76AFFF" />
-            </View>
-            <Text style={styles.roomCtrlLabel}>Hediye</Text>
-          </Pressable>
-
-          {/* Paylaş */}
-          <Pressable
-            style={styles.roomCtrlBtn}
-            onPress={shareRoom}
-            accessibilityLabel="Odayı paylaş"
-          >
-            <View style={styles.roomCtrlIconBubble}>
-              <Ionicons name="share-social-outline" size={20} color="#DBE8FB" />
-            </View>
-            <Text style={styles.roomCtrlLabel}>Paylaş</Text>
-          </Pressable>
-
-          {/* Çıkış — büyük kırmızı */}
-          <Pressable
-            style={styles.roomLeaveBtn}
-            onPress={leaveRoom}
-            accessibilityLabel="Odadan çık"
-          >
-            <View style={[styles.roomCtrlIconBubble, styles.roomLeaveIconBubble]}>
-              <Ionicons name="exit-outline" size={20} color="#F3A9AC" />
-            </View>
-            <Text style={styles.roomLeaveLabel}>Çık</Text>
+            <Ionicons name="gift" size={19} color="#FFFFFF" />
           </Pressable>
         </View>
       </KeyboardAvoidingView>
 
       <GiftFlight gift={giftFlight} />
 
-      <RoomSettingsSheet
+      <RoomMenuSheet
         visible={settingsOpen}
-        isHost={canModerate}
+        menuRole={room.persisted ? menuRole : isHost ? "owner" : "member"}
         roomLocked={roomLocked}
         chatLocked={chatLocked}
+        passwordProtected={roomDetails.passwordProtected}
+        seatCount={seatCapacity}
+        coupleSeat={roomDetails.coupleSeat}
+        requestCount={micRequests.length}
+        adminCount={adminCount}
+        musicPlaying={musicPlaying}
         canBlockHost={Boolean(room.hostId && room.hostId !== userId)}
-        onToggleRoomLock={toggleRoomLock}
-        onToggleChatLock={toggleChatLock}
-        onReportRoom={reportRoom}
-        onBlockHost={handleBlockHost}
-        onInvite={shareRoom}
+        onAction={handleMenuAction}
         onDismiss={handleCloseSettings}
+      />
+      <RoomSettingsEditorSheet
+        visible={menuSheet === "settings"}
+        details={roomDetails}
+        backgroundUrl={backgroundUrl}
+        backgroundRequest={backgroundRequest}
+        backgroundUploadsEnabled={backgroundUploadsEnabled}
+        saving={savingSettings}
+        uploadingBackground={uploadingBackground}
+        onSave={saveRoomDetails}
+        onPickBackground={pickRoomBackground}
+        onClearBackground={removeRoomBackground}
+        onOpenMusic={() => {
+          setMenuSheet(null);
+          setTimeout(() => setMenuSheet("music"), 320);
+        }}
+        onDismiss={closeMenuSheet}
+      />
+      <RoomMusicSheet
+        visible={menuSheet === "music"}
+        canControl={Boolean(room.persisted && canModerate)}
+        musicState={roomDetails.musicState}
+        music={music}
+        tracks={musicTracks}
+        loadingTracks={musicTracksLoading}
+        busy={musicBusy}
+        onAddTrack={addMusicTrack}
+        onPlayTrack={playMusicTrack}
+        onTogglePlay={toggleMusicPlay}
+        onStop={stopMusic}
+        onRoomVolume={setMusicRoomVolume}
+        onDeleteTrack={removeMusicTrack}
+        onDismiss={closeMenuSheet}
+      />
+      <RoomAdminsSheet
+        visible={menuSheet === "admins"}
+        participants={roomAdminCandidates}
+        busyUserId={staffBusy}
+        onToggleAdmin={toggleAdmin}
+        onDismiss={closeMenuSheet}
+      />
+      <MicRequestsSheet
+        visible={menuSheet === "requests"}
+        requests={micRequests}
+        busyUserId={staffBusy}
+        onApprove={approveMicRequest}
+        onReject={rejectMicRequest}
+        onDismiss={closeMenuSheet}
+      />
+      <RoomLockSheet
+        visible={menuSheet === "lock"}
+        passwordProtected={roomDetails.passwordProtected}
+        saving={savingSettings}
+        onSave={saveRoomPassword}
+        onDismiss={closeMenuSheet}
+      />
+      <RoomSeatsSheet
+        visible={menuSheet === "seats"}
+        seatCount={seatCapacity}
+        coupleSeat={roomDetails.coupleSeat}
+        saving={savingSettings}
+        onSave={saveRoomLayout}
+        onDismiss={closeMenuSheet}
+      />
+      <BanDurationSheet
+        participant={banTarget}
+        busy={Boolean(banTarget && staffBusy === banTarget.userId)}
+        onSelect={banSelectedTarget}
+        onDismiss={() => setBanTarget(null)}
       />
       <GiftSheet
         visible={giftOpen}
@@ -6168,13 +6994,15 @@ function Room({
         visible={Boolean(profileParticipant)}
         profile={profileParticipant}
         userId={profileParticipant?.userId}
-        roomContext={room}
+        roomContext={{ ...room, title: roomDetails.title }}
         isSelf={profileParticipant?.userId === userId}
         isFollowing={selectedIsFollowing}
         canBlock={Boolean(room.persisted && profileParticipant?.userId)}
         onToggleFollow={handleSelectedFollow}
         onBlock={handleSelectedBlock}
         onReport={handleSelectedReport}
+        staffActions={staffActionsFor(profileParticipant)}
+        onStaffAction={handleStaffAction}
         onDismiss={() => {
           setProfileParticipant(null);
           setSelectedParticipant(null);
@@ -6592,6 +7420,9 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState("discover");
   const [room, setRoom] = useState(null);
   const [roomMinimized, setRoomMinimized] = useState(false);
+  const [passwordPromptRoom, setPasswordPromptRoom] = useState(null);
+  const [passwordPromptError, setPasswordPromptError] = useState(null);
+  const [passwordPromptBusy, setPasswordPromptBusy] = useState(false);
   const [roomPreferences, setRoomPreferences] = useState({
     microphoneEnabled: false,
     speakerEnabled: true,
@@ -7467,11 +8298,36 @@ function AppContent() {
     }
   };
 
-  const openRoom = (nextRoom) => {
+  const openRoom = async (nextRoom, { skipPasswordCheck = false } = {}) => {
     if (!nextRoom || typeof nextRoom.id !== "string" || !nextRoom.id) {
       console.warn("[room-entry] open rejected: invalid room");
       Alert.alert("Oda açılamadı", "Oda bilgisi geçersiz. Tekrar dene.");
       return;
+    }
+
+    // Şifreli odalar: oda sahibi, yöneticiler ve şifreyi zaten girmiş olanlar
+    // doğrudan girer; diğerlerinden 4 haneli şifre istenir.
+    if (
+      !skipPasswordCheck &&
+      nextRoom.persisted &&
+      nextRoom.passwordProtected &&
+      nextRoom.hostId !== authSession?.user?.id &&
+      room?.id !== nextRoom.id
+    ) {
+      try {
+        await joinRoomWithPassword(nextRoom.id, null);
+      } catch (error) {
+        const message = String(error?.message || "");
+        if (message.includes("Room password required")) {
+          setPasswordPromptError(null);
+          setPasswordPromptRoom(nextRoom);
+          return;
+        }
+        if (message.includes("Room ban active") || message.includes("You were removed")) {
+          Alert.alert("Odaya girilemiyor", describeRoomError(error));
+          return;
+        }
+      }
     }
 
     console.warn("[room-entry] open requested", Boolean(nextRoom.id));
@@ -8061,6 +8917,27 @@ function AppContent() {
         visible={passwordRecoveryOpen}
         onDismiss={handleClosePasswordReset}
         onUpdatePassword={finishPasswordRecovery}
+      />
+      <RoomPasswordPrompt
+        room={passwordPromptRoom}
+        error={passwordPromptError}
+        busy={passwordPromptBusy}
+        onSubmit={async (pin) => {
+          const target = passwordPromptRoom;
+          if (!target) return;
+          setPasswordPromptBusy(true);
+          setPasswordPromptError(null);
+          try {
+            await joinRoomWithPassword(target.id, pin);
+            setPasswordPromptRoom(null);
+            openRoom(target, { skipPasswordCheck: true });
+          } catch (error) {
+            setPasswordPromptError(describeRoomError(error));
+          } finally {
+            setPasswordPromptBusy(false);
+          }
+        }}
+        onDismiss={() => setPasswordPromptRoom(null)}
       />
       <DataControlsSheet
         visible={dataControlsOpen}
@@ -13408,4 +14285,180 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surfaceRaised,
   },
   pfMenuTitle: { flex: 1, color: COLORS.text, fontSize: 14, fontWeight: "800" },
+
+  /* ══ Oda: bütünleşik sohbet, alt bar ve oda sahibi kontrolleri ═════ */
+  roomTitleLine: { flexDirection: "row", alignItems: "center", gap: 5 },
+  roomTopBarLeave: {
+    backgroundColor: "rgba(227,102,108,0.12)",
+    borderColor: "rgba(227,102,108,0.2)",
+  },
+  roomTopBarBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.danger,
+    borderWidth: 2,
+    borderColor: "#0B0F17",
+  },
+  roomTopBarBadgeText: { color: "#FFFFFF", fontSize: 9, fontWeight: "900" },
+  roomHostSeatRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "flex-start",
+    width: "100%",
+    marginBottom: 10,
+  },
+  roomHostPairSlot: { width: "36%" },
+  roomSpeakerGridCompact: { rowGap: 4 },
+  roomSpeakerSlotCompact: { minHeight: 76, paddingVertical: 2, gap: 4 },
+  roomCoupleSeat: {
+    backgroundColor: "rgba(120,52,96,0.55)",
+    borderColor: "rgba(255,160,200,0.4)",
+    shadowColor: "#FF8FC0",
+  },
+  roomCoupleSeatAvatar: { borderColor: "rgba(255,160,200,0.75)" },
+  roomCoupleSeatLabel: {
+    color: "#FFC6DE",
+    backgroundColor: "rgba(228,111,160,0.18)",
+  },
+  roomAdminBadge: { backgroundColor: "#9CD3FF" },
+  roomChatFlow: {
+    paddingHorizontal: 8,
+    paddingTop: 2,
+    paddingBottom: 6,
+  },
+  roomChatStatus: {
+    color: "#8FA6C4",
+    fontSize: 10,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  messageList: { gap: 6, paddingBottom: 4 },
+  messageRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  messageBubble: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    maxWidth: "88%",
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: "rgba(6,11,22,0.42)",
+  },
+  messageBubbleSystem: { backgroundColor: "rgba(47,128,237,0.13)" },
+  messageBubbleAnnouncement: {
+    backgroundColor: "rgba(47,128,237,0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(118,175,255,0.28)",
+  },
+  messageAnnouncementIcon: { marginTop: 3, marginRight: 6 },
+  messageText: { flexShrink: 1, color: "#DCE5F0", fontSize: 13, lineHeight: 19 },
+  systemMessage: { color: "#A9C3E4", fontStyle: "normal", fontSize: 12, lineHeight: 18 },
+  announcementMessage: { color: "#E6F0FF", fontWeight: "700" },
+  messageReportButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  roomBottomBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 10,
+    backgroundColor: "rgba(9,14,25,0.94)",
+    borderTopWidth: 1,
+    borderColor: "rgba(118,175,255,0.08)",
+  },
+  roomInputPill: {
+    flex: 1,
+    minWidth: 0,
+    height: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingLeft: 14,
+    paddingRight: 4,
+    borderRadius: 21,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  roomInputField: {
+    flex: 1,
+    minWidth: 0,
+    height: 42,
+    paddingVertical: 0,
+    color: "#F3F5F1",
+    fontSize: 13,
+  },
+  roomInputSend: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.primary,
+  },
+  roomBarButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  roomBarButtonActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: "rgba(118,175,255,0.75)",
+  },
+  roomBarButtonPending: {
+    backgroundColor: "rgba(47,128,237,0.22)",
+    borderColor: "rgba(118,175,255,0.45)",
+  },
+  roomBarButtonMuted: {
+    backgroundColor: "rgba(227,102,108,0.12)",
+    borderColor: "rgba(227,102,108,0.2)",
+  },
+  roomBarButtonOn: {
+    backgroundColor: "rgba(47,128,237,0.2)",
+    borderColor: "rgba(118,175,255,0.35)",
+  },
+  roomBarGift: {
+    backgroundColor: "#3D7FE0",
+    borderColor: "rgba(156,198,255,0.45)",
+  },
+  profileStaffSection: {
+    marginHorizontal: 18,
+    marginTop: 14,
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  profileStaffGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
+  profileStaffButton: {
+    flexGrow: 1,
+    flexBasis: "46%",
+    minHeight: 46,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: COLORS.surfaceRaised,
+  },
+  profileStaffButtonDanger: { backgroundColor: "rgba(217,79,92,0.08)" },
+  profileStaffButtonText: { flex: 1, color: COLORS.text, fontSize: 12, fontWeight: "800" },
 });

@@ -109,8 +109,32 @@ app.post("/errors", (request, response) => {
   response.status(202).json({ accepted: true });
 });
 
-const roomRoleCanPublish = (role, muted) => ["host", "moderator", "speaker"].includes(role) && !muted;
+// Oda sahibi her zaman 1 numaralı koltuktadır; diğer kullanıcılar yalnızca
+// bir koltuğa oturtulduklarında (LiveKit "seat" özniteliği) yayın yapabilir.
+const roomRoleCanPublish = (role, muted, seated = false) => role === "host" || (seated && !muted);
 const roomRoleIsStaff = (role) => ["host", "moderator"].includes(role);
+const UUID_PATTERN = /^[a-f0-9-]{36}$/i;
+const COUPLE_SEAT_INDEX = 1;
+const FIRST_REGULAR_SEAT_INDEX = 2;
+const MIC_KICK_MINUTES = 10;
+
+const roomSeatIndexes = (seatCount, coupleSeat) => {
+  const lastSeat = Number(seatCount) === 13 ? 13 : 9;
+  const seats = [];
+  if (coupleSeat) seats.push(COUPLE_SEAT_INDEX);
+  for (let seat = FIRST_REGULAR_SEAT_INDEX; seat <= lastSeat; seat += 1) seats.push(seat);
+  return seats;
+};
+
+const participantSeat = (participant) => {
+  const value = Number.parseInt(participant?.attributes?.seat || "", 10);
+  return Number.isInteger(value) ? value : null;
+};
+
+const sendError = (response, error, fallback) => {
+  const message = error?.message || fallback;
+  response.status(error?.status || 403).json({ error: message });
+};
 
 const supabaseRequest = async (path, accessToken, options = {}) => {
   const response = await fetch(`${supabaseUrl}${path}`, {
@@ -155,15 +179,22 @@ const joinRoomMembership = async (accessToken, roomId) => {
   return result?.[0];
 };
 
-const applyLiveKitPermission = async (roomId, identity, role, muted) => {
-  await liveKitService.updateParticipant(roomId, identity, {
+const applyLiveKitPermission = async (roomId, identity, role, muted, seat) => {
+  let seated = seat !== undefined ? seat !== null : false;
+  if (seat === undefined) {
+    const participant = await liveKitService.getParticipant(roomId, identity).catch(() => null);
+    seated = participantSeat(participant) !== null;
+  }
+  const options = {
     permission: {
-      canPublish: roomRoleCanPublish(role, muted),
+      canPublish: roomRoleCanPublish(role, muted, seated),
       canSubscribe: true,
       canPublishData: true,
-      roomAdmin: roomRoleIsStaff(role),
+      roomAdmin: false,
     },
-  });
+  };
+  if (seat !== undefined) options.attributes = { seat: seat === null ? "" : String(seat) };
+  await liveKitService.updateParticipant(roomId, identity, options);
 };
 
 const muteParticipantTracks = async (roomId, identity, muted) => {
@@ -201,14 +232,20 @@ app.post("/token", async (request, response) => {
     token.addGrant({
       roomJoin: true,
       room: cleanRoomName,
-      canPublish: roomRoleCanPublish(membership.role, membership.is_muted),
+      canPublish: roomRoleCanPublish(membership.role, membership.is_muted, false),
       canSubscribe: true,
       canPublishData: true,
-      roomAdmin: roomRoleIsStaff(membership.role),
+      roomAdmin: false,
     });
     const jwt = await token.toJwt();
     console.info("Room token issued");
-    response.json({ serverUrl: process.env.LIVEKIT_URL, token: jwt, role: membership.role, muted: membership.is_muted });
+    response.json({
+      serverUrl: process.env.LIVEKIT_URL,
+      token: jwt,
+      role: membership.role,
+      muted: membership.is_muted,
+      canPublish: roomRoleCanPublish(membership.role, membership.is_muted, false),
+    });
   } catch (error) {
     console.error("Room token request failed:", error.message);
     response.status(error.status || 403).json({ error: error.message || "Unable to join this room" });
@@ -234,12 +271,202 @@ app.post("/rooms/:roomId/moderate", async (request, response) => {
     if (action === "remove") {
       await liveKitService.removeParticipant(roomId, targetUserId, { revokeTokenTs: BigInt(Math.floor(Date.now() / 1000)) }).catch(() => undefined);
     } else {
-      await applyLiveKitPermission(roomId, targetUserId, membership.role, membership.is_muted).catch(() => undefined);
+      const seat = action === "demote_listener" ? null : undefined;
+      await applyLiveKitPermission(roomId, targetUserId, membership.role, membership.is_muted, seat).catch(() => undefined);
       if (["mute", "demote_listener"].includes(action)) await muteParticipantTracks(roomId, targetUserId, true);
     }
     response.json({ membership });
   } catch (error) {
     response.status(error.status || 403).json({ error: error.message || "Moderation action failed" });
+  }
+});
+
+const listSeatedParticipants = async (roomId) => {
+  const participants = await liveKitService.listParticipants(roomId).catch(() => []);
+  return participants.map((participant) => ({
+    identity: participant.identity,
+    seat: participantSeat(participant),
+  }));
+};
+
+// Koltuk işlemleri: take (yönetici/oda sahibi kendisi oturur), leave,
+// assign (istek onayı / mikrofona davet), kick (10 dk mikrofon yasağı),
+// reject (isteği reddet).
+app.post("/rooms/:roomId/seat", async (request, response) => {
+  const roomId = String(request.params.roomId || "").trim();
+  const action = String(request.body?.action || "").trim();
+  const rawTarget = request.body?.targetUserId ? String(request.body.targetUserId).trim() : null;
+  const requestedSeat = request.body?.seatIndex === undefined || request.body?.seatIndex === null
+    ? null
+    : Number.parseInt(request.body.seatIndex, 10);
+  if (!UUID_PATTERN.test(roomId) || (rawTarget && !UUID_PATTERN.test(rawTarget))) {
+    response.status(400).json({ error: "Invalid room or participant" });
+    return;
+  }
+  if (!["take", "leave", "assign", "kick", "reject"].includes(action)) {
+    response.status(400).json({ error: "Unsupported seat action" });
+    return;
+  }
+  try {
+    const { accessToken } = await getAuthenticatedUser(request);
+    const result = await supabaseRequest("/rest/v1/rpc/authorize_room_seat", accessToken, {
+      method: "POST",
+      body: JSON.stringify({ p_room_id: roomId, p_action: action, p_target_user_id: rawTarget }),
+    });
+    const seatAuth = result?.[0];
+    if (!seatAuth?.target_user_id) throw new Error("Seat action failed");
+    const targetId = seatAuth.target_user_id;
+
+    if (action === "reject") {
+      response.json({ ok: true });
+      return;
+    }
+
+    if (action === "leave" || action === "kick") {
+      if (targetId !== seatAuth.host_id) {
+        await applyLiveKitPermission(roomId, targetId, seatAuth.target_role, seatAuth.target_muted, null).catch(() => undefined);
+        await muteParticipantTracks(roomId, targetId, true).catch(() => undefined);
+      }
+      response.json({
+        ok: true,
+        seat: null,
+        micBannedMinutes: action === "kick" ? MIC_KICK_MINUTES : 0,
+      });
+      return;
+    }
+
+    if (targetId === seatAuth.host_id) {
+      response.json({ ok: true, seat: 0 });
+      return;
+    }
+
+    const participants = await listSeatedParticipants(roomId);
+    if (!participants.some((participant) => participant.identity === targetId)) {
+      const error = new Error("Participant is not connected");
+      error.status = 409;
+      throw error;
+    }
+    const validSeats = roomSeatIndexes(seatAuth.seat_count, seatAuth.couple_seat);
+    const occupied = new Map(
+      participants
+        .filter((participant) => participant.seat !== null && participant.identity !== targetId)
+        .map((participant) => [participant.seat, participant.identity]),
+    );
+    let seat = requestedSeat;
+    if (seat !== null) {
+      if (!validSeats.includes(seat)) {
+        const error = new Error("Invalid seat");
+        error.status = 400;
+        throw error;
+      }
+      if (occupied.has(seat)) {
+        const error = new Error("Seat is taken");
+        error.status = 409;
+        throw error;
+      }
+    } else {
+      seat = validSeats.find((index) => index >= FIRST_REGULAR_SEAT_INDEX && !occupied.has(index)) ?? null;
+      if (seat === null) {
+        const error = new Error("No free seat");
+        error.status = 409;
+        throw error;
+      }
+    }
+    await applyLiveKitPermission(roomId, targetId, seatAuth.target_role, seatAuth.target_muted, seat);
+    response.json({ ok: true, seat });
+  } catch (error) {
+    sendError(response, error, "Seat action failed");
+  }
+});
+
+// Süreli oda banı. minutes null => kalıcı.
+app.post("/rooms/:roomId/ban", async (request, response) => {
+  const roomId = String(request.params.roomId || "").trim();
+  const targetUserId = String(request.body?.targetUserId || "").trim();
+  const minutes = request.body?.minutes === null || request.body?.minutes === undefined
+    ? null
+    : Number.parseInt(request.body.minutes, 10);
+  if (!UUID_PATTERN.test(roomId) || !UUID_PATTERN.test(targetUserId) || (minutes !== null && !(minutes > 0))) {
+    response.status(400).json({ error: "Invalid ban request" });
+    return;
+  }
+  try {
+    const { accessToken } = await getAuthenticatedUser(request);
+    const result = await supabaseRequest("/rest/v1/rpc/ban_room_member", accessToken, {
+      method: "POST",
+      body: JSON.stringify({ p_room_id: roomId, p_target_user_id: targetUserId, p_minutes: minutes }),
+    });
+    const membership = result?.[0];
+    if (!membership) throw new Error("Ban failed");
+    await liveKitService
+      .removeParticipant(roomId, targetUserId, { revokeTokenTs: BigInt(Math.floor(Date.now() / 1000)) })
+      .catch(() => undefined);
+    response.json({ membership });
+  } catch (error) {
+    sendError(response, error, "Ban failed");
+  }
+});
+
+// Mikrofon sayısı / çift koltuğu. Kapanan koltuklardaki kullanıcılar indirilir.
+app.post("/rooms/:roomId/layout", async (request, response) => {
+  const roomId = String(request.params.roomId || "").trim();
+  const seatCount = Number.parseInt(request.body?.seatCount, 10);
+  const coupleSeat = Boolean(request.body?.coupleSeat);
+  if (!UUID_PATTERN.test(roomId) || ![9, 13].includes(seatCount)) {
+    response.status(400).json({ error: "Invalid layout" });
+    return;
+  }
+  try {
+    const { accessToken } = await getAuthenticatedUser(request);
+    const result = await supabaseRequest("/rest/v1/rpc/update_room_layout", accessToken, {
+      method: "POST",
+      body: JSON.stringify({ p_room_id: roomId, p_seat_count: seatCount, p_couple_seat: coupleSeat }),
+    });
+    const room = Array.isArray(result) ? result[0] : result;
+    const validSeats = new Set(roomSeatIndexes(seatCount, coupleSeat));
+    const participants = await listSeatedParticipants(roomId);
+    await Promise.all(
+      participants
+        .filter((participant) => participant.seat !== null && !validSeats.has(participant.seat))
+        .map(async (participant) => {
+          await liveKitService.updateParticipant(roomId, participant.identity, {
+            attributes: { seat: "" },
+            permission: { canPublish: false, canSubscribe: true, canPublishData: true, roomAdmin: false },
+          }).catch(() => undefined);
+          await muteParticipantTracks(roomId, participant.identity, true).catch(() => undefined);
+        }),
+    );
+    response.json({ room });
+  } catch (error) {
+    sendError(response, error, "Layout update failed");
+  }
+});
+
+// Keşfet: uygulaması arka planda olduğu için kalp atışı gecikmiş odaların
+// sahibinin LiveKit'te hâlâ bağlı olup olmadığını döndürür.
+app.post("/rooms/presence", async (request, response) => {
+  const rooms = Array.isArray(request.body?.rooms) ? request.body.rooms.slice(0, 50) : [];
+  try {
+    await getAuthenticatedUser(request);
+    const wanted = rooms.filter((room) => UUID_PATTERN.test(String(room?.roomId)) && UUID_PATTERN.test(String(room?.hostId)));
+    if (!wanted.length) {
+      response.json({ liveRoomIds: [] });
+      return;
+    }
+    const activeRooms = await liveKitService.listRooms(wanted.map((room) => room.roomId)).catch(() => []);
+    const activeNames = new Set(activeRooms.filter((room) => room.numParticipants > 0).map((room) => room.name));
+    const liveRoomIds = [];
+    await Promise.all(
+      wanted
+        .filter((room) => activeNames.has(room.roomId))
+        .map(async (room) => {
+          const host = await liveKitService.getParticipant(room.roomId, room.hostId).catch(() => null);
+          if (host) liveRoomIds.push(room.roomId);
+        }),
+    );
+    response.json({ liveRoomIds });
+  } catch (error) {
+    sendError(response, error, "Presence lookup failed");
   }
 });
 

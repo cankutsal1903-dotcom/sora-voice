@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AudioSession, registerGlobals } from "@livekit/react-native";
-import { Room, RoomEvent } from "livekit-client";
+import { DisconnectReason, Room, RoomEvent } from "livekit-client";
 
 registerGlobals();
 
@@ -12,13 +12,20 @@ const initialState = {
   role: "listener",
   mutedByModerator: false,
   microphoneEnabled: false,
+  canPublish: false,
+  localSeat: null,
+  removedByModerator: false,
   error: null,
 };
 
-const roomRoleCanPublish = (role, muted) => ["host", "moderator", "speaker"].includes(role) && !muted;
+const parseSeat = (participant) => {
+  const value = Number.parseInt(participant?.attributes?.seat || "", 10);
+  return Number.isInteger(value) ? value : null;
+};
 
 export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, startWithMicrophone }) {
   const liveKitRoomRef = useRef(null);
+  const speakerEnabledRef = useRef(true);
   const [state, setState] = useState(initialState);
   const [connectionAttempt, setConnectionAttempt] = useState(0);
   const tokenServerUrl = process.env.EXPO_PUBLIC_TOKEN_SERVER_URL?.replace(/\/$/, "");
@@ -29,20 +36,67 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
     let connectedRoom;
     let tokenFetchController;
 
+    const applySpeakerState = () => {
+      if (!connectedRoom) return;
+      connectedRoom.remoteParticipants.forEach((participant) => {
+        participant.trackPublications.forEach((publication) => {
+          const mediaTrack = publication.track?.mediaStreamTrack;
+          if (publication.kind === "audio" && mediaTrack) mediaTrack.enabled = speakerEnabledRef.current;
+        });
+      });
+    };
+
     const updateParticipants = () => {
       if (!active || !connectedRoom) return;
-      const everyone = [connectedRoom.localParticipant, ...connectedRoom.remoteParticipants.values()];
+      const local = connectedRoom.localParticipant;
+      const everyone = [local, ...connectedRoom.remoteParticipants.values()];
       const participants = everyone.map((participant) => {
         const microphonePublication = [...participant.trackPublications.values()].find((publication) => publication.kind === "audio" && publication.source === "microphone");
         return {
           id: participant.identity,
           name: participant.name || "Sora kullanıcısı",
-          isLocal: participant === connectedRoom.localParticipant,
+          isLocal: participant === local,
+          seat: parseSeat(participant),
           microphoneEnabled: Boolean(microphonePublication && !microphonePublication.isMuted),
         };
       });
-      setState((current) => ({ ...current, participantCount: participants.length, participants }));
+      const canPublish = Boolean(local.permissions?.canPublish);
+      setState((current) => ({
+        ...current,
+        participantCount: participants.length,
+        participants,
+        canPublish,
+        localSeat: parseSeat(local),
+        microphoneEnabled: canPublish ? current.microphoneEnabled : false,
+      }));
     };
+
+    const handlePermissionsChanged = (_previous, participant) => {
+      if (!active || !connectedRoom) return;
+      const local = connectedRoom.localParticipant;
+      if ((!participant || participant === local) && !local.permissions?.canPublish && local.isMicrophoneEnabled) {
+        local.setMicrophoneEnabled(false).catch(() => undefined);
+      }
+      updateParticipants();
+    };
+
+    const handleTrackSubscribed = () => {
+      applySpeakerState();
+      updateParticipants();
+    };
+
+    const participantEvents = [
+      RoomEvent.ParticipantConnected,
+      RoomEvent.ParticipantDisconnected,
+      RoomEvent.TrackMuted,
+      RoomEvent.TrackUnmuted,
+      RoomEvent.TrackPublished,
+      RoomEvent.TrackUnpublished,
+      RoomEvent.LocalTrackPublished,
+      RoomEvent.LocalTrackUnpublished,
+      RoomEvent.ParticipantAttributesChanged,
+      RoomEvent.ParticipantNameChanged,
+    ].filter(Boolean);
 
     const connect = async () => {
       if (!tokenServerUrl) {
@@ -86,10 +140,9 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
 
         connectedRoom = new Room({ adaptiveStream: false, dynacast: true });
         liveKitRoomRef.current = connectedRoom;
-        connectedRoom.on(RoomEvent.ParticipantConnected, updateParticipants);
-        connectedRoom.on(RoomEvent.ParticipantDisconnected, updateParticipants);
-        connectedRoom.on(RoomEvent.TrackMuted, updateParticipants);
-        connectedRoom.on(RoomEvent.TrackUnmuted, updateParticipants);
+        participantEvents.forEach((event) => connectedRoom.on(event, updateParticipants));
+        connectedRoom.on(RoomEvent.ParticipantPermissionsChanged, handlePermissionsChanged);
+        connectedRoom.on(RoomEvent.TrackSubscribed, handleTrackSubscribed);
         connectedRoom.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
           if (!active) return;
           setState((current) => ({
@@ -103,8 +156,18 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
         connectedRoom.on(RoomEvent.Reconnected, () => {
           if (active) setState((current) => ({ ...current, status: "connected" }));
         });
-        connectedRoom.on(RoomEvent.Disconnected, () => {
-          if (active) setState((current) => ({ ...current, status: "disconnected", microphoneEnabled: false, activeSpeakerIds: [] }));
+        connectedRoom.on(RoomEvent.Disconnected, (reason) => {
+          if (active) {
+            setState((current) => ({
+              ...current,
+              status: "disconnected",
+              microphoneEnabled: false,
+              canPublish: false,
+              localSeat: null,
+              activeSpeakerIds: [],
+              removedByModerator: reason === DisconnectReason.PARTICIPANT_REMOVED,
+            }));
+          }
         });
 
         await AudioSession.startAudioSession();
@@ -115,18 +178,20 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
           return;
         }
 
-        if (startWithMicrophone && roomRoleCanPublish(payload.role, payload.muted)) {
+        const canPublishNow = Boolean(connectedRoom.localParticipant.permissions?.canPublish ?? payload.canPublish);
+        if (startWithMicrophone && canPublishNow) {
           await connectedRoom.localParticipant.setMicrophoneEnabled(true);
         }
         setState({
+          ...initialState,
           status: "connected",
-          participantCount: 0,
-          participants: [],
           role: payload.role || "listener",
           mutedByModerator: Boolean(payload.muted),
-          microphoneEnabled: Boolean(startWithMicrophone && roomRoleCanPublish(payload.role, payload.muted)),
+          canPublish: canPublishNow,
+          microphoneEnabled: Boolean(startWithMicrophone && canPublishNow),
           error: null,
         });
+        applySpeakerState();
         updateParticipants();
       } catch (error) {
         console.warn(
@@ -155,10 +220,9 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
       active = false;
       tokenFetchController?.abort();
       if (connectedRoom) {
-        connectedRoom.off(RoomEvent.ParticipantConnected, updateParticipants);
-        connectedRoom.off(RoomEvent.ParticipantDisconnected, updateParticipants);
-        connectedRoom.off(RoomEvent.TrackMuted, updateParticipants);
-        connectedRoom.off(RoomEvent.TrackUnmuted, updateParticipants);
+        participantEvents.forEach((event) => connectedRoom.off(event, updateParticipants));
+        connectedRoom.off(RoomEvent.ParticipantPermissionsChanged, handlePermissionsChanged);
+        connectedRoom.off(RoomEvent.TrackSubscribed, handleTrackSubscribed);
         connectedRoom.disconnect().catch(() => undefined);
       }
       if (liveKitRoomRef.current === connectedRoom) liveKitRoomRef.current = null;
@@ -169,11 +233,24 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
   const setMicrophoneEnabled = useCallback(async (enabled) => {
     const room = liveKitRoomRef.current;
     if (!room || state.status !== "connected") return false;
-    if (enabled && (!roomRoleCanPublish(state.role, state.mutedByModerator))) return false;
+    if (enabled && !room.localParticipant.permissions?.canPublish) return false;
     await room.localParticipant.setMicrophoneEnabled(enabled);
     setState((current) => ({ ...current, microphoneEnabled: enabled }));
     return true;
-  }, [state.mutedByModerator, state.role, state.status]);
+  }, [state.status]);
+
+  // Hoparlör: odadaki diğer seslerin bu cihazda çalınmasını açar / kapatır.
+  const setSpeakerEnabled = useCallback((enabled) => {
+    speakerEnabledRef.current = Boolean(enabled);
+    const room = liveKitRoomRef.current;
+    if (!room) return;
+    room.remoteParticipants.forEach((participant) => {
+      participant.trackPublications.forEach((publication) => {
+        const mediaTrack = publication.track?.mediaStreamTrack;
+        if (publication.kind === "audio" && mediaTrack) mediaTrack.enabled = speakerEnabledRef.current;
+      });
+    });
+  }, []);
 
   const disconnect = useCallback(async () => {
     const room = liveKitRoomRef.current;
@@ -190,6 +267,7 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
     enabled,
     reconnect,
     setMicrophoneEnabled,
+    setSpeakerEnabled,
     disconnect,
   };
 }

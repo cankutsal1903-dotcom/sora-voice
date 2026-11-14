@@ -1,4 +1,5 @@
 import { supabase } from "../auth/supabase";
+import { fetchHostPresence } from "../room/roomApi";
 
 const FALLBACK_COLORS = ["#5140BD", "#252458"];
 const ROOM_SELECT = "*, profiles!rooms_host_id_fkey(display_name, handle, avatar_color)";
@@ -29,6 +30,12 @@ export const mapRoom = (room) => {
     accent: room.accent_color,
     roomLocked: room.room_locked,
     chatLocked: room.chat_locked,
+    announcement: room.announcement || "Hoşgeldin",
+    passwordProtected: Boolean(room.password_protected),
+    seatCount: room.seat_count === 13 ? 13 : 9,
+    coupleSeat: Boolean(room.couple_seat),
+    backgroundPath: room.background_path || null,
+    musicState: room.music_state || null,
     startsAt: room.schedule_label || (room.starts_at ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(room.starts_at)) : "Yakında"),
     startsAtIso: room.starts_at || null,
     userCreated: true,
@@ -45,16 +52,38 @@ export const listRooms = async (state = "live") => {
     .eq("state", state)
     .order(state === "scheduled" ? "starts_at" : "created_at", { ascending: state === "scheduled", nullsFirst: false });
   if (state === "live") {
-    query.gte("last_active_at", new Date(Date.now() - 90_000).toISOString());
+    // Uygulaması arka planda olan oda sahiplerinin kalp atışı gecikebilir;
+    // bu odalar LiveKit'te sahip hâlâ bağlıysa keşfette kalır.
+    query.gte("last_active_at", new Date(Date.now() - 12 * 60 * 60_000).toISOString());
   }
   const [{ data, error }, { data: blocks, error: blocksError }] = await Promise.all([
     query,
     client.from("user_blocks").select("blocked_id"),
   ]);
   throwIfError(error);
-  if (blocksError) return (data || []).map(mapRoom);
-  const blockedIds = new Set((blocks || []).map((block) => block.blocked_id));
-  return (data || []).filter((room) => !blockedIds.has(room.host_id)).map(mapRoom);
+  const blockedIds = new Set(blocksError ? [] : (blocks || []).map((block) => block.blocked_id));
+  let visibleRows = (data || []).filter((room) => !blockedIds.has(room.host_id));
+  if (state === "live") {
+    const freshSince = Date.now() - 90_000;
+    const staleRows = visibleRows.filter((room) => new Date(room.last_active_at).getTime() < freshSince);
+    let presentIds = new Set();
+    if (staleRows.length) {
+      try {
+        const { data: sessionData } = await client.auth.getSession();
+        const liveIds = await fetchHostPresence({
+          rooms: staleRows.map((room) => ({ id: room.id, hostId: room.host_id })),
+          accessToken: sessionData?.session?.access_token,
+        });
+        presentIds = new Set(liveIds);
+      } catch {
+        presentIds = new Set();
+      }
+    }
+    visibleRows = visibleRows.filter(
+      (room) => new Date(room.last_active_at).getTime() >= freshSince || presentIds.has(room.id),
+    );
+  }
+  return visibleRows.map(mapRoom);
 };
 
 export const createRoom = async ({ room, userId }) => {
@@ -213,7 +242,7 @@ export const listRoomMembers = async (roomId) => {
   const client = requireClient();
   const { data, error } = await client
     .from("room_members")
-    .select("user_id, role, is_muted, removed_at, profiles!room_members_user_id_fkey(display_name, avatar_color)")
+    .select("user_id, role, is_muted, removed_at, hand_raised_at, mic_banned_until, profiles!room_members_user_id_fkey(display_name, avatar_color)")
     .eq("room_id", roomId)
     .is("removed_at", null);
   throwIfError(error);
@@ -221,6 +250,8 @@ export const listRoomMembers = async (roomId) => {
     userId: member.user_id,
     role: member.role,
     isMuted: member.is_muted,
+    handRaisedAt: member.hand_raised_at || null,
+    micBannedUntil: member.mic_banned_until || null,
     name: profileFromJoin(member.profiles)?.display_name || "Sora kullanıcısı",
     color: profileFromJoin(member.profiles)?.avatar_color || "#7FCBEA",
   }));
