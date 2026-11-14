@@ -7950,44 +7950,39 @@ function AppContent() {
   };
   return (
     <View style={styles.app}>
-      <SafeAreaView
-        style={[
-          styles.safeArea,
-          room && !roomMinimized && styles.safeAreaBehindRoom,
-        ]}
-        pointerEvents={room && !roomMinimized ? "none" : "auto"}
-      >
+      <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="dark-content" />
         {screens[activeTab]}
         <BottomNavigation active={activeTab} onChange={setActiveTab} />
       </SafeAreaView>
       {room ? (
         <>
-          <View
-            style={[
-              styles.roomOverlay,
-              roomMinimized && styles.roomOverlayHidden,
-            ]}
-            pointerEvents={roomMinimized ? "none" : "auto"}
+          <Modal
+            visible={!roomMinimized}
+            animationType="none"
+            statusBarTranslucent
+            onRequestClose={() => setRoomMinimized(true)}
           >
-            <Room
-              room={room}
-              profile={profile}
-              userId={authSession?.user?.id}
-              accessToken={authSession?.access_token}
-              coins={walletBalance}
-              onSendGift={sendGift}
-              onLeave={leaveCurrentRoom}
-              onUpdateRoom={updateRoomSettings}
-              isFollowingHost={followedUserIds.includes(room.hostId)}
-              onToggleFollowHost={toggleFollowHost}
-              initialSpeakerOn={roomPreferences.speakerEnabled}
-              initialMicrophoneOn={roomPreferences.microphoneEnabled}
-              onHostPresenceChange={setHostRoomPresence}
-              onMinimize={() => setRoomMinimized(true)}
-              minimized={roomMinimized}
-            />
-          </View>
+            <View style={styles.roomOverlay}>
+              <Room
+                room={room}
+                profile={profile}
+                userId={authSession?.user?.id}
+                accessToken={authSession?.access_token}
+                coins={walletBalance}
+                onSendGift={sendGift}
+                onLeave={leaveCurrentRoom}
+                onUpdateRoom={updateRoomSettings}
+                isFollowingHost={followedUserIds.includes(room.hostId)}
+                onToggleFollowHost={toggleFollowHost}
+                initialSpeakerOn={roomPreferences.speakerEnabled}
+                initialMicrophoneOn={roomPreferences.microphoneEnabled}
+                onHostPresenceChange={setHostRoomPresence}
+                onMinimize={() => setRoomMinimized(true)}
+                minimized={roomMinimized}
+              />
+            </View>
+          </Modal>
           {roomMinimized ? (
             <RoomMiniBubble
               room={room}
@@ -8083,7 +8078,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     paddingTop: Platform.OS === "android" ? 8 : 0,
   },
-  safeAreaBehindRoom: { opacity: 0 },
   discoverScroll: { flex: 1 },
   pageContent: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 104 },
   topBar: {
@@ -12433,12 +12427,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   roomOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
     backgroundColor: "#11131A",
     zIndex: 200,
     elevation: 200,
   },
-  roomOverlayHidden: { display: "none" },
   roomBubble: {
     position: "absolute",
     right: 16,
