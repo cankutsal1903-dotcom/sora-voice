@@ -5740,8 +5740,6 @@ function Room({
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
-      <View style={styles.roomAmbientGlow} pointerEvents="none" />
-      <View style={styles.roomAmbientGlowBottom} pointerEvents="none" />
       {minimized ? null : (
         <StatusBar barStyle="light-content" backgroundColor="#11131A" />
       )}
@@ -12097,24 +12095,6 @@ const styles = StyleSheet.create({
     paddingTop: 6,
     paddingBottom: 8,
     backgroundColor: "rgba(11,15,23,0.92)",
-  },
-  roomAmbientGlow: {
-    position: "absolute",
-    top: 110,
-    right: -110,
-    width: 330,
-    height: 330,
-    borderRadius: 165,
-    backgroundColor: "rgba(47,128,237,0.075)",
-  },
-  roomAmbientGlowBottom: {
-    position: "absolute",
-    bottom: 150,
-    left: -155,
-    width: 330,
-    height: 330,
-    borderRadius: 165,
-    backgroundColor: "rgba(83,103,183,0.045)",
   },
   roomAtmosphereSparkle: {
     position: "absolute",
