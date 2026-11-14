@@ -144,7 +144,7 @@ export const supabase = isSupabaseConfigured
 
 export const AUTH_CALLBACK_URL = "sora://auth/callback";
 export const PASSWORD_RESET_CALLBACK_URL = "sora://auth/reset-password";
-export const EMAIL_CONFIRMATION_URL = "https://jamvnkspjaatffdgvsxi.supabase.co/functions/v1/auth-confirmed";
+export const EMAIL_CONFIRMATION_URL = "https://cankutsal1903-dotcom.github.io/sora-voice/auth-confirmed.html";
 
 const requireSupabase = () => {
   if (!supabase) throw new Error("Supabase is not configured");
