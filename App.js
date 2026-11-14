@@ -660,6 +660,7 @@ function Discover({
 
   const handleOpenRoom = useCallback(
     (room) => {
+      console.warn("[room-entry] discover room pressed", Boolean(room?.id));
       onOpenRoom(room);
     },
     [onOpenRoom],
@@ -819,7 +820,7 @@ function Discover({
 
         <Reveal delay={50}>
           <Pressable
-            onPress={() => onOpenRoom(featuredRoom)}
+            onPress={() => handleOpenRoom(featuredRoom)}
             accessibilityRole="button"
             accessibilityLabel={`${featuredRoom.title} öne çıkan canlı odasını aç`}
             style={styles.featurePressable}
@@ -4601,6 +4602,11 @@ function Room({
   onMinimize,
   minimized = false,
 }) {
+  useEffect(() => {
+    console.warn("[room-entry] Room component mounted");
+    return () => console.warn("[room-entry] Room component unmounted");
+  }, []);
+
   const roomBrand = useMemo(
     () => resolveRoomBrand(room),
     [room.accent, room.colors, room.id, room.title],
@@ -6609,6 +6615,7 @@ function AppContent() {
 
   const resumeHostedRoom = (existingRoom) => {
     // Odayı ağ çağrısını beklemeden hemen aç; "canlı" durumu arka planda güncellenir.
+    console.warn("[room-entry] resume hosted room pressed", Boolean(existingRoom?.id));
     setCreateOpen(false);
     openRoom(existingRoom);
     setHostRoomPresence(existingRoom.id, true).catch((error) => {
@@ -7120,10 +7127,12 @@ function AppContent() {
 
   const openRoom = (nextRoom) => {
     if (!nextRoom || typeof nextRoom.id !== "string" || !nextRoom.id) {
+      console.warn("[room-entry] open rejected: invalid room");
       Alert.alert("Oda açılamadı", "Oda bilgisi geçersiz. Tekrar dene.");
       return;
     }
 
+    console.warn("[room-entry] open requested", Boolean(nextRoom.id));
     setRoom(nextRoom);
     setRoomPreferences({ microphoneEnabled: false, speakerEnabled: true });
     setRoomMinimized(false);
@@ -7157,6 +7166,12 @@ function AppContent() {
     },
     [authSession?.user],
   );
+
+  useEffect(() => {
+    console.warn(
+      `[room-entry] app state room=${Boolean(room)} minimized=${roomMinimized}`,
+    );
+  }, [room, roomMinimized]);
 
   useEffect(() => {
     if (!supabase || !authSession?.user) return undefined;

@@ -46,10 +46,12 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
 
     const connect = async () => {
       if (!tokenServerUrl) {
+        console.warn("[room-entry] token server URL missing");
         setState({ ...initialState, status: "local" });
         return;
       }
       if (!userId || !accessToken) {
+        console.warn("[room-entry] voice connection missing session");
         setState({
           ...initialState,
           status: "error",
@@ -60,6 +62,7 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
 
       setState({ ...initialState, status: "connecting" });
       tokenFetchController = new AbortController();
+      console.warn("[room-entry] token request started");
       const tokenFetchTimeout = setTimeout(
         () => tokenFetchController.abort(),
         12_000,
@@ -74,10 +77,12 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
           }),
           signal: tokenFetchController.signal,
         });
+        console.warn("[room-entry] token response received", response.status);
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || !payload.token || !payload.serverUrl) {
           throw new Error(payload.error || "Ses oturumu oluşturulamadı.");
         }
+        console.warn("[room-entry] token payload accepted");
 
         connectedRoom = new Room({ adaptiveStream: false, dynacast: true });
         liveKitRoomRef.current = connectedRoom;
@@ -104,6 +109,7 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
 
         await AudioSession.startAudioSession();
         await connectedRoom.connect(payload.serverUrl, payload.token);
+        console.warn("[room-entry] LiveKit connected");
         if (!active) {
           await connectedRoom.disconnect();
           return;
@@ -123,6 +129,10 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
         });
         updateParticipants();
       } catch (error) {
+        console.warn(
+          "[room-entry] voice connection failed",
+          error?.name || "Error",
+        );
         if (active) {
           const aborted = error?.name === "AbortError";
           setState({
