@@ -12428,7 +12428,8 @@ const styles = StyleSheet.create({
   roomOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "#11131A",
-    zIndex: 10,
+    zIndex: 200,
+    elevation: 200,
   },
   roomOverlayHidden: { display: "none" },
   roomBubble: {
