@@ -4872,7 +4872,7 @@ const RoomMessageList = memo(function RoomMessageList({
   );
 });
 
-const ROOM_STAGE_CAPACITY = 7;
+const ROOM_STAGE_CAPACITY = 9;
 
 function Room({
   room,
@@ -4997,7 +4997,7 @@ function Room({
   const roomSeatParticipants = useMemo(() => {
     const participants = activeRoomParticipants
       .filter((participant) => participant.userId !== room.hostId)
-      .slice(0, 7);
+      .slice(0, 8);
     if (
       handRaised &&
       !isHost &&
@@ -5056,6 +5056,10 @@ function Room({
       ...Array.from({ length: Math.max(0, ROOM_STAGE_CAPACITY - seats.length) }),
     ];
   }, [stageParticipants]);
+  const stageSeatRows = useMemo(
+    () => [stageGrid.slice(0, 1), stageGrid.slice(1, 5), stageGrid.slice(5, 9)],
+    [stageGrid],
+  );
   const roomVoiceLabel =
     liveVoice.status === "connected"
       ? "CANLI"
@@ -5723,6 +5727,79 @@ function Room({
         ? `${messages.length} mesaj · Bağlantı kesildi`
         : `${messages.length} mesaj · Bağlanıyor`;
 
+  const renderStageSeat = (participant, index) => {
+    const seatNumber = index + 1;
+    if (!participant) {
+      return (
+        <Pressable
+          key={`empty-${index}`}
+          style={styles.roomSpeakerSlot}
+          onPress={toggleHand}
+          accessibilityRole="button"
+          accessibilityLabel={`${seatNumber} numaralı boş koltuğa otur`}
+        >
+          <View style={styles.roomEmptySeat}>
+            <Text style={styles.roomEmptySeatNumber}>{seatNumber}</Text>
+          </View>
+          <Text style={styles.roomSpeakerName}>Boş</Text>
+        </Pressable>
+      );
+    }
+
+    return (
+      <Pressable
+        style={styles.roomSpeakerSlot}
+        key={participant.userId}
+        delayLongPress={260}
+        onLongPress={() => openParticipantMenu(participant)}
+        accessibilityRole="button"
+        accessibilityLabel={`${seatNumber}. koltuk: ${participant.name}`}
+      >
+        <View style={styles.roomAvatarWrap}>
+          {participant.isSpeaking ? (
+            <SpeakingRing size={64} color="#76AFFF" />
+          ) : null}
+          <View
+            style={[
+              styles.roomSpeakerAvatar,
+              { backgroundColor: participant.color },
+              participant.role === "host" && styles.roomSpeakerAvatarHost,
+              participant.microphoneEnabled && styles.roomSpeakerAvatarActive,
+            ]}
+          >
+            <Text style={styles.roomSpeakerInitial}>
+              {participant.name?.charAt(0)?.toUpperCase() || "?"}
+            </Text>
+            {participant.microphoneEnabled ? (
+              <View style={styles.roomMicOnBadge}>
+                <Ionicons name="mic" size={9} color="#11131A" />
+              </View>
+            ) : (
+              <View style={styles.roomMicOffBadge}>
+                <Ionicons
+                  name="mic-off"
+                  size={9}
+                  color="rgba(255,255,255,0.7)"
+                />
+              </View>
+            )}
+          </View>
+          {participant.role === "host" ? (
+            <View style={styles.roomSpeakerCrown}>
+              <Ionicons name="sparkles" size={9} color="#11131A" />
+            </View>
+          ) : null}
+          <View style={styles.roomSeatNumberBadge}>
+            <Text style={styles.roomSeatNumberText}>{seatNumber}</Text>
+          </View>
+        </View>
+        <Text style={styles.roomSpeakerName} numberOfLines={1}>
+          {participant.pendingSeat ? "Bekliyor" : participant.name}
+        </Text>
+      </Pressable>
+    );
+  };
+
   /* ── WePlay / Hazan tarzı oda düzeni ─────────────────────────── */
   return (
     <SafeAreaView style={styles.roomScreen}>
@@ -5828,82 +5905,22 @@ function Room({
                 </Text>
               </View>
               <View style={styles.roomSpeakerGrid}>
-                {stageGrid.map((participant, index) =>
-                  participant ? (
-                    <Pressable
-                      style={styles.roomSpeakerSlot}
-                      key={participant.userId}
-                      delayLongPress={260}
-                      onLongPress={() => openParticipantMenu(participant)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${participant.name} kullanıcı menüsü`}
-                    >
-                      <View style={styles.roomAvatarWrap}>
-                        {participant.isSpeaking ? (
-                          <SpeakingRing size={64} color="#76AFFF" />
-                        ) : null}
-                        <View
-                          style={[
-                            styles.roomSpeakerAvatar,
-                            { backgroundColor: participant.color },
-                            participant.role === "host" &&
-                              styles.roomSpeakerAvatarHost,
-                            participant.microphoneEnabled &&
-                              styles.roomSpeakerAvatarActive,
-                          ]}
-                        >
-                          <Text style={styles.roomSpeakerInitial}>
-                            {participant.name?.charAt(0)?.toUpperCase() || "?"}
-                          </Text>
-                          {participant.microphoneEnabled ? (
-                            <View style={styles.roomMicOnBadge}>
-                              <Ionicons name="mic" size={9} color="#11131A" />
-                            </View>
-                          ) : (
-                            <View style={styles.roomMicOffBadge}>
-                              <Ionicons
-                                name="mic-off"
-                                size={9}
-                                color="rgba(255,255,255,0.7)"
-                              />
-                            </View>
-                          )}
-                        </View>
-                        {participant.role === "host" ? (
-                          <View style={styles.roomSpeakerCrown}>
-                            <Ionicons
-                              name="sparkles"
-                              size={9}
-                              color="#11131A"
-                            />
-                          </View>
-                        ) : null}
-                      </View>
-                      <Text style={styles.roomSpeakerName} numberOfLines={1}>
-                        {participant.pendingSeat
-                          ? "Bekliyor"
-                          : participant.name}
-                      </Text>
-                    </Pressable>
-                  ) : (
-                    <Pressable
-                      key={`empty-${index}`}
-                      style={styles.roomSpeakerSlot}
-                      onPress={toggleHand}
-                      accessibilityRole="button"
-                      accessibilityLabel="Boş koltuğa otur"
-                    >
-                      <View style={styles.roomEmptySeat}>
-                        <Ionicons
-                          name="add"
-                          size={22}
-                          color="rgba(255,255,255,0.35)"
-                        />
-                      </View>
-                      <Text style={styles.roomSpeakerName}>Boş</Text>
-                    </Pressable>
-                  ),
-                )}
+                {stageSeatRows.map((row, rowIndex) => (
+                  <View
+                    key={`room-seat-row-${rowIndex}`}
+                    style={styles.roomSpeakerGridRow}
+                  >
+                    {row.map((participant, offset) => {
+                      const index =
+                        rowIndex === 0
+                          ? 0
+                          : rowIndex === 1
+                            ? offset + 1
+                            : offset + 5;
+                      return renderStageSeat(participant, index);
+                    })}
+                  </View>
+                ))}
               </View>
 
               {/* Takip / el kaldır */}
@@ -12161,6 +12178,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   roomAvatarWrap: {
+    position: "relative",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -12255,8 +12273,13 @@ const styles = StyleSheet.create({
   roomFollowBtnText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
   roomFollowBtnTextActive: { color: "#76AFFF" },
   roomSpeakerGrid: {
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 16,
+    width: "100%",
+  },
+  roomSpeakerGridRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
     justifyContent: "center",
     gap: 16,
     width: "100%",
@@ -12302,6 +12325,21 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700",
   },
+  roomSeatNumberBadge: {
+    position: "absolute",
+    top: -4,
+    left: -4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#2F80ED",
+    borderWidth: 1,
+    borderColor: "#11131A",
+  },
+  roomSeatNumberText: { color: "#FFFFFF", fontSize: 9, fontWeight: "900" },
+  roomEmptySeatNumber: { color: "#76AFFF", fontSize: 17, fontWeight: "900" },
   roomEmptySeat: {
     width: 56,
     height: 56,
