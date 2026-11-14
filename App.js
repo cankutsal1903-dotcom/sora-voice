@@ -5735,11 +5735,13 @@ function Room({
   return (
     <SafeAreaView style={styles.roomScreen}>
       <LinearGradient
-        colors={["#101A2B", "#111827", "#0B0F17"]}
+        colors={["#142746", "#101A2B", "#0A101B"]}
         locations={[0, 0.4, 1]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
+      <View style={styles.roomAmbientGlow} pointerEvents="none" />
+      <View style={styles.roomAmbientGlowBottom} pointerEvents="none" />
       {minimized ? null : (
         <StatusBar barStyle="light-content" backgroundColor="#11131A" />
       )}
@@ -5797,13 +5799,14 @@ function Room({
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.roomSurface}>
-            <LinearGradient
-              colors={["rgba(47,128,237,0.15)", "rgba(47,128,237,0)"]}
-              style={styles.roomStageGlow}
-              pointerEvents="none"
-            />
             {/* Sahne: ev sahibi + konuşmacılar */}
             <View style={styles.roomStage}>
+              <LinearGradient
+                colors={["rgba(47,128,237,0.16)", "rgba(82,104,174,0.035)", "rgba(47,128,237,0)"]}
+                locations={[0, 0.48, 1]}
+                style={styles.roomStageGlow}
+                pointerEvents="none"
+              />
               <View style={styles.roomSpeakerGrid}>
                 {stageGrid.map((participant, index) =>
                   participant ? (
@@ -5826,13 +5829,21 @@ function Room({
                           style={[
                             styles.roomSpeakerAvatar,
                             index === 0 && styles.roomHostStageAvatar,
-                            { backgroundColor: participant.color },
                             participant.role === "host" &&
                               styles.roomSpeakerAvatarHost,
                             participant.microphoneEnabled &&
                               styles.roomSpeakerAvatarActive,
                           ]}
                         >
+                          <LinearGradient
+                            colors={index === 0
+                              ? ["#8CC8FF", "#347CE0"]
+                              : ["#527DB8", "#203D66"]}
+                            style={[
+                              StyleSheet.absoluteFill,
+                              { borderRadius: index === 0 ? 42 : 33 },
+                            ]}
+                          />
                           <Text
                             style={[
                               styles.roomSpeakerInitial,
@@ -6043,37 +6054,41 @@ function Room({
         <View style={styles.roomControlBar}>
           {/* Mikrofon */}
           <Pressable
-            style={[styles.roomCtrlBtn, styles.roomMicControl, micOn && styles.roomCtrlBtnOn]}
+            style={[styles.roomCtrlBtn, styles.roomMicControl]}
             onPress={toggleMicrophone}
             accessibilityRole="button"
             accessibilityLabel={micOn ? "Mikrofonu kapat" : "Mikrofonu aç"}
             accessibilityState={{ selected: micOn }}
           >
-            <Ionicons
-              name={micOn ? "mic" : "mic-off"}
-              size={22}
-              color={micOn ? "#11131A" : "#FFFFFF"}
-            />
-            <Text style={[styles.roomCtrlLabel, micOn && { color: "#11131A" }]}>
+            <View style={[styles.roomCtrlIconBubble, micOn && styles.roomCtrlIconBubbleActive]}>
+              <Ionicons
+                name={micOn ? "mic" : "mic-off"}
+                size={21}
+                color="#FFFFFF"
+              />
+            </View>
+            <Text style={[styles.roomCtrlLabel, micOn && styles.roomCtrlLabelActive]}>
               {micOn ? "Mikrofon açık" : "Mikrofon kapalı"}
             </Text>
           </Pressable>
 
           {/* Hoparlör */}
           <Pressable
-            style={[styles.roomCtrlBtn, speakerOn && styles.roomSpeakerControlOn]}
+            style={styles.roomCtrlBtn}
             onPress={handleToggleSpeaker}
             accessibilityLabel="Hoparlör"
             accessibilityRole="button"
             accessibilityState={{ selected: speakerOn }}
           >
-            <Ionicons
-              name={speakerOn ? "volume-high" : "volume-mute"}
-              size={22}
-              color={speakerOn ? COLORS.primary : "#FFFFFF"}
-            />
+            <View style={[styles.roomCtrlIconBubble, speakerOn && styles.roomCtrlIconBubbleOn]}>
+              <Ionicons
+                name={speakerOn ? "volume-high" : "volume-mute"}
+                size={21}
+                color={speakerOn ? COLORS.primary : "#DBE8FB"}
+              />
+            </View>
             <Text
-              style={[styles.roomCtrlLabel, speakerOn && { color: COLORS.primary }]}
+              style={[styles.roomCtrlLabel, speakerOn && styles.roomCtrlLabelActive]}
             >
               Ses
             </Text>
@@ -6085,7 +6100,9 @@ function Room({
             onPress={handleOpenGift}
             accessibilityLabel="Hediye gönder"
           >
-            <Ionicons name="gift-outline" size={22} color="#76AFFF" />
+            <View style={styles.roomCtrlIconBubble}>
+              <Ionicons name="gift-outline" size={21} color="#76AFFF" />
+            </View>
             <Text style={styles.roomCtrlLabel}>Hediye</Text>
           </Pressable>
 
@@ -6095,7 +6112,9 @@ function Room({
             onPress={shareRoom}
             accessibilityLabel="Odayı paylaş"
           >
-            <Ionicons name="share-social-outline" size={22} color="#FFFFFF" />
+            <View style={styles.roomCtrlIconBubble}>
+              <Ionicons name="share-social-outline" size={20} color="#DBE8FB" />
+            </View>
             <Text style={styles.roomCtrlLabel}>Paylaş</Text>
           </Pressable>
 
@@ -6105,7 +6124,9 @@ function Room({
             onPress={leaveRoom}
             accessibilityLabel="Odadan çık"
           >
-            <Ionicons name="exit-outline" size={22} color="#F3A9AC" />
+            <View style={[styles.roomCtrlIconBubble, styles.roomLeaveIconBubble]}>
+              <Ionicons name="exit-outline" size={20} color="#F3A9AC" />
+            </View>
             <Text style={styles.roomLeaveLabel}>Çık</Text>
           </Pressable>
         </View>
@@ -12077,13 +12098,23 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     backgroundColor: "rgba(11,15,23,0.92)",
   },
-  roomAtmosphereGlow: {
+  roomAmbientGlow: {
     position: "absolute",
-    top: 70,
-    right: -90,
-    width: 310,
-    height: 310,
-    borderRadius: 155,
+    top: 110,
+    right: -110,
+    width: 330,
+    height: 330,
+    borderRadius: 165,
+    backgroundColor: "rgba(47,128,237,0.075)",
+  },
+  roomAmbientGlowBottom: {
+    position: "absolute",
+    bottom: 150,
+    left: -155,
+    width: 330,
+    height: 330,
+    borderRadius: 165,
+    backgroundColor: "rgba(83,103,183,0.045)",
   },
   roomAtmosphereSparkle: {
     position: "absolute",
@@ -12142,10 +12173,12 @@ const styles = StyleSheet.create({
   },
   roomStageGlow: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 110,
+    top: 4,
+    alignSelf: "center",
+    width: "92%",
+    height: 240,
+    borderRadius: 150,
+    opacity: 0.9,
   },
   roomSectionHeading: {
     flexDirection: "row",
@@ -12153,14 +12186,24 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   roomSpeakerRole: {
-    color: "#A9BEDB",
-    fontSize: 8,
-    fontWeight: "600",
+    color: "#A9C9F4",
+    fontSize: 9,
+    fontWeight: "700",
+    overflow: "hidden",
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: "rgba(47,128,237,0.13)",
   },
   roomEmptySeatLabel: {
-    color: "#A9BEDB",
+    color: "#C6D9F4",
     fontSize: 10,
-    fontWeight: "600",
+    fontWeight: "800",
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: "rgba(47,128,237,0.16)",
   },
   roomSpeakerSlotHost: {
     backgroundColor: "rgba(47,128,237,0.045)",
@@ -12311,11 +12354,6 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     marginTop: "auto",
     marginBottom: "auto",
-    borderRadius: 26,
-    backgroundColor: "rgba(17,32,54,0.76)",
-    borderWidth: 1,
-    borderColor: "rgba(118,175,255,0.12)",
-    overflow: "hidden",
   },
   roomBody: {
     flexGrow: 1,
@@ -12454,7 +12492,6 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   roomSpeakerAvatar: {
-
     width: 66,
     height: 66,
     borderRadius: 33,
@@ -12464,7 +12501,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(118,175,255,0.42)",
   },
   roomSpeakerAvatarActive: { borderColor: COLORS.primary },
-  roomSpeakerInitial: { color: "#11131A", fontSize: 20, fontWeight: "900" },
+  roomSpeakerInitial: { color: "#FFFFFF", fontSize: 20, fontWeight: "900" },
   roomMicOnBadge: {
     position: "absolute",
     bottom: -2,
@@ -12502,10 +12539,14 @@ const styles = StyleSheet.create({
     borderRadius: 33,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(47,128,237,0.08)",
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: "rgba(118,175,255,0.42)",
+    backgroundColor: "rgba(37,62,98,0.75)",
+    borderWidth: 1.5,
+    borderColor: "rgba(118,175,255,0.3)",
+    shadowColor: "#2F80ED",
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
   roomHandBtn: {
     flexDirection: "row",
@@ -12551,45 +12592,59 @@ const styles = StyleSheet.create({
   roomControlBar: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 4,
     paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: 12,
-    backgroundColor: "#101827",
+    paddingTop: 10,
+    paddingBottom: 10,
+    backgroundColor: "rgba(11,16,28,0.96)",
     borderTopWidth: 1,
-    borderColor: "rgba(255,255,255,0.09)",
+    borderColor: "rgba(118,175,255,0.1)",
   },
   roomCtrlBtn: {
     flex: 1,
-    minHeight: 58,
+    minHeight: 60,
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: 5,
     paddingHorizontal: 3,
-    paddingVertical: 9,
-    borderRadius: 17,
-    backgroundColor: "rgba(255,255,255,0.035)",
+    paddingVertical: 2,
   },
-  roomCtrlBtnOn: {
+  roomCtrlIconBubble: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.055)",
+  },
+  roomCtrlIconBubbleActive: {
     backgroundColor: COLORS.primary,
+    borderColor: "rgba(118,175,255,0.75)",
+  },
+  roomCtrlIconBubbleOn: {
+    backgroundColor: "rgba(47,128,237,0.22)",
+    borderColor: "rgba(118,175,255,0.24)",
+  },
+  roomLeaveIconBubble: {
+    backgroundColor: "rgba(227,102,108,0.11)",
+    borderColor: "rgba(227,102,108,0.17)",
   },
   roomCtrlLabel: {
-    color: "#C4CDD3",
+    color: "#AFC0D6",
     fontSize: 9,
     fontWeight: "700",
   },
+  roomCtrlLabelActive: { color: "#8BB8F5" },
   roomLeaveBtn: {
     flex: 1,
-    minHeight: 58,
+    minHeight: 60,
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: 5,
     paddingHorizontal: 3,
-    paddingVertical: 9,
-    borderRadius: 17,
-    backgroundColor: "rgba(227,102,108,0.13)",
-    borderWidth: 1,
-    borderColor: "rgba(227,102,108,0.18)",
+    paddingVertical: 2,
   },
   roomTopic: {
     color: "rgba(255,255,255,0.66)",
