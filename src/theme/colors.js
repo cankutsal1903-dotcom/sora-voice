@@ -1,84 +1,55 @@
-/**
- * Sora Design System — Clubhouse-inspired Color Palette
- * Cream/warm white backgrounds, near-black text, yellow accent.
- */
-
+/** Sora's shared blue, white and near-black color system. */
 export const COLORS = {
-  // Backgrounds
-  background: "#F9F6F1",
+  background: "#F3F7FC",
   surface: "#FFFFFF",
-  surfaceRaised: "#F4F1EC",
-  raised: "#EDE9E2",
-  line: "#E8E3DC",
-  lineSoft: "#F0EDE8",
+  surfaceRaised: "#EDF3FA",
+  surfaceHigh: "#E4ECF6",
+  raised: "#EDF3FA",
+  line: "#D9E3EF",
+  lineSoft: "#EAF0F7",
 
-  // Text
-  text: "#1A1410",
-  textSecondary: "#5C5047",
-  muted: "#9C9088",
-  mutedDark: "#7A706A",
+  text: "#111820",
+  textSecondary: "#46596F",
+  muted: "#8190A2",
+  mutedDark: "#617287",
 
-  // Primary Brand — warm yellow (Clubhouse-style)
-  primary: "#F5C842",
-  primaryInk: "#1A1410",
-  primaryDark: "#D4A820",
-  primaryLight: "#FAD96A",
+  primary: "#2F80ED",
+  primaryInk: "#FFFFFF",
+  primaryDark: "#1D5FBF",
+  primaryLight: "#78B1FF",
+  primarySoft: "rgba(47,128,237,0.14)",
 
-  // Accent Colors
-  accent: "#3A85F5",
-  accentPurple: "#7C5CBF",
-  accentPink: "#E05C7A",
+  accent: "#1D5FC4",
+  accentPurple: "#5878B4",
+  accentPink: "#4B82D5",
+  pink: "#4B82D5",
+  purple: "#5878B4",
 
-  // Status
-  danger: "#D94F4F",
-  dangerDark: "#B53030",
-  warning: "#E0943A",
-  success: "#4CA96A",
+  danger: "#D94F5C",
+  dangerDark: "#B93E4A",
+  warning: "#3976C7",
+  success: "#2F80ED",
 
-  // Gradients
   gradients: {
-    primary: ["#1A1410", "#2D2520"],
-    warm: ["#F5C842", "#E8A020"],
-    ocean: ["#167A91", "#273D79"],
-    sunset: ["#B85B69", "#5B294C"],
-    forest: ["#2B806F", "#23443F"],
+    primary: ["#1C5FB8", "#2F80ED"],
+    blue: ["#246BC7", "#6AA8F8"],
+    dark: ["#101820", "#1D2E43"],
+    ocean: ["#1C5FB8", "#2F80ED"],
+    warm: ["#246BC7", "#6AA8F8"],
+    sunset: ["#1C5FB8", "#2F80ED"],
+    forest: ["#1D4F91", "#347AD0"],
   },
 
-  // Overlays
-  overlay: "rgba(26,20,16,0.48)",
-  overlayLight: "rgba(26,20,16,0.28)",
+  overlay: "rgba(9,18,30,0.52)",
+  overlayLight: "rgba(9,18,30,0.30)",
 };
 
 export const THEME = {
-  borderRadius: {
-    sm: 10,
-    md: 14,
-    lg: 18,
-    xl: 24,
-    pill: 100,
-  },
-  spacing: {
-    xs: 4,
-    sm: 8,
-    md: 12,
-    lg: 16,
-    xl: 24,
-  },
+  borderRadius: { sm: 10, md: 14, lg: 18, xl: 24, pill: 100 },
+  spacing: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 },
   typography: {
-    kicker: {
-      fontSize: 10,
-      fontWeight: "900",
-      letterSpacing: 1.6,
-      textTransform: "uppercase",
-    },
-    heading: {
-      fontSize: 30,
-      fontWeight: "900",
-      letterSpacing: -1.1,
-    },
-    body: {
-      fontSize: 14,
-      lineHeight: 20,
-    },
+    kicker: { fontSize: 10, fontWeight: "900", letterSpacing: 1.6, textTransform: "uppercase" },
+    heading: { fontSize: 30, fontWeight: "900", letterSpacing: -1.1 },
+    body: { fontSize: 14, lineHeight: 20 },
   },
 };

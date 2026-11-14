@@ -21,18 +21,7 @@ import {
   startDirectConversation,
   subscribeToDirectMessages,
 } from "../data/soraRepository";
-
-const COLORS = {
-  background: "#F0F3F4",
-  surface: "#FFFFFF",
-  raised: "#F7F9FA",
-  line: "#E1E6EA",
-  text: "#11161C",
-  muted: "#8A93A3",
-  primary: "#01D9A8",
-  primaryInk: "#04211B",
-  danger: "#E5486B",
-};
+import { COLORS } from "../theme/colors";
 
 const formatMessageTime = (value) => {
   if (!value) return "";
@@ -194,7 +183,7 @@ export function InboxScreen({ currentUserId, profile }) {
     <View style={styles.search}><Ionicons name="search-outline" size={18} color={COLORS.muted} /><TextInput value={query} onChangeText={setQuery} placeholder="Kişi ara" placeholderTextColor={COLORS.muted} style={styles.searchInput} autoCapitalize="none" /></View>
     {error ? <Pressable onPress={() => loadConversations()} style={styles.errorBanner}><Ionicons name="refresh-outline" size={17} color={COLORS.danger} /><Text style={styles.errorText}>{error} Tekrar dene.</Text></Pressable> : null}
     {loading ? <View style={styles.center}><ActivityIndicator color={COLORS.primary} /><Text style={styles.loadingText}>Sohbetler yükleniyor...</Text></View> : !visibleConversations.length ? <EmptyState icon="chatbubbles-outline" title={query ? "Sonuç bulunamadı" : "Henüz sohbet yok"} description={query ? "Farklı bir isim veya kullanıcı adı ara." : "Gerçek bir kullanıcı adıyla yeni sohbet başlat."} action={query ? null : "Sohbet başlat"} onAction={() => setNewChatOpen(true)} /> : <ScrollView contentContainerStyle={styles.conversationList} showsVerticalScrollIndicator={false}>{visibleConversations.map((conversation) => <Pressable key={conversation.id} onPress={() => openConversation(conversation)} style={styles.conversationCard}><Avatar name={conversation.name} color={conversation.color} /><View style={styles.conversationCopy}><View style={styles.conversationTop}><Text numberOfLines={1} style={styles.conversationName}>{conversation.name}</Text><Text style={styles.conversationTime}>{formatMessageTime(conversation.lastMessageAt)}</Text></View><Text numberOfLines={1} style={styles.conversationMessage}>{conversation.lastMessage || ("@" + conversation.handle)}</Text></View></Pressable>)}</ScrollView>}
-    <Modal transparent visible={newChatOpen} animationType="slide" onRequestClose={() => setNewChatOpen(false)}><KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === "ios" ? "padding" : undefined}><Pressable style={StyleSheet.absoluteFill} onPress={() => setNewChatOpen(false)} /><View style={styles.sheet}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><View><Text style={styles.eyebrow}>YENİ SOHBET</Text><Text style={styles.sheetTitle}>Birini bul.</Text></View><Pressable onPress={() => setNewChatOpen(false)} style={styles.headerButton}><Ionicons name="close" size={21} color={COLORS.text} /></Pressable></View><Text style={styles.fieldLabel}>KULLANICI ADI</Text><View style={styles.handleInput}><Text style={styles.handlePrefix}>@</Text><TextInput value={newHandle} onChangeText={setNewHandle} placeholder="kullaniciadi" placeholderTextColor={COLORS.muted} autoCapitalize="none" autoCorrect={false} maxLength={24} style={styles.handleTextInput} /></View><Text style={styles.sheetHint}>Yalnızca kayıtlı Sora kullanıcılarıyla sohbet başlatabilirsin.</Text><Pressable disabled={startingChat} onPress={createConversation}><LinearGradient colors={[COLORS.primary, "#8CE958"]} style={styles.primaryAction}>{startingChat ? <ActivityIndicator color={COLORS.primaryInk} /> : <><Text style={styles.primaryActionText}>Sohbeti aç</Text><Ionicons name="arrow-forward" size={19} color={COLORS.primaryInk} /></>}</LinearGradient></Pressable></View></KeyboardAvoidingView></Modal>
+    <Modal transparent visible={newChatOpen} animationType="slide" onRequestClose={() => setNewChatOpen(false)}><KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === "ios" ? "padding" : undefined}><Pressable style={StyleSheet.absoluteFill} onPress={() => setNewChatOpen(false)} /><View style={styles.sheet}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><View><Text style={styles.eyebrow}>YENİ SOHBET</Text><Text style={styles.sheetTitle}>Birini bul.</Text></View><Pressable onPress={() => setNewChatOpen(false)} style={styles.headerButton}><Ionicons name="close" size={21} color={COLORS.text} /></Pressable></View><Text style={styles.fieldLabel}>KULLANICI ADI</Text><View style={styles.handleInput}><Text style={styles.handlePrefix}>@</Text><TextInput value={newHandle} onChangeText={setNewHandle} placeholder="kullaniciadi" placeholderTextColor={COLORS.muted} autoCapitalize="none" autoCorrect={false} maxLength={24} style={styles.handleTextInput} /></View><Text style={styles.sheetHint}>Yalnızca kayıtlı Sora kullanıcılarıyla sohbet başlatabilirsin.</Text><Pressable disabled={startingChat} onPress={createConversation}><LinearGradient colors={[COLORS.primary, "#6AA8F5"]} style={styles.primaryAction}>{startingChat ? <ActivityIndicator color={COLORS.primaryInk} /> : <><Text style={styles.primaryActionText}>Sohbeti aç</Text><Ionicons name="arrow-forward" size={19} color={COLORS.primaryInk} /></>}</LinearGradient></Pressable></View></KeyboardAvoidingView></Modal>
   </View>;
 }
 
@@ -208,8 +197,8 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, color: COLORS.text, fontSize: 14 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, padding: 32 },
   loadingText: { color: COLORS.muted, fontSize: 12 },
-  errorBanner: { marginHorizontal: 18, marginTop: 12, padding: 12, borderRadius: 14, backgroundColor: "rgba(229,72,107,0.10)", borderWidth: 1, borderColor: "rgba(229,72,107,0.28)", flexDirection: "row", alignItems: "center", gap: 8 },
-  errorText: { color: "#C2294A", fontSize: 12, lineHeight: 17, flex: 1 },
+  errorBanner: { marginHorizontal: 18, marginTop: 12, padding: 12, borderRadius: 14, backgroundColor: "rgba(217,79,92,0.10)", borderWidth: 1, borderColor: "rgba(217,79,92,0.28)", flexDirection: "row", alignItems: "center", gap: 8 },
+  errorText: { color: "#B93E4A", fontSize: 12, lineHeight: 17, flex: 1 },
   emptyState: { flex: 1, minHeight: 280, paddingHorizontal: 36, alignItems: "center", justifyContent: "center" },
   emptyIcon: { width: 64, height: 64, borderRadius: 23, backgroundColor: COLORS.raised, borderWidth: 1, borderColor: COLORS.line, alignItems: "center", justifyContent: "center", marginBottom: 16 },
   emptyTitle: { color: COLORS.text, fontSize: 20, fontWeight: "900", textAlign: "center" },
@@ -231,7 +220,7 @@ const styles = StyleSheet.create({
   chatHeaderCopy: { flex: 1, minWidth: 0 },
   chatHeaderName: { color: COLORS.text, fontSize: 15, fontWeight: "900" },
   chatHeaderHandle: { color: COLORS.muted, fontSize: 10, marginTop: 2 },
-  savedBadge: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 10, backgroundColor: "rgba(1,217,168,0.12)", paddingHorizontal: 8, paddingVertical: 6 },
+  savedBadge: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 10, backgroundColor: "rgba(47,128,237,0.12)", paddingHorizontal: 8, paddingVertical: 6 },
   savedBadgeText: { color: COLORS.primary, fontSize: 9, fontWeight: "800" },
   messageList: { flexGrow: 1, justifyContent: "flex-end", padding: 16, gap: 8 },
   messageRow: { flexDirection: "row", justifyContent: "flex-start" },
@@ -241,14 +230,14 @@ const styles = StyleSheet.create({
   messageBody: { color: COLORS.text, fontSize: 14, lineHeight: 20 },
   messageBodyOwn: { color: COLORS.primaryInk },
   messageTime: { color: COLORS.muted, fontSize: 9, marginTop: 5, alignSelf: "flex-end" },
-  messageTimeOwn: { color: "#0B5A4B" },
+  messageTimeOwn: { color: "#1D5FBF" },
   composer: { paddingHorizontal: 13, paddingTop: 10, paddingBottom: Platform.OS === "ios" ? 12 : 9, borderTopWidth: 1, borderTopColor: COLORS.line, backgroundColor: COLORS.background, flexDirection: "row", alignItems: "flex-end", gap: 8 },
   composerInput: { flex: 1, minHeight: 43, maxHeight: 112, borderRadius: 15, paddingHorizontal: 14, paddingVertical: 11, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.line, color: COLORS.text, fontSize: 14 },
   sendButton: { width: 43, height: 43, borderRadius: 15, backgroundColor: COLORS.primary, alignItems: "center", justifyContent: "center" },
   sendButtonDisabled: { opacity: 0.42 },
   modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(4,5,9,0.64)" },
   sheet: { paddingHorizontal: 19, paddingTop: 11, paddingBottom: Platform.OS === "ios" ? 32 : 21, borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.line },
-  sheetHandle: { width: 42, height: 4, borderRadius: 2, backgroundColor: "#C4CBD3", alignSelf: "center", marginBottom: 15 },
+  sheetHandle: { width: 42, height: 4, borderRadius: 2, backgroundColor: "#C2CEDD", alignSelf: "center", marginBottom: 15 },
   sheetHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
   sheetTitle: { color: COLORS.text, fontSize: 25, fontWeight: "900", marginTop: 3 },
   fieldLabel: { color: COLORS.muted, fontSize: 9, letterSpacing: 1.3, fontWeight: "900", marginBottom: 8 },

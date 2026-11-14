@@ -9,9 +9,10 @@ import {
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { COLORS } from "../theme/colors";
 
-const BRAND_GREEN = "#B5FF78";
-const BRAND_PURPLE = "#8E5CFF";
+const BRAND_BLUE = COLORS.primary;
+const BRAND_BLUE_LIGHT = COLORS.primaryLight;
 
 /**
  * Azaltilmis hareket tercihi tek bir kez dinlenir ve tum bilesenlerle paylasilir.
@@ -183,7 +184,7 @@ export const Reveal = memo(function Reveal({
 });
 
 export const LivePulse = memo(function LivePulse({
-  color = "#FF6B9E",
+  color = "#6AA8F5",
   size = 8,
 }) {
   const pulse = useSharedDriver(pulseDriver, useReducedMotion());
@@ -228,7 +229,7 @@ const AUDIO_HEIGHTS = [18, 34, 25, 42, 21];
 const AUDIO_HEIGHTS_COMPACT = [12, 20, 15, 23];
 
 export const AudioBars = memo(function AudioBars({
-  color = BRAND_GREEN,
+  color = BRAND_BLUE,
   compact = false,
 }) {
   const progress = useSharedDriver(barsDriver, useReducedMotion());
@@ -311,7 +312,7 @@ export const BrandLaunch = memo(function BrandLaunch({
 
   return (
     <LinearGradient
-      colors={["#050509", "#0D0A18", "#090C14"]}
+      colors={["#060D18", "#0E1A2A", "#070D16"]}
       style={motionStyles.launch}
     >
       <View style={motionStyles.launchGlow} />
@@ -371,7 +372,7 @@ const motionStyles = StyleSheet.create({
     width: 330,
     height: 330,
     borderRadius: 165,
-    backgroundColor: "rgba(142,92,255,0.15)",
+    backgroundColor: "rgba(47,128,237,0.15)",
   },
   launchInner: { alignItems: "center" },
   orbit: {
@@ -380,7 +381,7 @@ const motionStyles = StyleSheet.create({
     height: 254,
     borderRadius: 127,
     borderWidth: 1,
-    borderColor: "rgba(181,255,120,0.22)",
+    borderColor: "rgba(47,128,237,0.22)",
   },
   orbitSpark: {
     position: "absolute",
@@ -389,8 +390,8 @@ const motionStyles = StyleSheet.create({
     width: 9,
     height: 9,
     borderRadius: 5,
-    backgroundColor: BRAND_GREEN,
-    shadowColor: BRAND_GREEN,
+    backgroundColor: BRAND_BLUE,
+    shadowColor: BRAND_BLUE,
     shadowOpacity: 0.8,
     shadowRadius: 9,
     elevation: 8,
@@ -400,10 +401,10 @@ const motionStyles = StyleSheet.create({
     height: 184,
     borderRadius: 58,
     overflow: "hidden",
-    backgroundColor: "#050509",
+    backgroundColor: "#060D18",
     borderWidth: 1,
-    borderColor: "rgba(181,255,120,0.2)",
-    shadowColor: BRAND_PURPLE,
+    borderColor: "rgba(47,128,237,0.2)",
+    shadowColor: BRAND_BLUE_LIGHT,
     shadowOpacity: 0.35,
     shadowRadius: 24,
     elevation: 16,
@@ -442,7 +443,7 @@ const motionStyles = StyleSheet.create({
     width: "72%",
     height: "100%",
     borderRadius: 3,
-    backgroundColor: BRAND_GREEN,
+    backgroundColor: BRAND_BLUE,
   },
   loadingText: {
     color: "#8F93A5",

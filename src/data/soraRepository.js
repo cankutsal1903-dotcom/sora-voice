@@ -67,7 +67,7 @@ export const createRoom = async ({ room, userId }) => {
       description: room.description || "Yeni başlayan bir sohbet.",
       category: room.category,
       theme_colors: room.colors || FALLBACK_COLORS,
-      accent_color: room.accent || "#D698FF",
+      accent_color: room.accent || "#8BB8F5",
       listener_count: room.listeners || 1,
       state: room.state || "live",
       starts_at: room.startsAtIso || null,
@@ -327,7 +327,7 @@ export const listBlockedUsers = async () => {
       userId: block.blocked_id,
       name: profile?.display_name || "Sora kullanıcısı",
       handle: profile?.handle || "sora",
-      color: profile?.avatar_color || "#785E90",
+      color: profile?.avatar_color || "#5878B4",
       createdAt: block.created_at,
     };
   });

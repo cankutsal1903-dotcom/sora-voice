@@ -11,21 +11,22 @@ import {
   supabase,
   verifyPhoneSignIn,
 } from "./supabase";
+import { COLORS } from "../theme/colors";
 
-const SORA_LOGO = require("../../assets/images/sora-logo.png");
-const BRAND = "#01D9A8";
+const SORA_LOGO = require("../../assets/images/sora-logo-blue.png");
+const BRAND = COLORS.primary;
 
 const cleanHandle = (value) => value.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
 
 function ProviderButton({ icon, label, onPress, disabled }) {
-  return <Pressable disabled={disabled} onPress={onPress} style={[styles.providerButton, disabled && styles.disabled]}><Ionicons name={icon} size={18} color="#F5F6FA" /><Text style={styles.providerButtonText}>{label}</Text></Pressable>;
+  return <Pressable disabled={disabled} onPress={onPress} style={[styles.providerButton, disabled && styles.disabled]}><Ionicons name={icon} size={18} color="#F5F8FC" /><Text style={styles.providerButtonText}>{label}</Text></Pressable>;
 }
 
 /** Odaklandiginda kenarligi marka rengine donen metin alani. */
 function Field({ focused, style, ...props }) {
   return (
     <TextInput
-      placeholderTextColor="#7C8296"
+      placeholderTextColor="#8190A2"
       selectionColor={BRAND}
       style={[style, focused && styles.inputFocused]}
       {...props}
@@ -149,21 +150,21 @@ export function AuthScreen() {
     }
   };
 
-  const profileFields = <><Text style={styles.label}>GÖRÜNEN AD</Text><Field value={displayName} onChangeText={setDisplayName} autoCapitalize="words" placeholder="Adın" style={styles.input} maxLength={36} focused={focusedField === "name"} onFocus={focus("name")} onBlur={blur} /><Text style={styles.label}>KULLANICI ADI</Text><View style={[styles.handleInput, focusedField === "handle" && styles.handleInputFocused]}><Text style={styles.handlePrefix}>@</Text><TextInput value={handle} onChangeText={setHandle} autoCapitalize="none" autoCorrect={false} placeholder="kullaniciadi" placeholderTextColor="#7C8296" selectionColor={BRAND} onFocus={focus("handle")} onBlur={blur} style={styles.handleText} maxLength={24} /></View></>;
+  const profileFields = <><Text style={styles.label}>GÖRÜNEN AD</Text><Field value={displayName} onChangeText={setDisplayName} autoCapitalize="words" placeholder="Adın" style={styles.input} maxLength={36} focused={focusedField === "name"} onFocus={focus("name")} onBlur={blur} /><Text style={styles.label}>KULLANICI ADI</Text><View style={[styles.handleInput, focusedField === "handle" && styles.handleInputFocused]}><Text style={styles.handlePrefix}>@</Text><TextInput value={handle} onChangeText={setHandle} autoCapitalize="none" autoCorrect={false} placeholder="kullaniciadi" placeholderTextColor="#8190A2" selectionColor={BRAND} onFocus={focus("handle")} onBlur={blur} style={styles.handleText} maxLength={24} /></View></>;
 
-  const emailCard = <><View style={styles.card}>{isRegistering ? profileFields : null}<Text style={styles.label}>E-POSTA</Text><Field value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" placeholder="ornek@mail.com" style={styles.input} focused={focusedField === "email"} onFocus={focus("email")} onBlur={blur} /><Text style={styles.label}>PAROLA</Text><Field value={password} onChangeText={setPassword} secureTextEntry placeholder="En az 6 karakter" style={styles.input} focused={focusedField === "password"} onFocus={focus("password")} onBlur={blur} /><Pressable disabled={submitting} onPress={submitEmail}><LinearGradient colors={[BRAND, "#16C7C0"]} style={[styles.submit, submitting && styles.disabled]}><Text style={styles.submitText}>{submitting ? "İşleniyor" : isRegistering ? "Hesabımı oluştur" : "Giriş yap"}</Text><Ionicons name="arrow-forward" size={19} color="#04211B" /></LinearGradient></Pressable>{!isRegistering ? <Pressable disabled={submitting} onPress={sendResetEmail} style={styles.textButton}><Text style={styles.textButtonLabel}>Parolamı unuttum</Text></Pressable> : null}<Pressable onPress={() => setIsRegistering((current) => !current)} style={styles.toggle} hitSlop={{ top: 14, bottom: 14, left: 24, right: 24 }}><Text style={styles.toggleMuted}>{isRegistering ? "Zaten hesabın var mı?" : "Sora'da yeni misin?"}</Text><Text style={styles.toggleLink}>{isRegistering ? " Giriş yap" : " Hesap oluştur"}</Text></Pressable></View><Text style={styles.or}>veya</Text><View style={styles.providerGrid}><ProviderButton disabled={submitting} icon="logo-google" label="Google" onPress={() => startProvider("google")} /><ProviderButton disabled={submitting} icon="phone-portrait-outline" label="Telefon" onPress={() => setScreen("phone")} /></View></>;
+  const emailCard = <><View style={styles.card}>{isRegistering ? profileFields : null}<Text style={styles.label}>E-POSTA</Text><Field value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" placeholder="ornek@mail.com" style={styles.input} focused={focusedField === "email"} onFocus={focus("email")} onBlur={blur} /><Text style={styles.label}>PAROLA</Text><Field value={password} onChangeText={setPassword} secureTextEntry placeholder="En az 6 karakter" style={styles.input} focused={focusedField === "password"} onFocus={focus("password")} onBlur={blur} /><Pressable disabled={submitting} onPress={submitEmail}><LinearGradient colors={[BRAND, "#1D5FBF"]} style={[styles.submit, submitting && styles.disabled]}><Text style={styles.submitText}>{submitting ? "İşleniyor" : isRegistering ? "Hesabımı oluştur" : "Giriş yap"}</Text><Ionicons name="arrow-forward" size={19} color="#FFFFFF" /></LinearGradient></Pressable>{!isRegistering ? <Pressable disabled={submitting} onPress={sendResetEmail} style={styles.textButton}><Text style={styles.textButtonLabel}>Parolamı unuttum</Text></Pressable> : null}<Pressable onPress={() => setIsRegistering((current) => !current)} style={styles.toggle} hitSlop={{ top: 14, bottom: 14, left: 24, right: 24 }}><Text style={styles.toggleMuted}>{isRegistering ? "Zaten hesabın var mı?" : "Sora'da yeni misin?"}</Text><Text style={styles.toggleLink}>{isRegistering ? " Giriş yap" : " Hesap oluştur"}</Text></Pressable></View><Text style={styles.or}>veya</Text><View style={styles.providerGrid}><ProviderButton disabled={submitting} icon="logo-google" label="Google" onPress={() => startProvider("google")} /><ProviderButton disabled={submitting} icon="phone-portrait-outline" label="Telefon" onPress={() => setScreen("phone")} /></View></>;
 
-  const phoneCard = <View style={styles.card}>{phoneRegistration ? profileFields : null}<Text style={styles.label}>TELEFON NUMARASI</Text><Field value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="532 123 45 67" style={styles.input} maxLength={18} focused={focusedField === "phone"} onFocus={focus("phone")} onBlur={blur} /><Pressable disabled={submitting} onPress={submitPhone}><LinearGradient colors={[BRAND, "#16C7C0"]} style={[styles.submit, submitting && styles.disabled]}><Text style={styles.submitText}>{submitting ? "Gönderiliyor" : "SMS kodu gönder"}</Text><Ionicons name="chatbubble-ellipses-outline" size={19} color="#04211B" /></LinearGradient></Pressable><Pressable onPress={() => setPhoneRegistration((current) => !current)} style={styles.toggle} hitSlop={{ top: 14, bottom: 14, left: 24, right: 24 }}><Text style={styles.toggleMuted}>{phoneRegistration ? "Zaten telefon hesabın var mı?" : "Telefonla yeni misin?"}</Text><Text style={styles.toggleLink}>{phoneRegistration ? " Giriş yap" : " Hesap oluştur"}</Text></Pressable><Pressable onPress={() => setScreen("email")} style={styles.textButton}><Text style={styles.textButtonLabel}>E-posta girişine dön</Text></Pressable></View>;
+  const phoneCard = <View style={styles.card}>{phoneRegistration ? profileFields : null}<Text style={styles.label}>TELEFON NUMARASI</Text><Field value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="532 123 45 67" style={styles.input} maxLength={18} focused={focusedField === "phone"} onFocus={focus("phone")} onBlur={blur} /><Pressable disabled={submitting} onPress={submitPhone}><LinearGradient colors={[BRAND, "#1D5FBF"]} style={[styles.submit, submitting && styles.disabled]}><Text style={styles.submitText}>{submitting ? "Gönderiliyor" : "SMS kodu gönder"}</Text><Ionicons name="chatbubble-ellipses-outline" size={19} color="#FFFFFF" /></LinearGradient></Pressable><Pressable onPress={() => setPhoneRegistration((current) => !current)} style={styles.toggle} hitSlop={{ top: 14, bottom: 14, left: 24, right: 24 }}><Text style={styles.toggleMuted}>{phoneRegistration ? "Zaten telefon hesabın var mı?" : "Telefonla yeni misin?"}</Text><Text style={styles.toggleLink}>{phoneRegistration ? " Giriş yap" : " Hesap oluştur"}</Text></Pressable><Pressable onPress={() => setScreen("email")} style={styles.textButton}><Text style={styles.textButtonLabel}>E-posta girişine dön</Text></Pressable></View>;
 
-  const otpCard = <View style={styles.card}><Text style={styles.otpDescription}>{phone} numarasına gönderilen 6 haneli kodu gir.</Text><Text style={styles.label}>DOĞRULAMA KODU</Text><Field value={otp} onChangeText={(value) => setOtp(value.replace(/\D/g, "").slice(0, 6))} keyboardType="number-pad" placeholder="000000" style={[styles.input, styles.otpInput]} maxLength={6} focused={focusedField === "otp"} onFocus={focus("otp")} onBlur={blur} /><Pressable disabled={submitting} onPress={submitOtp}><LinearGradient colors={[BRAND, "#16C7C0"]} style={[styles.submit, submitting && styles.disabled]}><Text style={styles.submitText}>{submitting ? "Doğrulanıyor" : "Kodu doğrula"}</Text><Ionicons name="checkmark-circle-outline" size={20} color="#04211B" /></LinearGradient></Pressable><Pressable disabled={submitting} onPress={submitPhone} style={styles.textButton}><Text style={styles.textButtonLabel}>Kodu yeniden gönder</Text></Pressable><Pressable onPress={() => setScreen("phone")} style={styles.textButton}><Text style={styles.textButtonLabel}>Telefon numarasını değiştir</Text></Pressable></View>;
+  const otpCard = <View style={styles.card}><Text style={styles.otpDescription}>{phone} numarasına gönderilen 6 haneli kodu gir.</Text><Text style={styles.label}>DOĞRULAMA KODU</Text><Field value={otp} onChangeText={(value) => setOtp(value.replace(/\D/g, "").slice(0, 6))} keyboardType="number-pad" placeholder="000000" style={[styles.input, styles.otpInput]} maxLength={6} focused={focusedField === "otp"} onFocus={focus("otp")} onBlur={blur} /><Pressable disabled={submitting} onPress={submitOtp}><LinearGradient colors={[BRAND, "#1D5FBF"]} style={[styles.submit, submitting && styles.disabled]}><Text style={styles.submitText}>{submitting ? "Doğrulanıyor" : "Kodu doğrula"}</Text><Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" /></LinearGradient></Pressable><Pressable disabled={submitting} onPress={submitPhone} style={styles.textButton}><Text style={styles.textButtonLabel}>Kodu yeniden gönder</Text></Pressable><Pressable onPress={() => setScreen("phone")} style={styles.textButton}><Text style={styles.textButtonLabel}>Telefon numarasını değiştir</Text></Pressable></View>;
 
   const subtitle = screen === "otp" ? "Telefon numaranı güvenle doğrula." : screen === "phone" ? "Telefon numaranla hızlı ve güvenli giriş yap." : isRegistering ? "Profilini oluştur, topluluğunu bul ve odalara katıl." : "Odaların, takiplerin ve profilin seni bekliyor.";
 
-  return <LinearGradient colors={["#F7FBFB", "#F0F3F4", "#E7F7F2"]} style={styles.screen}><SafeAreaView style={styles.safe}><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.content}><View style={styles.hero}><Image source={SORA_LOGO} style={styles.logo} accessibilityLabel="Sora logosu" /><Text style={styles.kicker}>SORA HESABI</Text><Text style={styles.title}>{screen === "otp" ? "Kodunu doğrula." : screen === "phone" ? "Telefonla devam et." : isRegistering ? "Sesinle yerini al." : "Sohbete geri dön."}</Text><Text style={styles.subtitle}>{subtitle}</Text></View>{screen === "email" ? emailCard : screen === "phone" ? phoneCard : otpCard}<View style={styles.providerHint}><Ionicons name="shield-checkmark-outline" size={16} color={BRAND} /><Text style={styles.providerHintText}>Hesabın güvenli oturumla cihazında saklanır.</Text></View></KeyboardAvoidingView></SafeAreaView></LinearGradient>;
+  return <LinearGradient colors={["#F3F7FC", "#F3F7FC", "#EAF3FD"]} style={styles.screen}><SafeAreaView style={styles.safe}><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.content}><View style={styles.hero}><Image source={SORA_LOGO} style={styles.logo} accessibilityLabel="Sora logosu" /><Text style={styles.kicker}>SORA HESABI</Text><Text style={styles.title}>{screen === "otp" ? "Kodunu doğrula." : screen === "phone" ? "Telefonla devam et." : isRegistering ? "Sesinle yerini al." : "Sohbete geri dön."}</Text><Text style={styles.subtitle}>{subtitle}</Text></View>{screen === "email" ? emailCard : screen === "phone" ? phoneCard : otpCard}<View style={styles.providerHint}><Ionicons name="shield-checkmark-outline" size={16} color={BRAND} /><Text style={styles.providerHintText}>Hesabın güvenli oturumla cihazında saklanır.</Text></View></KeyboardAvoidingView></SafeAreaView></LinearGradient>;
 }
 
 const CARD_SHADOW = {
-  shadowColor: "#0B1A24",
+  shadowColor: "#102033",
   shadowOpacity: 0.12,
   shadowRadius: 22,
   shadowOffset: { width: 0, height: 12 },
@@ -186,7 +187,7 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "rgba(1,217,168,0.22)",
+    borderColor: "rgba(47,128,237,0.22)",
   },
   kicker: {
     color: BRAND,
@@ -195,7 +196,7 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
   title: {
-    color: "#11161C",
+    color: "#111820",
     fontSize: 28,
     fontWeight: "900",
     letterSpacing: -1.1,
@@ -203,7 +204,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   subtitle: {
-    color: "#4B5462",
+    color: "#46596F",
     fontSize: 13,
     lineHeight: 19,
     textAlign: "center",
@@ -215,11 +216,11 @@ const styles = StyleSheet.create({
     padding: 19,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#E1E6EA",
+    borderColor: "#D9E3EF",
     ...CARD_SHADOW,
   },
   label: {
-    color: "#4B5462",
+    color: "#46596F",
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 1.2,
@@ -231,15 +232,15 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingHorizontal: 14,
     borderRadius: 15,
-    color: "#11161C",
-    backgroundColor: "#EAEEF1",
+    color: "#111820",
+    backgroundColor: "#EDF3FA",
     borderWidth: 1,
-    borderColor: "#E1E6EA",
+    borderColor: "#D9E3EF",
     fontSize: 15,
   },
   inputFocused: {
-    borderColor: "rgba(1,217,168,0.55)",
-    backgroundColor: "#E3E8EC",
+    borderColor: "rgba(47,128,237,0.55)",
+    backgroundColor: "#E4ECF6",
   },
   handleInput: {
     height: 52,
@@ -248,18 +249,18 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#EAEEF1",
+    backgroundColor: "#EDF3FA",
     borderWidth: 1,
-    borderColor: "#E1E6EA",
+    borderColor: "#D9E3EF",
   },
-  handleInputFocused: { borderColor: "rgba(1,217,168,0.55)" },
+  handleInputFocused: { borderColor: "rgba(47,128,237,0.55)" },
   handlePrefix: {
     color: BRAND,
     fontSize: 16,
     fontWeight: "900",
     marginRight: 4,
   },
-  handleText: { flex: 1, color: "#11161C", fontSize: 15 },
+  handleText: { flex: 1, color: "#111820", fontSize: 15 },
   submit: {
     height: 54,
     marginTop: 5,
@@ -275,14 +276,14 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   disabled: { opacity: 0.55, shadowOpacity: 0 },
-  submitText: { color: "#04211B", fontSize: 15, fontWeight: "900" },
+  submitText: { color: "#FFFFFF", fontSize: 15, fontWeight: "900" },
   toggle: { flexDirection: "row", justifyContent: "center", marginTop: 18 },
-  toggleMuted: { color: "#4B5462", fontSize: 12.5 },
+  toggleMuted: { color: "#46596F", fontSize: 12.5 },
   toggleLink: { color: BRAND, fontSize: 12.5, fontWeight: "900" },
   textButton: { alignSelf: "center", paddingVertical: 11 },
   textButtonLabel: { color: BRAND, fontSize: 12.5, fontWeight: "800" },
   or: {
-    color: "#8A93A3",
+    color: "#8190A2",
     fontSize: 11,
     textAlign: "center",
     marginVertical: 15,
@@ -294,15 +295,15 @@ const styles = StyleSheet.create({
     minHeight: 50,
     paddingHorizontal: 8,
     borderRadius: 15,
-    backgroundColor: "#F7F9FA",
+    backgroundColor: "#EDF3FA",
     borderWidth: 1,
-    borderColor: "#E1E6EA",
+    borderColor: "#D9E3EF",
     justifyContent: "center",
     alignItems: "center",
     gap: 5,
   },
   providerButtonText: {
-    color: "#11161C",
+    color: "#111820",
     fontSize: 10.5,
     fontWeight: "800",
   },
@@ -315,13 +316,13 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   providerHintText: {
-    color: "#8A93A3",
+    color: "#8190A2",
     fontSize: 10.5,
     textAlign: "center",
     flexShrink: 1,
   },
   otpDescription: {
-    color: "#B9BDCC",
+    color: "#C2CEDD",
     fontSize: 13,
     lineHeight: 19,
     marginBottom: 20,

@@ -12,18 +12,7 @@ import {
   resolveAdminSafetyReport,
   setUserBlocked,
 } from "../data/soraRepository";
-
-const COLORS = {
-  background: "#F0F3F4",
-  surface: "#FFFFFF",
-  surfaceRaised: "#EAEEF1",
-  line: "#E1E6EA",
-  text: "#11161C",
-  muted: "#8A93A3",
-  primary: "#01D9A8",
-  primaryInk: "#04211B",
-  pink: "#E5486B",
-};
+import { COLORS } from "../theme/colors";
 
 const REPORT_REASONS = [
   ["spam", "Spam", "mail-unread-outline"],
@@ -51,7 +40,7 @@ function SheetFrame({ visible, onDismiss, children, tall = false }) {
   </Modal>;
 }
 
-function Avatar({ name, color = "#785E90" }) {
+function Avatar({ name, color = "#5878B4" }) {
   return <View style={[styles.avatar, { backgroundColor: color }]}><Text style={styles.avatarText}>{(name || "S").charAt(0).toUpperCase()}</Text></View>;
 }
 
@@ -277,7 +266,7 @@ const styles = StyleSheet.create({
   dismissArea: { flex: 1 },
   sheet: { maxHeight: "82%", backgroundColor: COLORS.surface, paddingHorizontal: 22, paddingTop: 29, paddingBottom: 30, borderTopLeftRadius: 29, borderTopRightRadius: 29 },
   tallSheet: { height: "82%" },
-  handle: { width: 38, height: 4, borderRadius: 4, backgroundColor: "#C4CBD3", position: "absolute", alignSelf: "center", top: 10 },
+  handle: { width: 38, height: 4, borderRadius: 4, backgroundColor: "#C2CEDD", position: "absolute", alignSelf: "center", top: 10 },
   closeButton: { width: 31, height: 31, borderRadius: 16, backgroundColor: COLORS.surfaceRaised, justifyContent: "center", alignItems: "center", position: "absolute", right: 17, top: 15, zIndex: 2 },
   kicker: { color: COLORS.primary, fontSize: 10, fontWeight: "800", letterSpacing: 1.3, marginBottom: 7 },
   title: { color: COLORS.text, fontSize: 25, fontWeight: "800", letterSpacing: -0.8, marginBottom: 9, paddingRight: 44 },
@@ -294,7 +283,7 @@ const styles = StyleSheet.create({
   primaryButton: { minHeight: 51, borderRadius: 14, backgroundColor: COLORS.primary, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   primaryButtonText: { color: COLORS.primaryInk, fontSize: 13, fontWeight: "800" },
   disabledButton: { opacity: 0.55 },
-  notice: { padding: 14, marginTop: 8, marginBottom: 18, borderRadius: 16, flexDirection: "row", alignItems: "flex-start", gap: 10, backgroundColor: "rgba(1,217,168,0.12)", borderWidth: 1, borderColor: "rgba(1,217,168,0.30)" },
+  notice: { padding: 14, marginTop: 8, marginBottom: 18, borderRadius: 16, flexDirection: "row", alignItems: "flex-start", gap: 10, backgroundColor: "rgba(47,128,237,0.12)", borderWidth: 1, borderColor: "rgba(47,128,237,0.30)" },
   noticeText: { color: COLORS.textSecondary, flex: 1, fontSize: 11, lineHeight: 16 },
   scrollContent: { paddingBottom: 18 },
   sectionLabel: { color: COLORS.muted, fontSize: 10, fontWeight: "800", letterSpacing: 1.15, marginTop: 8, marginBottom: 9 },
@@ -312,9 +301,9 @@ const styles = StyleSheet.create({
   reportHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 },
   reportDetails: { color: COLORS.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 8 },
   statusPill: { backgroundColor: COLORS.surfaceHigh, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  statusDone: { backgroundColor: "rgba(1,217,168,0.16)" },
+  statusDone: { backgroundColor: "rgba(47,128,237,0.16)" },
   statusText: { color: COLORS.muted, fontSize: 9, fontWeight: "800" },
-  errorBox: { padding: 12, borderRadius: 13, backgroundColor: "rgba(229,72,107,0.10)", marginBottom: 10 },
+  errorBox: { padding: 12, borderRadius: 13, backgroundColor: "rgba(217,79,92,0.10)", marginBottom: 10 },
   errorText: { color: COLORS.danger, fontSize: 11, lineHeight: 16 },
   retryText: { color: COLORS.primary, fontSize: 11, fontWeight: "800", marginTop: 7 },
   statGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8, marginBottom: 16 },
@@ -327,10 +316,10 @@ const styles = StyleSheet.create({
   adminActions: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 12 },
   adminAction: { paddingHorizontal: 11, paddingVertical: 8, borderRadius: 10, backgroundColor: COLORS.surfaceHigh },
   adminActionText: { color: COLORS.text, fontSize: 10, fontWeight: "800" },
-  adminActionDanger: { backgroundColor: "rgba(229,72,107,0.12)" },
+  adminActionDanger: { backgroundColor: "rgba(217,79,92,0.12)" },
   adminActionDangerText: { color: COLORS.danger, fontSize: 10, fontWeight: "800" },
   transferRequest: { padding: 14, borderRadius: 15, backgroundColor: COLORS.surfaceRaised, marginBottom: 9, borderWidth: 1, borderColor: COLORS.line },
-  transferAmount: { color: "#A06A00", fontSize: 12, fontWeight: "900" },
+  transferAmount: { color: "#1D5FBF", fontSize: 12, fontWeight: "900" },
   transferMeta: { color: COLORS.textSecondary, fontSize: 10, marginTop: 7 },
   transferCreditInput: { height: 40, borderRadius: 10, marginTop: 11, paddingHorizontal: 11, color: COLORS.text, backgroundColor: COLORS.surfaceHigh, borderWidth: 1, borderColor: COLORS.line, fontSize: 12, fontWeight: "800" },
   transferApprove: { paddingHorizontal: 11, paddingVertical: 8, borderRadius: 10, backgroundColor: COLORS.primary },

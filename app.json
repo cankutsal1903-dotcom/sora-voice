@@ -4,8 +4,8 @@
     "slug": "sora-voice",
     "version": "1.0.2",
     "description": "Canlı sesli odalar, topluluk sohbeti ve güvenli etkileşim için Sora.",
-    "primaryColor": "#01D9A8",
-    "icon": "./assets/images/sora-logo.png",
+    "primaryColor": "#2F80ED",
+    "icon": "./assets/images/sora-logo-blue.png",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "scheme": "sora",
@@ -19,8 +19,8 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/sora-logo.png",
-          "color": "#01D9A8",
+          "icon": "./assets/images/sora-logo-blue.png",
+          "color": "#2F80ED",
           "defaultChannel": "sora-default",
           "sounds": []
         }
@@ -28,10 +28,10 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/sora-logo.png",
+          "image": "./assets/images/sora-logo-blue.png",
           "imageWidth": 180,
           "resizeMode": "contain",
-          "backgroundColor": "#050509"
+          "backgroundColor": "#060D18"
         }
       ]
     ],
@@ -50,8 +50,8 @@
         "android.permission.BLUETOOTH"
       ],
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/sora-logo.png",
-        "backgroundColor": "#050509"
+        "foregroundImage": "./assets/images/sora-logo-blue.png",
+        "backgroundColor": "#060D18"
       }
     },
     "ios": {

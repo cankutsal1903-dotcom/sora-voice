@@ -13,7 +13,7 @@ export async function configureNotificationChannel() {
     name: "Sora bildirimleri",
     importance: Notifications.AndroidImportance.HIGH,
     vibrationPattern: [0, 250, 250, 250],
-    lightColor: "#B5FF78",
+    lightColor: "#2F80ED",
     sound: "default",
   });
 }

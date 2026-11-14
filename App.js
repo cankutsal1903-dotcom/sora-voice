@@ -99,43 +99,22 @@ import { AudioBars, BrandLaunch, LivePulse, Reveal } from "./src/ui/Motion";
 import { installGlobalErrorReporting } from "./src/observability/errorReporting";
 import { InboxScreen } from "./src/screens/InboxScreen";
 import { CommunityScreen } from "./src/screens/CommunityScreen";
+import { COLORS as APP_COLORS } from "./src/theme/colors";
 
-// Clubhouse-inspired palette: cream/white backgrounds, near-black text,
-// warm yellow accent, clean minimal surfaces.
-const COLORS = {
-  background: "#F9F6F1",
-  surface: "#FFFFFF",
-  surfaceRaised: "#F4F1EC",
-  surfaceHigh: "#EDE9E2",
-  line: "#E8E3DC",
-  lineSoft: "#F0EDE8",
-  text: "#1A1410",
-  textSecondary: "#5C5047",
-  muted: "#9C9088",
-  primary: "#F5C842",
-  primaryInk: "#1A1410",
-  primarySoft: "rgba(245,200,66,0.18)",
-  pink: "#E05C7A",
-  purple: "#7C5CBF",
-  accent: "#3A85F5",
-  warning: "#E0943A",
-  danger: "#D94F4F",
-  overlay: "rgba(26,20,16,0.48)",
-};
+const COLORS = APP_COLORS;
 
-// Birincil butonlar siyah veya sarı; gradient kaldırıldı (Clubhouse flat).
-const BRAND_GRADIENT = ["#1A1410", "#2D2520"];
+const BRAND_GRADIENT = COLORS.gradients.primary;
 // Kartlarda kullanilan yumusak derinlik golgesi (Android'de elevation).
 const ELEVATION = {
   card: {
-    shadowColor: "#1A1410",
+    shadowColor: COLORS.text,
     shadowOpacity: 0.07,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 3 },
     elevation: 2,
   },
   raised: {
-    shadowColor: "#1A1410",
+    shadowColor: COLORS.text,
     shadowOpacity: 0.12,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 6 },
@@ -143,7 +122,7 @@ const ELEVATION = {
   },
 };
 
-const SORA_LOGO = require("./assets/images/sora-logo.png");
+const SORA_LOGO = require("./assets/images/sora-logo-blue.png");
 
 installGlobalErrorReporting();
 
@@ -222,8 +201,8 @@ const INITIAL_ROOMS = [
     listeners: 128,
     host: "Ece",
     initials: "E",
-    colors: ["#45378E", "#201F58"],
-    accent: "#D698FF",
+    colors: ["#345D9C", "#172B49"],
+    accent: "#8BB8F5",
     description: "Uykusu kaçanlar için sakin bir köşe.",
   },
   {
@@ -233,8 +212,8 @@ const INITIAL_ROOMS = [
     listeners: 86,
     host: "Baran",
     initials: "B",
-    colors: ["#167A91", "#273D79"],
-    accent: "#73E8E8",
+    colors: ["#1D6EA8", "#173B6C"],
+    accent: "#8CC8FF",
     description: "Mikrofon sende, sahne senin.",
   },
   {
@@ -244,8 +223,8 @@ const INITIAL_ROOMS = [
     listeners: 54,
     host: "Duru",
     initials: "D",
-    colors: ["#1F675B", "#314A41"],
-    accent: "#C3E86A",
+    colors: ["#2B6095", "#203C60"],
+    accent: "#A6C9F5",
     description: "Gunun nasil gecti?",
   },
   {
@@ -255,8 +234,8 @@ const INITIAL_ROOMS = [
     listeners: 41,
     host: "Mert",
     initials: "M",
-    colors: ["#B85B69", "#5B294C"],
-    accent: "#FFB284",
+    colors: ["#405F8D", "#1D3455"],
+    accent: "#9ABCF0",
     description: "Dorduncu aranıyor.",
   },
   {
@@ -266,8 +245,8 @@ const INITIAL_ROOMS = [
     listeners: 27,
     host: "Selin",
     initials: "S",
-    colors: ["#5A5BC3", "#253B73"],
-    accent: "#81DAFF",
+    colors: ["#4D72B5", "#203E70"],
+    accent: "#A4CCFF",
     description: "Bugunun sorusu: Mutluluk ne?",
   },
 ];
@@ -286,7 +265,7 @@ const DEFAULT_COMMUNITIES = [
     name: "Gece Kulubu",
     description: "Gece sohbetleri ve sakin odalar",
     members: "4,2 B uye",
-    color: ["#7956DE", "#38265E"],
+    color: ["#3979D2", "#1D3D70"],
     icon: "moon",
   },
   {
@@ -294,28 +273,45 @@ const DEFAULT_COMMUNITIES = [
     name: "Sarkini Birak",
     description: "Yeni sesler ve ortak listeler",
     members: "1,8 B uye",
-    color: ["#2A8D9B", "#1E3A70"],
+    color: ["#2F80ED", "#1C477E"],
     icon: "musical-notes",
   },
 ];
 const COMMUNITY_COLORS = [
-  ["#7A53D0", "#39225F"],
-  ["#258AA0", "#173D70"],
-  ["#B65776", "#54294E"],
-  ["#527F59", "#243F37"],
+  ["#3979D2", "#1D3D70"],
+  ["#2F80ED", "#1C477E"],
+  ["#628FD2", "#263F68"],
+  ["#244F8F", "#172E4E"],
 ];
 const ROOM_THEMES = [
-  { name: "Orman", colors: ["#2B806F", "#23443F"], accent: "#C5ED76" },
-  { name: "Gece", colors: ["#5140BD", "#252458"], accent: "#D698FF" },
-  { name: "Okyanus", colors: ["#167A91", "#273D79"], accent: "#73E8E8" },
-  { name: "Gul", colors: ["#B85B69", "#5B294C"], accent: "#FFB284" },
+  { name: "Orman", colors: ["#2B6095", "#203C60"], accent: "#A6C9F5" },
+  { name: "Gece", colors: ["#254777", "#111F36"], accent: "#8BB8F5" },
+  { name: "Okyanus", colors: ["#1D6EA8", "#173B6C"], accent: "#8CC8FF" },
+  { name: "Gul", colors: ["#405F8D", "#1D3455"], accent: "#9ABCF0" },
 ];
+const ROOM_THEME_COLOR_SET = new Set(
+  ROOM_THEMES.flatMap((theme) => [...theme.colors, theme.accent]).map((color) => color.toUpperCase()),
+);
+const resolveRoomBrand = (room = {}) => {
+  const seed = String(room.id || room.title || room.name || "sora");
+  const themeIndex = [...seed].reduce((value, char) => value + char.charCodeAt(0), 0) % ROOM_THEMES.length;
+  const fallback = ROOM_THEMES[themeIndex];
+  const colors = Array.isArray(room.colors)
+    && room.colors.length >= 2
+    && room.colors.every((color) => ROOM_THEME_COLOR_SET.has(String(color).toUpperCase()))
+    ? room.colors
+    : fallback.colors;
+  const accent = ROOM_THEME_COLOR_SET.has(String(room.accent || "").toUpperCase())
+    ? room.accent
+    : fallback.accent;
+  return { colors, accent };
+};
 
 const GIFT_CATALOG = [
-  { id: "clap", icon: "sparkles", name: "Alkis", cost: 15, color: "#8D79FF" },
-  { id: "heart", icon: "heart", name: "Kalp", cost: 40, color: "#FF719D" },
-  { id: "crown", icon: "crown", name: "Tac", cost: 120, color: "#E9B94D" },
-  { id: "rocket", icon: "rocket", name: "Roket", cost: 300, color: "#54BBD3" },
+  { id: "clap", icon: "sparkles", name: "Alkis", cost: 15, color: "#6AA8F5" },
+  { id: "heart", icon: "heart", name: "Kalp", cost: 40, color: "#2F80ED" },
+  { id: "crown", icon: "crown", name: "Tac", cost: 120, color: "#1D5FBF" },
+  { id: "rocket", icon: "rocket", name: "Roket", cost: 300, color: "#8CC8FF" },
 ];
 const createRequestUuid = () => {
   return globalThis.crypto?.randomUUID?.() || `xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`.replace(/[xy]/g, (c) => {
@@ -324,12 +320,12 @@ const createRequestUuid = () => {
   });
 };
 const PROFILE_ITEM_APPEARANCE = {
-  frame_sky: { color: "#58BCEB", width: 3 },
-  frame_amber: { color: "#E5B94F", width: 3 },
-  frame_lilac: { color: "#A78BFA", width: 3 },
-  theme_ocean: { background: "#E7F6FC", accent: "#258FB8" },
-  theme_midnight: { background: "#E8EAF5", accent: "#5B63B8" },
-  theme_sunrise: { background: "#FFF1E6", accent: "#D98257" },
+  frame_sky: { color: "#58A0F0", width: 3 },
+  frame_amber: { color: "#2F80ED", width: 3 },
+  frame_lilac: { color: "#7C9ED4", width: 3 },
+  theme_ocean: { background: "#E7F2FF", accent: "#258FB8" },
+  theme_midnight: { background: "#E8EEF8", accent: "#315FAD" },
+  theme_sunrise: { background: "#F2F7FD", accent: "#5388CB" },
 };
 const DEFAULT_CHATS = [
   {
@@ -337,7 +333,7 @@ const DEFAULT_CHATS = [
     name: "Ece",
     text: "Bu gece yine buradayiz.",
     time: "21:42",
-    color: "#EAC875",
+    color: "#5F96DF",
     unread: 2,
   },
   {
@@ -345,22 +341,22 @@ const DEFAULT_CHATS = [
     name: "Duru",
     text: "Odayi sevdin mi?",
     time: "19:18",
-    color: "#A4D67D",
+    color: "#2F80ED",
   },
   {
     id: "sora",
     name: "Sora Ekibi",
     text: "Topluluk kurallari yenilendi.",
     time: "Dun",
-    color: "#8D83F6",
+    color: "#739DDC",
     system: true,
   },
 ];
-const CHAT_COLORS = ["#EAC875", "#A4D67D", "#8D83F6", "#7FCBEA", "#F0A178"];
+const CHAT_COLORS = ["#5F96DF", "#2F80ED", "#739DDC", "#7FCBEA", "#254F8A"];
 
 const Avatar = memo(function Avatar({
   label,
-  color = "#E8B176",
+  color = "#5F96DF",
   size = 42,
   bordered = false,
 }) {
@@ -511,7 +507,7 @@ function Onboarding({ visible, onComplete }) {
   return (
     <Modal visible={visible} animationType="fade" onRequestClose={onComplete}>
       <LinearGradient
-        colors={["#1A1410", "#2D2520"]}
+        colors={["#111820", "#1D2E43"]}
         style={styles.onboardingScreen}
       >
         <SafeAreaView style={styles.onboardingSafe}>
@@ -683,6 +679,7 @@ function Discover({
       rooms[0],
     [favoriteRoomIds, recentRoomIds, rooms],
   );
+  const featuredRoomBrand = resolveRoomBrand(featuredRoom);
   if (!featuredRoom) {
     return (
       <ScrollView
@@ -704,7 +701,7 @@ function Discover({
           />
         </View>
         <LinearGradient
-          colors={["#1A1410", "#2D2520"]}
+          colors={["#111820", "#1D2E43"]}
           style={styles.discoverEmptyHero}
         >
           <View style={styles.discoverEmptyGlow} />
@@ -828,7 +825,7 @@ function Discover({
             style={styles.featurePressable}
           >
             <LinearGradient
-              colors={[...featuredRoom.colors, "#1A1410"]}
+              colors={[...featuredRoomBrand.colors, "#111820"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.featureCardModern}
@@ -866,7 +863,7 @@ function Discover({
                         featuredRoom.initials?.charAt(0) ||
                         featuredRoom.host.charAt(0)
                       }
-                      color={featuredRoom.accent}
+                      color={featuredRoomBrand.accent}
                       size={30}
                     />
                     <View>
@@ -1134,6 +1131,7 @@ const RoomCard = memo(function RoomCard({
   onToggleFavorite,
   index = 0,
 }) {
+  const roomBrand = resolveRoomBrand(room);
   const handlePress = useCallback(() => onPress(room), [onPress, room]);
   const handleToggle = useCallback(
     () => onToggleFavorite(room.id),
@@ -1154,11 +1152,11 @@ const RoomCard = memo(function RoomCard({
           ]}
         >
           <LinearGradient
-            colors={[...room.colors, "#1A1410"]}
+            colors={[...roomBrand.colors, "#111820"]}
             style={styles.roomArtwork}
           >
             <View
-              style={[styles.roomArtworkOrb, { backgroundColor: room.accent }]}
+              style={[styles.roomArtworkOrb, { backgroundColor: roomBrand.accent }]}
             />
             <View style={styles.roomArtworkRing} />
             <View style={styles.roomArtworkTop}>
@@ -1187,7 +1185,7 @@ const RoomCard = memo(function RoomCard({
             <View style={styles.roomHostRow}>
               <Avatar
                 label={room.host?.charAt(0) || "S"}
-                color={room.accent}
+                color={roomBrand.accent}
                 size={25}
               />
               <Text style={styles.roomHostName} numberOfLines={1}>
@@ -1722,7 +1720,7 @@ function Community({ onNotify }) {
         />
       </View>
       <LinearGradient
-        colors={["#1A1410", "#2D2520"]}
+        colors={["#111820", "#1D2E43"]}
         style={styles.communityBanner}
       >
         <Text style={styles.communityIcon}>✦</Text>
@@ -2175,7 +2173,7 @@ function Profile({
       <Reveal distance={12}>
         <View style={styles.pfCover}>
           <LinearGradient
-            colors={["#1A1410", "#2D2520", "#1A1410"]}
+            colors={["#111820", "#1D2E43", "#111820"]}
             style={StyleSheet.absoluteFill}
           />
           <View style={styles.pfCoverOrbOne} />
@@ -2209,13 +2207,13 @@ function Profile({
           </View>
           <View style={styles.pfCoverBottom}>
             <View style={styles.pfCoverStat}>
-              <Ionicons name="flame" size={13} color="#FFD86B" />
+              <Ionicons name="flame" size={13} color="#76AFFF" />
               <Text style={styles.pfCoverStatText}>
                 {activityStreak} gün seri
               </Text>
             </View>
             <View style={styles.pfCoverStat}>
-              <Ionicons name="medal-outline" size={13} color="#FFD86B" />
+              <Ionicons name="medal-outline" size={13} color="#76AFFF" />
               <Text style={styles.pfCoverStatText}>
                 {badges.filter((badge) => badge.unlocked).length}/{badges.length}{" "}
                 rozet
@@ -2276,7 +2274,7 @@ function Profile({
         <View style={styles.pfLevelCard}>
           <View style={styles.pfLevelHead}>
             <View style={styles.pfLevelIcon}>
-              <Ionicons name="sparkles" size={18} color="#ECD06D" />
+              <Ionicons name="sparkles" size={18} color="#6AA8F5" />
             </View>
             <View style={styles.pfLevelInfo}>
               <Text style={styles.pfLevelTitle}>
@@ -2777,7 +2775,7 @@ const GiftSheet = memo(function GiftSheet({
           <View style={styles.giftSheetHeading}>
             <Text style={styles.sheetTitle}>Bir iz birak.</Text>
             <View style={styles.coinPill}>
-              <Ionicons name="diamond" size={14} color="#F4D168" />
+              <Ionicons name="diamond" size={14} color="#6AA8F5" />
               <Text style={styles.coinPillText}>{coins}</Text>
             </View>
           </View>
@@ -2804,7 +2802,7 @@ const GiftSheet = memo(function GiftSheet({
                 </View>
                 <Text style={styles.giftName}>{gift.name}</Text>
                 <View style={styles.giftCost}>
-                  <Ionicons name="diamond" size={11} color="#F4D168" />
+                  <Ionicons name="diamond" size={11} color="#6AA8F5" />
                   <Text style={styles.giftCostText}>{gift.cost}</Text>
                 </View>
               </Pressable>
@@ -2893,7 +2891,7 @@ const GiftFlight = memo(function GiftFlight({ gift }) {
       <Animated.View
         style={[styles.giftFlyerBanner, { opacity: bannerOpacity }]}
       >
-        <Ionicons name="sparkles" size={14} color="#FFD86B" />
+        <Ionicons name="sparkles" size={14} color="#76AFFF" />
         <Text style={styles.giftFlyerBannerText}>
           {activeGift.name} gönderildi
         </Text>
@@ -3093,7 +3091,7 @@ const RoomMiniBubble = memo(function RoomMiniBubble({
         <View
           style={[
             styles.roomBubbleInner,
-            { backgroundColor: room.accent || COLORS.purple },
+            { backgroundColor: resolveRoomBrand(room).accent },
           ]}
         >
           <Text style={styles.roomBubbleInitial}>
@@ -3314,7 +3312,7 @@ const WalletSheet = memo(function WalletSheet({
           >
             <Text style={styles.kicker}>KREDİ CÜZDANI</Text>
             <LinearGradient
-              colors={["#1A1410", "#2D2520"]}
+              colors={["#111820", "#1D2E43"]}
               style={styles.walletBalanceCard}
             >
               <View>
@@ -3327,7 +3325,7 @@ const WalletSheet = memo(function WalletSheet({
                 <Text style={styles.walletActivityTime}>Promosyon {promoCoins} · Satın alınan {paidCoins}</Text>
               </View>
               <View style={styles.walletBalanceIcon}>
-                <Ionicons name="diamond" size={28} color="#F5D978" />
+                <Ionicons name="diamond" size={28} color="#6AA8F5" />
               </View>
             </LinearGradient>
             <Text style={styles.settingsCaption}>GÜNLÜK ÖDÜL</Text>
@@ -3336,7 +3334,7 @@ const WalletSheet = memo(function WalletSheet({
                 <Ionicons
                   name={dailyRewardClaimed ? "checkmark" : "gift-outline"}
                   size={19}
-                  color={dailyRewardClaimed ? COLORS.primaryInk : "#F4D168"}
+                  color={dailyRewardClaimed ? COLORS.primaryInk : "#6AA8F5"}
                 />
               </View>
               <View style={styles.settingContent}>
@@ -3527,13 +3525,13 @@ const RoomLobby = memo(function RoomLobby({
           <View style={styles.lobbyHeaderSpacer} />
         </View>
         <View style={styles.lobbyContent}>
-          <LinearGradient colors={room.colors} style={styles.lobbyArtwork}>
+          <LinearGradient colors={resolveRoomBrand(room).colors} style={styles.lobbyArtwork}>
             <View style={styles.lobbyOrb} />
             <Text style={styles.lobbyLive}>
               <Text style={styles.liveDot}>●</Text> {room.listeners} kişi
               dinliyor
             </Text>
-            <Avatar label={room.initials} color="#E8C477" size={82} bordered />
+            <Avatar label={room.initials} color="#679DE8" size={82} bordered />
             <Text style={styles.lobbyHost}>{room.host}</Text>
             <Text style={styles.lobbyHostRole}>EV SAHİBİ</Text>
           </LinearGradient>
@@ -3662,7 +3660,7 @@ const ParticipantList = memo(function ParticipantList({ room }) {
   const [blockedNames, setBlockedNames] = useState([]);
   // Katilimcilar LiveKit'ten gelmelidir; sabit demo isimleri kullanilmaz.
   const participants = [
-    { name: room.host, initial: room.initials, color: "#E8C477", host: true },
+    { name: room.host, initial: room.initials, color: "#679DE8", host: true },
   ];
 
   useEffect(() => {
@@ -4351,7 +4349,7 @@ const USER_COMMUNITIES_KEY = "@sora/user-communities";
 const DEFAULT_PROFILE = {
   name: "",
   handle: "",
-  color: "#E6A577",
+  color: "#80ADE6",
   bio: "",
 };
 const DEFAULT_NOTIFICATIONS = [
@@ -4365,7 +4363,7 @@ const DEFAULT_NOTIFICATIONS = [
   {
     id: "night",
     icon: "moon",
-    color: "#7956DE",
+    color: "#3979D2",
     text: "Gece Vardiyasi odasi canli yayinda.",
     time: "12 dk",
   },
@@ -4493,7 +4491,7 @@ const RoomComposer = memo(function RoomComposer({
   return (
     <View style={styles.composer}>
       <Pressable onPress={onOpenGift} style={styles.composerGift}>
-        <Ionicons name="gift-outline" size={17} color="#FFD36D" />
+        <Ionicons name="gift-outline" size={17} color="#6AA8F5" />
       </Pressable>
       <TextInput
         value={value}
@@ -4603,6 +4601,10 @@ function Room({
   onMinimize,
   minimized = false,
 }) {
+  const roomBrand = useMemo(
+    () => resolveRoomBrand(room),
+    [room.accent, room.colors, room.id, room.title],
+  );
   const [speakerOn, setSpeakerOn] = useState(initialSpeakerOn);
   const [handRaised, setHandRaised] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -4731,7 +4733,7 @@ function Room({
     ) || {
       userId: room.hostId || `host-${room.id}`,
       name: room.host,
-      color: room.accent || "#E8C477",
+      color: roomBrand.accent,
       role: "host",
       microphoneEnabled: isHost ? micOn : false,
     };
@@ -4745,7 +4747,7 @@ function Room({
     activeSpeakerIds,
     isHost,
     micOn,
-    room.accent,
+    roomBrand.accent,
     room.host,
     room.hostId,
     room.id,
@@ -5032,7 +5034,7 @@ function Room({
         title: room.title,
         category: room.category,
         initials: room.initials,
-        color: room.accent,
+        color: roomBrand.accent,
         visitedAt: "Simdi",
       };
       const nextHistory = [
@@ -5482,7 +5484,7 @@ function Room({
             <View style={styles.roomIdentity}>
               <View style={styles.roomIdAvatar}>
                 <LinearGradient
-                  colors={room.colors || ["#2A2E3A", "#11131A"]}
+                  colors={roomBrand.colors}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.roomIdAvatarGrad}
@@ -5534,7 +5536,7 @@ function Room({
                     >
                       <View style={styles.roomAvatarWrap}>
                         {participant.isSpeaking ? (
-                          <SpeakingRing size={64} color="#FFD86B" />
+                          <SpeakingRing size={64} color="#76AFFF" />
                         ) : null}
                         <View
                           style={[
@@ -5771,7 +5773,7 @@ function Room({
             onPress={handleOpenGift}
             accessibilityLabel="Hediye gönder"
           >
-            <Ionicons name="gift-outline" size={22} color="#FFD86B" />
+            <Ionicons name="gift-outline" size={22} color="#76AFFF" />
             <Text style={styles.roomCtrlLabel}>Hediye</Text>
           </Pressable>
 
@@ -5843,7 +5845,7 @@ function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh }
   const [ownedItemIds, setOwnedItemIds] = useState([]);
   const [previewItemId, setPreviewItemId] = useState(null);
   const [itemBusy, setItemBusy] = useState(null);
-  const colors = ["#E6A577", "#8FC7EF", "#C891D9", "#A9D479", "#F08E99"];
+  const colors = ["#80ADE6", "#8FC7EF", "#6EA1E8", "#7FAEEB", "#5F90D0"];
 
   useEffect(() => {
     if (visible) {
@@ -6079,7 +6081,7 @@ const AppSettingsSheet = memo(function AppSettingsSheet({
               <Switch
                 value={settings[option.key]}
                 pointerEvents="none"
-                trackColor={{ false: "#4B4E63", true: "#6DAF48" }}
+                trackColor={{ false: "#4C5E73", true: "#2F80ED" }}
                 thumbColor={settings[option.key] ? COLORS.primary : "#D8DAE5"}
               />
             </Pressable>
@@ -6424,10 +6426,10 @@ function AppContent() {
       icon: ["daily_reward", "promo_grant"].includes(transaction.type) ? "gift" : "diamond",
       color:
         ["daily_reward", "promo_grant"].includes(transaction.type)
-          ? "#D39C48"
+          ? "#2F80ED"
           : transaction.type === "bank_transfer"
             ? "#59C5FF"
-            : "#8873FF",
+            : "#5D91D8",
       text: transaction.description,
       amount: transaction.amount,
       time: new Intl.DateTimeFormat("tr-TR", {
@@ -6946,10 +6948,10 @@ function AppContent() {
         icon: ["daily_reward", "promo_grant"].includes(transaction.type) ? "gift" : "diamond",
         color:
           ["daily_reward", "promo_grant"].includes(transaction.type)
-            ? "#D39C48"
+            ? "#2F80ED"
             : transaction.type === "bank_transfer"
               ? "#59C5FF"
-              : "#8873FF",
+              : "#5D91D8",
         text: transaction.description,
         amount: transaction.amount,
         time: new Intl.DateTimeFormat("tr-TR", {
@@ -7028,7 +7030,7 @@ function AppContent() {
           {
             id: `reward-${Date.now()}`,
             icon: "gift",
-            color: "#D39C48",
+            color: "#2F80ED",
             text: "Günlük giriş ödülü",
             amount: DAILY_REWARD_AMOUNT,
             time: "Şimdi",
@@ -7038,7 +7040,7 @@ function AppContent() {
         pushNotification({
           id: `daily-reward-${Date.now()}`,
           icon: "gift",
-          color: "#D39C48",
+          color: "#2F80ED",
           text: `${DAILY_REWARD_AMOUNT} kredi günlük ödülü hesabına eklendi.`,
           time: "Şimdi",
         });
@@ -7063,7 +7065,7 @@ function AppContent() {
         {
           id: `daily-reward-${Date.now()}`,
           icon: "gift",
-          color: "#D39C48",
+          color: "#2F80ED",
           text: `${DAILY_REWARD_AMOUNT} kredi gunluk odulu hesabina eklendi.`,
           time: "Simdi",
         },
@@ -7078,7 +7080,7 @@ function AppContent() {
     recordWalletActivity({
       id: `reward-${Date.now()}`,
       icon: "gift",
-      color: "#D39C48",
+      color: "#2F80ED",
       text: "Gunluk giris odulu",
       amount: DAILY_REWARD_AMOUNT,
       time: "Simdi",
@@ -7820,7 +7822,7 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   searchBoxFocused: {
-    borderColor: "rgba(245,200,66,0.60)",
+    borderColor: "rgba(47,128,237,0.60)",
     backgroundColor: COLORS.surface,
   },
   searchInput: {
@@ -8386,7 +8388,7 @@ const styles = StyleSheet.create({
     width: 280,
     height: 280,
     borderRadius: 140,
-    backgroundColor: "rgba(245,200,66,0.15)",
+    backgroundColor: "rgba(47,128,237,0.15)",
     position: "absolute",
     top: -90,
     left: "13%",
@@ -9119,7 +9121,7 @@ const styles = StyleSheet.create({
   followButtonActive: {
     backgroundColor: COLORS.surfaceRaised,
     borderWidth: 1,
-    borderColor: "#4B4E63",
+    borderColor: "#4C5E73",
   },
   followButtonText: {
     color: COLORS.primaryInk,
@@ -9164,7 +9166,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#4B4E63",
+    borderColor: "#4C5E73",
     borderRadius: 12,
   },
   reminderButtonActive: {
@@ -9195,9 +9197,9 @@ const styles = StyleSheet.create({
     borderRadius: 54,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(245,200,66,0.18)",
+    backgroundColor: "rgba(47,128,237,0.14)",
     borderWidth: 2,
-    borderColor: "rgba(245,200,66,0.40)",
+    borderColor: "rgba(47,128,237,0.40)",
     marginBottom: 32,
   },
   onboardingKicker: {
@@ -9279,7 +9281,7 @@ const styles = StyleSheet.create({
   lobbyLive: {
     position: "absolute",
     top: 18,
-    color: "#EEEAFE",
+    color: "#E8EEF8",
     fontSize: 10,
     fontWeight: "800",
     letterSpacing: 0.75,
@@ -9383,7 +9385,7 @@ const styles = StyleSheet.create({
   },
   lobbyJoinTitle: { color: COLORS.primary, fontSize: 15, fontWeight: "900" },
   lobbyJoinSubtitle: {
-    color: "rgba(245,200,66,0.70)",
+    color: "rgba(47,128,237,0.70)",
     fontSize: 10,
     fontWeight: "700",
     marginTop: 2,
@@ -9422,7 +9424,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: -0.5,
   },
-  communityDetailMembers: { color: "#E4E0F3", fontSize: 11, marginTop: 4 },
+  communityDetailMembers: { color: "#E8EEF8", fontSize: 11, marginTop: 4 },
   communityDetailDescription: {
     color: "#C7C9D5",
     fontSize: 13,
@@ -9505,7 +9507,7 @@ const styles = StyleSheet.create({
     gap: 5,
     backgroundColor: COLORS.primarySoft,
     borderWidth: 1,
-    borderColor: "rgba(245,200,66,0.35)",
+    borderColor: "rgba(47,128,237,0.35)",
   },
   coinPillText: { color: COLORS.text, fontSize: 13, fontWeight: "900" },
   giftHint: {
@@ -9545,7 +9547,7 @@ const styles = StyleSheet.create({
     gap: 3,
     marginTop: 4,
   },
-  giftCostText: { color: "#9A6A00", fontSize: 10, fontWeight: "800" },
+  giftCostText: { color: "#1D5FBF", fontSize: 10, fontWeight: "800" },
   dailyRewardCard: {
     minHeight: 76,
     marginTop: 12,
@@ -9554,9 +9556,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 11,
-    backgroundColor: "rgba(1,217,168,0.10)",
+    backgroundColor: "rgba(47,128,237,0.10)",
     borderWidth: 1,
-    borderColor: "rgba(1,217,168,0.26)",
+    borderColor: "rgba(47,128,237,0.26)",
   },
   streakCard: {
     minHeight: 76,
@@ -9641,7 +9643,7 @@ const styles = StyleSheet.create({
     borderRadius: 27,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(245,200,66,0.18)",
+    backgroundColor: "rgba(47,128,237,0.14)",
   },
   walletRewardRow: {
     minHeight: 74,
@@ -9707,12 +9709,12 @@ const styles = StyleSheet.create({
   transferTitle: { color: COLORS.text, fontSize: 14, fontWeight: "900" },
   transferSubtitle: { color: COLORS.muted, fontSize: 10, marginTop: 4 },
   transferStatus: {
-    backgroundColor: "rgba(224,169,58,0.16)",
+    backgroundColor: "rgba(47,128,237,0.14)",
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 8,
   },
-  transferStatusText: { color: "#9A6A00", fontSize: 9, fontWeight: "900" },
+  transferStatusText: { color: "#1D5FBF", fontSize: 9, fontWeight: "900" },
   transferHint: {
     color: COLORS.textSecondary,
     fontSize: 11,
@@ -9893,7 +9895,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.line,
   },
-  communityMeetingRowSaved: { backgroundColor: "rgba(1,217,168,0.05)" },
+  communityMeetingRowSaved: { backgroundColor: "rgba(47,128,237,0.05)" },
   communityMeetingDate: {
     width: 42,
     height: 42,
@@ -10023,7 +10025,7 @@ const styles = StyleSheet.create({
   },
   badgeCardUnlocked: {
     backgroundColor: COLORS.primarySoft,
-    borderColor: "rgba(245,200,66,0.35)",
+    borderColor: "rgba(47,128,237,0.35)",
     opacity: 1,
   },
   badgeIcon: {
@@ -10069,13 +10071,13 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surfaceRaised,
     position: "relative",
   },
-  pollOptionVoted: { borderColor: "#557448" },
+  pollOptionVoted: { borderColor: "#537497" },
   pollProgress: {
     position: "absolute",
     top: 0,
     bottom: 0,
     left: 0,
-    backgroundColor: "rgba(1,217,168,0.16)",
+    backgroundColor: "rgba(47,128,237,0.16)",
   },
   pollOptionText: {
     color: COLORS.text,
@@ -10174,7 +10176,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 13,
-    backgroundColor: "rgba(1,217,168,0.14)",
+    backgroundColor: "rgba(47,128,237,0.14)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -10192,7 +10194,7 @@ const styles = StyleSheet.create({
     height: 39,
     borderRadius: 13,
     borderWidth: 1,
-    borderColor: "#4B4E63",
+    borderColor: "#4C5E73",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -10217,7 +10219,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 9,
   },
-  levelPoints: { color: "#9A6A00", fontSize: 9, fontWeight: "900" },
+  levelPoints: { color: "#1D5FBF", fontSize: 9, fontWeight: "900" },
   levelProgressTrack: {
     height: 4,
     borderRadius: 4,
@@ -10295,7 +10297,7 @@ const styles = StyleSheet.create({
     gap: 9,
     backgroundColor: COLORS.primarySoft,
     borderWidth: 1,
-    borderColor: "rgba(245,200,66,0.30)",
+    borderColor: "rgba(47,128,237,0.30)",
   },
   profileSocialIcon: {
     width: 27,
@@ -10485,7 +10487,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   roomHeaderEyebrow: {
-    color: "#B9FF7A",
+    color: "#91BCFA",
     fontSize: 8,
     letterSpacing: 1.15,
     fontWeight: "900",
@@ -10511,7 +10513,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(185,255,122,0.20)",
   },
-  roomAudienceCount: { color: "#E7FFD1", fontSize: 11, fontWeight: "900" },
+  roomAudienceCount: { color: "#E6F0FF", fontSize: 11, fontWeight: "900" },
   liveActionBar: {
     minHeight: 55,
     paddingHorizontal: 16,
@@ -10527,7 +10529,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
     borderWidth: 1,
-    borderColor: "#455447",
+    borderColor: "#46596F",
     borderRadius: 13,
     paddingHorizontal: 11,
     paddingVertical: 8,
@@ -10691,10 +10693,10 @@ const styles = StyleSheet.create({
   },
   seatAvatarSpeaking: {
     borderWidth: 3,
-    borderColor: "#D4FF89",
+    borderColor: "#B4D0F5",
   },
   seatName: {
-    color: "#F7F6FB",
+    color: "#F3F7FC",
     fontSize: 9.5,
     fontWeight: "800",
     marginTop: 7,
@@ -10717,13 +10719,13 @@ const styles = StyleSheet.create({
     borderColor: "rgba(212,255,137,0.25)",
   },
   emptyStageTitle: {
-    color: "#F5F3FC",
+    color: "#F3F7FC",
     fontSize: 13,
     fontWeight: "900",
     marginTop: 10,
   },
   emptyStageText: {
-    color: "#D0CDD9",
+    color: "#D9E3EF",
     fontSize: 10,
     lineHeight: 15,
     textAlign: "center",
@@ -10871,7 +10873,7 @@ const styles = StyleSheet.create({
     minHeight: 32,
     paddingHorizontal: 9,
     borderRadius: 10,
-    backgroundColor: "rgba(1,217,168,0.12)",
+    backgroundColor: "rgba(47,128,237,0.12)",
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
@@ -10928,7 +10930,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: COLORS.primarySoft,
     borderWidth: 1,
-    borderColor: "rgba(1,217,168,0.18)",
+    borderColor: "rgba(47,128,237,0.18)",
   },
   memberRemoveAction: {
     backgroundColor: "rgba(255,123,167,0.13)",
@@ -10990,7 +10992,7 @@ const styles = StyleSheet.create({
     width: 260,
     height: 260,
     borderRadius: 130,
-    backgroundColor: "rgba(245,200,66,0.12)",
+    backgroundColor: "rgba(47,128,237,0.12)",
     top: -112,
     right: -92,
   },
@@ -11007,9 +11009,9 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(245,200,66,0.18)",
+    backgroundColor: "rgba(47,128,237,0.14)",
     borderWidth: 2,
-    borderColor: "rgba(245,200,66,0.45)",
+    borderColor: "rgba(47,128,237,0.45)",
     transform: [{ rotate: "-5deg" }],
   },
   discoverEmptySeatSide: {
@@ -11029,7 +11031,7 @@ const styles = StyleSheet.create({
     marginBottom: 9,
   },
   discoverEmptyTitle: {
-    color: "#F7F8FC",
+    color: "#F3F7FC",
     fontSize: 30,
     lineHeight: 35,
     fontWeight: "900",
@@ -11154,7 +11156,7 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(245,200,66,0.18)",
+    backgroundColor: "rgba(47,128,237,0.14)",
   },
   discoverLiveNumber: {
     color: COLORS.primary,
@@ -11163,7 +11165,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   discoverLiveCountText: {
-    color: "rgba(245,200,66,0.80)",
+    color: "rgba(47,128,237,0.80)",
     fontSize: 9,
     fontWeight: "900",
     letterSpacing: 0.9,
@@ -11188,7 +11190,7 @@ const styles = StyleSheet.create({
     maxWidth: "100%",
   },
   featureSubtitle: {
-    color: "#E0DDF0",
+    color: "#EDF3FA",
     fontSize: 14,
     lineHeight: 19,
     maxWidth: "100%",
@@ -11206,7 +11208,7 @@ const styles = StyleSheet.create({
     height: 48,
     justifyContent: "center",
   },
-  featureListeners: { color: "#F6F5FF", fontSize: 12, fontWeight: "800" },
+  featureListeners: { color: "#F3F7FC", fontSize: 12, fontWeight: "800" },
   sectionTitle: {
     color: COLORS.text,
     fontSize: 20,
@@ -11369,7 +11371,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     borderRadius: 9,
     borderWidth: 1,
-    borderColor: "rgba(1,217,168,0.30)",
+    borderColor: "rgba(47,128,237,0.30)",
   },
   livePillText: {
     color: COLORS.primary,
@@ -11394,7 +11396,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     backgroundColor: COLORS.primarySoft,
     borderWidth: 1,
-    borderColor: "rgba(1,217,168,0.18)",
+    borderColor: "rgba(47,128,237,0.18)",
   },
   roomCategory: {
     color: COLORS.textSecondary,
@@ -11476,7 +11478,7 @@ const styles = StyleSheet.create({
     borderRadius: 120,
     top: -118,
     right: -52,
-    backgroundColor: "rgba(1,217,168,0.16)",
+    backgroundColor: "rgba(47,128,237,0.16)",
   },
   profileCoverOrbTwo: {
     position: "absolute",
@@ -11583,7 +11585,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: "rgba(1,217,168,0.22)",
+    borderColor: "rgba(47,128,237,0.22)",
   },
   levelTitle: {
     color: COLORS.text,
@@ -11668,10 +11670,10 @@ const styles = StyleSheet.create({
     borderRadius: 27,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(1,217,168,0.10)",
+    backgroundColor: "rgba(47,128,237,0.10)",
     borderWidth: 1,
     borderStyle: "dashed",
-    borderColor: "rgba(1,217,168,0.55)",
+    borderColor: "rgba(47,128,237,0.55)",
   },
   stageHint: {
     color: "rgba(255,255,255,0.79)",
@@ -11718,7 +11720,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.08)",
   },
   roomTopBarCategory: {
-    color: "#FFD86B",
+    color: "#76AFFF",
     fontSize: 9,
     fontWeight: "900",
     letterSpacing: 1.6,
@@ -11760,7 +11762,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: "rgba(245,200,66,0.16)",
+    backgroundColor: "rgba(47,128,237,0.16)",
   },
   roomRetryText: { color: COLORS.primary, fontSize: 10, fontWeight: "800" },
   speakingRing: {
@@ -11840,7 +11842,7 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFD86B",
+    backgroundColor: "#76AFFF",
   },
   roomStageActions: {
     flexDirection: "row",
@@ -11869,7 +11871,7 @@ const styles = StyleSheet.create({
     height: 94,
     borderRadius: 47,
     borderWidth: 2,
-    borderColor: "#FFD86B",
+    borderColor: "#76AFFF",
   },
   roomHostAvatar: {
     width: 82,
@@ -11919,7 +11921,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,216,107,0.6)",
   },
   roomFollowBtnText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
-  roomFollowBtnTextActive: { color: "#FFD86B" },
+  roomFollowBtnTextActive: { color: "#76AFFF" },
   roomSpeakerGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -11937,7 +11939,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "rgba(255,255,255,0.12)",
   },
-  roomSpeakerAvatarActive: { borderColor: "#FFD86B" },
+  roomSpeakerAvatarActive: { borderColor: "#76AFFF" },
   roomSpeakerInitial: { color: "#11131A", fontSize: 20, fontWeight: "900" },
   roomMicOnBadge: {
     position: "absolute",
@@ -11948,7 +11950,7 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFD86B",
+    backgroundColor: "#76AFFF",
   },
   roomMicOffBadge: {
     position: "absolute",
@@ -11959,7 +11961,7 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#2A2E3A",
+    backgroundColor: "#1D2E43",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
   },
@@ -11991,7 +11993,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.16)",
   },
-  roomHandBtnActive: { backgroundColor: "#FFD86B", borderColor: "#FFD86B" },
+  roomHandBtnActive: { backgroundColor: "#76AFFF", borderColor: "#76AFFF" },
   roomHandBtnEmoji: { fontSize: 14 },
   roomHandBtnText: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
   roomChatBox: {
@@ -12067,7 +12069,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: 1.2,
   },
-  roomSectionCount: { color: "#FFD86B", fontSize: 10, fontWeight: "900" },
+  roomSectionCount: { color: "#76AFFF", fontSize: 10, fontWeight: "900" },
   roomAudienceCard: {
     borderRadius: 22,
     padding: 12,
@@ -12096,7 +12098,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFD86B",
+    backgroundColor: "#76AFFF",
   },
   roomAudienceName: {
     color: "rgba(255,255,255,0.7)",
@@ -12264,7 +12266,7 @@ const styles = StyleSheet.create({
     width: 150,
     height: 150,
     borderRadius: 75,
-    backgroundColor: "rgba(245,200,66,0.22)",
+    backgroundColor: "rgba(47,128,237,0.22)",
   },
   pfCoverOrbTwo: {
     position: "absolute",
@@ -12415,7 +12417,7 @@ const styles = StyleSheet.create({
   pfLevelInfo: { flex: 1 },
   pfLevelTitle: { color: COLORS.text, fontSize: 14, fontWeight: "900" },
   pfLevelDesc: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
-  pfLevelPoints: { color: "#9A6A00", fontSize: 12, fontWeight: "900" },
+  pfLevelPoints: { color: "#1D5FBF", fontSize: 12, fontWeight: "900" },
   pfProgressTrack: {
     height: 8,
     borderRadius: 999,
