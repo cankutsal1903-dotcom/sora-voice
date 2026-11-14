@@ -7950,7 +7950,13 @@ function AppContent() {
   };
   return (
     <View style={styles.app}>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView
+        style={[
+          styles.safeArea,
+          room && !roomMinimized && styles.safeAreaBehindRoom,
+        ]}
+        pointerEvents={room && !roomMinimized ? "none" : "auto"}
+      >
         <StatusBar barStyle="dark-content" />
         {screens[activeTab]}
         <BottomNavigation active={activeTab} onChange={setActiveTab} />
@@ -8077,6 +8083,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     paddingTop: Platform.OS === "android" ? 8 : 0,
   },
+  safeAreaBehindRoom: { opacity: 0 },
   discoverScroll: { flex: 1 },
   pageContent: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 104 },
   topBar: {
@@ -12684,6 +12691,8 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     justifyContent: "space-between",
     overflow: "visible",
+    zIndex: 2,
+    elevation: 2,
   },
   profileDetailOrb: {
     position: "absolute",
@@ -12715,6 +12724,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
+    zIndex: 3,
+    elevation: 3,
   },
   profileDetailAvatarRing: {
     padding: 5,
