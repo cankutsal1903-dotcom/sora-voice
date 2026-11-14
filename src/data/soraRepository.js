@@ -226,6 +226,36 @@ export const listRoomMembers = async (roomId) => {
   }));
 };
 
+export const getPublicProfile = async (userId) => {
+  if (!userId) return null;
+  const client = requireClient();
+  const [profileResult, appearanceResult] = await Promise.all([
+    client
+      .from("profiles")
+      .select("id, handle, display_name, avatar_color, bio")
+      .eq("id", userId)
+      .maybeSingle(),
+    client
+      .from("profiles")
+      .select("active_frame_id, active_profile_theme_id")
+      .eq("id", userId)
+      .maybeSingle(),
+  ]);
+  const { data, error } = profileResult;
+  throwIfError(error);
+  if (!data) return null;
+  const appearance = appearanceResult.error ? null : appearanceResult.data;
+  return {
+    userId: data.id,
+    handle: data.handle,
+    name: data.display_name,
+    color: data.avatar_color,
+    bio: data.bio,
+    activeFrameId: appearance?.active_frame_id || null,
+    activeProfileThemeId: appearance?.active_profile_theme_id || null,
+  };
+};
+
 export const listFollowedUserIds = async (userId) => {
   const client = requireClient();
   const { data, error } = await client.from("follows").select("following_id").eq("follower_id", userId);

@@ -9,6 +9,7 @@ import {
 import {
   Alert,
   Animated,
+  ActivityIndicator,
   AppState,
   Easing,
   Image,
@@ -56,6 +57,7 @@ import {
   createRoom as createRemoteRoom,
   deleteRoom as deleteRemoteRoom,
   getHostedRoom,
+  getPublicProfile,
   getRoom,
   getCurrentAdminRole,
   getWallet,
@@ -359,6 +361,7 @@ const Avatar = memo(function Avatar({
   color = "#5F96DF",
   size = 42,
   bordered = false,
+  circle = false,
 }) {
   return (
     <View
@@ -367,7 +370,7 @@ const Avatar = memo(function Avatar({
         {
           width: size,
           height: size,
-          borderRadius: size * 0.34,
+          borderRadius: circle ? size / 2 : size * 0.34,
           backgroundColor: color,
         },
         bordered && styles.avatarBorder,
@@ -2049,11 +2052,20 @@ function Profile({
   const [followedCount, setFollowedCount] = useState(0);
   const [followedNames, setFollowedNames] = useState([]);
   const [profileTab, setProfileTab] = useState("rooms");
+  const [profileDetailsOpen, setProfileDetailsOpen] = useState(false);
   const openSafetyCenter = useCallback(() => setSafetyOpen(true), []);
+  const openProfileDetails = useCallback(
+    () => setProfileDetailsOpen(true),
+    [],
+  );
   const actions = useMemo(
     () => [
-      ["person-outline", "Profili duzenle", onEdit],
-      ["diamond-outline", "Kredi cuzdani", onOpenWallet],
+      ["person-circle-outline", "Profili görüntüle", openProfileDetails],
+      [
+        "gift-outline",
+        dailyRewardClaimed ? "Günlük ödül alındı" : "Günlük ödül",
+        dailyRewardClaimed ? onOpenWallet : onClaimDailyReward,
+      ],
       ["shield-checkmark-outline", "Guvenlik merkezi", openSafetyCenter],
       ...(adminRole
         ? [["shield-half-outline", "Yonetim paneli", onOpenAdmin]]
@@ -2062,11 +2074,13 @@ function Profile({
     ],
     [
       adminRole,
+      dailyRewardClaimed,
+      onClaimDailyReward,
       onOpenAdmin,
-      onEdit,
       onOpenSettings,
       onOpenWallet,
       openSafetyCenter,
+      openProfileDetails,
     ],
   );
   useEffect(() => {
@@ -2163,169 +2177,165 @@ function Profile({
   const levelProgress = experiencePoints % 50;
   const levelName =
     level >= 7 ? "Topluluk sesi" : level >= 4 ? "Oda kurucusu" : "Yeni ses";
+  const homeFrameAppearance = PROFILE_ITEM_APPEARANCE[profile.activeFrameId];
+  const homeThemeAppearance = PROFILE_ITEM_APPEARANCE[profile.activeProfileThemeId];
   return (
-    <ScrollView
-      contentContainerStyle={styles.pageContent}
-      showsVerticalScrollIndicator={false}
-      windowSize={10}
-      maxToRenderPerBatch={15}
-      updateCellsBatchingPeriod={50}
-    >
-      <Reveal distance={12}>
-        <View style={styles.pfCover}>
-          <LinearGradient
-            colors={["#111820", "#1D2E43", "#111820"]}
-            style={StyleSheet.absoluteFill}
-          />
-          <View style={styles.pfCoverOrbOne} />
-          <View style={styles.pfCoverOrbTwo} />
-          <View style={styles.pfCoverTopRow}>
-            <View style={styles.pfBrandChip}>
-              <Image
-                source={SORA_LOGO}
-                style={styles.pfBrandLogo}
-                fadeDuration={0}
-                accessibilityLabel="Sora logosu"
-              />
-              <Text style={styles.pfBrandChipText}>SORA</Text>
-            </View>
-            <View style={styles.pfCoverActions}>
-              <Pressable
-                onPress={shareProfile}
-                style={styles.pfIconBtn}
-                accessibilityLabel="Profili paylaş"
+    <>
+      <ScrollView
+        contentContainerStyle={styles.pageContent}
+        showsVerticalScrollIndicator={false}
+        windowSize={10}
+        maxToRenderPerBatch={15}
+        updateCellsBatchingPeriod={50}
+      >
+        <Reveal distance={10}>
+          <View style={styles.profileHomeHeaderRow}>
+            <Pressable
+              onPress={openProfileDetails}
+              accessibilityRole="button"
+              accessibilityLabel="Profil ayrıntılarını aç"
+              style={({ pressed }) => [
+                styles.profileHomeIdentity,
+                homeThemeAppearance?.background
+                  ? { backgroundColor: homeThemeAppearance.background }
+                  : null,
+                pressed && styles.profileHomePressed,
+              ]}
+            >
+              <View
+                style={[
+                  styles.profileHomeAvatarWrap,
+                  homeFrameAppearance
+                    ? {
+                        padding: 3,
+                        borderRadius: 999,
+                        borderWidth: homeFrameAppearance.width || 3,
+                        borderColor: homeFrameAppearance.color || COLORS.primary,
+                      }
+                    : null,
+                ]}
               >
-                <Ionicons name="share-outline" size={18} color="#FFFFFF" />
-              </Pressable>
-              <Pressable
-                onPress={onOpenSettings}
-                style={styles.pfIconBtn}
-                accessibilityLabel="Profil ayarlarını aç"
-              >
-                <Ionicons name="settings-outline" size={18} color="#FFFFFF" />
-              </Pressable>
-            </View>
-          </View>
-          <View style={styles.pfCoverBottom}>
-            <View style={styles.pfCoverStat}>
-              <Ionicons name="flame" size={13} color="#76AFFF" />
-              <Text style={styles.pfCoverStatText}>
-                {activityStreak} gün seri
-              </Text>
-            </View>
-            <View style={styles.pfCoverStat}>
-              <Ionicons name="medal-outline" size={13} color="#76AFFF" />
-              <Text style={styles.pfCoverStatText}>
-                {badges.filter((badge) => badge.unlocked).length}/{badges.length}{" "}
-                rozet
-              </Text>
-            </View>
-          </View>
-        </View>
-      </Reveal>
-      <Reveal delay={70} distance={14}>
-        <View style={[styles.pfIdentity, { backgroundColor: PROFILE_ITEM_APPEARANCE[profile.activeProfileThemeId]?.background || COLORS.surface, borderRadius: 18 }]}>
-          <View style={styles.pfAvatarWrap}>
-            <View style={[styles.pfAvatarRing, profile.activeFrameId && { borderWidth: PROFILE_ITEM_APPEARANCE[profile.activeFrameId]?.width || 3, borderColor: PROFILE_ITEM_APPEARANCE[profile.activeFrameId]?.color || COLORS.primary }]}>
-              <Avatar
-                label={profile.name.charAt(0).toUpperCase()}
-                color={profile.color}
-                size={88}
-                bordered
-              />
-            </View>
-            <View style={styles.pfLevelBadge}>
-              <Text style={styles.pfLevelBadgeText}>L{level}</Text>
-            </View>
-          </View>
-          <Text style={styles.pfName}>{profile.name}</Text>
-          <Text style={styles.pfHandle}>@{profile.handle}</Text>
-          <Text style={styles.pfBio} numberOfLines={3}>
-            {profile.bio || "Sora topluluğunda sesini paylaşmaya hazır."}
-          </Text>
-          <View style={styles.pfIdentityActions}>
-            <Pressable onPress={onEdit} style={styles.pfPrimaryBtn}>
-              <Ionicons
-                name="create-outline"
-                size={16}
-                color={COLORS.primaryInk}
-              />
-              <Text style={styles.pfPrimaryBtnText}>Profili düzenle</Text>
+                <Avatar
+                  label={profile.name.charAt(0).toUpperCase()}
+                  color={profile.color}
+                  size={68}
+                  bordered
+                  circle
+                />
+                <View style={styles.profileHomeLevelBadge}>
+                  <Text style={styles.profileHomeLevelText}>L{level}</Text>
+                </View>
+              </View>
+              <View style={styles.profileHomeCopy}>
+                <Text style={styles.profileHomeName} numberOfLines={1}>
+                  {profile.name}
+                </Text>
+                <Text style={styles.profileHomeHandle} numberOfLines={1}>
+                  @{profile.handle}
+                </Text>
+                <Text style={styles.profileHomeBio} numberOfLines={1}>
+                  {profile.bio || "Sora ses topluluğundaki profilin"}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={21} color={COLORS.muted} />
             </Pressable>
             <Pressable
               onPress={shareProfile}
-              style={styles.pfSecondaryBtn}
+              style={styles.profileShareButton}
+              accessibilityRole="button"
               accessibilityLabel="Profili paylaş"
             >
-              <Ionicons name="share-social-outline" size={17} color="#FFFFFF" />
+              <Ionicons name="share-social-outline" size={18} color={COLORS.primary} />
             </Pressable>
           </View>
-        </View>
-      </Reveal>
-      <Reveal delay={120} distance={14}>
-        <View style={styles.pfStatsStrip}>
-          <ProfileStat number={String(favoriteCount)} label="Favori" />
-          <View style={styles.pfStatDivider} />
-          <ProfileStat number={String(hostedRoomCount)} label="Oda" />
-          <View style={styles.pfStatDivider} />
-          <ProfileStat number={String(coins)} label="Kredi" />
-        </View>
-      </Reveal>
-      <Reveal delay={150} distance={14}>
-        <View style={styles.pfLevelCard}>
-          <View style={styles.pfLevelHead}>
-            <View style={styles.pfLevelIcon}>
-              <Ionicons name="sparkles" size={18} color="#6AA8F5" />
-            </View>
-            <View style={styles.pfLevelInfo}>
-              <Text style={styles.pfLevelTitle}>
-                Seviye {String(level).padStart(2, "0")} · {levelName}
-              </Text>
-              <Text style={styles.pfLevelDesc} numberOfLines={1}>
-                {levelProgress
-                  ? "Odalar, favoriler ve serin seni ileri taşır."
-                  : "Yeni seviyeye hoş geldin, ritmi koru."}
-              </Text>
-            </View>
-            <Text style={styles.pfLevelPoints}>{levelProgress}/50</Text>
+        </Reveal>
+
+        <Reveal delay={45} distance={10}>
+          <View style={styles.profileMetricsRow}>
+            <ProfileMetric number={String(followedCount)} label="Takip" />
+            <ProfileMetric number={String(favoriteCount)} label="Favori" />
+            <ProfileMetric number={String(hostedRoomCount)} label="Oda" />
+            <ProfileMetric number={String(coins)} label="Kredi" />
           </View>
-          <View style={styles.pfProgressTrack}>
-            <View
-              style={[
-                styles.pfProgressFill,
-                { width: `${levelProgress || 4}%` },
-              ]}
-            />
-          </View>
-        </View>
-      </Reveal>
-      <Reveal delay={180} distance={14}>
-        <View style={styles.pfChipRow}>
-          <View style={styles.pfChip}>
-            <Ionicons name="heart" size={15} color={COLORS.pink} />
-            <Text style={styles.pfChipText}>{followedCount} takip</Text>
-          </View>
-          <Pressable
-            onPress={dailyRewardClaimed ? onOpenWallet : onClaimDailyReward}
-            style={[styles.pfChip, !dailyRewardClaimed && styles.pfChipAccent]}
-          >
-            <Ionicons
-              name={dailyRewardClaimed ? "checkmark" : "gift-outline"}
-              size={15}
-              color={dailyRewardClaimed ? COLORS.muted : COLORS.primaryInk}
-            />
-            <Text
-              style={[
-                styles.pfChipText,
-                !dailyRewardClaimed && styles.pfChipTextAccent,
-              ]}
+        </Reveal>
+
+        <Reveal delay={85} distance={10}>
+          <View style={styles.profileBannerRow}>
+            <Pressable
+              onPress={onEdit}
+              style={styles.profileBannerButton}
+              accessibilityRole="button"
+              accessibilityLabel="Profilini kişiselleştir"
             >
-              {dailyRewardClaimed ? "Ödül alındı" : "Günlük +75"}
-            </Text>
-          </Pressable>
+              <LinearGradient
+                colors={["#246BC7", "#6AA8F8"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.profileBanner}
+              >
+                <View style={styles.profileBannerCopy}>
+                  <Text style={styles.profileBannerTitle}>Profilini düzenle</Text>
+                  <Text style={styles.profileBannerCaption}>Görünümünü kişiselleştir</Text>
+                </View>
+                <Ionicons name="color-palette-outline" size={29} color="#FFFFFF" />
+              </LinearGradient>
+            </Pressable>
+            <Pressable
+              onPress={onOpenWallet}
+              style={styles.profileBannerButton}
+              accessibilityRole="button"
+              accessibilityLabel="Cüzdanı aç"
+            >
+              <LinearGradient
+                colors={["#111820", "#1D2E43"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.profileBanner}
+              >
+                <View style={styles.profileBannerCopy}>
+                  <Text style={styles.profileBannerTitle}>Cüzdan</Text>
+                  <Text style={styles.profileBannerCaption}>{coins} kredi</Text>
+                </View>
+                <Ionicons name="wallet-outline" size={29} color="#9FC7FF" />
+              </LinearGradient>
+            </Pressable>
+          </View>
+        </Reveal>
+
+        <Text style={styles.pfSection}>HESABIN</Text>
+        <View style={styles.pfMenu}>
+          {actions.map(([icon, title, action]) => (
+            <Pressable
+              key={title}
+              accessibilityRole="button"
+              accessibilityLabel={title}
+              onPress={action}
+              style={styles.pfMenuRow}
+            >
+              <View style={styles.pfMenuIcon}>
+                <Ionicons name={icon} size={19} color={COLORS.primary} />
+              </View>
+              <Text style={styles.pfMenuTitle}>{title}</Text>
+              <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
+            </Pressable>
+          ))}
         </View>
-      </Reveal>
-      <Reveal delay={200} distance={14}>
+
+        <View style={styles.profileLevelSummary}>
+          <View style={styles.pfLevelIcon}>
+            <Ionicons name="medal-outline" size={18} color={COLORS.primary} />
+          </View>
+          <View style={styles.pfLevelInfo}>
+            <Text style={styles.pfLevelTitle}>
+              Seviye {String(level).padStart(2, "0")} · {levelName}
+            </Text>
+            <Text style={styles.pfLevelDesc} numberOfLines={1}>
+              {activityStreak} günlük seri · {badges.filter((badge) => badge.unlocked).length} rozet
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
+        </View>
+
         <View style={styles.pfTabs}>
           <Pressable
             onPress={() => setProfileTab("rooms")}
@@ -2367,139 +2377,401 @@ function Profile({
             </View>
           </Pressable>
         </View>
-      </Reveal>
-      {profileTab === "rooms" ? (
-        myRooms.length ? (
-          myRooms.map((item) => (
-            <View key={item.id} style={styles.pfActivityRow}>
+        {profileTab === "rooms" ? (
+          myRooms.length ? (
+            myRooms.map((item) => (
+              <View key={item.id} style={styles.pfActivityRow}>
+                <View
+                  style={[
+                    styles.pfActivityAvatar,
+                    { backgroundColor: item.accent || COLORS.purple },
+                  ]}
+                >
+                  <Text style={styles.pfActivityAvatarText}>
+                    {item.initials || item.title.charAt(0)}
+                  </Text>
+                </View>
+                <View style={styles.pfActivityInfo}>
+                  <Text style={styles.pfActivityTitle} numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  <Text style={styles.pfActivityMeta}>
+                    {item.category} · {item.listeners ?? 0} dinleyici
+                  </Text>
+                </View>
+                <Ionicons name="mic-outline" size={18} color={COLORS.muted} />
+              </View>
+            ))
+          ) : (
+            <View style={styles.pfEmpty}>
+              <Ionicons name="mic-off-outline" size={16} color={COLORS.muted} />
+              <Text style={styles.pfEmptyText}>Henüz bir oda açmadın.</Text>
+            </View>
+          )
+        ) : followedNames.length ? (
+          followedNames.map((name) => (
+            <View key={name} style={styles.pfActivityRow}>
               <View
                 style={[
                   styles.pfActivityAvatar,
-                  { backgroundColor: item.accent || COLORS.purple },
+                  { backgroundColor: COLORS.primaryLight },
                 ]}
               >
                 <Text style={styles.pfActivityAvatarText}>
-                  {item.initials || item.title.charAt(0)}
+                  {name.charAt(0).toUpperCase()}
                 </Text>
               </View>
               <View style={styles.pfActivityInfo}>
                 <Text style={styles.pfActivityTitle} numberOfLines={1}>
-                  {item.title}
+                  {name}
                 </Text>
-                <Text style={styles.pfActivityMeta}>
-                  {item.category} · {item.listeners ?? 0} dinleyici
-                </Text>
+                <Text style={styles.pfActivityMeta}>Takip ediliyor</Text>
               </View>
-              <Ionicons name="mic-outline" size={18} color={COLORS.muted} />
+              <Ionicons name="heart" size={16} color={COLORS.primary} />
             </View>
           ))
         ) : (
           <View style={styles.pfEmpty}>
-            <Ionicons name="mic-off-outline" size={16} color={COLORS.muted} />
-            <Text style={styles.pfEmptyText}>Henüz bir oda açmadın.</Text>
+            <Ionicons name="heart-outline" size={16} color={COLORS.muted} />
+            <Text style={styles.pfEmptyText}>Henüz kimseyi takip etmiyorsun.</Text>
           </View>
-        )
-      ) : followedNames.length ? (
-        followedNames.map((name) => (
-          <View key={name} style={styles.pfActivityRow}>
-            <View
-              style={[
-                styles.pfActivityAvatar,
-                { backgroundColor: COLORS.purple },
-              ]}
-            >
-              <Text style={styles.pfActivityAvatarText}>
-                {name.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-            <View style={styles.pfActivityInfo}>
-              <Text style={styles.pfActivityTitle} numberOfLines={1}>
-                {name}
-              </Text>
-              <Text style={styles.pfActivityMeta}>Takip ediliyor</Text>
-            </View>
-            <Ionicons name="heart" size={16} color={COLORS.pink} />
-          </View>
-        ))
-      ) : (
-        <View style={styles.pfEmpty}>
-          <Ionicons name="heart-outline" size={16} color={COLORS.muted} />
-          <Text style={styles.pfEmptyText}>Henüz kimseyi takip etmiyorsun.</Text>
-        </View>
-      )}
-      <Text style={styles.pfSection}>ROZETLER</Text>
-      <View style={styles.pfBadgeRow}>
-        {badges.map((badge) => (
-          <View key={badge.id} style={styles.pfBadge}>
-            <View
-              style={[
-                styles.pfBadgeIcon,
-                badge.unlocked && styles.pfBadgeIconOn,
-              ]}
-            >
-              <Ionicons
-                name={badge.unlocked ? badge.icon : "lock-closed"}
-                size={18}
-                color={badge.unlocked ? COLORS.primaryInk : COLORS.muted}
-              />
-            </View>
-            <Text style={styles.pfBadgeText} numberOfLines={1}>
-              {badge.title}
-            </Text>
-          </View>
-        ))}
-      </View>
-      {recentActivity.length > 0 && (
-        <>
-          <Text style={styles.pfSection}>SON DİNLEDİKLERİN</Text>
-          {recentActivity.map((item) => (
-            <View key={item.id} style={styles.pfActivityRow}>
+        )}
+
+        <Text style={styles.pfSection}>ROZETLER</Text>
+        <View style={styles.pfBadgeRow}>
+          {badges.map((badge) => (
+            <View key={badge.id} style={styles.pfBadge}>
               <View
                 style={[
-                  styles.pfActivityAvatar,
-                  { backgroundColor: item.color || COLORS.purple },
+                  styles.pfBadgeIcon,
+                  badge.unlocked && styles.pfBadgeIconOn,
                 ]}
               >
-                <Text style={styles.pfActivityAvatarText}>
-                  {item.initials || item.title.charAt(0)}
-                </Text>
+                <Ionicons
+                  name={badge.unlocked ? badge.icon : "lock-closed"}
+                  size={18}
+                  color={badge.unlocked ? COLORS.primary : COLORS.muted}
+                />
               </View>
-              <View style={styles.pfActivityInfo}>
-                <Text style={styles.pfActivityTitle} numberOfLines={1}>
-                  {item.title}
-                </Text>
-                <Text style={styles.pfActivityMeta}>
-                  {item.category} · {item.visitedAt}
-                </Text>
-              </View>
-              <Ionicons name="headset-outline" size={18} color={COLORS.muted} />
+              <Text style={styles.pfBadgeText} numberOfLines={1}>
+                {badge.title}
+              </Text>
             </View>
           ))}
-        </>
-      )}
-      <Text style={styles.pfSection}>HESABIN</Text>
-      <View style={styles.pfMenu}>
-        {actions.map(([icon, title, action]) => (
-          <Pressable
-            key={title}
-            accessibilityRole="button"
-            accessibilityLabel={title}
-            onPress={action}
-            style={styles.pfMenuRow}
-          >
-            <View style={styles.pfMenuIcon}>
-              <Ionicons name={icon} size={19} color={COLORS.text} />
-            </View>
-            <Text style={styles.pfMenuTitle}>{title}</Text>
-            <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
-          </Pressable>
-        ))}
-      </View>
+        </View>
+        {recentActivity.length > 0 && (
+          <>
+            <Text style={styles.pfSection}>SON DİNLEDİKLERİN</Text>
+            {recentActivity.map((item) => (
+              <View key={item.id} style={styles.pfActivityRow}>
+                <View
+                  style={[
+                    styles.pfActivityAvatar,
+                    { backgroundColor: item.color || COLORS.purple },
+                  ]}
+                >
+                  <Text style={styles.pfActivityAvatarText}>
+                    {item.initials || item.title.charAt(0)}
+                  </Text>
+                </View>
+                <View style={styles.pfActivityInfo}>
+                  <Text style={styles.pfActivityTitle} numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  <Text style={styles.pfActivityMeta}>
+                    {item.category} · {item.visitedAt}
+                  </Text>
+                </View>
+                <Ionicons name="headset-outline" size={18} color={COLORS.muted} />
+              </View>
+            ))}
+          </>
+        )}
+      </ScrollView>
+      <ProfileDetailSheet
+        visible={profileDetailsOpen}
+        profile={profile}
+        isSelf
+        onEdit={onEdit}
+        onShare={shareProfile}
+        onDismiss={() => setProfileDetailsOpen(false)}
+      />
       <SecureSafetyCenterSheet
         visible={safetyOpen}
         onDismiss={() => setSafetyOpen(false)}
       />
-    </ScrollView>
+    </>
+  );
+}
+
+const ProfileMetric = memo(function ProfileMetric({ number, label }) {
+  return (
+    <View style={styles.profileMetric}>
+      <Text style={styles.profileMetricNumber}>{number}</Text>
+      <Text style={styles.profileMetricLabel}>{label}</Text>
+    </View>
+  );
+});
+
+function ProfileDetailSheet({
+  visible,
+  profile,
+  userId,
+  isSelf = false,
+  roomContext,
+  isFollowing = false,
+  canBlock = false,
+  onDismiss,
+  onEdit,
+  onShare,
+  onToggleFollow,
+  onBlock,
+  onReport,
+}) {
+  const insets = useSafeAreaInsets();
+  const [remoteProfile, setRemoteProfile] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [detailTab, setDetailTab] = useState("profile");
+
+  useEffect(() => {
+    if (!visible || !userId || profile?.handle) {
+      setRemoteProfile(null);
+      return undefined;
+    }
+    let active = true;
+    setLoading(true);
+    getPublicProfile(userId)
+      .then((result) => {
+        if (active) setRemoteProfile(result);
+      })
+      .catch(() => {
+        if (active) setRemoteProfile(null);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [profile?.handle, userId, visible]);
+
+  useEffect(() => {
+    if (visible) setDetailTab("profile");
+  }, [visible]);
+
+  const person = remoteProfile || profile || {};
+  const name = person.name || person.display_name || "Sora kullanıcısı";
+  const handle = person.handle ? `@${person.handle.replace(/^@+/, "")}` : "Sora kullanıcısı";
+  const color = person.color || person.avatar_color || COLORS.primaryLight;
+  const frameAppearance = PROFILE_ITEM_APPEARANCE[person.activeFrameId];
+  const themeAppearance = PROFILE_ITEM_APPEARANCE[person.activeProfileThemeId];
+  const role = person.role;
+  const roleLabel =
+    role === "host"
+      ? "Oda sahibi"
+      : role === "moderator"
+        ? "Moderatör"
+        : role === "speaker"
+          ? "Konuşmacı"
+          : "Dinleyici";
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      statusBarTranslucent
+      onRequestClose={onDismiss}
+    >
+      <View style={styles.profileDetailScreen}>
+        <StatusBar barStyle="light-content" backgroundColor="#111820" />
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+        >
+          <View
+            style={[
+              styles.profileDetailCover,
+              { paddingTop: insets.top + 10 },
+            ]}
+          >
+            <LinearGradient
+              colors={COLORS.gradients.dark}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={[styles.profileDetailOrb, { backgroundColor: `${color}55` }]} />
+            <View style={styles.profileDetailTopRow}>
+              <Pressable
+                onPress={onDismiss}
+                style={styles.profileDetailIconButton}
+                accessibilityRole="button"
+                accessibilityLabel="Profile geri dön"
+              >
+                <Ionicons name="arrow-back" size={21} color="#FFFFFF" />
+              </Pressable>
+              <View style={styles.profileDetailTopActions}>
+                {loading ? <ActivityIndicator color="#FFFFFF" size="small" /> : null}
+                {isSelf && onShare ? (
+                  <Pressable
+                    onPress={onShare}
+                    style={styles.profileDetailIconButton}
+                    accessibilityLabel="Profili paylaş"
+                  >
+                    <Ionicons name="share-social-outline" size={19} color="#FFFFFF" />
+                  </Pressable>
+                ) : null}
+                {isSelf && onEdit ? (
+                  <Pressable
+                    onPress={() => {
+                      onDismiss();
+                      onEdit();
+                    }}
+                    style={styles.profileDetailIconButton}
+                    accessibilityLabel="Profili düzenle"
+                  >
+                    <Ionicons name="create-outline" size={19} color="#FFFFFF" />
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+            <View style={styles.profileDetailCoverBottom}>
+              <View
+                style={[
+                  styles.profileDetailAvatarRing,
+                  frameAppearance
+                    ? {
+                        borderColor: frameAppearance.color || COLORS.primary,
+                        borderWidth: frameAppearance.width || 3,
+                      }
+                    : null,
+                ]}
+              >
+                <Avatar
+                  label={name.charAt(0).toUpperCase()}
+                  color={color}
+                  size={88}
+                  bordered
+                  circle
+                />
+              </View>
+              <View style={styles.profileDetailStatus}>
+                <View style={styles.profileDetailStatusDot} />
+                <Text style={styles.profileDetailStatusText}>
+                  {roomContext ? "Bu odada" : "Sora profili"}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <View
+            style={[
+              styles.profileDetailIdentity,
+              themeAppearance?.background
+                ? { backgroundColor: themeAppearance.background }
+                : null,
+            ]}
+          >
+            <Text style={styles.profileDetailName}>{name}</Text>
+            <Text style={styles.profileDetailHandle}>{handle}</Text>
+            {roomContext ? (
+              <View style={styles.profileDetailRoleRow}>
+                <Ionicons name="mic-outline" size={16} color={COLORS.primary} />
+                <Text style={styles.profileDetailRoleText}>{roleLabel} · {roomContext.title}</Text>
+              </View>
+            ) : null}
+          </View>
+
+          {roomContext ? (
+            <View style={styles.profileDetailTabs}>
+              <Pressable
+                onPress={() => setDetailTab("profile")}
+                style={[
+                  styles.profileDetailTab,
+                  detailTab === "profile" && styles.profileDetailTabActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.profileDetailTabText,
+                    detailTab === "profile" && styles.profileDetailTabTextActive,
+                  ]}
+                >
+                  Profil
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setDetailTab("room")}
+                style={[
+                  styles.profileDetailTab,
+                  detailTab === "room" && styles.profileDetailTabActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.profileDetailTabText,
+                    detailTab === "room" && styles.profileDetailTabTextActive,
+                  ]}
+                >
+                  Bu oda
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+
+          {detailTab === "room" && roomContext ? (
+            <View style={styles.profileDetailSection}>
+              <Text style={styles.profileDetailSectionTitle}>Odadaki bilgileri</Text>
+              <View style={styles.profileDetailInfoRow}>
+                <Ionicons name="radio-outline" size={19} color={COLORS.primary} />
+                <View style={styles.profileDetailInfoCopy}>
+                  <Text style={styles.profileDetailInfoTitle}>{roomContext.title}</Text>
+                  <Text style={styles.profileDetailInfoCaption}>{roleLabel}</Text>
+                </View>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.profileDetailSection}>
+              <Text style={styles.profileDetailSectionTitle}>Hakkında</Text>
+              <Text style={styles.profileDetailBio}>
+                {person.bio || "Henüz bir profil açıklaması eklenmemiş."}
+              </Text>
+              {loading ? (
+                <Text style={styles.profileDetailLoading}>Profil bilgileri yükleniyor…</Text>
+              ) : null}
+            </View>
+          )}
+          {!isSelf ? (
+            <View style={styles.profileDetailActions}>
+              <Pressable
+                onPress={onToggleFollow}
+                style={styles.profileDetailFollowButton}
+                accessibilityRole="button"
+              >
+                <Ionicons
+                  name={isFollowing ? "heart-dislike-outline" : "heart-outline"}
+                  size={18}
+                  color="#FFFFFF"
+                />
+                <Text style={styles.profileDetailFollowText}>
+                  {isFollowing ? "Takipten çık" : "Takip et"}
+                </Text>
+              </Pressable>
+              <View style={styles.profileDetailSafetyActions}>
+                <Pressable onPress={onReport} style={styles.profileDetailSafetyButton}>
+                  <Ionicons name="flag-outline" size={17} color={COLORS.danger} />
+                  <Text style={styles.profileDetailSafetyText}>Raporla</Text>
+                </Pressable>
+                {canBlock ? (
+                  <Pressable onPress={onBlock} style={styles.profileDetailSafetyButton}>
+                    <Ionicons name="ban-outline" size={17} color={COLORS.danger} />
+                    <Text style={styles.profileDetailSafetyText}>Engelle</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
+        </ScrollView>
+      </View>
+    </Modal>
   );
 }
 
@@ -2906,6 +3178,7 @@ const ParticipantActionSheet = memo(function ParticipantActionSheet({
   participant,
   isFollowing,
   canBlock,
+  onViewProfile,
   onToggleFollow,
   onBlock,
   onReport,
@@ -2946,6 +3219,11 @@ const ParticipantActionSheet = memo(function ParticipantActionSheet({
               </Text>
             </View>
           </View>
+          <Pressable onPress={onViewProfile} style={styles.participantProfileButton}>
+            <Ionicons name="person-circle-outline" size={19} color={COLORS.primary} />
+            <Text style={styles.participantProfileButtonText}>Profili görüntüle</Text>
+            <Ionicons name="chevron-forward" size={17} color={COLORS.muted} />
+          </Pressable>
           <Pressable onPress={onToggleFollow} style={styles.settingRow}>
             <View
               style={[styles.settingIcon, isFollowing && styles.settingIconActive]}
@@ -4619,6 +4897,7 @@ function Room({
   const [roomGiftCatalog, setRoomGiftCatalog] = useState(GIFT_CATALOG);
   const [giftFlight, setGiftFlight] = useState(null);
   const [selectedParticipant, setSelectedParticipant] = useState(null);
+  const [profileParticipant, setProfileParticipant] = useState(null);
   const [followedParticipantNames, setFollowedParticipantNames] = useState([]);
   const [roomLocked, setRoomLocked] = useState(Boolean(room.roomLocked));
   const [chatLocked, setChatLocked] = useState(Boolean(room.chatLocked));
@@ -5310,6 +5589,7 @@ function Room({
     (participant) => {
       if (!participant?.userId || participant.userId === userId) return;
       setSelectedParticipant(participant);
+      setProfileParticipant(participant);
     },
     [userId],
   );
@@ -5317,6 +5597,11 @@ function Room({
     () => setSelectedParticipant(null),
     [],
   );
+  const handleViewSelectedProfile = useCallback(() => {
+    if (!selectedParticipant) return;
+    setProfileParticipant(selectedParticipant);
+    setSelectedParticipant(null);
+  }, [selectedParticipant]);
   const selectedIsHostParticipant = Boolean(
     selectedParticipant && selectedParticipant.userId === room.hostId,
   );
@@ -5346,11 +5631,13 @@ function Room({
   const handleSelectedBlock = useCallback(() => {
     const participant = selectedParticipant;
     setSelectedParticipant(null);
+    setProfileParticipant(null);
     if (participant) blockParticipant(participant);
   }, [blockParticipant, selectedParticipant]);
   const handleSelectedReport = useCallback(() => {
     const participant = selectedParticipant;
     setSelectedParticipant(null);
+    setProfileParticipant(null);
     if (participant)
       setReportTarget({
         name: `${participant.name} kullanıcısı`,
@@ -5679,6 +5966,7 @@ function Room({
                       key={participant.userId}
                       style={styles.roomAudienceItem}
                       delayLongPress={260}
+                      onPress={() => openParticipantMenu(participant)}
                       onLongPress={() => openParticipantMenu(participant)}
                       accessibilityRole="button"
                       accessibilityLabel={`${participant.name} kullanıcı menüsü`}
@@ -5830,13 +6118,30 @@ function Room({
       />
       <ReportSheet target={reportTarget} onDismiss={handleCloseReport} />
       <ParticipantActionSheet
-        participant={selectedParticipant}
+        participant={profileParticipant ? null : selectedParticipant}
         isFollowing={selectedIsFollowing}
         canBlock={Boolean(room.persisted && selectedParticipant?.userId)}
+        onViewProfile={handleViewSelectedProfile}
         onToggleFollow={handleSelectedFollow}
         onBlock={handleSelectedBlock}
         onReport={handleSelectedReport}
         onDismiss={closeParticipantMenu}
+      />
+      <ProfileDetailSheet
+        visible={Boolean(profileParticipant)}
+        profile={profileParticipant}
+        userId={profileParticipant?.userId}
+        roomContext={room}
+        isSelf={profileParticipant?.userId === userId}
+        isFollowing={selectedIsFollowing}
+        canBlock={Boolean(room.persisted && profileParticipant?.userId)}
+        onToggleFollow={handleSelectedFollow}
+        onBlock={handleSelectedBlock}
+        onReport={handleSelectedReport}
+        onDismiss={() => {
+          setProfileParticipant(null);
+          setSelectedParticipant(null);
+        }}
       />
     </SafeAreaView>
   );
@@ -12240,6 +12545,22 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: 2,
   },
+  participantProfileButton: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    marginBottom: 4,
+    borderRadius: 14,
+    backgroundColor: COLORS.surfaceRaised,
+  },
+  participantProfileButtonText: {
+    flex: 1,
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: "800",
+  },
   // Koyu oda içinde sohbet metinleri okunur olsun.
   composerGift: {
     width: 34,
@@ -12266,6 +12587,220 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.08)",
   },
 
+  /* ══ WePlay / Hazan tarzı profil ekranı ══════════════════════════ */
+  profileHomeHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    marginTop: 4,
+  },
+  profileHomeIdentity: {
+    flex: 1,
+    minHeight: 96,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    borderRadius: 20,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  profileHomePressed: { opacity: 0.82 },
+  profileHomeAvatarWrap: { position: "relative" },
+  profileHomeLevelBadge: {
+    position: "absolute",
+    right: -3,
+    bottom: -2,
+    minWidth: 28,
+    height: 22,
+    paddingHorizontal: 6,
+    borderRadius: 11,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: COLORS.primary,
+    borderWidth: 2,
+    borderColor: COLORS.surface,
+  },
+  profileHomeLevelText: { color: "#FFFFFF", fontSize: 9, fontWeight: "900" },
+  profileHomeCopy: { flex: 1, gap: 2 },
+  profileHomeName: { color: COLORS.text, fontSize: 17, fontWeight: "900" },
+  profileHomeHandle: { color: COLORS.mutedDark, fontSize: 12, fontWeight: "700" },
+  profileHomeBio: { color: COLORS.textSecondary, fontSize: 11, marginTop: 2 },
+  profileShareButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  profileMetricsRow: {
+    flexDirection: "row",
+    marginTop: 13,
+    paddingVertical: 5,
+    borderRadius: 20,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  profileMetric: { flex: 1, alignItems: "center", paddingVertical: 7 },
+  profileMetricNumber: { color: COLORS.text, fontSize: 20, fontWeight: "900" },
+  profileMetricLabel: { color: COLORS.muted, fontSize: 10, fontWeight: "700", marginTop: 2 },
+  profileBannerRow: { flexDirection: "row", gap: 10, marginTop: 13 },
+  profileBannerButton: { flex: 1 },
+  profileBanner: {
+    minHeight: 86,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 17,
+    overflow: "hidden",
+  },
+  profileBannerCopy: { flex: 1 },
+  profileBannerTitle: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
+  profileBannerCaption: { color: "rgba(255,255,255,0.78)", fontSize: 10, fontWeight: "700", marginTop: 4 },
+  profileLevelSummary: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    marginTop: 12,
+    padding: 13,
+    borderRadius: 18,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  profileDetailScreen: { flex: 1, backgroundColor: COLORS.background },
+  profileDetailCover: {
+    height: 284,
+    paddingHorizontal: 18,
+    paddingBottom: 24,
+    justifyContent: "space-between",
+    overflow: "visible",
+  },
+  profileDetailOrb: {
+    position: "absolute",
+    width: 290,
+    height: 290,
+    borderRadius: 145,
+    right: -112,
+    top: -110,
+  },
+  profileDetailTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  profileDetailTopActions: { flexDirection: "row", alignItems: "center", gap: 9 },
+  profileDetailIconButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.16)",
+  },
+  profileDetailCoverBottom: {
+    position: "absolute",
+    left: 20,
+    right: 20,
+    bottom: -44,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+  },
+  profileDetailAvatarRing: {
+    padding: 5,
+    borderRadius: 999,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  profileDetailStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 10,
+    borderRadius: 999,
+    backgroundColor: COLORS.primary,
+  },
+  profileDetailStatusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#FFFFFF" },
+  profileDetailStatusText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
+  profileDetailIdentity: {
+    marginHorizontal: 12,
+    marginTop: -3,
+    paddingHorizontal: 20,
+    paddingTop: 56,
+    paddingBottom: 18,
+    borderRadius: 22,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  profileDetailName: { color: COLORS.text, fontSize: 22, fontWeight: "900" },
+  profileDetailHandle: { color: COLORS.mutedDark, fontSize: 13, fontWeight: "700", marginTop: 5 },
+  profileDetailRoleRow: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 12 },
+  profileDetailRoleText: { color: COLORS.textSecondary, fontSize: 12, fontWeight: "700", flexShrink: 1 },
+  profileDetailTabs: {
+    flexDirection: "row",
+    marginHorizontal: 18,
+    marginTop: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.line,
+  },
+  profileDetailTab: { flex: 1, minHeight: 46, alignItems: "center", justifyContent: "center" },
+  profileDetailTabActive: { borderBottomWidth: 3, borderBottomColor: COLORS.primary },
+  profileDetailTabText: { color: COLORS.muted, fontSize: 14, fontWeight: "800" },
+  profileDetailTabTextActive: { color: COLORS.text },
+  profileDetailSection: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 18,
+    borderRadius: 20,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  profileDetailSectionTitle: { color: COLORS.text, fontSize: 16, fontWeight: "900", marginBottom: 12 },
+  profileDetailBio: { color: COLORS.textSecondary, fontSize: 14, lineHeight: 21 },
+  profileDetailLoading: { color: COLORS.muted, fontSize: 12, marginTop: 10 },
+  profileDetailInfoRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 7 },
+  profileDetailInfoCopy: { flex: 1 },
+  profileDetailInfoTitle: { color: COLORS.text, fontSize: 14, fontWeight: "800" },
+  profileDetailInfoCaption: { color: COLORS.muted, fontSize: 12, marginTop: 3 },
+  profileDetailActions: { marginHorizontal: 16, marginTop: 14, gap: 9 },
+  profileDetailFollowButton: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 15,
+    backgroundColor: COLORS.primary,
+  },
+  profileDetailFollowText: { color: "#FFFFFF", fontSize: 14, fontWeight: "900" },
+  profileDetailSafetyActions: { flexDirection: "row", gap: 9 },
+  profileDetailSafetyButton: {
+    flex: 1,
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    borderRadius: 14,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  profileDetailSafetyText: { color: COLORS.textSecondary, fontSize: 12, fontWeight: "800" },
   /* ══ WePlay / Hazan tarzı profil ekranı ══════════════════════════ */
   pfCover: {
     height: 178,
