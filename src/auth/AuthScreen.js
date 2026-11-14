@@ -5,8 +5,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import {
   isHandleAvailable,
   normalizePhoneNumber,
+  EMAIL_CONFIRMATION_URL,
   requestPasswordReset,
-  AUTH_CALLBACK_URL,
   startOAuthSignIn,
   startPhoneSignIn,
   supabase,
@@ -78,7 +78,7 @@ export function AuthScreen() {
             password,
             options: {
               data: { display_name: profile.displayName, handle: profile.handle },
-              ...(Platform.OS === "web" ? {} : { emailRedirectTo: AUTH_CALLBACK_URL }),
+              emailRedirectTo: EMAIL_CONFIRMATION_URL,
             },
           })
         : await supabase.auth.signInWithPassword({ email: cleanEmail, password });
