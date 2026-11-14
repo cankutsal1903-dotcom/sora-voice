@@ -51,9 +51,6 @@ Aynı sayfada **Variables** sekmesi (`eas.json` → `build.release-apk.env`):
 - `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `EXPO_PUBLIC_EAS_PROJECT_ID`
 - `EXPO_PUBLIC_ERROR_REPORTING_ENABLED`
-- `EXPO_PUBLIC_BANK_ACCOUNT_HOLDER`
-- `EXPO_PUBLIC_BANK_NAME`
-- `EXPO_PUBLIC_BANK_IBAN`
 
 Bunlar gizli değildir; APK'nın içine gömülür.
 

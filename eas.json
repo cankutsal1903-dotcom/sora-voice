@@ -20,10 +20,7 @@
         "EXPO_PUBLIC_SUPABASE_URL": "https://eziwbekavrhbqrovbgwa.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_-G4IyIqCxn_vCsXvJb2n3g_HI6kPDG-",
         "EXPO_PUBLIC_EAS_PROJECT_ID": "eaa65edd-9980-4db9-950a-9ecb047f0ad7",
-        "EXPO_PUBLIC_ERROR_REPORTING_ENABLED": "true",
-        "EXPO_PUBLIC_BANK_ACCOUNT_HOLDER": "Ömer Can Kutsal",
-        "EXPO_PUBLIC_BANK_NAME": "İNG Bankası",
-        "EXPO_PUBLIC_BANK_IBAN": "TR98 0009 9039 7073 2700 1000 01"
+        "EXPO_PUBLIC_ERROR_REPORTING_ENABLED": "true"
       }
     },
     "release-apk": {
@@ -38,10 +35,7 @@
         "EXPO_PUBLIC_SUPABASE_URL": "https://eziwbekavrhbqrovbgwa.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_-G4IyIqCxn_vCsXvJb2n3g_HI6kPDG-",
         "EXPO_PUBLIC_EAS_PROJECT_ID": "eaa65edd-9980-4db9-950a-9ecb047f0ad7",
-        "EXPO_PUBLIC_ERROR_REPORTING_ENABLED": "true",
-        "EXPO_PUBLIC_BANK_ACCOUNT_HOLDER": "Ömer Can Kutsal",
-        "EXPO_PUBLIC_BANK_NAME": "İNG Bankası",
-        "EXPO_PUBLIC_BANK_IBAN": "TR98 0009 9039 7073 2700 1000 01"
+        "EXPO_PUBLIC_ERROR_REPORTING_ENABLED": "true"
       }
     },
     "production": {
@@ -55,10 +49,7 @@
         "EXPO_PUBLIC_SUPABASE_URL": "https://eziwbekavrhbqrovbgwa.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_-G4IyIqCxn_vCsXvJb2n3g_HI6kPDG-",
         "EXPO_PUBLIC_EAS_PROJECT_ID": "eaa65edd-9980-4db9-950a-9ecb047f0ad7",
-        "EXPO_PUBLIC_ERROR_REPORTING_ENABLED": "true",
-        "EXPO_PUBLIC_BANK_ACCOUNT_HOLDER": "Ömer Can Kutsal",
-        "EXPO_PUBLIC_BANK_NAME": "İNG Bankası",
-        "EXPO_PUBLIC_BANK_IBAN": "TR98 0009 9039 7073 2700 1000 01"
+        "EXPO_PUBLIC_ERROR_REPORTING_ENABLED": "true"
       }
     }
   },

@@ -295,27 +295,6 @@ const mapBankTransferRequest = (request) => ({
   requesterHandle: request.requester_handle || null,
 });
 
-export const createBankTransferRequest = async ({ requestedCredits, amountTry }) => {
-  const client = requireClient();
-  const { data, error } = await client.rpc("create_bank_transfer_request", {
-    p_requested_credits: requestedCredits,
-    p_amount_try: amountTry,
-  });
-  throwIfError(error);
-  return mapBankTransferRequest(Array.isArray(data) ? data[0] : data);
-};
-
-export const listMyBankTransferRequests = async () => {
-  const client = requireClient();
-  const { data, error } = await client
-    .from("bank_transfer_requests")
-    .select("id, reference_code, user_id, requested_credits, amount_try, status, credited_credits, admin_note, created_at, reviewed_at")
-    .order("created_at", { ascending: false })
-    .limit(20);
-  throwIfError(error);
-  return (data || []).map(mapBankTransferRequest);
-};
-
 export const listAdminBankTransferRequests = async () => {
   const client = requireClient();
   const { data, error } = await client.rpc("admin_list_bank_transfer_requests", { p_status: null });

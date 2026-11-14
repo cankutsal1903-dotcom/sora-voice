@@ -9,14 +9,14 @@ Bu politika, Sora'nın sesli oda ve topluluk özelliklerini kullanırken hangi v
 
 - **Hesap ve profil:** Kimlik doğrulama sağlayıcısının verdiği kullanıcı kimliği, e-posta adresi, kullanıcı adı, görünen ad ve seçtiğiniz profil görünümü.
 - **Topluluk etkinliği:** Açtığınız veya katıldığınız odalar, oda üyeliğiniz, oda içi mesajlar, takipler, engellemeler, şikâyetler ve moderasyon kararları.
-- **Cüzdan ve kredi talepleri:** Kredi bakiyesi, işlem geçmişi, banka transferi talep tutarı, transfer referansı ve talep durumu. Banka kartı veya hesap giriş bilgileri uygulamada toplanmaz.
+- **Cüzdan ve krediler:** Kredi bakiyesi, promosyon ve satın alınmış kredi toplamları ile kredi işlem geçmişi. Mağaza satın alımları etkinleştirildiğinde ödemeyi Google Play işler; Sora banka kartı veya hesap giriş bilgilerini toplamaz.
 - **Ses bağlantısı:** Mikrofona yalnızca izin verdiğinizde, güvenli ses bağlantısı kurulduğunda ve sesli odaya katıldığınızda erişilir. Sora ses kaydı oluşturma ya da oynatma özelliği sunmaz; ses, odayı sağlamak için canlı iletişim altyapısından geçer.
 - **Bildirim bilgileri:** Bildirim izni, cihaz bildirim belirteci ve seçtiğiniz oda hatırlatıcıları.
 - **Teknik hata bilgileri:** Uygulama sürümü, işletim sistemi, hata zamanı ve hassas verileri ayıklanmış hata metni. Hata kayıtlarına erişim belirteçleri, parolalar ve e-posta adresleri gönderilmemelidir.
 
 ## Bilgileri neden kullanıyoruz
 
-Bilgileri hesabınızı çalıştırmak, sesli odaları ve mesajlaşmayı sağlamak, güvenliği ve moderasyonu yürütmek, kredi taleplerini incelemek, bildirim göndermek ve uygulama hatalarını çözmek için kullanırız.
+Bilgileri hesabınızı çalıştırmak, sesli odaları ve mesajlaşmayı sağlamak, güvenliği ve moderasyonu yürütmek, kredi bakiyesini ve işlem geçmişini yönetmek, bildirim göndermek ve uygulama hatalarını çözmek için kullanırız.
 
 ## Paylaşım ve altyapı sağlayıcıları
 

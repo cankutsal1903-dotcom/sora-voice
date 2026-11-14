@@ -226,8 +226,8 @@ $env:SORA_RELEASE_KEY_PASSWORD="..."
 ## Güvenlik notları
 
 - `eas.json` içindeki `EXPO_PUBLIC_*` değerleri **gizli değildir**; APK'nın
-  içine gömülür ve herkes okuyabilir. Supabase publishable key ve IBAN bilgisi
-  bu yüzden sorun değildir.
+  içine gömülür ve herkes okuyabilir. Banka hesap bilgileri veya sunucu sırlarını
+  bu alana koymayın.
 - `LIVEKIT_API_SECRET` **asla** `eas.json`, `.env` (kök) veya uygulama koduna
   konmaz. Yalnızca `server/.env` içinde durur ve sunucu `.gitignore` ile dışlanır.
 - Canlıya çıkmadan önce token sunucusunu HTTPS/WSS adresine taşıyın ve

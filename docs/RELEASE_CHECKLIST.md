@@ -15,8 +15,8 @@ Bu dosya Android ve iOS mağaza yayınını hazırlamak içindir. Yapılandırma
 1. `docs/PRIVACY_POLICY.md` içindeki `DESTEK_E_POSTA_ADRESI` alanını gerçek destek adresiyle değiştirin.
 2. Politikayı kendi alan adınızda HTTPS ile yayımlayın; mağaza listelerinde bu açık URL'yi kullanın.
 3. Üretim `.env` dosyasında erişilebilir HTTPS token sunucusu adresini ve `EXPO_PUBLIC_ERROR_REPORTING_ENABLED=true` değerini ayarlayın. Bu değerler gizli değildir; LiveKit ve Supabase sunucu sırlarını sadece sunucu ortamında saklayın.
-4. Supabase, LiveKit, push bildirimleri, banka kredi talebi ve moderasyon akışlarını gerçek cihazda üretim adresleriyle doğrulayın.
-5. Dijital kredi/IBAN akışını yayınlamadan önce Google Play ve App Store'un güncel ödeme politikalarına göre ayrıca inceleyin.
+4. Supabase, LiveKit, push bildirimleri ve moderasyon akışlarını gerçek cihazda üretim adresleriyle doğrulayın.
+5. Android dijital kredileri için Google Play Billing'i ve sunucuda satın alma doğrulamasını yapılandırıp gerçek cihazda doğrulayın. iOS sürümünde App Store'un uygulama içi satın alma akışını kullanın.
 
 ## Android: imzalama ve Play Store
 

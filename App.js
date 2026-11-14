@@ -59,9 +59,7 @@ import {
   getRoom,
   getCurrentAdminRole,
   getWallet,
-  createBankTransferRequest,
   joinRoomMembership,
-  listMyBankTransferRequests,
   listBlockedUsers,
   listFollowedUserIds,
   listRoomMembers,
@@ -86,16 +84,6 @@ import {
   ReportSheet,
   SafetyCenterSheet as SecureSafetyCenterSheet,
 } from "./src/security/SafetySheets";
-import {
-  BANK_TRANSFER_DETAILS,
-  BANK_TRANSFER_STATUS,
-  CREDIT_REQUEST_OPTIONS,
-  TRANSFER_AMOUNT_OPTIONS,
-  formatBankRequestDate,
-  formatIban,
-  formatTry,
-  hasBankTransferDetails,
-} from "./src/payments/bankTransfer";
 import { createMessageGuard } from "./src/security/contentFilter";
 import { moderateLiveParticipant } from "./src/voice/roomModeration";
 import {
@@ -3288,18 +3276,10 @@ const WalletSheet = memo(function WalletSheet({
   dailyRewardClaimed,
   onDismiss,
   onClaimDailyReward,
-  onCreateBankTransferRequest,
   onRefresh,
-  paymentRequests = [],
-  authenticated,
   activities = [],
 }) {
   const [storedActivities, setStoredActivities] = useState([]);
-  const [requestedCredits, setRequestedCredits] = useState(
-    CREDIT_REQUEST_OPTIONS[1],
-  );
-  const [amountTry, setAmountTry] = useState("");
-  const [creatingRequest, setCreatingRequest] = useState(false);
   useEffect(() => {
     if (!visible) return;
     AsyncStorage.getItem(WALLET_ACTIVITY_KEY)
@@ -3314,42 +3294,6 @@ const WalletSheet = memo(function WalletSheet({
     if (visible) onRefresh?.();
   }, [visible]);
   const visibleActivities = activities.length ? activities : storedActivities;
-  const pendingRequest = paymentRequests.find(
-    (request) => request.status === "awaiting_transfer",
-  );
-  const requestTransfer = async () => {
-    const parsedAmount = Number(amountTry.replace(",", "."));
-    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-      Alert.alert("Tutar gerekli", "Göndereceğin TL tutarını yaz.");
-      return;
-    }
-    setCreatingRequest(true);
-    try {
-      const request = await onCreateBankTransferRequest({
-        requestedCredits,
-        amountTry: parsedAmount,
-      });
-      setAmountTry("");
-      Alert.alert(
-        "Ödeme referansın hazır",
-        `${request.referenceCode} kodunu banka transferinin açıklamasına eksiksiz yaz.`,
-      );
-    } catch (error) {
-      Alert.alert(
-        "Talep oluşturulamadı",
-        error?.message?.includes("Too many")
-          ? "Bugün için en fazla üç bekleyen ödeme talebi oluşturabilirsin."
-          : "Bağlantını kontrol edip tekrar dene.",
-      );
-    } finally {
-      setCreatingRequest(false);
-    }
-  };
-  const shareTransfer = async (request) => {
-    await Share.share({
-      message: `Sora kredi transferi\nBanka: ${BANK_TRANSFER_DETAILS.bankName}\nAlıcı: ${BANK_TRANSFER_DETAILS.accountHolder}\nIBAN: ${formatIban()}\nTutar: ${formatTry(request.amountTry)}\nAçıklama: ${request.referenceCode}`,
-    }).catch(() => undefined);
-  };
   return (
     <Modal
       transparent
@@ -3425,225 +3369,21 @@ const WalletSheet = memo(function WalletSheet({
                 </Text>
               </Pressable>
             </View>
-            <Text style={styles.settingsCaption}>
-              {Platform.OS === "web"
-                ? "IBAN İLE KREDİ YÜKLE"
-                : "MAĞAZA İLE KREDİ YÜKLE"}
-            </Text>
-            {Platform.OS !== "web" ? (
-              <View style={styles.transferCard}>
-                <Text style={styles.transferTitle}>{Platform.OS === "android" ? "Google Play ile kredi yükleme" : "App Store üzerinden kredi yükleme"}</Text>
-                <Text style={styles.transferHint}>Mağaza ürün kimlikleri ve sunucu doğrulaması henüz yapılandırılmadı. Satın alma şu an kapalı; mağazadan ürün adı ve yerel fiyat alınmadan işlem başlatılmaz.</Text>
-              </View>
-            ) : pendingRequest ? (
-              <View style={styles.transferCard}>
-                <View style={styles.transferCardHeader}>
-                  <View>
-                    <Text style={styles.transferTitle}>
-                      Transferini tamamla
-                    </Text>
-                    <Text style={styles.transferSubtitle}>
-                      {formatTry(pendingRequest.amountTry)} karşılığında{" "}
-                      {pendingRequest.requestedCredits} kredi talebi
-                    </Text>
-                  </View>
-                  <View style={styles.transferStatus}>
-                    <Text style={styles.transferStatusText}>
-                      {BANK_TRANSFER_STATUS.awaiting_transfer.label}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={styles.transferLabel}>ALICI</Text>
-                <Text style={styles.transferValue}>
-                  {BANK_TRANSFER_DETAILS.accountHolder} ·{" "}
-                  {BANK_TRANSFER_DETAILS.bankName}
-                </Text>
-                <Text style={styles.transferLabel}>IBAN</Text>
-                <Text selectable style={styles.transferIban}>
-                  {formatIban()}
-                </Text>
-                <Text style={styles.transferLabel}>AÇIKLAMAYA YAZ</Text>
-                <Text selectable style={styles.transferReference}>
-                  {pendingRequest.referenceCode}
-                </Text>
-                <Text style={styles.transferHint}>
-                  Bankadan gönderirken bu referansı açıklamaya yaz. Hesap
-                  hareketini kontrol ettikten sonra yönetici krediyi yükler.
-                </Text>
-                <View style={styles.transferActions}>
-                  <Pressable
-                    onPress={() => shareTransfer(pendingRequest)}
-                    style={styles.transferAction}
-                  >
-                    <Ionicons
-                      name="share-outline"
-                      size={16}
-                      color={COLORS.primary}
-                    />
-                    <Text style={styles.transferActionText}>
-                      Bilgileri paylaş
-                    </Text>
-                  </Pressable>
-                  <Pressable onPress={onRefresh} style={styles.transferAction}>
-                    <Ionicons
-                      name="refresh-outline"
-                      size={16}
-                      color={COLORS.primary}
-                    />
-                    <Text style={styles.transferActionText}>Durumu yenile</Text>
-                  </Pressable>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.transferCard}>
-                {authenticated && hasBankTransferDetails ? (
-                  <>
-                    <Text style={styles.transferTitle}>
-                      Manuel banka transferi
-                    </Text>
-                    <Text style={styles.transferHint}>
-                      Talebini oluştur, sana özel referansı banka transferinin
-                      açıklamasına yaz. Kredi yalnızca yönetici transferi
-                      doğruladıktan sonra eklenir.
-                    </Text>
-                    <Text style={styles.transferLabel}>İSTEDİĞİN KREDİ</Text>
-                    <View style={styles.transferOptionRow}>
-                      {CREDIT_REQUEST_OPTIONS.map((option) => (
-                        <Pressable
-                          key={option}
-                          onPress={() => setRequestedCredits(option)}
-                          style={[
-                            styles.transferOption,
-                            requestedCredits === option &&
-                              styles.transferOptionActive,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.transferOptionText,
-                              requestedCredits === option &&
-                                styles.transferOptionTextActive,
-                            ]}
-                          >
-                            {option}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                    <Text style={styles.transferLabel}>
-                      GÖNDERECEĞİN TUTAR (₺)
-                    </Text>
-                    <View style={styles.transferOptionRow}>
-                      {TRANSFER_AMOUNT_OPTIONS.map((option) => (
-                        <Pressable
-                          key={option}
-                          onPress={() => setAmountTry(String(option))}
-                          style={styles.transferQuickAmount}
-                        >
-                          <Text style={styles.transferQuickAmountText}>
-                            {option} ₺
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                    <TextInput
-                      value={amountTry}
-                      onChangeText={setAmountTry}
-                      placeholder="Örneğin 50"
-                      placeholderTextColor={COLORS.muted}
-                      keyboardType="decimal-pad"
-                      style={styles.transferInput}
-                      maxLength={10}
-                    />
-                    <Pressable
-                      disabled={creatingRequest}
-                      onPress={requestTransfer}
-                      style={[
-                        styles.transferCreateButton,
-                        creatingRequest && styles.transferCreateButtonDisabled,
-                      ]}
-                    >
-                      <Text style={styles.transferCreateButtonText}>
-                        {creatingRequest
-                          ? "Hazırlanıyor"
-                          : "Ödeme referansı oluştur"}
-                      </Text>
-                      <Ionicons
-                        name="receipt-outline"
-                        size={19}
-                        color={COLORS.primaryInk}
-                      />
-                    </Pressable>
-                  </>
-                ) : (
-                  <>
-                    <Ionicons
-                      name="lock-closed-outline"
-                      size={24}
-                      color={COLORS.pink}
-                    />
-                    <Text style={styles.transferTitle}>
-                      Kredi talebi kapalı
-                    </Text>
-                    <Text style={styles.transferHint}>
-                      {authenticated
-                        ? "Banka hesap bilgileri yapılandırılmadı."
-                        : "IBAN ile kredi talebi oluşturmak için hesabınla giriş yap."}
-                    </Text>
-                  </>
-                )}
-              </View>
-            )}
-            {paymentRequests.length > 0 && (
-              <>
-                <View style={styles.walletHistoryHeading}>
-                  <Text style={styles.settingsCaption}>KREDİ TALEPLERİM</Text>
-                  <Pressable onPress={onRefresh}>
-                    <Ionicons
-                      name="refresh-outline"
-                      size={16}
-                      color={COLORS.primary}
-                    />
-                  </Pressable>
-                </View>
-                {paymentRequests.slice(0, 4).map((request) => (
-                  <View key={request.id} style={styles.transferHistoryRow}>
-                    <View style={styles.transferHistoryIcon}>
-                      <Ionicons
-                        name="receipt-outline"
-                        size={16}
-                        color={
-                          BANK_TRANSFER_STATUS[request.status]?.color ||
-                          COLORS.muted
-                        }
-                      />
-                    </View>
-                    <View style={styles.settingContent}>
-                      <Text style={styles.walletActivityText}>
-                        {request.referenceCode}
-                      </Text>
-                      <Text style={styles.walletActivityTime}>
-                        {formatBankRequestDate(request.createdAt)} ·{" "}
-                        {formatTry(request.amountTry)}
-                      </Text>
-                    </View>
-                    <Text
-                      style={[
-                        styles.transferHistoryStatus,
-                        {
-                          color:
-                            BANK_TRANSFER_STATUS[request.status]?.color ||
-                            COLORS.muted,
-                        },
-                      ]}
-                    >
-                      {BANK_TRANSFER_STATUS[request.status]?.label ||
-                        request.status}
-                    </Text>
-                  </View>
-                ))}
-              </>
-            )}
+            <Text style={styles.settingsCaption}>MAĞAZA İLE KREDİ YÜKLE</Text>
+            <View style={styles.transferCard}>
+              <Text style={styles.transferTitle}>
+                {Platform.OS === "android"
+                  ? "Google Play üzerinden kredi yükleme"
+                  : Platform.OS === "ios"
+                    ? "App Store üzerinden kredi yükleme"
+                    : "Mağaza satın alımları"}
+              </Text>
+              <Text style={styles.transferHint}>
+                {Platform.OS === "web"
+                  ? "Kredi paketleri web sürümünde satılmaz. Android'de Google Play, iOS'ta App Store kullanılacaktır."
+                  : "Mağaza ürünleri ve sunucu doğrulaması yapılandırılana kadar satın alma kapalıdır. Ürün adı ve yerel fiyat mağazadan alınacaktır."}
+              </Text>
+            </View>
             {visibleActivities.length > 0 && (
               <>
                 <Text style={styles.settingsCaption}>SON HAREKETLER</Text>
@@ -6495,7 +6235,6 @@ function AppContent() {
   const [promoWalletBalance, setPromoWalletBalance] = useState(0);
   const [paidWalletBalance, setPaidWalletBalance] = useState(0);
   const [walletActivities, setWalletActivities] = useState([]);
-  const [bankTransferRequests, setBankTransferRequests] = useState([]);
   const [dailyRewardClaimed, setDailyRewardClaimed] = useState(false);
   const [followedUserIds, setFollowedUserIds] = useState([]);
   const [walletOpen, setWalletOpen] = useState(false);
@@ -6702,7 +6441,6 @@ function AppContent() {
       listFollowedUserIds(user.id),
       getWallet(),
       listWalletTransactions(),
-      listMyBankTransferRequests(),
     ])
       .then(
         ([
@@ -6711,7 +6449,6 @@ function AppContent() {
           follows,
           wallet,
           transactions,
-          transferRequests,
         ]) => {
           if (!active) return;
           setRooms([...liveRooms, ...SEEDED_ROOMS]);
@@ -6725,7 +6462,6 @@ function AppContent() {
               new Date().toISOString().slice(0, 10),
           );
           setWalletActivities(transactions.map(formatTransaction));
-          setBankTransferRequests(transferRequests);
         },
       )
       .catch(() => undefined);
@@ -7194,10 +6930,9 @@ function AppContent() {
 
   const refreshWalletData = async () => {
     if (!supabase || !authSession?.user) return;
-    const [wallet, transactions, transferRequests] = await Promise.all([
+    const [wallet, transactions] = await Promise.all([
       getWallet(),
       listWalletTransactions(),
-      listMyBankTransferRequests(),
     ]);
     setWalletBalance(wallet.balance);
     setPromoWalletBalance(wallet.promo_balance || 0);
@@ -7223,28 +6958,6 @@ function AppContent() {
         }).format(new Date(transaction.created_at)),
       })),
     );
-    setBankTransferRequests(transferRequests);
-  };
-
-  const createManualBankTransferRequest = async ({
-    requestedCredits,
-    amountTry,
-  }) => {
-    if (!supabase || !authSession?.user)
-      throw new Error("Authentication required");
-    const request = await createBankTransferRequest({
-      requestedCredits,
-      amountTry,
-    });
-    setBankTransferRequests((currentRequests) => [request, ...currentRequests]);
-    pushNotification({
-      id: `bank-transfer-${request.id}`,
-      icon: "receipt-outline",
-      color: "#59C5FF",
-      text: "IBAN kredi talebin oluşturuldu. Referansı açıklamaya yaz.",
-      time: "Şimdi",
-    });
-    return request;
   };
 
   const sendGift = async ({ gift, recipient, roomId, requestId }) => {
@@ -8007,11 +7720,8 @@ function AppContent() {
         promoCoins={promoWalletBalance}
         paidCoins={paidWalletBalance}
         activities={walletActivities}
-        paymentRequests={bankTransferRequests}
-        authenticated={Boolean(supabase && authSession?.user)}
         onDismiss={handleCloseWallet}
         onClaimDailyReward={claimDailyReward}
-        onCreateBankTransferRequest={createManualBankTransferRequest}
         onRefresh={handleRefreshWallet}
       />
       <NotificationCenter
