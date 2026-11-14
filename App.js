@@ -5756,11 +5756,13 @@ function Room({
           >
             <Ionicons name="chevron-down" size={22} color="#FFFFFF" />
           </Pressable>
-          <View style={styles.roomHeaderBrand}>
-            <Ionicons name="radio" size={16} color={COLORS.primary} />
-            <Text style={styles.roomHeaderBrandText}>SORA</Text>
-            <View style={styles.roomHeaderDivider} />
-            <Text style={styles.roomHeaderCaption}>Ses odası</Text>
+          <View style={styles.roomHeaderRoom}>
+            <Text style={styles.roomTopBarTitle} numberOfLines={1}>
+              {room.title}
+            </Text>
+            <Text style={styles.roomHeaderCaption} numberOfLines={1}>
+              {room.category || "Sohbet"} · {Math.max(liveVoice.participantCount, activeRoomParticipants.length)} kişi
+            </Text>
           </View>
           <Pressable
             onPress={handleOpenSettings}
@@ -5771,33 +5773,21 @@ function Room({
           </Pressable>
         </View>
 
-        {/* Oda bilgisi kompakt tutulur; bağlantı etiketi yalnızca sorun varken görünür. */}
-        <View style={styles.roomLiveBand}>
-          <View style={styles.roomRoomMeta}>
-            <Text style={styles.roomInlineTitle} numberOfLines={1}>
-              {room.title}
-            </Text>
-            <Text style={styles.roomInlineDetails} numberOfLines={1}>
-              {room.category || "Sohbet"}
-              {liveVoice.status !== "connected" ? ` · ${roomVoiceLabel}` : ""}
-            </Text>
+        {liveVoice.status !== "connected" && (
+          <View style={styles.roomConnectionNotice}>
+            <Ionicons name="radio-outline" size={13} color="#A9BEDB" />
+            <Text style={styles.roomConnectionText}>{roomVoiceLabel}</Text>
+            {["error", "disconnected", "local"].includes(liveVoice.status) && (
+              <Pressable
+                style={styles.roomRetryPill}
+                onPress={retryVoiceConnection}
+              >
+                <Ionicons name="refresh" size={12} color={COLORS.primary} />
+                <Text style={styles.roomRetryText}>Yeniden bağlan</Text>
+              </Pressable>
+            )}
           </View>
-          <View style={styles.roomPeoplePill}>
-            <Ionicons name="people-outline" size={13} color="#A9BEDB" />
-            <Text style={styles.roomPeopleText}>
-              {Math.max(liveVoice.participantCount, activeRoomParticipants.length)} kişi
-            </Text>
-          </View>
-          {["error", "disconnected", "local"].includes(liveVoice.status) && (
-            <Pressable
-              style={styles.roomRetryPill}
-              onPress={retryVoiceConnection}
-            >
-              <Ionicons name="refresh" size={12} color={COLORS.primary} />
-              <Text style={styles.roomRetryText}>Yeniden bağlan</Text>
-            </Pressable>
-          )}
-        </View>
+        )}
 
         {/* Oda kimliği, sahne ve sohbet */}
         <ScrollView
@@ -6038,13 +6028,16 @@ function Room({
               userId={userId}
               onReport={handleReportMessage}
             />
-            <RoomComposer
-              onSend={sendMessage}
-              onOpenGift={handleOpenGift}
-              sending={messageSending}
-            />
           </View>
         </ScrollView>
+
+        <View style={styles.roomComposerDock}>
+          <RoomComposer
+            onSend={sendMessage}
+            onOpenGift={handleOpenGift}
+            sending={messageSending}
+          />
+        </View>
 
         {/* Sabit oda kontrolleri */}
         <View style={styles.roomControlBar}>
@@ -12074,15 +12067,15 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   roomConnectionText: {
-    color: "#D5C7F0",
+    color: "#A9BEDB",
     fontSize: 9,
     fontWeight: "600",
   },
   roomComposerDock: {
     paddingHorizontal: 16,
-    paddingTop: 2,
-    paddingBottom: 6,
-    backgroundColor: "rgba(12,16,34,0.5)",
+    paddingTop: 6,
+    paddingBottom: 8,
+    backgroundColor: "rgba(11,15,23,0.92)",
   },
   roomAtmosphereGlow: {
     position: "absolute",
@@ -12207,10 +12200,10 @@ const styles = StyleSheet.create({
   roomTopBar: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 12,
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   roomTopBarBack: {
     width: 42,
@@ -12240,11 +12233,10 @@ const styles = StyleSheet.create({
     letterSpacing: 1.6,
   },
   roomTopBarTitle: {
-    color: "#F7F8F3",
-    fontSize: 16,
-    fontWeight: "900",
-    letterSpacing: -0.7,
-    marginTop: 3,
+    color: "#F3F7FF",
+    fontSize: 15,
+    fontWeight: "800",
+    letterSpacing: 0,
   },
   roomLiveBand: {
     flexDirection: "row",
@@ -12314,11 +12306,16 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   roomSurface: {
-    paddingHorizontal: 2,
-    paddingTop: 20,
-    paddingBottom: 6,
+    paddingHorizontal: 8,
+    paddingTop: 14,
+    paddingBottom: 12,
     marginTop: "auto",
     marginBottom: "auto",
+    borderRadius: 26,
+    backgroundColor: "rgba(17,32,54,0.76)",
+    borderWidth: 1,
+    borderColor: "rgba(118,175,255,0.12)",
+    overflow: "hidden",
   },
   roomBody: {
     flexGrow: 1,
