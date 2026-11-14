@@ -25,6 +25,7 @@ export function useRoomMusic({ musicState, enabled = true }) {
   const [localVolume, setLocalVolumeState] = useState(1);
   const [status, setStatus] = useState("idle");
   const [duration, setDuration] = useState(0);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     AsyncStorage.getItem(LOCAL_VOLUME_KEY)
@@ -53,6 +54,9 @@ export function useRoomMusic({ musicState, enabled = true }) {
     [],
   );
 
+  const roomVolume = Math.min(1, Math.max(0, Number(musicState?.volume ?? 0.7)));
+  const effectiveVolumeRef = useRef(roomVolume * localVolume);
+  effectiveVolumeRef.current = roomVolume * localVolume;
   const path = enabled ? musicState?.path || null : null;
   const playing = Boolean(musicState?.playing);
   const startedAt = musicState?.started_at || null;
@@ -90,13 +94,14 @@ export function useRoomMusic({ musicState, enabled = true }) {
           } catch {}
           const player = createAudioPlayer({ uri: url }, { updateInterval: 1000 });
           player.loop = true;
+          player.volume = effectiveVolumeRef.current;
           playerRef.current = player;
           loadedPathRef.current = path;
         }
         const player = playerRef.current;
         if (!player) return;
         // Süre bilgisi yüklenene kadar kısa bir süre bekle.
-        for (let attempt = 0; attempt < 10 && !(player.duration > 0); attempt += 1) {
+        for (let attempt = 0; attempt < 50 && !(player.duration > 0); attempt += 1) {
           await new Promise((resolve) => setTimeout(resolve, 200));
           if (cancelled) return;
         }
@@ -105,7 +110,7 @@ export function useRoomMusic({ musicState, enabled = true }) {
           { position_ms: positionMs, playing, started_at: startedAt },
           player.duration || 0,
         );
-        await player.seekTo(target / 1000).catch(() => undefined);
+        await player.seekTo(target / 1000);
         if (cancelled) return;
         if (playing) {
           player.play();
@@ -123,12 +128,13 @@ export function useRoomMusic({ musicState, enabled = true }) {
     return () => {
       cancelled = true;
     };
-  }, [path, playing, positionMs, startedAt]);
+  }, [path, playing, positionMs, retryNonce, startedAt]);
 
-  const roomVolume = Math.min(1, Math.max(0, Number(musicState?.volume ?? 0.7)));
   useEffect(() => {
     if (playerRef.current) playerRef.current.volume = roomVolume * localVolume;
   }, [localVolume, roomVolume, status]);
+
+  const retry = useCallback(() => setRetryNonce((value) => value + 1), []);
 
   const currentPositionMs = useCallback(() => {
     const player = playerRef.current;
@@ -144,6 +150,7 @@ export function useRoomMusic({ musicState, enabled = true }) {
     roomVolume,
     localVolume,
     setLocalVolume,
+    retry,
     currentPositionMs,
   };
 }

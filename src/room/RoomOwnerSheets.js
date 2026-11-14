@@ -14,11 +14,13 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "../theme/colors";
 import { DEFAULT_ROOM_ANNOUNCEMENT, ROOM_BAN_DURATIONS } from "./roomApi";
 
 // ── Ortak parçalar ────────────────────────────────────────────────────────
 function SheetFrame({ visible, title, subtitle, onDismiss, children, scroll = true }) {
+  const insets = useSafeAreaInsets();
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onDismiss}>
       <KeyboardAvoidingView
@@ -26,7 +28,7 @@ function SheetFrame({ visible, title, subtitle, onDismiss, children, scroll = tr
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <Pressable style={sheetStyles.dismiss} onPress={onDismiss} accessibilityLabel="Kapat" />
-        <View style={sheetStyles.sheet}>
+        <View style={[sheetStyles.sheet, { paddingBottom: Math.max(insets.bottom, 14) + 12 }]}>
           <View style={sheetStyles.handle} />
           <View style={sheetStyles.header}>
             <View style={{ flex: 1 }}>
@@ -764,6 +766,7 @@ export function RoomMusicSheet({
   music,
   tracks,
   loadingTracks,
+  tracksError,
   busy,
   onAddTrack,
   onPlayTrack,
@@ -771,6 +774,7 @@ export function RoomMusicSheet({
   onStop,
   onRoomVolume,
   onDeleteTrack,
+  onRetryTracks,
   onDismiss,
 }) {
   const [, setTick] = useState(0);
@@ -820,6 +824,10 @@ export function RoomMusicSheet({
         ) : null}
       </View>
 
+      {music.status === "error" && musicState ? (
+        <SecondaryButton label="Müziği yeniden yükle" icon="refresh" onPress={music.retry} />
+      ) : null}
+
       {canControl ? (
         <VolumeStepper
           label="Oda müzik sesi (herkes için)"
@@ -842,6 +850,12 @@ export function RoomMusicSheet({
             busy={busy}
             onPress={onAddTrack}
           />
+          {tracksError ? (
+            <View style={sheetStyles.inlineError}>
+              <Text style={sheetStyles.errorText}>{tracksError}</Text>
+              <SecondaryButton label="Listeyi yeniden dene" icon="refresh" onPress={onRetryTracks} />
+            </View>
+          ) : null}
           {tracks.length ? (
             tracks.map((track) => {
               const active = musicState?.path === track.path;
@@ -963,7 +977,7 @@ const sheetStyles = StyleSheet.create({
     maxHeight: "88%",
     backgroundColor: COLORS.surface,
     paddingTop: 22,
-    paddingBottom: Platform.OS === "ios" ? 30 : 40,
+    paddingBottom: 14,
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
   },
@@ -1129,6 +1143,7 @@ const sheetStyles = StyleSheet.create({
   pinHiddenInput: { position: "absolute", opacity: 0, width: 1, height: 1 },
   footnote: { color: COLORS.muted, fontSize: 11, lineHeight: 16, textAlign: "center", marginTop: 14 },
   errorText: { color: COLORS.danger, fontSize: 12, fontWeight: "700", textAlign: "center", marginTop: 12 },
+  inlineError: { gap: 8, marginTop: 10, marginBottom: 4 },
   seatOptions: { flexDirection: "row", gap: 12, marginBottom: 8 },
   seatOption: {
     flex: 1,

@@ -235,7 +235,9 @@ export const joinRoomMembership = async (roomId) => {
   const client = requireClient();
   const { data, error } = await client.rpc("join_room", { p_room_id: roomId });
   throwIfError(error);
-  return data?.[0] || null;
+  const membership = data?.[0] || null;
+  if (!membership?.role) throw new Error("Room membership could not be created");
+  return membership;
 };
 
 export const listRoomMembers = async (roomId) => {

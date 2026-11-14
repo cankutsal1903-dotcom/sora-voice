@@ -223,7 +223,7 @@ app.post("/token", async (request, response) => {
   try {
     const { accessToken, user } = await getAuthenticatedUser(request);
     const membership = await joinRoomMembership(accessToken, cleanRoomName);
-    if (!membership) throw new Error("Room membership could not be created");
+    if (!membership?.role) throw new Error("Room membership could not be created");
     const token = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET, {
       identity: user.id,
       name: cleanName,

@@ -12,6 +12,8 @@ cd tools/background-review
 ```
 
 Uygulama menüsüne ve masaüstüne **Sora Arka Plan İnceleme** başlatıcısı eklenir.
+Programın çalıştırılabilir kopyası `~/.local/share/sora-background-review/`
+altına kurulur; geçici çalışma dalı silinse bile başlatıcı çalışmaya devam eder.
 Masaüstü simgesi "güvenilmiyor" görünürse sağ tıklayıp *Başlatmaya İzin Ver*
 seçin. Kurmadan denemek için: `./sora_background_review.py`
 

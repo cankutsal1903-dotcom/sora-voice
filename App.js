@@ -5049,7 +5049,9 @@ function Room({
   const [savingSettings, setSavingSettings] = useState(false);
   const [musicTracks, setMusicTracks] = useState([]);
   const [musicTracksLoading, setMusicTracksLoading] = useState(false);
+  const [musicTracksError, setMusicTracksError] = useState(null);
   const [musicBusy, setMusicBusy] = useState(false);
+  const musicBusyRef = useRef(false);
   const chatScrollRef = useRef(null);
   const chatNearBottomRef = useRef(true);
   const pendingMicRef = useRef(false);
@@ -5224,7 +5226,7 @@ function Room({
   const adminCount = roomMembers.filter((member) => member.role === "moderator").length;
   const music = useRoomMusic({
     musicState: roomDetails.musicState,
-    enabled: Boolean(room.persisted),
+    enabled: Boolean(room.persisted && speakerOn),
   });
   const musicPlaying = Boolean(roomDetails.musicState?.playing);
   const roomVoiceLabel =
@@ -6280,10 +6282,12 @@ function Room({
   const loadMusicTracks = useCallback(async () => {
     if (!room.persisted) return;
     setMusicTracksLoading(true);
+    setMusicTracksError(null);
     try {
       setMusicTracks(await listRoomMusic(room.id));
-    } catch {
+    } catch (error) {
       setMusicTracks([]);
+      setMusicTracksError(describeRoomError(error));
     } finally {
       setMusicTracksLoading(false);
     }
@@ -6298,12 +6302,17 @@ function Room({
       Alert.alert("Kullanılamıyor", "Örnek odalarda müzik çalınamaz.");
       return;
     }
+    if (musicBusyRef.current) return false;
+    musicBusyRef.current = true;
     setMusicBusy(true);
     try {
       applyRoomRow(await setRoomMusic({ roomId: room.id, state }));
+      return true;
     } catch (error) {
       Alert.alert("Müzik güncellenemedi", describeRoomError(error));
+      return false;
     } finally {
+      musicBusyRef.current = false;
       setMusicBusy(false);
     }
   };
@@ -6315,6 +6324,7 @@ function Room({
       Alert.alert("Kullanılamıyor", "Örnek odalarda müzik çalınamaz.");
       return;
     }
+    if (musicBusyRef.current) return;
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: "audio/*",
@@ -6327,6 +6337,7 @@ function Room({
         Alert.alert("Dosya çok büyük", "En fazla 25 MB boyutunda bir müzik dosyası seç.");
         return;
       }
+      musicBusyRef.current = true;
       setMusicBusy(true);
       const path = await uploadRoomMusic({ roomId: room.id, asset });
       const title = String(asset.name || "").replace(/\.[^.]+$/, "") || musicTitleFromPath(path);
@@ -6340,6 +6351,7 @@ function Room({
     } catch (error) {
       Alert.alert("Müzik eklenemedi", describeRoomError(error));
     } finally {
+      musicBusyRef.current = false;
       setMusicBusy(false);
     }
   };
@@ -6374,12 +6386,21 @@ function Room({
         text: "Sil",
         style: "destructive",
         onPress: async () => {
+          if (musicBusyRef.current) return;
+          musicBusyRef.current = true;
+          setMusicBusy(true);
           try {
+            if (roomDetails.musicState?.path === track.path) {
+              const stopped = await setRoomMusic({ roomId: room.id, state: null });
+              applyRoomRow(stopped);
+            }
             await deleteRoomMusic(track.path);
             setMusicTracks((current) => current.filter((item) => item.path !== track.path));
-            if (roomDetails.musicState?.path === track.path) stopMusic();
           } catch (error) {
             Alert.alert("Silinemedi", describeRoomError(error));
+          } finally {
+            musicBusyRef.current = false;
+            setMusicBusy(false);
           }
         },
       },
@@ -6926,6 +6947,7 @@ function Room({
         music={music}
         tracks={musicTracks}
         loadingTracks={musicTracksLoading}
+        tracksError={musicTracksError}
         busy={musicBusy}
         onAddTrack={addMusicTrack}
         onPlayTrack={playMusicTrack}
@@ -6933,6 +6955,7 @@ function Room({
         onStop={stopMusic}
         onRoomVolume={setMusicRoomVolume}
         onDeleteTrack={removeMusicTrack}
+        onRetryTracks={loadMusicTracks}
         onDismiss={closeMenuSheet}
       />
       <RoomAdminsSheet
@@ -8305,15 +8328,10 @@ function AppContent() {
       return;
     }
 
-    // Şifreli odalar: oda sahibi, yöneticiler ve şifreyi zaten girmiş olanlar
-    // doğrudan girer; diğerlerinden 4 haneli şifre istenir.
-    if (
-      !skipPasswordCheck &&
-      nextRoom.persisted &&
-      nextRoom.passwordProtected &&
-      nextRoom.hostId !== authSession?.user?.id &&
-      room?.id !== nextRoom.id
-    ) {
+    // Odayı ekranda açmadan önce sunucuda üyelik, ban ve şifre denetimini yap.
+    // Bağlantı veya yetki hatasında kapalı davran; aksi halde token çağrısına
+    // kadar hatalı bir oda ekranı kısa süreliğine görünebiliyordu.
+    if (!skipPasswordCheck && nextRoom.persisted && room?.id !== nextRoom.id) {
       try {
         await joinRoomWithPassword(nextRoom.id, null);
       } catch (error) {
@@ -8323,10 +8341,8 @@ function AppContent() {
           setPasswordPromptRoom(nextRoom);
           return;
         }
-        if (message.includes("Room ban active") || message.includes("You were removed")) {
-          Alert.alert("Odaya girilemiyor", describeRoomError(error));
-          return;
-        }
+        Alert.alert("Odaya girilemiyor", describeRoomError(error));
+        return;
       }
     }
 

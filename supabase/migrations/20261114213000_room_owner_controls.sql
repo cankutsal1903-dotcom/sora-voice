@@ -55,6 +55,7 @@ create table if not exists public.app_settings (
   updated_by uuid references auth.users(id) on delete set null
 );
 alter table public.app_settings enable row level security;
+grant select on public.app_settings to authenticated;
 drop policy if exists "Authenticated users read app settings" on public.app_settings;
 create policy "Authenticated users read app settings" on public.app_settings
   for select using (auth.uid() is not null);
@@ -169,8 +170,12 @@ begin
     select s.password_hash into secret_hash from public.room_secrets s where s.room_id = p_room_id;
     if secret_hash is null or extensions.crypt(p_password, secret_hash) <> secret_hash then
       insert into public.room_password_failures (room_id, user_id) values (p_room_id, auth.uid());
-      raise exception 'Room password incorrect';
+      -- Bir exception bu INSERT'i de geri alır ve deneme limiti çalışmaz. Boş
+      -- sonuç döndürerek hatayı istemcinin kapalı biçimde ele almasını sağla.
+      return;
     end if;
+    delete from public.room_password_failures
+    where room_id = p_room_id and user_id = auth.uid();
   end if;
 
   if member.user_id is null then
@@ -350,6 +355,78 @@ $$;
 revoke execute on function public.ban_room_member(uuid, uuid, integer) from public;
 grant execute on function public.ban_room_member(uuid, uuid, integer) to authenticated;
 
+-- Eski yönetim fonksiyonunda NULL actor_role, SQL'in üç değerli mantığı
+-- nedeniyle yetki kontrolünü atlayabiliyordu. Kapalı yetki kontrolü eski
+-- yönetim çağrılarını da güvenli tutar.
+create or replace function public.manage_room_member(
+  p_room_id uuid,
+  p_target_user_id uuid,
+  p_action text
+)
+returns table (role text, is_muted boolean, removed boolean)
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  actor_role text;
+  target_role text;
+begin
+  if auth.uid() is null then raise exception 'Authentication required'; end if;
+  select m.role into actor_role from public.room_members m
+  where m.room_id = p_room_id and m.user_id = auth.uid() and m.removed_at is null;
+  if actor_role is null or actor_role not in ('host', 'moderator') then
+    raise exception 'Moderator permission required';
+  end if;
+  select m.role into target_role from public.room_members m
+  where m.room_id = p_room_id and m.user_id = p_target_user_id;
+  if target_role is null then raise exception 'Member not found'; end if;
+  if p_target_user_id = auth.uid() or target_role = 'host'
+    or public.is_room_host(p_room_id, p_target_user_id) then
+    raise exception 'This member cannot be changed';
+  end if;
+  if actor_role = 'moderator' and target_role = 'moderator' then
+    raise exception 'Moderators cannot change each other';
+  end if;
+  if p_action in ('make_moderator', 'remove_moderator') and actor_role <> 'host' then
+    raise exception 'Only the host can manage moderators';
+  end if;
+
+  if p_action = 'make_moderator' then
+    update public.room_members set role = 'moderator', is_muted = false,
+      removed_at = null, updated_at = now()
+    where room_id = p_room_id and user_id = p_target_user_id;
+  elsif p_action = 'remove_moderator' then
+    update public.room_members set role = 'listener', updated_at = now()
+    where room_id = p_room_id and user_id = p_target_user_id;
+  elsif p_action = 'promote_speaker' then
+    update public.room_members set role = 'speaker', is_muted = false,
+      removed_at = null, updated_at = now()
+    where room_id = p_room_id and user_id = p_target_user_id;
+  elsif p_action = 'demote_listener' then
+    update public.room_members set role = 'listener', is_muted = true, updated_at = now()
+    where room_id = p_room_id and user_id = p_target_user_id;
+  elsif p_action = 'mute' then
+    update public.room_members set is_muted = true, updated_at = now()
+    where room_id = p_room_id and user_id = p_target_user_id;
+  elsif p_action = 'unmute' then
+    update public.room_members set is_muted = false, updated_at = now()
+    where room_id = p_room_id and user_id = p_target_user_id;
+  elsif p_action = 'remove' then
+    update public.room_members set role = 'listener', is_muted = true,
+      removed_at = now(), password_verified_at = null, updated_at = now()
+    where room_id = p_room_id and user_id = p_target_user_id;
+  else
+    raise exception 'Unsupported moderation action';
+  end if;
+
+  return query select m.role, m.is_muted, m.removed_at is not null
+  from public.room_members m
+  where m.room_id = p_room_id and m.user_id = p_target_user_id;
+end;
+$$;
+revoke execute on function public.manage_room_member(uuid, uuid, text) from public, anon;
+grant execute on function public.manage_room_member(uuid, uuid, text) to authenticated;
+
 -- ── Oda ayarları (yalnızca oda sahibi) ────────────────────────────────────
 create or replace function public.update_room_details(
   p_room_id uuid,
@@ -502,6 +579,7 @@ create index if not exists room_background_requests_status_idx
 create index if not exists room_background_requests_room_idx
   on public.room_background_requests(room_id, created_at desc);
 alter table public.room_background_requests enable row level security;
+grant select on public.room_background_requests to authenticated;
 drop policy if exists "Owners and admins read background requests" on public.room_background_requests;
 create policy "Owners and admins read background requests" on public.room_background_requests
   for select using (requested_by = auth.uid() or public.is_app_admin());
@@ -663,6 +741,14 @@ begin
   return null;
 end;
 $$;
+
+revoke execute on function public.guard_room_privileged_columns() from public, anon, authenticated;
+revoke execute on function public.is_room_host(uuid, uuid) from public, anon;
+grant execute on function public.is_room_host(uuid, uuid) to authenticated;
+revoke execute on function public.app_setting_enabled(text) from public, anon;
+grant execute on function public.app_setting_enabled(text) to authenticated;
+revoke execute on function public.storage_room_id(text) from public, anon;
+grant execute on function public.storage_room_id(text) to authenticated;
 
 drop policy if exists "Room owners upload backgrounds" on storage.objects;
 create policy "Room owners upload backgrounds" on storage.objects for insert to authenticated

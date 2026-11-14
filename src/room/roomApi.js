@@ -109,7 +109,9 @@ export const joinRoomWithPassword = async (roomId, password) => {
   const client = requireClient();
   const { data, error } = await client.rpc("join_room", { p_room_id: roomId, p_password: password || null });
   throwIfError(error);
-  return firstRow(data);
+  const membership = firstRow(data);
+  if (!membership?.role) throw new Error("Room password incorrect");
+  return membership;
 };
 
 export const leaveRoomMembership = async (roomId) => {

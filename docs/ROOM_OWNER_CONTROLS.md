@@ -10,9 +10,10 @@ istekleri, mikrofondan indirme (10 dk), süreli ban, 4 haneli oda kilidi,
 1. **Veritabanı:** `supabase/migrations/20261114213000_room_owner_controls.sql`
    - `npx supabase db push` ya da dosya içeriğini Supabase SQL Editor'da bir kez çalıştır.
    - `room-backgrounds` ve `room-music` depolama alanlarını ve ilgili izinleri de oluşturur.
-2. **Token sunucusu:** `server/src/index.js` güncellendi. Sunucuyu yeniden başlat
-   (`npm run voice:server`). Yeni uç noktalar: `/rooms/:id/seat`, `/rooms/:id/ban`,
-   `/rooms/:id/layout`, `/rooms/presence`.
+2. **Canlı token hizmeti:** APK Supabase Edge Function kullanıyorsa
+   `supabase/functions/livekit-token` dağıtılır. Yerel Express alternatifi
+   `server/src/index.js` ile aynı uçları sunar: `/rooms/:id/seat`,
+   `/rooms/:id/ban`, `/rooms/:id/layout`, `/rooms/presence`.
 3. **Uygulama:** `expo-image-picker` ve `expo-document-picker` eklendi; yeni APK gerekir.
 4. **Arka plan inceleme programı:** `tools/background-review/install.sh` dosyasını çalıştır.
    Ayrıntılar için [README](../tools/background-review/README.md) dosyasına bak. Giriş

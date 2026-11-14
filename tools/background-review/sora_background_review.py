@@ -10,6 +10,7 @@ Kullanım:
     ./sora_background_review.py --self-test  # ağ kullanmadan iç testleri çalıştır
 """
 
+import base64
 import json
 import os
 import shutil
@@ -22,6 +23,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 
 import gi
@@ -38,6 +40,10 @@ SETTING_KEY = "room_background_uploads_enabled"
 BUCKET = "room-backgrounds"
 REFRESH_SECONDS = 30
 HTTP_TIMEOUT = 25
+MAX_RESPONSE_BYTES = 8 * 1024 * 1024
+MAX_IMAGE_PIXELS = 40_000_000
+MAX_PREVIEW_EDGE = 1600
+IMAGE_CACHE_ITEMS = 8
 THUMB_WIDTH = 320
 THUMB_MAX_HEIGHT = 568  # 9:16 telefon dikey oranı
 PLACEHOLDER_HEIGHT = 420
@@ -121,6 +127,21 @@ def config_candidates():
 class Config:
     def __init__(self, url, key, source):
         self.url = url.rstrip("/")
+        parsed = urllib.parse.urlsplit(self.url)
+        local = parsed.hostname in ("localhost", "127.0.0.1", "::1")
+        if (not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment
+                or parsed.path or (parsed.scheme != "https" and not (local and parsed.scheme == "http"))):
+            raise ConfigError("Supabase adresi HTTPS olmalı ve yol, kullanıcı bilgisi veya sorgu içermemeli.")
+        if key.startswith("sb_secret_"):
+            raise ConfigError("Bu program yalnızca publishable/anon anahtarı kullanır; secret anahtarı kabul edilmez.")
+        if key.count(".") == 2:
+            try:
+                claims = key.split(".")[1]
+                role = json.loads(base64.urlsafe_b64decode(claims + "=" * (-len(claims) % 4))).get("role")
+            except (ValueError, TypeError, AttributeError):
+                role = None
+            if role != "anon":
+                raise ConfigError("Legacy anahtarın rolü anon olmalı; ayrıcalıklı anahtar kabul edilmez.")
         self.key = key
         self.source = source
 
@@ -173,8 +194,7 @@ def write_private_json(path, data):
         os.chmod(directory, 0o700)
     except OSError:
         pass
-    tmp_path = path + ".tmp"
-    fd = os.open(tmp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    fd, tmp_path = tempfile.mkstemp(prefix=".session-", dir=directory)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             json.dump(data, handle, ensure_ascii=False, indent=2)
@@ -293,17 +313,26 @@ def _is_jwt_problem(status, raw_message):
 # Supabase istemcisi (iş parçacığı güvenli)
 # ---------------------------------------------------------------------------
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        # Auth başlıklarını veya parolayı başka bir adrese taşımayın.
+        return None
+
+
 class SupabaseClient:
     def __init__(self, config, session_path=SESSION_PATH):
         self.config = config
         self.session_path = session_path
         self._lock = threading.Lock()
+        self._opener = urllib.request.build_opener(NoRedirect())
         self.session = self._load_session()
 
     # --- oturum dosyası ---
     def _load_session(self):
         data = read_json_file(self.session_path)
-        if isinstance(data, dict) and data.get("access_token") and data.get("refresh_token"):
+        if (isinstance(data, dict) and data.get("access_token") and data.get("refresh_token")
+                and data.get("project_url") == self.config.url):
+            os.chmod(self.session_path, 0o600)
             return data
         return None
 
@@ -313,6 +342,7 @@ class SupabaseClient:
             expires_at = int(time.time()) + int(data.get("expires_in") or 3600)
         user = data.get("user") or {}
         session = {
+            "project_url": self.config.url,
             "access_token": data["access_token"],
             "refresh_token": data["refresh_token"],
             "expires_at": int(expires_at),
@@ -347,11 +377,14 @@ class SupabaseClient:
         for name, value in headers.items():
             request.add_header(name, value)
         try:
-            with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT) as response:
-                return response.status, response.read()
+            with self._opener.open(request, timeout=HTTP_TIMEOUT) as response:
+                payload = response.read(MAX_RESPONSE_BYTES + 1)
+                if len(payload) > MAX_RESPONSE_BYTES:
+                    raise ApiError("Sunucu yanıtı izin verilen boyutu aşıyor.")
+                return response.status, payload
         except urllib.error.HTTPError as exc:
             try:
-                payload = exc.read()
+                payload = exc.read(16384)
             except Exception:
                 payload = b""
             return exc.code, payload
@@ -364,7 +397,7 @@ class SupabaseClient:
         url = "%s/auth/v1/token?grant_type=%s" % (self.config.url, grant_type)
         headers = {"apikey": self.config.key, "Content-Type": "application/json"}
         status, payload = self._http("POST", url, headers, body)
-        if status >= 400:
+        if not 200 <= status < 300:
             raw = _extract_message(payload)
             raise ApiError(translate_error(raw), status, raw)
         try:
@@ -417,7 +450,7 @@ class SupabaseClient:
                 "Content-Type": "application/json",
             }
             status, payload = self._http(method, url, headers, body)
-            if status < 400:
+            if 200 <= status < 300:
                 if not expect_json:
                     return payload
                 if not payload:
@@ -475,7 +508,7 @@ class SupabaseClient:
         """Sunucu tarafında oturumu kapat (en iyi çaba)."""
         if not access_token:
             return
-        url = self.config.url + "/auth/v1/logout"
+        url = self.config.url + "/auth/v1/logout?scope=local"
         headers = {
             "apikey": self.config.key,
             "Authorization": "Bearer " + access_token,
@@ -498,7 +531,23 @@ def coerce_bool(value):
 
 
 def pixbuf_from_bytes(data):
+    if len(data) > MAX_RESPONSE_BYTES:
+        raise ApiError("Görsel çok büyük.")
+    if not (data.startswith(b"\xff\xd8\xff") or data.startswith(b"\x89PNG\r\n\x1a\n")
+            or (data[:4] == b"RIFF" and data[8:12] == b"WEBP")):
+        raise ApiError("Yalnızca JPEG, PNG ve WebP görselleri desteklenir.")
     loader = GdkPixbuf.PixbufLoader()
+    oversized = []
+
+    def size_prepared(image_loader, width, height):
+        if width * height > MAX_IMAGE_PIXELS:
+            oversized.append(True)
+            image_loader.set_size(1, 1)
+            return
+        ratio = min(1.0, MAX_PREVIEW_EDGE / max(width, height))
+        image_loader.set_size(max(1, int(width * ratio)), max(1, int(height * ratio)))
+
+    loader.connect("size-prepared", size_prepared)
     try:
         loader.write(data)
         loader.close()
@@ -509,6 +558,8 @@ def pixbuf_from_bytes(data):
             pass
         raise ApiError("Görsel açılamadı (biçim desteklenmiyor olabilir): %s" % exc.message)
     pixbuf = loader.get_pixbuf()
+    if oversized:
+        raise ApiError("Görselin piksel boyutu çok büyük (en fazla 40 megapiksel).")
     if pixbuf is None:
         raise ApiError("Görsel açılamadı.")
     oriented = pixbuf.apply_embedded_orientation()
@@ -527,6 +578,9 @@ def scale_to_fit(pixbuf, max_w, max_h):
 
 
 def find_logo():
+    installed = os.path.join(SCRIPT_DIR, "sora-logo.png")
+    if os.path.isfile(installed):
+        return installed
     for name in ("sora-logo-blue.png", "sora-logo.png"):
         path = os.path.join(REPO_ROOT, "assets", "images", name)
         if os.path.isfile(path):
@@ -743,10 +797,11 @@ class MainWindow(Gtk.ApplicationWindow):
                 self.config_error = str(exc)
 
         self.executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="sora-img")
-        self.image_cache = {}
+        self.image_cache = OrderedDict()
         self.cards = []
         self.current_status = "pending"
         self.refresh_generation = 0
+        self.operation_generation = 0
         self.refreshing = False
         self.list_signature = None
         self.known_pending = None
@@ -938,17 +993,24 @@ class MainWindow(Gtk.ApplicationWindow):
 
     # --- genel yardımcılar ---
     def run_bg(self, func, on_ok=None, on_err=None):
+        generation = self.operation_generation
+
         def worker():
             try:
                 result = func()
             except Exception as exc:  # noqa: BLE001 - arayüze hata olarak iletilir
                 if not isinstance(exc, ApiError):
                     exc = ApiError("Beklenmeyen hata: %s" % exc)
-                GLib.idle_add(self._dispatch, on_err, exc)
+                GLib.idle_add(self._dispatch_if_current, generation, on_err, exc)
             else:
-                GLib.idle_add(self._dispatch, on_ok, result)
+                GLib.idle_add(self._dispatch_if_current, generation, on_ok, result)
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _dispatch_if_current(self, generation, callback, value):
+        if generation != self.operation_generation:
+            return False
+        return self._dispatch(callback, value)
 
     def _dispatch(self, callback, value):
         if isinstance(value, AuthRequired):
@@ -1008,6 +1070,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self._show_view("login")
 
     def _reset_main_state(self):
+        self.operation_generation += 1
         self.refresh_generation += 1
         self.refreshing = False
         self.list_signature = None
@@ -1023,6 +1086,7 @@ class MainWindow(Gtk.ApplicationWindow):
         return False
 
     def _on_destroy(self, *_args):
+        self.operation_generation += 1
         if self.tick_id:
             GLib.source_remove(self.tick_id)
             self.tick_id = 0
@@ -1183,30 +1247,39 @@ class MainWindow(Gtk.ApplicationWindow):
             card.set_image_error("Görsel yolu yok.")
             return
         if not force and path in self.image_cache:
+            self.image_cache.move_to_end(path)
             card.set_pixbuf(self.image_cache[path])
             return
         card.thumb_stack.set_visible_child_name("loading")
         client = self.client
+        generation = self.operation_generation
 
         def job():
             try:
                 pixbuf = pixbuf_from_bytes(client.download_image(path))
             except Exception as exc:  # noqa: BLE001
-                GLib.idle_add(self._thumbnail_failed, card, exc)
+                GLib.idle_add(self._thumbnail_failed, generation, card, exc)
             else:
-                GLib.idle_add(self._thumbnail_loaded, card, path, pixbuf)
+                GLib.idle_add(self._thumbnail_loaded, generation, card, path, pixbuf)
 
         try:
             self.executor.submit(job)
         except RuntimeError:
             pass  # pencere kapanıyor
 
-    def _thumbnail_loaded(self, card, path, pixbuf):
+    def _thumbnail_loaded(self, generation, card, path, pixbuf):
+        if generation != self.operation_generation or not card.alive:
+            return False
         self.image_cache[path] = pixbuf
+        self.image_cache.move_to_end(path)
+        while len(self.image_cache) > IMAGE_CACHE_ITEMS:
+            self.image_cache.popitem(last=False)
         card.set_pixbuf(pixbuf)
         return False
 
-    def _thumbnail_failed(self, card, exc):
+    def _thumbnail_failed(self, generation, card, exc):
+        if generation != self.operation_generation or not card.alive:
+            return False
         if isinstance(exc, AuthRequired):
             self._session_lost(str(exc))
         else:
@@ -1471,7 +1544,9 @@ def self_test():
                       thumb is not None and THUMB_WIDTH - 2 <= thumb.get_width() <= THUMB_WIDTH
                       and thumb.get_height() <= THUMB_MAX_HEIGHT)
                 ok_png, png = pix.save_to_bufferv("png", [], [])
-                check("arayüz: PNG baytlarından pixbuf", ok_png and pixbuf_from_bytes(png).get_width() == 1080)
+                decoded = pixbuf_from_bytes(png) if ok_png else None
+                check("arayüz: PNG güvenli önizleme sınırı",
+                      decoded is not None and max(decoded.get_width(), decoded.get_height()) <= MAX_PREVIEW_EDGE)
                 window._apply_rows([], "pending")
                 check("arayüz: boş durum", window.main_stack.get_visible_child_name() == "empty"
                       and window.empty_label.get_text() == "Bekleyen arka plan yok")

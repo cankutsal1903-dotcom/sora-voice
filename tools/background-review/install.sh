@@ -4,12 +4,14 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-APP="$SCRIPT_DIR/sora_background_review.py"
+SOURCE_APP="$SCRIPT_DIR/sora_background_review.py"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
 DESKTOP_NAME="sora-background-review.desktop"
+INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/sora-background-review"
+APP="$INSTALL_DIR/sora_background_review.py"
 
-if [ ! -f "$APP" ]; then
-  echo "Hata: $APP bulunamadı." >&2
+if [ ! -f "$SOURCE_APP" ]; then
+  echo "Hata: $SOURCE_APP bulunamadı." >&2
   exit 1
 fi
 
@@ -17,13 +19,15 @@ if ! python3 -c 'import gi; gi.require_version("Gtk", "3.0"); from gi.repository
   echo "Uyarı: python3 için GTK 3 (PyGObject) bulunamadı. Örn: sudo apt install python3-gi gir1.2-gtk-3.0" >&2
 fi
 
-chmod +x "$APP"
+mkdir -p "$INSTALL_DIR"
+install -m 755 "$SOURCE_APP" "$APP"
 
 # Simge: depo kökündeki logoyu kullan (klasör ana projeye taşınsa da çalışır)
 ICON="image-x-generic"
 for candidate in "$REPO_ROOT/assets/images/sora-logo-blue.png" "$REPO_ROOT/assets/images/sora-logo.png"; do
   if [ -f "$candidate" ]; then
-    ICON="$candidate"
+    install -m 644 "$candidate" "$INSTALL_DIR/sora-logo.png"
+    ICON="$INSTALL_DIR/sora-logo.png"
     break
   fi
 done
