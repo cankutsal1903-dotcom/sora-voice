@@ -5060,10 +5060,6 @@ function Room({
       ...Array.from({ length: Math.max(0, ROOM_STAGE_CAPACITY - seats.length) }),
     ];
   }, [stageParticipants]);
-  const stageSeatRows = useMemo(
-    () => [stageGrid.slice(0, 1), stageGrid.slice(1, 5), stageGrid.slice(5, 9)],
-    [stageGrid],
-  );
   const roomVoiceLabel =
     liveVoice.status === "connected"
       ? "CANLI"
@@ -5739,7 +5735,7 @@ function Room({
   return (
     <SafeAreaView style={styles.roomScreen}>
       <LinearGradient
-        colors={["#17332F", "#121A21", "#101319"]}
+        colors={["#101A2B", "#111827", "#0B0F17"]}
         locations={[0, 0.4, 1]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
@@ -5761,7 +5757,7 @@ function Room({
             <Ionicons name="chevron-down" size={22} color="#FFFFFF" />
           </Pressable>
           <View style={styles.roomHeaderBrand}>
-            <Ionicons name="radio" size={16} color="#FFD86B" />
+            <Ionicons name="radio" size={16} color={COLORS.primary} />
             <Text style={styles.roomHeaderBrandText}>SORA</Text>
             <View style={styles.roomHeaderDivider} />
             <Text style={styles.roomHeaderCaption}>Ses odası</Text>
@@ -5775,20 +5771,19 @@ function Room({
           </Pressable>
         </View>
 
-        {/* ── Canlı bant ── */}
+        {/* Oda bilgisi kompakt tutulur; bağlantı etiketi yalnızca sorun varken görünür. */}
         <View style={styles.roomLiveBand}>
-          <View style={styles.roomLivePill}>
-            {liveVoice.status === "connected" ? (
-              <LivePulse size={5} color="#7AE0BC" />
-            ) : null}
-            <Text style={styles.roomLivePillText}>
-              {liveVoice.status === "connected"
-                ? "CANLI"
-                : roomVoiceLabel}
+          <View style={styles.roomRoomMeta}>
+            <Text style={styles.roomInlineTitle} numberOfLines={1}>
+              {room.title}
+            </Text>
+            <Text style={styles.roomInlineDetails} numberOfLines={1}>
+              {room.category || "Sohbet"}
+              {liveVoice.status !== "connected" ? ` · ${roomVoiceLabel}` : ""}
             </Text>
           </View>
           <View style={styles.roomPeoplePill}>
-            <Ionicons name="people-outline" size={13} color="#B9C9C5" />
+            <Ionicons name="people-outline" size={13} color="#A9BEDB" />
             <Text style={styles.roomPeopleText}>
               {Math.max(liveVoice.participantCount, activeRoomParticipants.length)} kişi
             </Text>
@@ -5811,65 +5806,22 @@ function Room({
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-
-          {/* Oda kimliği */}
-          <View style={styles.roomIdentity}>
-            <View style={styles.roomIdAvatar}>
-              <LinearGradient
-                colors={room.colors || ["#2A2E3A", "#11131A"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.roomIdAvatarGrad}
-              >
-                <Text style={styles.roomIdInitial}>
-                  {room.initials || room.title?.charAt(0) || "S"}
-                </Text>
-              </LinearGradient>
-              {liveVoice.status === "connected" ? (
-                <View style={styles.roomIdLiveDot}>
-                  <LivePulse size={4} color="#11131A" />
-                </View>
-              ) : null}
-            </View>
-            <View style={styles.roomIdCopy}>
-              <Text style={styles.roomTopBarCategory} numberOfLines={1}>
-                {room.category.toUpperCase()}
-              </Text>
-              <Text style={styles.roomTopBarTitle} numberOfLines={1}>
-                {room.title}
-              </Text>
-              {room.description ? (
-                <Text style={styles.roomIdTopic} numberOfLines={2}>
-                  {room.description}
-                </Text>
-              ) : null}
-            </View>
-          </View>
-
           <View style={styles.roomSurface}>
             <LinearGradient
-              colors={["rgba(255,216,107,0.07)", "rgba(255,216,107,0)"]}
+              colors={["rgba(47,128,237,0.15)", "rgba(47,128,237,0)"]}
               style={styles.roomStageGlow}
               pointerEvents="none"
             />
             {/* Sahne: ev sahibi + konuşmacılar */}
             <View style={styles.roomStage}>
-              <View style={styles.roomSectionRow}>
-                <View style={styles.roomSectionHeading}>
-                  <Ionicons name="mic-outline" size={15} color="#FFD86B" />
-                  <Text style={styles.roomSectionTitle}>Sahne</Text>
-                </View>
-                <Text style={styles.roomSectionCount}>
-                  {Math.min(stageParticipants.length, ROOM_STAGE_CAPACITY)}/
-                  {ROOM_STAGE_CAPACITY} koltuk
-                </Text>
-              </View>
               <View style={styles.roomSpeakerGrid}>
-
                 {stageGrid.map((participant, index) =>
                   participant ? (
                     <Pressable
-                      style={[styles.roomSpeakerSlot, participant.role === "host" && styles.roomSpeakerSlotHost]}
+                      style={[
+                        styles.roomSpeakerSlot,
+                        index === 0 && styles.roomHostStageSlot,
+                      ]}
                       key={participant.userId}
                       delayLongPress={260}
                       onLongPress={() => openParticipantMenu(participant)}
@@ -5878,12 +5830,12 @@ function Room({
                     >
                       <View style={styles.roomAvatarWrap}>
                         {participant.isSpeaking ? (
-
-                          <SpeakingRing size={index === 0 ? 98 : 78} color="#FFD86B" />
+                          <SpeakingRing size={index === 0 ? 98 : 78} color={COLORS.primary} />
                         ) : null}
                         <View
                           style={[
                             styles.roomSpeakerAvatar,
+                            index === 0 && styles.roomHostStageAvatar,
                             { backgroundColor: participant.color },
                             participant.role === "host" &&
                               styles.roomSpeakerAvatarHost,
@@ -5891,7 +5843,12 @@ function Room({
                               styles.roomSpeakerAvatarActive,
                           ]}
                         >
-                          <Text style={styles.roomSpeakerInitial}>
+                          <Text
+                            style={[
+                              styles.roomSpeakerInitial,
+                              index === 0 && styles.roomHostStageInitial,
+                            ]}
+                          >
                             {participant.name?.charAt(0)?.toUpperCase() || "?"}
                           </Text>
                           {participant.microphoneEnabled ? (
@@ -5921,8 +5878,9 @@ function Room({
                       <Text style={styles.roomSpeakerName} numberOfLines={1}>
                         {participant.pendingSeat
                           ? "Bekliyor"
-
-                          : index === 0 ? `1 · ${participant.name}` : participant.name}
+                          : index === 0
+                            ? `1 · ${participant.name}`
+                            : participant.name}
                       </Text>
                       {index !== 0 && (
                         <Text style={styles.roomSpeakerRole} numberOfLines={1}>
@@ -5943,10 +5901,10 @@ function Room({
 
                           name="mic-outline"
                           size={28}
-                          color="rgba(235,228,255,0.6)"
+                          color="rgba(118,175,255,0.78)"
                         />
                       </View>
-                      <Text style={styles.roomEmptySeatLabel}>Katıl</Text>
+                      <Text style={styles.roomEmptySeatLabel}>{index + 1}</Text>
                     </Pressable>
                   ),
                 )}
@@ -5988,7 +5946,7 @@ function Room({
                     <Ionicons
                       name={handRaised ? "remove-circle-outline" : "list-outline"}
                       size={17}
-                      color={handRaised ? "#11131A" : "#FFD86B"}
+                      color={handRaised ? "#11131A" : COLORS.primary}
                     />
                     <Text
                       style={[
@@ -6060,7 +6018,7 @@ function Room({
           <View style={styles.roomChatSection}>
             <View style={styles.roomChatHead}>
               <View style={styles.roomChatIcon}>
-                <Ionicons name="chatbubbles-outline" size={17} color="#91DAC4" />
+                <Ionicons name="chatbubbles-outline" size={17} color={COLORS.primary} />
               </View>
               <View style={styles.roomChatHeading}>
                 <Text style={styles.roomChatTitle}>Sohbet</Text>
@@ -6119,10 +6077,10 @@ function Room({
             <Ionicons
               name={speakerOn ? "volume-high" : "volume-mute"}
               size={22}
-              color={speakerOn ? "#A8EDD3" : "#FFFFFF"}
+              color={speakerOn ? COLORS.primary : "#FFFFFF"}
             />
             <Text
-              style={[styles.roomCtrlLabel, speakerOn && { color: "#A8EDD3" }]}
+              style={[styles.roomCtrlLabel, speakerOn && { color: COLORS.primary }]}
             >
               Ses
             </Text>
@@ -12148,7 +12106,7 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   roomHeaderBrandText: {
-    color: "#F8E6B1",
+    color: "#F3F7FF",
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 2,
@@ -12160,20 +12118,32 @@ const styles = StyleSheet.create({
     marginHorizontal: 2,
   },
   roomHeaderCaption: {
-    color: "#B0C0BD",
+    color: "#A9BEDB",
     fontSize: 11,
     fontWeight: "500",
+  },
+  roomRoomMeta: { flex: 1, minWidth: 0 },
+  roomInlineTitle: {
+    color: "#F5F8FF",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  roomInlineDetails: {
+    color: "#A9BEDB",
+    fontSize: 10,
+    fontWeight: "600",
+    marginTop: 2,
   },
   roomPeoplePill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginLeft: "auto",
+    flexShrink: 0,
     paddingHorizontal: 8,
     paddingVertical: 6,
   },
   roomPeopleText: {
-    color: "#BCCBC7",
+    color: "#C5D4E8",
     fontSize: 11,
     fontWeight: "600",
   },
@@ -12190,17 +12160,17 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   roomSpeakerRole: {
-    color: "#B8AA81",
+    color: "#A9BEDB",
     fontSize: 8,
     fontWeight: "600",
   },
   roomEmptySeatLabel: {
-    color: "#8D9DA6",
+    color: "#A9BEDB",
     fontSize: 10,
     fontWeight: "600",
   },
   roomSpeakerSlotHost: {
-    backgroundColor: "rgba(255,216,107,0.045)",
+    backgroundColor: "rgba(47,128,237,0.045)",
   },
   roomChatHeading: {
     flex: 1,
@@ -12211,7 +12181,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(111,220,179,0.08)",
+    backgroundColor: "rgba(47,128,237,0.12)",
   },
   roomChatClear: {
     width: 44,
@@ -12223,7 +12193,7 @@ const styles = StyleSheet.create({
     flex: 1.8,
   },
   roomSpeakerControlOn: {
-    backgroundColor: "rgba(122,224,188,0.12)",
+    backgroundColor: "rgba(47,128,237,0.18)",
   },
   roomLeaveLabel: {
     color: "#F3A9AC",
@@ -12232,7 +12202,7 @@ const styles = StyleSheet.create({
   },
   roomScreen: {
     flex: 1,
-    backgroundColor: "#101319",
+    backgroundColor: "#0B0F17",
   },
   roomTopBar: {
     flexDirection: "row",
@@ -12271,7 +12241,7 @@ const styles = StyleSheet.create({
   },
   roomTopBarTitle: {
     color: "#F7F8F3",
-    fontSize: 27,
+    fontSize: 16,
     fontWeight: "900",
     letterSpacing: -0.7,
     marginTop: 3,
@@ -12279,27 +12249,9 @@ const styles = StyleSheet.create({
   roomLiveBand: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
     gap: 8,
     paddingHorizontal: 20,
-    paddingBottom: 6,
-  },
-  roomLivePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    borderRadius: 10,
-    backgroundColor: "rgba(111,220,179,0.1)",
-    borderWidth: 1,
-    borderColor: "rgba(111,220,179,0.18)",
-  },
-  roomLivePillText: {
-    color: "#A8EDD3",
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 1,
+    paddingBottom: 8,
   },
   roomRetryPill: {
     flexDirection: "row",
@@ -12328,7 +12280,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "rgba(170,224,198,0.28)",
+    borderColor: "rgba(118,175,255,0.28)",
   },
   roomIdAvatarGrad: {
     ...StyleSheet.absoluteFill,
@@ -12356,20 +12308,20 @@ const styles = StyleSheet.create({
   },
   roomIdCopy: { flex: 1 },
   roomIdTopic: {
-    color: "#A8B7B7",
+    color: "#A9BEDB",
     fontSize: 12,
     lineHeight: 18,
     marginTop: 4,
   },
   roomSurface: {
-
     paddingHorizontal: 2,
     paddingTop: 20,
     paddingBottom: 6,
+    marginTop: "auto",
+    marginBottom: "auto",
   },
   roomBody: {
     flexGrow: 1,
-
     paddingHorizontal: 8,
     paddingTop: 2,
     paddingBottom: 8,
@@ -12383,7 +12335,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  roomSpeakerAvatarHost: { borderColor: "rgba(255,216,107,0.9)" },
+  roomSpeakerAvatarHost: { borderColor: "rgba(118,175,255,0.9)" },
   roomSpeakerCrown: {
     position: "absolute",
     top: -3,
@@ -12446,7 +12398,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: "rgba(255,216,107,0.9)",
+    borderColor: "rgba(118,175,255,0.9)",
   },
   roomHostInitial: { color: "#11131A", fontSize: 30, fontWeight: "900" },
   roomHostCrown: {
@@ -12460,7 +12412,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#1B1E27",
     borderWidth: 1,
-    borderColor: "rgba(255,216,107,0.7)",
+    borderColor: "rgba(118,175,255,0.7)",
   },
   roomStageHostName: {
     color: "#FFFFFF",
@@ -12484,21 +12436,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   roomFollowBtnActive: {
-    backgroundColor: "rgba(255,216,107,0.16)",
-    borderColor: "rgba(255,216,107,0.6)",
+    backgroundColor: "rgba(47,128,237,0.16)",
+    borderColor: "rgba(118,175,255,0.6)",
   },
   roomFollowBtnText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
-  roomFollowBtnTextActive: { color: "#76AFFF" },
+  roomFollowBtnTextActive: { color: COLORS.primary },
   roomSpeakerGrid: {
-    flexDirection: "column",
-    alignItems: "center",
-    gap: 16,
-    width: "100%",
-  },
-  roomSpeakerGridRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "center",
-
     columnGap: 0,
     rowGap: 10,
     width: "100%",
@@ -12507,9 +12453,8 @@ const styles = StyleSheet.create({
     width: "25%",
     minHeight: 84,
     alignItems: "center",
-    paddingVertical: 5,
+    paddingVertical: 4,
     gap: 5,
-    borderRadius: 18,
   },
   roomSpeakerAvatar: {
 
@@ -12519,9 +12464,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(118,175,255,0.42)",
   },
-  roomSpeakerAvatarActive: { borderColor: "#76AFFF" },
+  roomSpeakerAvatarActive: { borderColor: COLORS.primary },
   roomSpeakerInitial: { color: "#11131A", fontSize: 20, fontWeight: "900" },
   roomMicOnBadge: {
     position: "absolute",
@@ -12532,7 +12477,7 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#76AFFF",
+    backgroundColor: COLORS.primary,
   },
   roomMicOffBadge: {
     position: "absolute",
@@ -12560,22 +12505,10 @@ const styles = StyleSheet.create({
     borderRadius: 33,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#2F80ED",
-    borderWidth: 1,
-    borderColor: "#11131A",
-  },
-  roomSeatNumberText: { color: "#FFFFFF", fontSize: 9, fontWeight: "900" },
-  roomEmptySeatNumber: { color: "#76AFFF", fontSize: 17, fontWeight: "900" },
-  roomEmptySeat: {
-    width: 52,
-    height: 52,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.025)",
+    backgroundColor: "rgba(47,128,237,0.08)",
     borderWidth: 1,
     borderStyle: "dashed",
-    borderColor: "rgba(182,202,204,0.22)",
+    borderColor: "rgba(118,175,255,0.42)",
   },
   roomHandBtn: {
     flexDirection: "row",
@@ -12587,12 +12520,11 @@ const styles = StyleSheet.create({
     minHeight: 44,
     borderRadius: 13,
     flex: 1,
-    backgroundColor: "rgba(255,216,107,0.12)",
+    backgroundColor: "rgba(47,128,237,0.15)",
     borderWidth: 1,
-    borderColor: "rgba(255,216,107,0.22)",
+    borderColor: "rgba(118,175,255,0.28)",
   },
-  roomHandBtnActive: { backgroundColor: "#76AFFF", borderColor: "#76AFFF" },
-  roomHandBtnEmoji: { fontSize: 14 },
+  roomHandBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   roomHandBtnText: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
   roomChatBox: {
     borderRadius: 22,
@@ -12626,7 +12558,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 12,
     paddingBottom: 12,
-    backgroundColor: "#151C24",
+    backgroundColor: "#101827",
     borderTopWidth: 1,
     borderColor: "rgba(255,255,255,0.09)",
   },
@@ -12642,7 +12574,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.035)",
   },
   roomCtrlBtnOn: {
-    backgroundColor: "#FFD86B",
+    backgroundColor: COLORS.primary,
   },
   roomCtrlLabel: {
     color: "#C4CDD3",
@@ -12670,29 +12602,6 @@ const styles = StyleSheet.create({
     marginBottom: 18,
     paddingHorizontal: 10,
   },
-  roomSectionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-    marginBottom: 16,
-  },
-  roomSectionTitle: {
-    color: "#EEEDE5",
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  roomSectionCount: {
-    color: "#CBBB8B",
-    fontSize: 10,
-    fontWeight: "600",
-    backgroundColor: "rgba(255,216,107,0.07)",
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-
-  roomSectionCount: { color: "#76AFFF", fontSize: 10, fontWeight: "900" },
   roomAudienceCard: {
     borderRadius: 22,
     padding: 12,
@@ -12721,7 +12630,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#76AFFF",
+    backgroundColor: COLORS.primary,
   },
   roomAudienceName: {
     color: "rgba(255,255,255,0.7)",
@@ -12822,7 +12731,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: "rgba(17,19,26,0.85)",
     borderWidth: 1,
-    borderColor: "rgba(255,216,107,0.4)",
+    borderColor: "rgba(118,175,255,0.4)",
   },
   giftFlyerBannerText: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
   participantSheetHead: {
@@ -12879,7 +12788,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFD86B",
+    backgroundColor: COLORS.primary,
   },
   composerGift: {
     width: 44,
