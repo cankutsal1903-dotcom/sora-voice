@@ -6,6 +6,7 @@ import {
   isHandleAvailable,
   normalizePhoneNumber,
   requestPasswordReset,
+  AUTH_CALLBACK_URL,
   startOAuthSignIn,
   startPhoneSignIn,
   supabase,
@@ -72,7 +73,14 @@ export function AuthScreen() {
       const profile = isRegistering ? await validateProfile() : null;
       if (isRegistering && !profile) return;
       const result = isRegistering
-        ? await supabase.auth.signUp({ email: cleanEmail, password, options: { data: { display_name: profile.displayName, handle: profile.handle } } })
+        ? await supabase.auth.signUp({
+            email: cleanEmail,
+            password,
+            options: {
+              data: { display_name: profile.displayName, handle: profile.handle },
+              ...(Platform.OS === "web" ? {} : { emailRedirectTo: AUTH_CALLBACK_URL }),
+            },
+          })
         : await supabase.auth.signInWithPassword({ email: cleanEmail, password });
       if (result.error) throw result.error;
       if (isRegistering && !result.data.session) {
