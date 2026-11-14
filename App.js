@@ -2633,6 +2633,17 @@ function ProfileDetailSheet({
                 ) : null}
               </View>
             </View>
+            <View style={styles.profileDetailBrand} pointerEvents="none">
+              <Ionicons
+                name="radio-outline"
+                size={34}
+                color="rgba(255,255,255,0.28)"
+              />
+              <View>
+                <Text style={styles.profileDetailBrandTitle}>SORA</Text>
+                <Text style={styles.profileDetailBrandCaption}>SESİNİ PAYLAŞ</Text>
+              </View>
+            </View>
             <View style={styles.profileDetailCoverBottom}>
               <View
                 style={[
@@ -12701,6 +12712,28 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   profileDetailTopActions: { flexDirection: "row", alignItems: "center", gap: 9 },
+  profileDetailBrand: {
+    position: "absolute",
+    left: 24,
+    top: 112,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    opacity: 0.72,
+  },
+  profileDetailBrandTitle: {
+    color: "rgba(255,255,255,0.32)",
+    fontSize: 30,
+    fontWeight: "900",
+    letterSpacing: 4,
+  },
+  profileDetailBrandCaption: {
+    color: "rgba(255,255,255,0.48)",
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 2,
+    marginTop: 1,
+  },
   profileDetailIconButton: {
     width: 42,
     height: 42,
@@ -12713,7 +12746,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 20,
     right: 20,
-    bottom: -44,
+    bottom: -18,
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
@@ -12733,7 +12766,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    marginBottom: 10,
+    marginBottom: 24,
     borderRadius: 999,
     backgroundColor: COLORS.primary,
   },
