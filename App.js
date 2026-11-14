@@ -3425,7 +3425,11 @@ const WalletSheet = memo(function WalletSheet({
                 </Text>
               </Pressable>
             </View>
-            <Text style={styles.settingsCaption}>IBAN İLE KREDİ YÜKLE</Text>
+            <Text style={styles.settingsCaption}>
+              {Platform.OS === "web"
+                ? "IBAN İLE KREDİ YÜKLE"
+                : "MAĞAZA İLE KREDİ YÜKLE"}
+            </Text>
             {Platform.OS !== "web" ? (
               <View style={styles.transferCard}>
                 <Text style={styles.transferTitle}>{Platform.OS === "android" ? "Google Play ile kredi yükleme" : "App Store üzerinden kredi yükleme"}</Text>
