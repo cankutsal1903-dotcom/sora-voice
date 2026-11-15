@@ -1,5 +1,6 @@
 -- Aile sistemi, 8 haneli benzersiz kullanıcı/aile ID'leri, 10.000.000 coin atomik aile kurma,
--- tek aile üyeliği kısıtı, RLS korumalı aile sohbeti ve yapılandırılabilir aile seviyeleri/ödülleri.
+-- tek aile üyeliği kısıtı, RLS korumalı aile sohbeti, aile içi (kendine ve üyelere) hediye gönderimi
+-- ve hediye hacmine bağlı 2x katlanan aile seviyeleri (10.000.000 coin = 100.000 XP).
 
 begin;
 
@@ -98,15 +99,19 @@ set name = excluded.name,
     active = excluded.active,
     purchasable = excluded.purchasable;
 
--- ── 1. 8 Haneli Benzersiz Özel ID (Kullanıcı + Aile) ────────────────────────────
+-- ── 1. 8 Haneli Benzersiz Özel ID ve Üstel (2x) Aile XP Kolonları ────────────────
 alter table public.profiles
   add column if not exists public_id text;
 
 alter table public.communities
   add column if not exists family_code text,
   add column if not exists avatar_url text check (avatar_url is null or char_length(avatar_url) <= 600),
-  add column if not exists xp integer not null default 0 check (xp >= 0),
+  add column if not exists xp bigint not null default 0 check (xp >= 0),
+  add column if not exists gift_coins_total bigint not null default 0 check (gift_coins_total >= 0),
   add column if not exists level integer not null default 1 check (level >= 1);
+
+alter table public.communities
+  alter column xp type bigint using xp::bigint;
 
 create or replace function public.generate_unique_8digit_code(p_target text)
 returns text
@@ -269,6 +274,12 @@ create policy "Users delete family avatar in own folder" on storage.objects
   using (bucket_id = 'family-avatars' and (storage.foldername(name))[1] = auth.uid()::text);
 
 -- ── 3. Tek Aile Üyeliği Kısıtı & Doğrudan Yazma Kilidi ──────────────────────────
+insert into public.community_members (community_id, user_id, role)
+select c.id, c.owner_id, 'owner'
+from public.communities c
+where c.owner_id is not null
+on conflict (community_id, user_id) do update set role = 'owner';
+
 with ranked_memberships as (
   select community_id, user_id,
     row_number() over (
@@ -286,20 +297,27 @@ where cm.community_id = rm.community_id
 create unique index if not exists community_members_single_family_idx
   on public.community_members(user_id);
 
--- Maliyet (10.000.000 coin) ve tek aile kuralının istemciden aşılmasını önlemek için
--- doğrudan INSERT/UPDATE/DELETE politikaları kapatılır; tüm yazmalar RPC üzerinden geçer.
 drop policy if exists "Users create communities" on public.communities;
 drop policy if exists "Owners update communities" on public.communities;
 drop policy if exists "Owners delete communities" on public.communities;
 drop policy if exists "Users join communities" on public.community_members;
 drop policy if exists "Users leave communities" on public.community_members;
 
--- ── 4. Aile Seviyeleri, Puan Kuralları, Ödüller ve Hediye Katalog Bağlantısı ────
+-- ── 4. Hediye Kataloğu ve 2x Katlanan Aile Seviyeleri (10M Coin = 100K XP) ──────
 alter table public.gift_catalog
   add column if not exists min_family_level integer not null default 0 check (min_family_level >= 0);
 
+update public.gift_catalog
+set icon = 'trophy'
+where icon = 'crown';
+
 insert into public.gift_catalog (id, name, icon, color, cost, active, min_family_level)
-values ('family_crest', 'Aile Sancağı', 'shield', '#2F80ED', 200, true, 4)
+values
+  ('family_crest', 'Aile Sancağı', 'shield', '#2F80ED', 200, true, 4),
+  ('crystal_mic', 'Kristal Mikrofon', 'mic', '#3B82F6', 5000, true, 0),
+  ('sapphire_wing', 'Safir Kanat', 'airplane', '#2563EB', 50000, true, 0),
+  ('northern_star', 'Kuzey Yıldızı', 'planet', '#1D5FBF', 250000, true, 0),
+  ('sora_palace', 'Sora Kalesi', 'diamond', '#1E40AF', 1000000, true, 0)
 on conflict (id) do update
   set name = excluded.name,
       icon = excluded.icon,
@@ -308,9 +326,35 @@ on conflict (id) do update
       active = excluded.active,
       min_family_level = excluded.min_family_level;
 
+-- Her seviye geçişinde gereken XP bir öncekinin 2 katıdır:
+-- Sv.1 -> Sv.2: 100.000 XP (10.000.000 kredi)   => toplam eşik: 100.000
+-- Sv.2 -> Sv.3: 200.000 XP (20.000.000 kredi)   => toplam eşik: 300.000
+-- Sv.3 -> Sv.4: 400.000 XP (40.000.000 kredi)   => toplam eşik: 700.000
+-- Sv.4 -> Sv.5: 800.000 XP (80.000.000 kredi)   => toplam eşik: 1.500.000
+-- Sv.5 -> Sv.6: 1.600.000 XP (160.000.000 kredi)=> toplam eşik: 3.100.000
+create or replace function public.calculate_family_level(p_xp bigint)
+returns integer
+language plpgsql
+immutable
+set search_path = public, pg_temp
+as $$
+declare
+  v_remaining bigint := greatest(0, coalesce(p_xp, 0));
+  v_level integer := 1;
+  v_step bigint := 100000;
+begin
+  while v_remaining >= v_step and v_level < 50 loop
+    v_remaining := v_remaining - v_step;
+    v_level := v_level + 1;
+    v_step := v_step * 2;
+  end loop;
+  return v_level;
+end;
+$$;
+
 create table if not exists public.family_level_configs (
   level integer primary key check (level >= 1),
-  min_xp integer not null check (min_xp >= 0),
+  min_xp bigint not null check (min_xp >= 0),
   title text not null check (char_length(title) between 2 and 48),
   badge_code text,
   frame_item_id text references public.profile_item_catalog(id),
@@ -319,6 +363,9 @@ create table if not exists public.family_level_configs (
   perk_label text not null
 );
 
+alter table public.family_level_configs
+  alter column min_xp type bigint using min_xp::bigint;
+
 alter table public.family_level_configs enable row level security;
 drop policy if exists "Authenticated users read family levels" on public.family_level_configs;
 create policy "Authenticated users read family levels"
@@ -326,12 +373,16 @@ create policy "Authenticated users read family levels"
 
 insert into public.family_level_configs (level, min_xp, title, badge_code, frame_item_id, gift_unlock_id, member_limit, perk_label)
 values
-  (1, 0, 'Başlangıç Ailesi', 'family_lv1', null, null, 30, 'Aile sohbeti ve 30 üye kapasitesi'),
-  (2, 150, 'Yükselen Aile', 'family_lv2', null, null, 45, 'Yükselen Aile rozeti ve 45 üye kapasitesi'),
-  (3, 400, 'Parlayan Aile', 'family_lv3', 'frame_family_silver', null, 60, 'Aile Gümüş profil çerçevesi ve 60 üye kapasitesi'),
-  (4, 800, 'Seçkin Aile', 'family_lv4', null, 'family_crest', 80, 'Odada Aile Sancağı hediyesi kilidi ve 80 üye kapasitesi'),
-  (5, 1500, 'Asil Aile', 'family_lv5', 'frame_family_royal', null, 100, 'Aile Asil profil çerçevesi ve 100 üye kapasitesi'),
-  (6, 2600, 'Zirve Ailesi', 'family_lv6', null, null, 150, 'Zirve Ailesi rozeti ve 150 üye kapasitesi')
+  (1, 0, 'Başlangıç Ailesi', 'family_lv1', null, null, 30, 'Aile sohbeti, hediyeleşme ve 30 üye kapasitesi'),
+  (2, 100000, 'Yükselen Aile', 'family_lv2', null, null, 45, 'Yükselen Aile rozeti ve 45 üye kapasitesi (+100.000 XP)'),
+  (3, 300000, 'Parlayan Aile', 'family_lv3', 'frame_family_silver', null, 60, 'Aile Gümüş profil çerçevesi ve 60 üye kapasitesi (+200.000 XP)'),
+  (4, 700000, 'Seçkin Aile', 'family_lv4', null, 'family_crest', 80, 'Aile Sancağı hediyesi kilidi ve 80 üye kapasitesi (+400.000 XP)'),
+  (5, 1500000, 'Asil Aile', 'family_lv5', 'frame_family_royal', null, 100, 'Aile Asil profil çerçevesi ve 100 üye kapasitesi (+800.000 XP)'),
+  (6, 3100000, 'Zirve Ailesi', 'family_lv6', null, null, 130, 'Zirve Ailesi rozeti ve 130 üye kapasitesi (+1.600.000 XP)'),
+  (7, 6300000, 'Sancak Ailesi', 'family_lv7', null, null, 160, 'Sancak Ailesi rozeti ve 160 üye kapasitesi (+3.200.000 XP)'),
+  (8, 12700000, 'Hükümran Aile', 'family_lv8', null, null, 200, 'Hükümran Aile rozeti ve 200 üye kapasitesi (+6.400.000 XP)'),
+  (9, 25500000, 'Efsane Aile', 'family_lv9', null, null, 250, 'Efsane Aile rozeti ve 250 üye kapasitesi (+12.800.000 XP)'),
+  (10, 51100000, 'İmparatorluk Ailesi', 'family_lv10', null, null, 300, 'İmparatorluk Ailesi rozeti ve 300 üye kapasitesi (+25.600.000 XP)')
 on conflict (level) do update
   set min_xp = excluded.min_xp,
       title = excluded.title,
@@ -353,12 +404,13 @@ drop policy if exists "Authenticated users read family xp rules" on public.famil
 create policy "Authenticated users read family xp rules"
   on public.family_xp_rules for select to authenticated using (true);
 
+delete from public.family_xp_rules
+where event_type in ('daily_checkin', 'family_message', 'member_joined');
+
 insert into public.family_xp_rules (event_type, xp_amount, daily_user_cap, label)
 values
-  ('daily_checkin', 25, 1, 'Günlük aile yoklaması (günde 1 kez +25 XP)'),
-  ('family_message', 5, 5, 'Aile sohbetinde aktif mesaj (günde en fazla 5 kez +5 XP)'),
-  ('member_joined', 40, 1, 'Yeni üye katılımı (kullanıcı başına 1 kez +40 XP)'),
-  ('room_gift_sent', 20, 10, 'Canlı odada hediye gönderimi (işlem başına +20 XP)')
+  ('family_gift_sent', 100000, 1000000, 'Aile içi hediye gönderimi: 10.000.000 kredi = +100.000 XP (100 kredi = +1 XP)'),
+  ('room_gift_sent', 100000, 1000000, 'Canlı odada hediye gönderimi: 10.000.000 kredi = +100.000 XP (100 kredi = +1 XP)')
 on conflict (event_type) do update
   set xp_amount = excluded.xp_amount,
       daily_user_cap = excluded.daily_user_cap,
@@ -370,11 +422,21 @@ create table if not exists public.family_xp_events (
   actor_id uuid not null references public.profiles(id) on delete cascade,
   event_type text not null references public.family_xp_rules(event_type),
   dedupe_key text not null,
-  xp_awarded integer not null check (xp_awarded > 0),
+  coins_spent bigint not null default 0 check (coins_spent >= 0),
+  xp_awarded bigint not null default 0 check (xp_awarded >= 0),
   event_date date not null default (timezone('utc', now()))::date,
   created_at timestamptz not null default now(),
   unique (community_id, dedupe_key)
 );
+
+alter table public.family_xp_events
+  add column if not exists coins_spent bigint not null default 0 check (coins_spent >= 0);
+
+alter table public.family_xp_events drop constraint if exists family_xp_events_xp_awarded_check;
+alter table public.family_xp_events
+  alter column xp_awarded type bigint using xp_awarded::bigint;
+alter table public.family_xp_events add constraint family_xp_events_xp_awarded_check
+  check (xp_awarded >= 0);
 
 create index if not exists family_xp_events_daily_cap_idx
   on public.family_xp_events(community_id, actor_id, event_type, event_date);
@@ -409,15 +471,21 @@ create policy "Users read own family reward grants"
 
 grant select on public.family_level_configs, public.family_xp_rules, public.family_xp_events, public.family_reward_grants to authenticated;
 
--- ── 5. Aile Sohbeti (DM'den bağımsız, yalnızca üyeler arası RLS korumalı) ───────
+-- ── 5. Aile Sohbeti (Mesaj + Hediye Kartı, yalnızca üyeler arası RLS korumalı) ───
 create table if not exists public.family_messages (
   id uuid primary key default gen_random_uuid(),
   community_id uuid not null references public.communities(id) on delete cascade,
   sender_id uuid not null references public.profiles(id) on delete cascade,
   body text not null check (char_length(trim(body)) between 1 and 1000),
+  kind text not null default 'text' check (kind in ('text', 'gift')),
+  metadata jsonb not null default '{}'::jsonb,
   client_message_id uuid,
   created_at timestamptz not null default now()
 );
+
+alter table public.family_messages
+  add column if not exists kind text not null default 'text' check (kind in ('text', 'gift')),
+  add column if not exists metadata jsonb not null default '{}'::jsonb;
 
 create unique index if not exists family_messages_sender_client_id_idx
   on public.family_messages(sender_id, client_message_id)
@@ -449,7 +517,7 @@ exception
 end;
 $$;
 
--- ── 6. İç Yardımcı: Tekrarlanan Olaylara Karşı Korumalı Aile XP & Ödül Motoru ───
+-- ── 6. İç Yardımcılar: Hediye XP Motoru (100 Coin = 1 XP) ve Ödül Eşitleme ──────
 create or replace function public.sync_family_rewards_for_user(p_community_id uuid, p_user_id uuid)
 returns integer
 language plpgsql
@@ -496,79 +564,105 @@ begin
 end;
 $$;
 
-create or replace function public.award_family_xp_internal(
+create or replace function public.award_family_gift_xp_internal(
   p_community_id uuid,
   p_actor_id uuid,
   p_event_type text,
+  p_coins_spent bigint,
   p_dedupe_key text
 )
-returns table (awarded_xp integer, new_xp integer, new_level integer)
+returns table (awarded_xp bigint, new_xp bigint, new_level integer, new_gift_coins bigint)
 language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
 declare
-  v_rule public.family_xp_rules;
-  v_today date := (timezone('utc', now()))::date;
-  v_today_count integer;
+  v_clean_coins bigint := greatest(0, coalesce(p_coins_spent, 0));
+  v_family public.communities;
+  v_old_coins bigint;
+  v_next_coins bigint;
+  v_delta_xp bigint;
+  v_next_xp bigint;
+  v_next_level integer;
   v_inserted_id uuid;
-  v_total_xp integer;
-  v_calc_level integer;
 begin
-  select * into v_rule from public.family_xp_rules where event_type = p_event_type;
-  if not found then
-    select c.xp, c.level into new_xp, new_level from public.communities c where c.id = p_community_id;
+  select * into v_family from public.communities c where c.id = p_community_id for update;
+  if not found or v_clean_coins <= 0 then
     awarded_xp := 0;
+    new_xp := coalesce(v_family.xp, 0);
+    new_level := coalesce(v_family.level, 1);
+    new_gift_coins := coalesce(v_family.gift_coins_total, 0);
     return next;
     return;
   end if;
 
-  select count(*) into v_today_count
-  from public.family_xp_events
-  where community_id = p_community_id
-    and actor_id = p_actor_id
-    and event_type = p_event_type
-    and event_date = v_today;
-
-  if v_today_count >= v_rule.daily_user_cap then
-    select c.xp, c.level into new_xp, new_level from public.communities c where c.id = p_community_id;
+  if exists (
+    select 1 from public.family_xp_events fxe
+    where fxe.community_id = p_community_id and fxe.dedupe_key = p_dedupe_key
+  ) then
     awarded_xp := 0;
+    new_xp := v_family.xp;
+    new_level := v_family.level;
+    new_gift_coins := v_family.gift_coins_total;
     return next;
     return;
   end if;
 
-  insert into public.family_xp_events (community_id, actor_id, event_type, dedupe_key, xp_awarded, event_date)
-  values (p_community_id, p_actor_id, p_event_type, p_dedupe_key, v_rule.xp_amount, v_today)
+  v_old_coins := coalesce(v_family.gift_coins_total, 0);
+  v_next_coins := v_old_coins + v_clean_coins;
+  -- 10.000.000 coin = 100.000 XP => her 100 coin = 1 XP (küçük hediyelerde küsürat kaybolmaz).
+  v_delta_xp := (v_next_coins / 100) - (v_old_coins / 100);
+  v_next_xp := coalesce(v_family.xp, 0) + v_delta_xp;
+  v_next_level := public.calculate_family_level(v_next_xp);
+
+  insert into public.family_xp_events (
+    community_id,
+    actor_id,
+    event_type,
+    dedupe_key,
+    coins_spent,
+    xp_awarded,
+    event_date
+  )
+  values (
+    p_community_id,
+    p_actor_id,
+    p_event_type,
+    p_dedupe_key,
+    v_clean_coins,
+    v_delta_xp,
+    (timezone('utc', now()))::date
+  )
   on conflict (community_id, dedupe_key) do nothing
   returning id into v_inserted_id;
 
   if v_inserted_id is null then
-    select c.xp, c.level into new_xp, new_level from public.communities c where c.id = p_community_id;
     awarded_xp := 0;
+    new_xp := v_family.xp;
+    new_level := v_family.level;
+    new_gift_coins := v_family.gift_coins_total;
     return next;
     return;
   end if;
 
   update public.communities c
-  set xp = c.xp + v_rule.xp_amount,
-      level = coalesce(
-        (select max(flc.level) from public.family_level_configs flc where flc.min_xp <= c.xp + v_rule.xp_amount),
-        1
-      ),
+  set gift_coins_total = v_next_coins,
+      xp = v_next_xp,
+      level = v_next_level,
       updated_at = now()
-  where c.id = p_community_id
-  returning c.xp, c.level into v_total_xp, v_calc_level;
+  where c.id = p_community_id;
 
   perform public.sync_family_rewards_for_user(p_community_id, p_actor_id);
 
-  awarded_xp := v_rule.xp_amount;
-  new_xp := v_total_xp;
-  new_level := v_calc_level;
+  awarded_xp := v_delta_xp;
+  new_xp := v_next_xp;
+  new_level := v_next_level;
+  new_gift_coins := v_next_coins;
   return next;
 end;
 $$;
 
--- ── 7. Atomik Aile RPC'leri (Kurma: 10.000.000 Coin, Katılma, Ayrılma, Sohbet) ──
+-- ── 7. Atomik Aile RPC'leri (Kurma: 10M Coin, Katılma, Ayrılma, Sohbet, Hediye) ──
 create or replace function public.create_family(
   p_name text,
   p_description text default '',
@@ -610,10 +704,8 @@ begin
     raise exception 'Request ID required';
   end if;
 
-  -- Aynı kullanıcının eşzamanlı isteklerini sıraya al.
   perform 1 from public.profiles where id = v_uid for update;
 
-  -- İdempotensi: aynı p_request_id daha önce işlendiyse tekrar ücret kesme.
   select * into v_prior
   from public.wallet_transactions
   where idempotency_key = p_request_id and user_id = v_uid;
@@ -681,7 +773,7 @@ begin
 
   for v_code_attempt in 1..8 loop
     begin
-      insert into public.communities (owner_id, name, description, avatar_url, icon, theme_colors, xp, level, family_code)
+      insert into public.communities (owner_id, name, description, avatar_url, icon, theme_colors, xp, gift_coins_total, level, family_code)
       values (
         v_uid,
         v_clean_name,
@@ -689,6 +781,7 @@ begin
         v_clean_avatar,
         'people',
         '["#2F80ED", "#1D4E89"]'::jsonb,
+        0,
         0,
         1,
         public.generate_unique_8digit_code('communities')
@@ -704,7 +797,6 @@ begin
     end;
   end loop;
 
-  -- add_community_owner tetikleyicisi kurucuyu community_members'a ekler; yine de garantiye al:
   insert into public.community_members (community_id, user_id, role)
   values (v_created.id, v_uid, 'owner')
   on conflict (community_id, user_id) do update set role = 'owner';
@@ -732,8 +824,9 @@ begin
 end;
 $$;
 
-create or replace function public.join_family(p_community_id uuid)
-returns table (community_id uuid, role text, xp integer, level integer)
+drop function if exists public.join_family(uuid);
+create function public.join_family(p_community_id uuid)
+returns table (community_id uuid, role text, xp bigint, level integer)
 language plpgsql
 security definer
 set search_path = public, pg_temp
@@ -759,7 +852,6 @@ begin
 
   if v_existing_community is not null then
     if v_existing_community = p_community_id then
-      -- Zaten bu ailenin üyesi: idempotent olarak mevcut durumu döndür.
       select * into v_family from public.communities c where c.id = p_community_id;
       community_id := v_family.id;
       role := v_existing_role;
@@ -776,31 +868,23 @@ begin
     raise exception 'Family not found';
   end if;
 
-  select coalesce(flc.member_limit, 40) into v_limit
+  select coalesce(flc.member_limit, 300) into v_limit
   from public.family_level_configs flc
-  where flc.level = v_family.level;
+  where flc.level = least(v_family.level, 10);
 
   select count(*) into v_member_count
   from public.community_members cm
   where cm.community_id = p_community_id;
 
-  if v_member_count >= coalesce(v_limit, 40) then
+  if v_member_count >= coalesce(v_limit, 300) then
     raise exception 'Family is full';
   end if;
 
   insert into public.community_members (community_id, user_id, role)
   values (p_community_id, v_uid, 'member');
 
-  perform public.award_family_xp_internal(
-    p_community_id,
-    v_uid,
-    'member_joined',
-    'join:' || v_uid::text
-  );
-
   perform public.sync_family_rewards_for_user(p_community_id, v_uid);
 
-  select * into v_family from public.communities c where c.id = p_community_id;
   community_id := v_family.id;
   role := 'member';
   xp := v_family.xp;
@@ -910,7 +994,8 @@ begin
 end;
 $$;
 
-create or replace function public.send_family_message(
+drop function if exists public.send_family_message(uuid, text, uuid);
+create function public.send_family_message(
   p_community_id uuid,
   p_body text,
   p_client_message_id uuid default null
@@ -920,9 +1005,11 @@ returns table (
   community_id uuid,
   sender_id uuid,
   body text,
+  kind text,
+  metadata jsonb,
   created_at timestamptz,
-  awarded_xp integer,
-  family_xp integer,
+  awarded_xp bigint,
+  family_xp bigint,
   family_level integer
 )
 language plpgsql
@@ -934,7 +1021,6 @@ declare
   v_clean text := trim(coalesce(p_body, ''));
   v_msg public.family_messages;
   v_recent_count integer;
-  v_xp record;
 begin
   if v_uid is null then
     raise exception 'Authentication required';
@@ -962,6 +1048,8 @@ begin
       community_id := v_msg.community_id;
       sender_id := v_msg.sender_id;
       body := v_msg.body;
+      kind := v_msg.kind;
+      metadata := v_msg.metadata;
       created_at := v_msg.created_at;
       awarded_xp := 0;
       return next;
@@ -972,49 +1060,119 @@ begin
   select count(*) into v_recent_count
   from public.family_messages fm
   where fm.sender_id = v_uid
+    and fm.kind = 'text'
     and fm.created_at > now() - interval '8 seconds';
 
   if v_recent_count >= 5 then
     raise exception 'Too many messages';
   end if;
 
-  insert into public.family_messages (community_id, sender_id, body, client_message_id)
-  values (p_community_id, v_uid, v_clean, p_client_message_id)
+  insert into public.family_messages (community_id, sender_id, body, kind, metadata, client_message_id)
+  values (p_community_id, v_uid, v_clean, 'text', '{}'::jsonb, p_client_message_id)
   returning * into v_msg;
 
-  select * into v_xp
-  from public.award_family_xp_internal(
-    p_community_id,
-    v_uid,
-    'family_message',
-    'msg:' || v_msg.id::text
-  );
+  select c.xp, c.level into family_xp, family_level from public.communities c where c.id = p_community_id;
 
   id := v_msg.id;
   community_id := v_msg.community_id;
   sender_id := v_msg.sender_id;
   body := v_msg.body;
+  kind := v_msg.kind;
+  metadata := v_msg.metadata;
   created_at := v_msg.created_at;
-  awarded_xp := coalesce(v_xp.awarded_xp, 0);
-  family_xp := v_xp.new_xp;
-  family_level := v_xp.new_level;
+  awarded_xp := 0;
   return next;
 end;
 $$;
 
-create or replace function public.claim_family_checkin(p_community_id uuid)
-returns table (claimed boolean, awarded_xp integer, family_xp integer, family_level integer)
+-- Aile içi hediye gönderimi: üyeler birbirine veya kendine hediye gönderebilir;
+-- harcanan coin sunucuda atomik düşer ve 10.000.000 coin = 100.000 XP oranıyla aile seviyesini artırır.
+drop function if exists public.send_family_gift(uuid, text, uuid, integer, uuid);
+create function public.send_family_gift(
+  p_community_id uuid,
+  p_gift_id text,
+  p_recipient_id uuid,
+  p_quantity integer default 1,
+  p_request_id uuid default null
+)
+returns table (
+  message_id uuid,
+  message_body text,
+  message_metadata jsonb,
+  created_at timestamptz,
+  balance integer,
+  promo_balance integer,
+  paid_balance integer,
+  gift_name text,
+  total_cost bigint,
+  awarded_xp bigint,
+  family_xp bigint,
+  family_level integer,
+  gift_coins_total bigint
+)
 language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
 declare
   v_uid uuid := auth.uid();
-  v_today date := (timezone('utc', now()))::date;
+  v_qty integer := coalesce(p_quantity, 1);
+  v_prior public.wallet_transactions;
+  v_prior_msg public.family_messages;
+  v_gift public.gift_catalog;
+  v_family public.communities;
+  v_cost_bigint bigint;
+  v_cost_int integer;
+  v_wallet_total integer;
+  v_wallet_promo integer;
+  v_promo_spent integer;
+  v_paid_spent integer;
+  v_sender_name text;
+  v_recipient_name text;
+  v_recipient_avatar text;
+  v_body text;
+  v_meta jsonb;
+  v_msg public.family_messages;
   v_xp record;
 begin
   if v_uid is null then
     raise exception 'Authentication required';
+  end if;
+  if p_request_id is null then
+    raise exception 'Request ID required';
+  end if;
+  if v_qty < 1 or v_qty > 1000 then
+    raise exception 'Invalid gift quantity';
+  end if;
+
+  perform 1 from public.profiles where id = v_uid for update;
+
+  select * into v_prior
+  from public.wallet_transactions
+  where idempotency_key = p_request_id and user_id = v_uid;
+
+  if found then
+    select * into v_prior_msg
+    from public.family_messages fm
+    where fm.id = (v_prior.metadata->>'message_id')::uuid;
+
+    select * into v_family from public.communities c where c.id = p_community_id;
+    select w.balance, w.promo_balance, w.paid_balance
+      into balance, promo_balance, paid_balance
+    from public.wallets w where w.user_id = v_uid;
+
+    message_id := v_prior_msg.id;
+    message_body := coalesce(v_prior_msg.body, '');
+    message_metadata := coalesce(v_prior_msg.metadata, '{}'::jsonb);
+    created_at := coalesce(v_prior_msg.created_at, v_prior.created_at);
+    gift_name := coalesce(v_prior.metadata->>'gift_name', 'Hediye');
+    total_cost := abs(v_prior.amount)::bigint;
+    awarded_xp := coalesce((v_prior.metadata->>'awarded_xp')::bigint, 0);
+    family_xp := coalesce(v_family.xp, 0);
+    family_level := coalesce(v_family.level, 1);
+    gift_coins_total := coalesce(v_family.gift_coins_total, 0);
+    return next;
+    return;
   end if;
 
   if not exists (
@@ -1024,18 +1182,156 @@ begin
     raise exception 'Family membership required';
   end if;
 
+  if p_recipient_id is null or not exists (
+    select 1 from public.community_members cm
+    where cm.community_id = p_community_id and cm.user_id = p_recipient_id
+  ) then
+    raise exception 'Recipient must be in the same family';
+  end if;
+
+  if p_recipient_id <> v_uid and public.users_blocked(v_uid, p_recipient_id) then
+    raise exception 'Recipient unavailable';
+  end if;
+
+  select * into v_gift from public.gift_catalog where id = p_gift_id and active;
+  if not found then
+    raise exception 'Gift is unavailable';
+  end if;
+
+  select * into v_family from public.communities c where c.id = p_community_id;
+  if not found then
+    raise exception 'Family not found';
+  end if;
+
+  if coalesce(v_gift.min_family_level, 0) > 0 and coalesce(v_family.level, 1) < v_gift.min_family_level then
+    raise exception 'Family level required';
+  end if;
+
+  v_cost_bigint := v_gift.cost::bigint * v_qty::bigint;
+  if v_cost_bigint <= 0 or v_cost_bigint > 2000000000 then
+    raise exception 'Invalid gift quantity';
+  end if;
+  v_cost_int := v_cost_bigint::integer;
+
+  insert into public.wallets (user_id) values (v_uid) on conflict (user_id) do nothing;
+
+  select w.balance, w.promo_balance
+    into v_wallet_total, v_wallet_promo
+  from public.wallets w
+  where w.user_id = v_uid
+  for update;
+
+  if coalesce(v_wallet_total, 0) < v_cost_int then
+    raise exception 'Insufficient balance';
+  end if;
+
+  v_promo_spent := least(coalesce(v_wallet_promo, 0), v_cost_int);
+  v_paid_spent := v_cost_int - v_promo_spent;
+
+  update public.wallets w
+  set balance = w.balance - v_cost_int,
+      promo_balance = w.promo_balance - v_promo_spent,
+      paid_balance = w.paid_balance - v_paid_spent,
+      updated_at = now()
+  where w.user_id = v_uid
+  returning w.balance, w.promo_balance, w.paid_balance
+    into balance, promo_balance, paid_balance;
+
   select * into v_xp
-  from public.award_family_xp_internal(
+  from public.award_family_gift_xp_internal(
     p_community_id,
     v_uid,
-    'daily_checkin',
-    'checkin:' || v_uid::text || ':' || v_today::text
+    'family_gift_sent',
+    v_cost_bigint,
+    'family_gift:' || p_request_id::text
   );
 
-  claimed := coalesce(v_xp.awarded_xp, 0) > 0;
+  if p_recipient_id <> v_uid then
+    perform public.sync_family_rewards_for_user(p_community_id, p_recipient_id);
+  end if;
+
+  select p.display_name into v_sender_name from public.profiles p where p.id = v_uid;
+  select p.display_name, p.avatar_url into v_recipient_name, v_recipient_avatar from public.profiles p where p.id = p_recipient_id;
+
+  if p_recipient_id = v_uid then
+    v_body := coalesce(v_sender_name, 'Üye') || ' kendine ' ||
+      (case when v_qty > 1 then v_qty::text || 'x ' else '' end) || v_gift.name || ' hediyesi gönderdi.';
+  else
+    v_body := coalesce(v_sender_name, 'Üye') || ' -> ' || coalesce(v_recipient_name, 'Üye') || ': ' ||
+      (case when v_qty > 1 then v_qty::text || 'x ' else '' end) || v_gift.name || ' hediyesi gönderdi.';
+  end if;
+
+  v_meta := jsonb_build_object(
+    'gift_id', v_gift.id,
+    'gift_name', v_gift.name,
+    'gift_icon', v_gift.icon,
+    'gift_color', v_gift.color,
+    'quantity', v_qty,
+    'unit_cost', v_gift.cost,
+    'total_cost', v_cost_bigint,
+    'recipient_id', p_recipient_id,
+    'recipient_name', coalesce(v_recipient_name, 'Üye'),
+    'recipient_avatar_url', v_recipient_avatar,
+    'self_gift', (p_recipient_id = v_uid),
+    'awarded_xp', coalesce(v_xp.awarded_xp, 0)
+  );
+
+  insert into public.family_messages (community_id, sender_id, body, kind, metadata, client_message_id)
+  values (p_community_id, v_uid, v_body, 'gift', v_meta, p_request_id)
+  returning * into v_msg;
+
+  insert into public.wallet_transactions (user_id, amount, type, description, metadata, idempotency_key)
+  values (
+    v_uid,
+    -v_cost_int,
+    'gift',
+    (case when v_qty > 1 then v_qty::text || 'x ' else '' end) || v_gift.name || ' (Aile hediyesi)',
+    jsonb_build_object(
+      'gift_id', v_gift.id,
+      'gift_name', v_gift.name,
+      'quantity', v_qty,
+      'family_id', p_community_id,
+      'recipient_id', p_recipient_id,
+      'self_gift', (p_recipient_id = v_uid),
+      'promo_spent', v_promo_spent,
+      'paid_spent', v_paid_spent,
+      'message_id', v_msg.id,
+      'awarded_xp', coalesce(v_xp.awarded_xp, 0)
+    ),
+    p_request_id
+  );
+
+  message_id := v_msg.id;
+  message_body := v_msg.body;
+  message_metadata := v_msg.metadata;
+  created_at := v_msg.created_at;
+  gift_name := v_gift.name;
+  total_cost := v_cost_bigint;
   awarded_xp := coalesce(v_xp.awarded_xp, 0);
-  family_xp := v_xp.new_xp;
-  family_level := v_xp.new_level;
+  family_xp := coalesce(v_xp.new_xp, 0);
+  family_level := coalesce(v_xp.new_level, 1);
+  gift_coins_total := coalesce(v_xp.new_gift_coins, 0);
+  return next;
+end;
+$$;
+
+drop function if exists public.claim_family_checkin(uuid);
+create function public.claim_family_checkin(p_community_id uuid)
+returns table (claimed boolean, awarded_xp bigint, family_xp bigint, family_level integer)
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_uid uuid := auth.uid();
+begin
+  if v_uid is null then
+    raise exception 'Authentication required';
+  end if;
+  select false, 0::bigint, c.xp, c.level
+    into claimed, awarded_xp, family_xp, family_level
+  from public.communities c
+  where c.id = p_community_id;
   return next;
 end;
 $$;
@@ -1074,7 +1370,7 @@ begin
   select * into item from public.profile_item_catalog where id = p_item_id and active and purchasable;
   if not found then raise exception 'Item unavailable'; end if;
   select w.promo_balance, w.paid_balance into promo_spent, paid_spent
-  from public.wallets w where user_id = auth.uid() for update;
+  from public.wallets w where w.user_id = auth.uid() for update;
   if not found then raise exception 'Wallet unavailable'; end if;
   if promo_spent + paid_spent < item.cost then raise exception 'Insufficient balance'; end if;
   promo_spent := least(promo_spent, item.cost);
@@ -1189,11 +1485,12 @@ begin
   );
 
   if v_sender_family_id is not null then
-    perform public.award_family_xp_internal(
+    perform public.award_family_gift_xp_internal(
       v_sender_family_id,
       auth.uid(),
       'room_gift_sent',
-      'gift:' || p_request_id::text
+      g.cost::bigint,
+      'room_gift:' || p_request_id::text
     );
   end if;
 
@@ -1205,13 +1502,15 @@ $$;
 -- ── 9. Fonksiyon İzin Korumaları ─────────────────────────────────────────────────
 revoke all on function public.generate_unique_8digit_code(text) from public, anon, authenticated;
 revoke all on function public.sync_family_rewards_for_user(uuid, uuid) from public, anon, authenticated;
-revoke all on function public.award_family_xp_internal(uuid, uuid, text, text) from public, anon, authenticated;
+drop function if exists public.award_family_xp_internal(uuid, uuid, text, text);
+revoke all on function public.award_family_gift_xp_internal(uuid, uuid, text, bigint, text) from public, anon, authenticated;
 
 revoke all on function public.create_family(text, text, text, uuid) from public, anon;
 revoke all on function public.join_family(uuid) from public, anon;
 revoke all on function public.leave_family(uuid) from public, anon;
 revoke all on function public.update_family_profile(uuid, text, text, text, boolean) from public, anon;
 revoke all on function public.send_family_message(uuid, text, uuid) from public, anon;
+revoke all on function public.send_family_gift(uuid, text, uuid, integer, uuid) from public, anon;
 revoke all on function public.claim_family_checkin(uuid) from public, anon;
 revoke all on function public.claim_family_level_rewards(uuid) from public, anon;
 
@@ -1220,6 +1519,7 @@ grant execute on function public.join_family(uuid) to authenticated;
 grant execute on function public.leave_family(uuid) to authenticated;
 grant execute on function public.update_family_profile(uuid, text, text, text, boolean) to authenticated;
 grant execute on function public.send_family_message(uuid, text, uuid) to authenticated;
+grant execute on function public.send_family_gift(uuid, text, uuid, integer, uuid) to authenticated;
 grant execute on function public.claim_family_checkin(uuid) to authenticated;
 grant execute on function public.claim_family_level_rewards(uuid) to authenticated;
 

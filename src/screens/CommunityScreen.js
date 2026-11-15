@@ -18,12 +18,12 @@ import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  claimFamilyCheckin,
   claimFamilyLevelRewards,
+  computeFamilyLevelProgress,
   createFamily,
   DEFAULT_FAMILY_LEVEL_CONFIGS,
-  DEFAULT_FAMILY_XP_RULES,
   describeFamilyError,
+  FAMILY_COINS_PER_XP,
   FAMILY_CREATION_COST,
   findFamilyByCode,
   getFamilyDetails,
@@ -31,6 +31,8 @@ import {
   leaveFamily,
   listFamilies,
   listFamilyMessages,
+  listRoomGiftCatalog,
+  sendFamilyGift,
   sendFamilyMessage,
   subscribeToCommunities,
   subscribeToFamilyMessages,
@@ -38,6 +40,26 @@ import {
 } from "../data/soraRepository";
 import { describeRoomError, uploadFamilyAvatar, validateFamilyAvatarAsset } from "../room/roomApi";
 import { COLORS } from "../theme/colors";
+
+const FALLBACK_FAMILY_GIFTS = [
+  { id: "clap", name: "Alkış", icon: "sparkles", color: "#6AA8F5", cost: 15, minFamilyLevel: 0 },
+  { id: "heart", name: "Kalp", icon: "heart", color: "#2F80ED", cost: 40, minFamilyLevel: 0 },
+  { id: "crown", name: "Taç", icon: "trophy", color: "#1D5FBF", cost: 120, minFamilyLevel: 0 },
+  { id: "family_crest", name: "Aile Sancağı", icon: "shield", color: "#2F80ED", cost: 200, minFamilyLevel: 4 },
+  { id: "rocket", name: "Roket", icon: "rocket", color: "#54BBD3", cost: 300, minFamilyLevel: 0 },
+  { id: "crystal_mic", name: "Kristal Mikrofon", icon: "mic", color: "#3B82F6", cost: 5000, minFamilyLevel: 0 },
+  { id: "sapphire_wing", name: "Safir Kanat", icon: "airplane", color: "#2563EB", cost: 50000, minFamilyLevel: 0 },
+  { id: "northern_star", name: "Kuzey Yıldızı", icon: "planet", color: "#1D5FBF", cost: 250000, minFamilyLevel: 0 },
+  { id: "sora_palace", name: "Sora Kalesi", icon: "diamond", color: "#1E40AF", cost: 1000000, minFamilyLevel: 0 },
+];
+
+const GIFT_QUANTITIES = [1, 10, 50, 100];
+
+const resolveGiftIcon = (iconName) => {
+  if (!iconName || iconName === "crown") return "trophy";
+  if (Ionicons?.glyphMap && !Ionicons.glyphMap[iconName]) return "gift";
+  return iconName;
+};
 
 const createUuid = () =>
   globalThis.crypto?.randomUUID?.()
@@ -47,7 +69,7 @@ const createUuid = () =>
   });
 
 const formatCredits = (value) =>
-  new Intl.NumberFormat("tr-TR").format(Math.max(0, Number(value) || 0));
+  new Intl.NumberFormat("tr-TR").format(Math.max(0, Math.floor(Number(value) || 0)));
 
 const formatMessageTime = (iso) => {
   if (!iso) return "";
@@ -124,30 +146,6 @@ function MemberAvatar({ uri, name, color = "#2F80ED", size = 36 }) {
   );
 }
 
-function computeLevelProgress(xp, level, levelConfigs = DEFAULT_FAMILY_LEVEL_CONFIGS) {
-  const configs = levelConfigs.length ? levelConfigs : DEFAULT_FAMILY_LEVEL_CONFIGS;
-  const currentCfg = configs.find((item) => item.level === level) || configs[0];
-  const nextCfg = configs.find((item) => item.level === level + 1) || null;
-  if (!nextCfg) {
-    return {
-      currentTitle: currentCfg?.title || `Seviye ${level}`,
-      nextLevel: null,
-      nextMinXp: currentCfg?.minXp || xp,
-      ratio: 1,
-      remainingXp: 0,
-    };
-  }
-  const span = Math.max(1, nextCfg.minXp - (currentCfg?.minXp || 0));
-  const gained = Math.max(0, xp - (currentCfg?.minXp || 0));
-  return {
-    currentTitle: currentCfg?.title || `Seviye ${level}`,
-    nextLevel: nextCfg.level,
-    nextMinXp: nextCfg.minXp,
-    ratio: Math.min(1, gained / span),
-    remainingXp: Math.max(0, nextCfg.minXp - xp),
-  };
-}
-
 export function CommunityScreen({
   currentUserId,
   profile,
@@ -161,14 +159,14 @@ export function CommunityScreen({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Arama & keşfet
+  // Arama ve keşfet
   const [searchQuery, setSearchQuery] = useState("");
   const [searchingCode, setSearchingCode] = useState(false);
   const [codeLookupResult, setCodeLookupResult] = useState(null);
   const [codeLookupMessage, setCodeLookupMessage] = useState("");
   const [discoverModalOpen, setDiscoverModalOpen] = useState(false);
 
-  // Detay & yönetim modalı
+  // Detay ve yönetim modalı
   const [selectedFamilyId, setSelectedFamilyId] = useState(null);
   const [detailData, setDetailData] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -195,18 +193,27 @@ export function CommunityScreen({
   const [editClearAvatar, setEditClearAvatar] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
 
-  // Aile sohbeti
+  // Aile sohbeti ve üyeler
   const [messages, setMessages] = useState([]);
+  const [familyMembers, setFamilyMembers] = useState([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [messagesError, setMessagesError] = useState("");
   const [draft, setDraft] = useState("");
   const [sendingMessage, setSendingMessage] = useState(false);
-  const [checkinBusy, setCheckinBusy] = useState(false);
-  const [checkedInToday, setCheckedInToday] = useState(false);
   const sendInFlightRef = useRef(false);
   const draftMessageIdRef = useRef(null);
   const draftFingerprintRef = useRef("");
   const chatScrollRef = useRef(null);
+
+  // Aile hediye kutusu
+  const [giftCatalog, setGiftCatalog] = useState(FALLBACK_FAMILY_GIFTS);
+  const [giftSheetOpen, setGiftSheetOpen] = useState(false);
+  const [giftRecipientId, setGiftRecipientId] = useState(null);
+  const [giftQuantity, setGiftQuantity] = useState(1);
+  const [sendingGift, setSendingGift] = useState(false);
+  const giftInFlightRef = useRef(false);
+  const giftRequestIdRef = useRef(null);
+  const giftFingerprintRef = useRef("");
 
   const myFamily = useMemo(
     () => families.find((item) => item.joined) || null,
@@ -240,7 +247,21 @@ export function CommunityScreen({
     return unsubscribe;
   }, [currentUserId, loadFamilies]);
 
-  // Kullanıcı bir ailedeyse sohbet geçmişini ve gerçek zamanlı akışı bağla
+  useEffect(() => {
+    if (!currentUserId) return undefined;
+    let active = true;
+    listRoomGiftCatalog()
+      .then((items) => {
+        if (active && Array.isArray(items) && items.length > 0) {
+          setGiftCatalog(items);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [currentUserId]);
+
   const loadMessages = useCallback(async (communityId, { silent = false } = {}) => {
     if (!communityId || !currentUserId) return;
     if (!silent) setMessagesLoading(true);
@@ -251,8 +272,23 @@ export function CommunityScreen({
         getFamilyDetails(communityId, currentUserId).catch(() => null),
       ]);
       setMessages(rows);
-      if (details) {
-        setCheckedInToday(Boolean(details.checkedInToday));
+      if (details?.members) {
+        setFamilyMembers(details.members);
+      }
+      if (details?.family) {
+        setFamilies((prev) =>
+          prev.map((item) =>
+            item.id === communityId
+              ? {
+                  ...item,
+                  xp: details.family.xp,
+                  level: details.family.level,
+                  giftCoinsTotal: details.family.giftCoinsTotal,
+                  memberCount: details.family.memberCount,
+                }
+              : item,
+          ),
+        );
       }
     } catch (msgErr) {
       setMessagesError(describeFamilyError(msgErr, "Aile sohbeti yüklenemedi."));
@@ -264,8 +300,8 @@ export function CommunityScreen({
   useEffect(() => {
     if (!myFamily?.id || !currentUserId) {
       setMessages([]);
+      setFamilyMembers([]);
       setMessagesError("");
-      setCheckedInToday(false);
       return undefined;
     }
     loadMessages(myFamily.id);
@@ -286,6 +322,8 @@ export function CommunityScreen({
               senderColor: isOwn ? (profile?.color || COLORS.primary) : COLORS.primary,
               senderAvatarUrl: isOwn ? (profile?.avatarUrl || null) : null,
               text: incoming.text,
+              kind: incoming.kind || "text",
+              metadata: incoming.metadata || {},
               own: isOwn,
               createdAt: incoming.createdAt,
             },
@@ -307,6 +345,203 @@ export function CommunityScreen({
     profile?.name,
   ]);
 
+  // Hediye alıcıları: önce kullanıcının kendisi (profil fotoğrafıyla), ardından diğer aile üyeleri
+  const giftRecipients = useMemo(() => {
+    if (!currentUserId) return [];
+    const byId = new Map();
+    byId.set(currentUserId, {
+      userId: currentUserId,
+      name: profile?.name || "Kendim",
+      handle: profile?.handle || "sora",
+      avatarUrl: profile?.avatarUrl || null,
+      color: profile?.color || COLORS.primary,
+      isSelf: true,
+    });
+    for (const m of familyMembers) {
+      if (!m?.userId) continue;
+      if (m.userId === currentUserId) {
+        const selfItem = byId.get(currentUserId);
+        byId.set(currentUserId, {
+          ...selfItem,
+          name: m.name || selfItem.name,
+          avatarUrl: m.avatarUrl || selfItem.avatarUrl,
+          color: m.color || selfItem.color,
+        });
+      } else {
+        byId.set(m.userId, {
+          userId: m.userId,
+          name: m.name || "Aile üyesi",
+          handle: m.handle || "sora",
+          avatarUrl: m.avatarUrl || null,
+          color: m.color || COLORS.primary,
+          isSelf: false,
+        });
+      }
+    }
+    for (const msg of messages) {
+      if (msg?.userId && !byId.has(msg.userId)) {
+        byId.set(msg.userId, {
+          userId: msg.userId,
+          name: msg.senderName || "Aile üyesi",
+          handle: msg.senderHandle || "sora",
+          avatarUrl: msg.senderAvatarUrl || null,
+          color: msg.senderColor || COLORS.primary,
+          isSelf: msg.userId === currentUserId,
+        });
+      }
+    }
+    return Array.from(byId.values());
+  }, [currentUserId, familyMembers, messages, profile?.avatarUrl, profile?.color, profile?.handle, profile?.name]);
+
+  const openGiftSheet = useCallback((targetUserId = null) => {
+    if (!myFamily?.id || !currentUserId) return;
+    const preferred =
+      targetUserId
+      || giftRecipients.find((item) => !item.isSelf)?.userId
+      || currentUserId;
+    setGiftRecipientId(preferred);
+    setGiftQuantity(1);
+    setGiftSheetOpen(true);
+    getFamilyDetails(myFamily.id, currentUserId)
+      .then((details) => {
+        if (details?.members) setFamilyMembers(details.members);
+      })
+      .catch(() => undefined);
+  }, [currentUserId, giftRecipients, myFamily?.id]);
+
+  const selectedGiftRecipient = useMemo(
+    () =>
+      giftRecipients.find((item) => item.userId === giftRecipientId)
+      || giftRecipients[0]
+      || null,
+    [giftRecipientId, giftRecipients],
+  );
+
+  const handleConfirmSendGift = useCallback((gift) => {
+    if (!myFamily?.id || !gift || sendingGift) return;
+    const recipient = selectedGiftRecipient;
+    if (!recipient?.userId) {
+      Alert.alert("Alıcı seç", "Hediyeyi göndereceğin kişiyi seç.");
+      return;
+    }
+    const reqLevel = Number(gift.minFamilyLevel || 0);
+    if (reqLevel > 0 && Number(myFamily.level || 1) < reqLevel) {
+      Alert.alert(
+        "Aile seviyesi gerekli",
+        `Bu hediyeyi göndermek için ailenin en az Seviye ${reqLevel} olması gerekiyor.`,
+      );
+      return;
+    }
+    const totalCost = Number(gift.cost || 0) * giftQuantity;
+    if (typeof coins === "number" && coins < totalCost) {
+      Alert.alert(
+        "Bakiye yetersiz",
+        `${giftQuantity}x ${gift.name} için ${formatCredits(totalCost)} kredi gerekiyor.`,
+      );
+      return;
+    }
+    const xpPreview = Math.floor(totalCost / FAMILY_COINS_PER_XP);
+    const targetText = recipient.isSelf ? "Kendine" : `${recipient.name} kişisine`;
+    const xpText = xpPreview > 0
+      ? `Aileye +${formatCredits(xpPreview)} XP kazandırır.`
+      : "Harcama aile hediye havuzuna eklenir (her 100 kredi = +1 XP).";
+
+    Alert.alert(
+      "Hediyeyi onayla",
+      `${targetText} ${giftQuantity > 1 ? `${giftQuantity}x ` : ""}${gift.name} (${formatCredits(totalCost)} kredi) gönderilsin mi?\n${xpText}`,
+      [
+        { text: "Vazgeç", style: "cancel" },
+        {
+          text: "Gönder",
+          onPress: async () => {
+            if (giftInFlightRef.current) return;
+            giftInFlightRef.current = true;
+            setSendingGift(true);
+            try {
+              const fingerprint = `${myFamily.id}:${recipient.userId}:${gift.id}:${giftQuantity}`;
+              if (giftFingerprintRef.current !== fingerprint || !giftRequestIdRef.current) {
+                giftFingerprintRef.current = fingerprint;
+                giftRequestIdRef.current = createUuid();
+              }
+              const result = await sendFamilyGift({
+                communityId: myFamily.id,
+                giftId: gift.id,
+                recipientId: recipient.userId,
+                quantity: giftQuantity,
+                requestId: giftRequestIdRef.current,
+              });
+              giftRequestIdRef.current = null;
+              giftFingerprintRef.current = "";
+              setGiftSheetOpen(false);
+
+              if (result.messageId) {
+                setMessages((prev) => {
+                  if (prev.some((item) => item.id === result.messageId)) return prev;
+                  return [
+                    ...prev,
+                    {
+                      id: result.messageId,
+                      communityId: myFamily.id,
+                      userId: currentUserId,
+                      senderName: profile?.name || "Sen",
+                      senderHandle: profile?.handle || "sora",
+                      senderColor: profile?.color || COLORS.primary,
+                      senderAvatarUrl: profile?.avatarUrl || null,
+                      text: result.messageBody,
+                      kind: "gift",
+                      metadata: result.messageMetadata || {},
+                      own: true,
+                      createdAt: result.createdAt,
+                    },
+                  ];
+                });
+              }
+
+              setFamilies((prev) =>
+                prev.map((item) =>
+                  item.id === myFamily.id
+                    ? {
+                        ...item,
+                        xp: typeof result.familyXp === "number" ? result.familyXp : item.xp,
+                        level: typeof result.familyLevel === "number" ? result.familyLevel : item.level,
+                        giftCoinsTotal:
+                          typeof result.giftCoinsTotal === "number"
+                            ? result.giftCoinsTotal
+                            : item.giftCoinsTotal,
+                      }
+                    : item,
+                ),
+              );
+
+              requestAnimationFrame(() => {
+                chatScrollRef.current?.scrollToEnd?.({ animated: true });
+              });
+              await onBalanceRefresh?.();
+            } catch (err) {
+              Alert.alert("Hediye gönderilemedi", describeFamilyError(err));
+            } finally {
+              giftInFlightRef.current = false;
+              setSendingGift(false);
+            }
+          },
+        },
+      ],
+    );
+  }, [
+    coins,
+    currentUserId,
+    giftQuantity,
+    myFamily?.id,
+    myFamily?.level,
+    onBalanceRefresh,
+    profile?.avatarUrl,
+    profile?.color,
+    profile?.handle,
+    profile?.name,
+    selectedGiftRecipient,
+    sendingGift,
+  ]);
+
   const openFamilyDetail = useCallback(async (familyId, initialTab = "levels") => {
     if (!familyId) return;
     setSelectedFamilyId(familyId);
@@ -321,8 +556,8 @@ export function CommunityScreen({
         setEditDescription(data.family.description || "");
         setEditAvatarAsset(null);
         setEditClearAvatar(false);
-        if (data.family.id === myFamily?.id) {
-          setCheckedInToday(Boolean(data.checkedInToday));
+        if (data.family.id === myFamily?.id && data.members) {
+          setFamilyMembers(data.members);
         }
       }
     } catch (err) {
@@ -358,14 +593,14 @@ export function CommunityScreen({
     setCodeLookupMessage("");
     setCodeLookupResult(null);
     if (!/^[1-9][0-9]{7}$/.test(normalizedDigits)) {
-      setCodeLookupMessage("ID ile arama yapmak için 8 haneli aile numarasını gir.");
+      setCodeLookupMessage("8 haneli Aile ID gir.");
       return;
     }
     setSearchingCode(true);
     try {
       const found = await findFamilyByCode(normalizedDigits, currentUserId);
       if (!found) {
-        setCodeLookupMessage(`${normalizedDigits} ID numaralı bir aile bulunamadı.`);
+        setCodeLookupMessage("Aile bulunamadı.");
       } else {
         setCodeLookupResult(found);
       }
@@ -594,24 +829,13 @@ export function CommunityScreen({
             senderColor: profile?.color || COLORS.primary,
             senderAvatarUrl: profile?.avatarUrl || null,
             text: sent.text,
+            kind: sent.kind || "text",
+            metadata: sent.metadata || {},
             own: true,
             createdAt: sent.createdAt,
           },
         ];
       });
-      if (typeof sent.familyXp === "number" || typeof sent.familyLevel === "number") {
-        setFamilies((prev) =>
-          prev.map((item) =>
-            item.id === myFamily.id
-              ? {
-                  ...item,
-                  xp: typeof sent.familyXp === "number" ? sent.familyXp : item.xp,
-                  level: typeof sent.familyLevel === "number" ? sent.familyLevel : item.level,
-                }
-              : item,
-          ),
-        );
-      }
       requestAnimationFrame(() => {
         chatScrollRef.current?.scrollToEnd?.({ animated: true });
       });
@@ -630,35 +854,6 @@ export function CommunityScreen({
     profile?.name,
     sendingMessage,
   ]);
-
-  const handleDailyCheckin = useCallback(async () => {
-    if (!myFamily?.id || checkinBusy || checkedInToday) return;
-    setCheckinBusy(true);
-    try {
-      const result = await claimFamilyCheckin(myFamily.id);
-      setCheckedInToday(true);
-      if (typeof result.familyXp === "number" || typeof result.familyLevel === "number") {
-        setFamilies((prev) =>
-          prev.map((item) =>
-            item.id === myFamily.id
-              ? {
-                  ...item,
-                  xp: typeof result.familyXp === "number" ? result.familyXp : item.xp,
-                  level: typeof result.familyLevel === "number" ? result.familyLevel : item.level,
-                }
-              : item,
-          ),
-        );
-      }
-      if (!result.claimed) {
-        Alert.alert("Günlük yoklama", "Bugünkü aile yoklaman zaten kaydedildi.");
-      }
-    } catch (err) {
-      Alert.alert("Yoklama alınamadı", describeFamilyError(err));
-    } finally {
-      setCheckinBusy(false);
-    }
-  }, [checkedInToday, checkinBusy, myFamily?.id]);
 
   const handleSyncRewards = useCallback(async () => {
     const targetId = detailData?.family?.id || myFamily?.id;
@@ -724,6 +919,7 @@ export function CommunityScreen({
     </Pressable>
   );
 
+  // ID arama ve keşfet alanı — açıklama metni olmadan sade
   const renderDiscoverContent = ({ insideModal = false } = {}) => (
     <View style={{ flex: 1 }}>
       <View style={styles.searchSection}>
@@ -736,7 +932,7 @@ export function CommunityScreen({
               if (codeLookupMessage) setCodeLookupMessage("");
               if (codeLookupResult) setCodeLookupResult(null);
             }}
-            placeholder="8 haneli Aile ID veya aile adı ara"
+            placeholder="Aile ID ara"
             placeholderTextColor={COLORS.muted}
             returnKeyType="search"
             onSubmitEditing={() => {
@@ -783,7 +979,6 @@ export function CommunityScreen({
 
       {codeLookupResult ? (
         <View style={{ paddingHorizontal: 18, marginTop: 10 }}>
-          <Text style={styles.sectionCaption}>ID ARAMA SONUCU</Text>
           {renderFamilyCard(codeLookupResult)}
         </View>
       ) : null}
@@ -791,7 +986,7 @@ export function CommunityScreen({
       {error ? (
         <Pressable onPress={() => loadFamilies()} style={styles.errorBanner}>
           <Ionicons name="refresh-outline" size={17} color={COLORS.danger} />
-          <Text style={styles.errorText}>{error} Yeniden denemek için dokun.</Text>
+          <Text style={styles.errorText}>{error} Yeniden dene.</Text>
         </Pressable>
       ) : null}
 
@@ -806,12 +1001,7 @@ export function CommunityScreen({
             <Ionicons name="shield-outline" size={30} color={COLORS.primary} />
           </View>
           <Text style={styles.emptyTitle}>
-            {searchQuery.trim() ? "Eşleşen aile bulunamadı" : "Henüz kurulmuş bir aile yok"}
-          </Text>
-          <Text style={styles.emptyDescription}>
-            {searchQuery.trim()
-              ? "8 haneli Aile ID numarasını kontrol ederek tekrar arayabilirsin."
-              : "Aileleri keşfedebilir veya kendi aileni kurarak üyeleri davet edebilirsin."}
+            {searchQuery.trim() ? "Aile bulunamadı" : "Henüz kurulmuş bir aile yok"}
           </Text>
           {!insideModal && !myFamily && !searchQuery.trim() ? (
             <Pressable onPress={() => setCreateOpen(true)} style={styles.emptyAction}>
@@ -832,19 +1022,111 @@ export function CommunityScreen({
   );
 
   const myProgress = useMemo(
-    () => (myFamily ? computeLevelProgress(myFamily.xp, myFamily.level) : null),
+    () => (myFamily ? computeFamilyLevelProgress(myFamily.xp, myFamily.level) : null),
     [myFamily],
   );
 
   const detailProgress = useMemo(
     () =>
       detailData?.family
-        ? computeLevelProgress(detailData.family.xp, detailData.family.level, detailData.levelConfigs)
+        ? computeFamilyLevelProgress(
+            detailData.family.xp,
+            detailData.family.level,
+            detailData.levelConfigs || DEFAULT_FAMILY_LEVEL_CONFIGS,
+          )
         : null,
     [detailData],
   );
 
   const canAffordFamily = typeof coins !== "number" || coins >= FAMILY_CREATION_COST;
+
+  const renderMessageItem = (msg) => {
+    const isGift = msg.kind === "gift";
+    const meta = msg.metadata || {};
+    const giftColor = meta.gift_color || COLORS.primary;
+    const giftIcon = resolveGiftIcon(meta.gift_icon);
+    const giftQty = Number(meta.quantity) || 1;
+    const giftCost = Number(meta.total_cost) || 0;
+    const giftXp = Number(meta.awarded_xp) || 0;
+
+    return (
+      <View
+        key={msg.id}
+        style={[styles.msgRow, msg.own && styles.msgRowOwn]}
+      >
+        {!msg.own ? (
+          <Pressable
+            onPress={() => msg.userId && onOpenUserProfile?.(msg.userId)}
+            onLongPress={() => msg.userId && openGiftSheet(msg.userId)}
+            delayLongPress={240}
+          >
+            <MemberAvatar
+              uri={msg.senderAvatarUrl}
+              name={msg.senderName}
+              color={msg.senderColor}
+              size={32}
+            />
+          </Pressable>
+        ) : null}
+
+        {isGift ? (
+          <Pressable
+            onLongPress={() => msg.userId && openGiftSheet(msg.userId)}
+            delayLongPress={240}
+            style={({ pressed }) => [
+              styles.giftMsgCard,
+              msg.own && styles.giftMsgCardOwn,
+              pressed && { opacity: 0.9 },
+            ]}
+          >
+            <View style={[styles.giftMsgBadge, { backgroundColor: giftColor }]}>
+              <Ionicons name={giftIcon} size={20} color="#FFFFFF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.giftMsgTitle}>
+                {giftQty > 1 ? `${giftQty}x ` : ""}
+                {meta.gift_name || "Aile Hediyesi"}
+              </Text>
+              <Text style={styles.giftMsgBody}>{msg.text}</Text>
+              <View style={styles.giftMsgMetaRow}>
+                {giftCost > 0 ? (
+                  <Text style={styles.giftMsgMetaChip}>
+                    {formatCredits(giftCost)} kredi
+                  </Text>
+                ) : null}
+                {giftXp > 0 ? (
+                  <Text style={styles.giftMsgXpChip}>
+                    +{formatCredits(giftXp)} XP
+                  </Text>
+                ) : null}
+                <Text style={styles.giftMsgTime}>{formatMessageTime(msg.createdAt)}</Text>
+              </View>
+            </View>
+          </Pressable>
+        ) : (
+          <Pressable
+            onLongPress={() => msg.userId && openGiftSheet(msg.userId)}
+            delayLongPress={240}
+            style={({ pressed }) => [
+              styles.msgBubble,
+              msg.own ? styles.msgBubbleOwn : styles.msgBubbleOther,
+              pressed && { opacity: 0.88 },
+            ]}
+          >
+            {!msg.own ? (
+              <Text style={styles.msgSender}>{msg.senderName}</Text>
+            ) : null}
+            <Text style={[styles.msgText, msg.own && styles.msgTextOwn]}>
+              {msg.text}
+            </Text>
+            <Text style={[styles.msgTime, msg.own && styles.msgTimeOwn]}>
+              {formatMessageTime(msg.createdAt)}
+            </Text>
+          </Pressable>
+        )}
+      </View>
+    );
+  };
 
   return (
     <View style={styles.screen}>
@@ -898,9 +1180,7 @@ export function CommunityScreen({
               <View style={styles.xpStripLabels}>
                 <Text style={styles.xpStripTitle}>{myProgress?.currentTitle}</Text>
                 <Text style={styles.xpStripValue}>
-                  {myProgress?.nextLevel
-                    ? `${myFamily.xp} / ${myProgress.nextMinXp} XP`
-                    : `${myFamily.xp} XP · Maksimum seviye`}
+                  {formatCredits(myProgress?.gainedInLevel || 0)} / {formatCredits(myProgress?.stepRequiredXp || 100000)} XP
                 </Text>
               </View>
               <View style={styles.progressTrack}>
@@ -913,32 +1193,12 @@ export function CommunityScreen({
               </View>
             </View>
             <Pressable
-              disabled={checkinBusy || checkedInToday}
-              onPress={handleDailyCheckin}
-              style={[
-                styles.checkinPill,
-                checkedInToday && styles.checkinPillDone,
-              ]}
+              onPress={() => openGiftSheet(null)}
+              accessibilityLabel="Ailede hediye gönder"
+              style={styles.giftHeaderPill}
             >
-              {checkinBusy ? (
-                <ActivityIndicator size="small" color={COLORS.primary} />
-              ) : (
-                <>
-                  <Ionicons
-                    name={checkedInToday ? "checkmark-circle" : "flash-outline"}
-                    size={14}
-                    color={checkedInToday ? COLORS.success : COLORS.primary}
-                  />
-                  <Text
-                    style={[
-                      styles.checkinPillText,
-                      checkedInToday && { color: COLORS.success },
-                    ]}
-                  >
-                    {checkedInToday ? "Yoklama alındı" : "Yoklama +25 XP"}
-                  </Text>
-                </>
-              )}
+              <Ionicons name="gift-outline" size={14} color={COLORS.primary} />
+              <Text style={styles.giftHeaderPillText}>Hediye</Text>
             </Pressable>
           </View>
 
@@ -964,7 +1224,7 @@ export function CommunityScreen({
               </View>
               <Text style={styles.emptyTitle}>Aile sohbeti hazır</Text>
               <Text style={styles.emptyDescription}>
-                Yalnızca aile üyeleri bu mesajları görebilir ve yazabilir. İlk mesajı göndererek sohbeti başlat.
+                Mesaj yazabilir veya hediye kutusuna dokunup üyelere ve kendine hediye gönderebilirsin.
               </Text>
             </View>
           ) : (
@@ -974,37 +1234,7 @@ export function CommunityScreen({
               showsVerticalScrollIndicator={false}
               onContentSizeChange={() => chatScrollRef.current?.scrollToEnd?.({ animated: false })}
             >
-              {messages.map((msg) => (
-                <View
-                  key={msg.id}
-                  style={[styles.msgRow, msg.own && styles.msgRowOwn]}
-                >
-                  {!msg.own ? (
-                    <Pressable
-                      onPress={() => msg.userId && onOpenUserProfile?.(msg.userId)}
-                      disabled={!onOpenUserProfile}
-                    >
-                      <MemberAvatar
-                        uri={msg.senderAvatarUrl}
-                        name={msg.senderName}
-                        color={msg.senderColor}
-                        size={32}
-                      />
-                    </Pressable>
-                  ) : null}
-                  <View style={[styles.msgBubble, msg.own ? styles.msgBubbleOwn : styles.msgBubbleOther]}>
-                    {!msg.own ? (
-                      <Text style={styles.msgSender}>{msg.senderName}</Text>
-                    ) : null}
-                    <Text style={[styles.msgText, msg.own && styles.msgTextOwn]}>
-                      {msg.text}
-                    </Text>
-                    <Text style={[styles.msgTime, msg.own && styles.msgTimeOwn]}>
-                      {formatMessageTime(msg.createdAt)}
-                    </Text>
-                  </View>
-                </View>
-              ))}
+              {messages.map(renderMessageItem)}
             </ScrollView>
           )}
 
@@ -1014,6 +1244,13 @@ export function CommunityScreen({
               { marginBottom: 64 + Math.max(insets.bottom, 8) },
             ]}
           >
+            <Pressable
+              onPress={() => openGiftSheet(null)}
+              accessibilityLabel="Hediye kutusu"
+              style={styles.composerGiftBtn}
+            >
+              <Ionicons name="gift-outline" size={20} color={COLORS.primary} />
+            </Pressable>
             <TextInput
               value={draft}
               onChangeText={setDraft}
@@ -1041,12 +1278,12 @@ export function CommunityScreen({
           </View>
         </KeyboardAvoidingView>
       ) : (
-        // ── Kullanıcı henüz ailede değilse Keşfet + ID Arama + Aile Kurma ─────
+        // ── Kullanıcı henüz ailede değilse sade Keşfet + ID Arama + Aile Kurma ─
         <>
           <View style={styles.pageHeader}>
             <View>
               <Text style={styles.eyebrow}>AİLE</Text>
-              <Text style={styles.pageTitle}>Aileni seç.</Text>
+              <Text style={styles.pageTitle}>Aileler</Text>
             </View>
             <Pressable
               onPress={() => setCreateOpen(true)}
@@ -1058,23 +1295,161 @@ export function CommunityScreen({
             </Pressable>
           </View>
 
-          <LinearGradient colors={["#EAF3FD", "#EEF4FA"]} style={styles.hero}>
-            <View style={styles.heroIcon}>
-              <Ionicons name="shield-half-outline" size={24} color={COLORS.primary} />
-            </View>
-            <View style={styles.heroCopy}>
-              <Text style={styles.heroTitle}>Tek aile, ortak seviye ve özel sohbet</Text>
-              <Text style={styles.heroDescription}>
-                8 haneli Aile ID ile doğrudan arama yap, bir aileye katıl veya 10.000.000 kredi ile kendi aileni kur.
-              </Text>
-            </View>
-          </LinearGradient>
-
           {renderDiscoverContent({ insideModal: false })}
         </>
       )}
 
-      {/* ── Ailedeyken Diğer Aileleri Keşfet & ID Arama Modalı ─────────────── */}
+      {/* ── Aile İçi Hediye Kutusu Modalı (Profil fotoğraflı alıcı + Kendine atma) ─ */}
+      <Modal
+        transparent
+        visible={giftSheetOpen}
+        animationType="slide"
+        onRequestClose={() => !sendingGift && setGiftSheetOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => !sendingGift && setGiftSheetOpen(false)}
+          />
+          <View style={[styles.sheet, { maxHeight: "86%" }]}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+              <View>
+                <Text style={styles.eyebrow}>AİLE HEDİYELERİ</Text>
+                <Text style={styles.sheetTitle}>Hediye gönder</Text>
+              </View>
+              <View style={styles.giftHeaderRight}>
+                <View style={styles.coinBadge}>
+                  <Ionicons name="diamond" size={13} color={COLORS.primary} />
+                  <Text style={styles.coinBadgeText}>{formatCredits(coins)}</Text>
+                </View>
+                <Pressable
+                  disabled={sendingGift}
+                  onPress={() => setGiftSheetOpen(false)}
+                  style={styles.closeButton}
+                >
+                  <Ionicons name="close" size={20} color={COLORS.text} />
+                </Pressable>
+              </View>
+            </View>
+
+            <Text style={styles.fieldLabel}>ALICI SEÇ</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.recipientPickerRow}
+              style={{ flexGrow: 0, marginBottom: 14 }}
+            >
+              {giftRecipients.map((recipient) => {
+                const active = selectedGiftRecipient?.userId === recipient.userId;
+                return (
+                  <Pressable
+                    key={recipient.userId}
+                    onPress={() => setGiftRecipientId(recipient.userId)}
+                    style={[
+                      styles.recipientCard,
+                      active && styles.recipientCardActive,
+                    ]}
+                  >
+                    <View style={[styles.recipientAvatarRing, active && styles.recipientAvatarRingActive]}>
+                      <MemberAvatar
+                        uri={recipient.avatarUrl}
+                        name={recipient.name}
+                        color={recipient.color}
+                        size={44}
+                      />
+                      {active ? (
+                        <View style={styles.recipientCheckBadge}>
+                          <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+                        </View>
+                      ) : null}
+                    </View>
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.recipientName,
+                        active && styles.recipientNameActive,
+                      ]}
+                    >
+                      {recipient.isSelf ? "Kendim" : recipient.name}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.recipientSub}>
+                      {recipient.isSelf ? `@${recipient.handle}` : "Üye"}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            <View style={styles.qtyHeaderRow}>
+              <Text style={styles.fieldLabel}>ADET</Text>
+              <View style={styles.qtyPillsRow}>
+                {GIFT_QUANTITIES.map((qty) => {
+                  const active = giftQuantity === qty;
+                  return (
+                    <Pressable
+                      key={qty}
+                      onPress={() => setGiftQuantity(qty)}
+                      style={[styles.qtyPill, active && styles.qtyPillActive]}
+                    >
+                      <Text style={[styles.qtyPillText, active && styles.qtyPillTextActive]}>
+                        {qty}x
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
+              <View style={styles.giftGrid}>
+                {giftCatalog.map((gift) => {
+                  const lockedByLevel =
+                    Number(gift.minFamilyLevel || 0) > Number(myFamily?.level || 1);
+                  const totalCost = Number(gift.cost || 0) * giftQuantity;
+                  const xpGain = Math.floor(totalCost / FAMILY_COINS_PER_XP);
+                  return (
+                    <Pressable
+                      key={gift.id}
+                      disabled={sendingGift}
+                      onPress={() => handleConfirmSendGift(gift)}
+                      style={({ pressed }) => [
+                        styles.giftItemCard,
+                        lockedByLevel && { opacity: 0.62 },
+                        pressed && { transform: [{ scale: 0.98 }] },
+                      ]}
+                    >
+                      <View style={[styles.giftItemIcon, { backgroundColor: gift.color || COLORS.primary }]}>
+                        <Ionicons name={resolveGiftIcon(gift.icon)} size={22} color="#FFFFFF" />
+                      </View>
+                      <Text numberOfLines={1} style={styles.giftItemName}>
+                        {gift.name}
+                      </Text>
+                      <View style={styles.giftItemCostRow}>
+                        <Ionicons
+                          name={lockedByLevel ? "lock-closed-outline" : "diamond"}
+                          size={11}
+                          color={COLORS.primary}
+                        />
+                        <Text numberOfLines={1} style={styles.giftItemCostText}>
+                          {lockedByLevel
+                            ? `Sv. ${gift.minFamilyLevel} · ${formatCredits(totalCost)}`
+                            : formatCredits(totalCost)}
+                        </Text>
+                      </View>
+                      {xpGain > 0 ? (
+                        <Text style={styles.giftItemXpHint}>+{formatCredits(xpGain)} XP</Text>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Ailedeyken Diğer Aileleri Keşfet ve ID Arama Modalı ─────────────── */}
       <Modal
         transparent
         visible={discoverModalOpen}
@@ -1088,7 +1463,7 @@ export function CommunityScreen({
             <View style={styles.sheetHeader}>
               <View>
                 <Text style={styles.eyebrow}>AİLE KEŞFET</Text>
-                <Text style={styles.sheetTitle}>Aileleri incele</Text>
+                <Text style={styles.sheetTitle}>Aileler</Text>
               </View>
               <Pressable onPress={() => setDiscoverModalOpen(false)} style={styles.closeButton}>
                 <Ionicons name="close" size={20} color={COLORS.text} />
@@ -1319,7 +1694,9 @@ export function CommunityScreen({
                           <Text style={styles.levelHeroTitle}>
                             Sv. {detailData.family.level} · {detailProgress?.currentTitle}
                           </Text>
-                          <Text style={styles.xpStripValue}>{detailData.family.xp} XP</Text>
+                          <Text style={styles.xpStripValue}>
+                            {formatCredits(detailProgress?.gainedInLevel || 0)} / {formatCredits(detailProgress?.stepRequiredXp || 100000)} XP
+                          </Text>
                         </View>
                         <View style={[styles.progressTrack, { marginTop: 8 }]}>
                           <View
@@ -1330,9 +1707,10 @@ export function CommunityScreen({
                           />
                         </View>
                         <Text style={styles.levelHeroSub}>
-                          {detailProgress?.nextLevel
-                            ? `Seviye ${detailProgress.nextLevel} için ${detailProgress.remainingXp} XP kaldı`
-                            : "En yüksek aile seviyesine ulaşıldı"}
+                          Seviye {detailProgress?.nextLevel} için {formatCredits(detailProgress?.remainingXp || 0)} XP kaldı · Her seviyede gereken XP 2 katına çıkar
+                        </Text>
+                        <Text style={styles.levelHeroVolume}>
+                          Toplam XP: {formatCredits(detailData.family.xp)} · Hediye hacmi: {formatCredits(detailData.family.giftCoinsTotal || 0)} kredi
                         </Text>
                         {detailData.family.joined ? (
                           <Pressable
@@ -1352,13 +1730,12 @@ export function CommunityScreen({
                         ) : null}
                       </View>
 
-                      <Text style={styles.sectionCaption}>PUAN KAZANDIRAN ETKİNLİKLER</Text>
+                      <Text style={styles.sectionCaption}>SEVİYE İLERLEME KURALI</Text>
                       <View style={styles.ruleCard}>
                         {detailData.xpRules.map((rule) => (
                           <View key={rule.eventType} style={styles.ruleRow}>
-                            <Ionicons name="checkmark-circle-outline" size={16} color={COLORS.primary} />
+                            <Ionicons name="gift-outline" size={16} color={COLORS.primary} />
                             <Text style={styles.ruleLabel}>{rule.label}</Text>
-                            <Text style={styles.ruleXp}>+{rule.xpAmount} XP</Text>
                           </View>
                         ))}
                       </View>
@@ -1378,7 +1755,7 @@ export function CommunityScreen({
                             </View>
                             <View style={{ flex: 1 }}>
                               <Text style={styles.tierTitle}>
-                                {cfg.title} · {cfg.minXp} XP
+                                {cfg.title} · {formatCredits(cfg.minXp)} XP
                               </Text>
                               <Text style={styles.tierPerk}>{cfg.perkLabel}</Text>
                             </View>
@@ -1394,30 +1771,43 @@ export function CommunityScreen({
                   ) : detailTab === "members" ? (
                     <View style={{ gap: 8 }}>
                       {detailData.members.map((member) => (
-                        <Pressable
-                          key={member.userId}
-                          disabled={!onOpenUserProfile}
-                          onPress={() => {
-                            closeFamilyDetail();
-                            onOpenUserProfile?.(member.userId);
-                          }}
-                          style={styles.memberRow}
-                        >
-                          <MemberAvatar
-                            uri={member.avatarUrl}
-                            name={member.name}
-                            color={member.color}
-                            size={40}
-                          />
-                          <View style={{ flex: 1 }}>
-                            <Text numberOfLines={1} style={styles.memberName}>
-                              {member.name}
-                            </Text>
-                            <Text numberOfLines={1} style={styles.memberMeta}>
-                              @{member.handle}
-                              {member.publicId ? ` · ID: ${member.publicId}` : ""}
-                            </Text>
-                          </View>
+                        <View key={member.userId} style={styles.memberRow}>
+                          <Pressable
+                            disabled={!onOpenUserProfile}
+                            onPress={() => {
+                              closeFamilyDetail();
+                              onOpenUserProfile?.(member.userId);
+                            }}
+                            style={styles.memberIdentityPress}
+                          >
+                            <MemberAvatar
+                              uri={member.avatarUrl}
+                              name={member.name}
+                              color={member.color}
+                              size={40}
+                            />
+                            <View style={{ flex: 1 }}>
+                              <Text numberOfLines={1} style={styles.memberName}>
+                                {member.name}
+                              </Text>
+                              <Text numberOfLines={1} style={styles.memberMeta}>
+                                @{member.handle}
+                                {member.publicId ? ` · ID: ${member.publicId}` : ""}
+                              </Text>
+                            </View>
+                          </Pressable>
+                          {detailData.family.joined && detailData.family.id === myFamily?.id ? (
+                            <Pressable
+                              onPress={() => {
+                                closeFamilyDetail();
+                                openGiftSheet(member.userId);
+                              }}
+                              accessibilityLabel={`${member.name} kişisine hediye gönder`}
+                              style={styles.memberGiftBtn}
+                            >
+                              <Ionicons name="gift-outline" size={16} color={COLORS.primary} />
+                            </Pressable>
+                          ) : null}
                           <View
                             style={[
                               styles.rolePill,
@@ -1433,7 +1823,7 @@ export function CommunityScreen({
                               {member.role === "owner" ? "Kurucu" : "Üye"}
                             </Text>
                           </View>
-                        </Pressable>
+                        </View>
                       ))}
                     </View>
                   ) : (
@@ -1508,7 +1898,6 @@ export function CommunityScreen({
                   )}
                 </ScrollView>
 
-                {/* Alt Aksiyon: Katıl / Ayrıl / Zaten başka ailedesin */}
                 {detailTab !== "edit" ? (
                   <View style={styles.detailFooter}>
                     {detailData.family.joined ? (
@@ -1567,7 +1956,7 @@ const styles = StyleSheet.create({
   pageHeader: {
     paddingHorizontal: 18,
     paddingTop: 14,
-    paddingBottom: 12,
+    paddingBottom: 6,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -1591,32 +1980,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
   createHeaderBtnText: { color: COLORS.primaryInk, fontSize: 12, fontWeight: "900" },
-  hero: {
-    marginHorizontal: 18,
-    borderRadius: 20,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: COLORS.line,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  heroIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 16,
-    backgroundColor: "rgba(47,128,237,0.14)",
-    borderWidth: 1,
-    borderColor: "rgba(47,128,237,0.26)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  heroCopy: { flex: 1 },
-  heroTitle: { color: COLORS.text, fontSize: 14, fontWeight: "900" },
-  heroDescription: { color: COLORS.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 3 },
   searchSection: {
     marginHorizontal: 18,
-    marginTop: 12,
+    marginTop: 10,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
@@ -1749,7 +2115,7 @@ const styles = StyleSheet.create({
   },
   emptyActionText: { color: COLORS.primaryInk, fontSize: 12, fontWeight: "900" },
 
-  // ── Aile Sohbeti Stilleri ───────────────────────────────────────────────────
+  // ── Aile Sohbeti ve Hediye Mesajı Stilleri ──────────────────────────────────
   chatHeader: {
     paddingHorizontal: 16,
     paddingVertical: 11,
@@ -1795,22 +2161,18 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   progressFill: { height: "100%", borderRadius: 3, backgroundColor: COLORS.primary },
-  checkinPill: {
+  giftHeaderPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    paddingHorizontal: 10,
+    paddingHorizontal: 11,
     height: 32,
     borderRadius: 10,
     backgroundColor: COLORS.primarySoft,
     borderWidth: 1,
     borderColor: "rgba(47,128,237,0.24)",
   },
-  checkinPillDone: {
-    backgroundColor: "rgba(46,158,107,0.12)",
-    borderColor: "rgba(46,158,107,0.26)",
-  },
-  checkinPillText: { color: COLORS.primary, fontSize: 10, fontWeight: "900" },
+  giftHeaderPillText: { color: COLORS.primary, fontSize: 11, fontWeight: "900" },
   messagesList: { padding: 16, paddingBottom: 20, gap: 10 },
   msgRow: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
   msgRowOwn: { justifyContent: "flex-end" },
@@ -1827,8 +2189,53 @@ const styles = StyleSheet.create({
   msgTextOwn: { color: COLORS.primaryInk },
   msgTime: { color: COLORS.muted, fontSize: 9, marginTop: 4, alignSelf: "flex-end" },
   msgTimeOwn: { color: "rgba(255,255,255,0.78)" },
+  giftMsgCard: {
+    maxWidth: "84%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 18,
+    backgroundColor: "#EAF3FD",
+    borderWidth: 1,
+    borderColor: "rgba(47,128,237,0.32)",
+  },
+  giftMsgCardOwn: {
+    backgroundColor: "#E3F0FF",
+    borderColor: "rgba(29,95,191,0.40)",
+  },
+  giftMsgBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  giftMsgTitle: { color: COLORS.text, fontSize: 12, fontWeight: "900" },
+  giftMsgBody: { color: COLORS.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 2 },
+  giftMsgMetaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 5, flexWrap: "wrap" },
+  giftMsgMetaChip: {
+    color: COLORS.primary,
+    fontSize: 10,
+    fontWeight: "900",
+    backgroundColor: "rgba(47,128,237,0.12)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  giftMsgXpChip: {
+    color: "#1D5FBF",
+    fontSize: 10,
+    fontWeight: "900",
+    backgroundColor: "rgba(29,95,191,0.14)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  giftMsgTime: { color: COLORS.muted, fontSize: 9, marginLeft: "auto" },
   composerRow: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     backgroundColor: COLORS.surface,
     borderTopWidth: 1,
@@ -1836,6 +2243,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 8,
+  },
+  composerGiftBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: COLORS.primarySoft,
+    borderWidth: 1,
+    borderColor: "rgba(47,128,237,0.24)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   composerInput: {
     flex: 1,
@@ -1860,7 +2277,105 @@ const styles = StyleSheet.create({
   },
   sendBtnDisabled: { opacity: 0.45 },
 
-  // ── Modallar & Formlar ──────────────────────────────────────────────────────
+  // ── Aile Hediye Kutusu Stilleri ─────────────────────────────────────────────
+  giftHeaderRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  coinBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: COLORS.primarySoft,
+  },
+  coinBadgeText: { color: COLORS.primary, fontSize: 12, fontWeight: "900" },
+  recipientPickerRow: { gap: 10, paddingRight: 6 },
+  recipientCard: {
+    width: 82,
+    paddingVertical: 9,
+    paddingHorizontal: 6,
+    borderRadius: 16,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.lineSoft,
+    alignItems: "center",
+  },
+  recipientCardActive: {
+    backgroundColor: COLORS.primarySoft,
+    borderColor: COLORS.primary,
+  },
+  recipientAvatarRing: {
+    padding: 2,
+    borderRadius: 26,
+    borderWidth: 2,
+    borderColor: "transparent",
+    marginBottom: 5,
+  },
+  recipientAvatarRingActive: { borderColor: COLORS.primary },
+  recipientCheckBadge: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+    width: 17,
+    height: 17,
+    borderRadius: 9,
+    backgroundColor: COLORS.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "#FFFFFF",
+  },
+  recipientName: { color: COLORS.text, fontSize: 11, fontWeight: "800" },
+  recipientNameActive: { color: COLORS.primary, fontWeight: "900" },
+  recipientSub: { color: COLORS.muted, fontSize: 9, marginTop: 1 },
+  qtyHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  qtyPillsRow: { flexDirection: "row", gap: 6 },
+  qtyPill: {
+    paddingHorizontal: 11,
+    height: 30,
+    borderRadius: 9,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  qtyPillActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  qtyPillText: { color: COLORS.textSecondary, fontSize: 11, fontWeight: "800" },
+  qtyPillTextActive: { color: COLORS.primaryInk, fontWeight: "900" },
+  giftGrid: { flexDirection: "row", flexWrap: "wrap", gap: 9 },
+  giftItemCard: {
+    width: "31.2%",
+    paddingVertical: 11,
+    paddingHorizontal: 8,
+    borderRadius: 16,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.lineSoft,
+    alignItems: "center",
+  },
+  giftItemIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 7,
+  },
+  giftItemName: { color: COLORS.text, fontSize: 11, fontWeight: "800" },
+  giftItemCostRow: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 4 },
+  giftItemCostText: { color: COLORS.primary, fontSize: 10, fontWeight: "900" },
+  giftItemXpHint: { color: COLORS.textSecondary, fontSize: 9, fontWeight: "700", marginTop: 2 },
+
+  // ── Modallar ve Formlar ─────────────────────────────────────────────────────
   modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(15,23,42,0.56)" },
   sheet: {
     paddingHorizontal: 18,
@@ -1884,7 +2399,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 14,
   },
   sheetTitle: { color: COLORS.text, fontSize: 22, fontWeight: "900", marginTop: 2 },
   closeButton: {
@@ -2002,7 +2517,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.line,
   },
   levelHeroTitle: { color: COLORS.text, fontSize: 14, fontWeight: "900" },
-  levelHeroSub: { color: COLORS.textSecondary, fontSize: 11, marginTop: 7 },
+  levelHeroSub: { color: COLORS.textSecondary, fontSize: 11, marginTop: 7, lineHeight: 16 },
+  levelHeroVolume: { color: COLORS.muted, fontSize: 10, fontWeight: "700", marginTop: 4 },
   syncRewardBtn: {
     marginTop: 10,
     minHeight: 36,
@@ -2024,7 +2540,6 @@ const styles = StyleSheet.create({
   },
   ruleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   ruleLabel: { flex: 1, color: COLORS.textSecondary, fontSize: 12, lineHeight: 16 },
-  ruleXp: { color: COLORS.primary, fontSize: 11, fontWeight: "900" },
   tierCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -2055,13 +2570,27 @@ const styles = StyleSheet.create({
   memberRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
     paddingVertical: 9,
     paddingHorizontal: 10,
     borderRadius: 14,
     backgroundColor: COLORS.background,
     borderWidth: 1,
     borderColor: COLORS.lineSoft,
+  },
+  memberIdentityPress: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  memberGiftBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: COLORS.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
   },
   memberName: { color: COLORS.text, fontSize: 13, fontWeight: "800" },
   memberMeta: { color: COLORS.textSecondary, fontSize: 11, marginTop: 2 },

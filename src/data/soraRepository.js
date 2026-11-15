@@ -616,27 +616,65 @@ export const subscribeToDirectMessages = ({ conversationId, onMessage }) => {
 };
 
 export const FAMILY_CREATION_COST = 10_000_000;
+export const FAMILY_BASE_STEP_XP = 100_000;
+export const FAMILY_COINS_PER_XP = 100;
+
+export const calculateFamilyLevelFromXp = (rawXp) => {
+  let remaining = Math.max(0, Math.floor(Number(rawXp) || 0));
+  let level = 1;
+  let step = FAMILY_BASE_STEP_XP;
+  while (remaining >= step && level < 50) {
+    remaining -= step;
+    level += 1;
+    step *= 2;
+  }
+  return level;
+};
+
+export const computeFamilyLevelProgress = (rawXp, rawLevel, levelConfigs = DEFAULT_FAMILY_LEVEL_CONFIGS) => {
+  const xp = Math.max(0, Math.floor(Number(rawXp) || 0));
+  const level = Math.max(1, Number(rawLevel) || calculateFamilyLevelFromXp(xp));
+  const currentMinXp = FAMILY_BASE_STEP_XP * (Math.pow(2, level - 1) - 1);
+  const stepRequiredXp = FAMILY_BASE_STEP_XP * Math.pow(2, level - 1);
+  const nextMinXp = currentMinXp + stepRequiredXp;
+  const gainedInLevel = Math.max(0, xp - currentMinXp);
+  const remainingXp = Math.max(0, stepRequiredXp - gainedInLevel);
+  const currentCfg = (levelConfigs || []).find((item) => item.level === level);
+  return {
+    level,
+    currentTitle: currentCfg?.title || `Seviye ${level} Ailesi`,
+    currentMinXp,
+    stepRequiredXp,
+    gainedInLevel,
+    nextLevel: level + 1,
+    nextMinXp,
+    remainingXp,
+    ratio: Math.min(1, gainedInLevel / Math.max(1, stepRequiredXp)),
+  };
+};
 
 export const DEFAULT_FAMILY_LEVEL_CONFIGS = [
-  { level: 1, minXp: 0, title: "Başlangıç Ailesi", badgeCode: "family_lv1", frameItemId: null, giftUnlockId: null, memberLimit: 30, perkLabel: "Aile sohbeti ve 30 üye kapasitesi" },
-  { level: 2, minXp: 150, title: "Yükselen Aile", badgeCode: "family_lv2", frameItemId: null, giftUnlockId: null, memberLimit: 45, perkLabel: "Yükselen Aile rozeti ve 45 üye kapasitesi" },
-  { level: 3, minXp: 400, title: "Parlayan Aile", badgeCode: "family_lv3", frameItemId: "frame_family_silver", giftUnlockId: null, memberLimit: 60, perkLabel: "Aile Gümüş profil çerçevesi ve 60 üye kapasitesi" },
-  { level: 4, minXp: 800, title: "Seçkin Aile", badgeCode: "family_lv4", frameItemId: null, giftUnlockId: "family_crest", memberLimit: 80, perkLabel: "Odada Aile Sancağı hediyesi kilidi ve 80 üye kapasitesi" },
-  { level: 5, minXp: 1500, title: "Asil Aile", badgeCode: "family_lv5", frameItemId: "frame_family_royal", giftUnlockId: null, memberLimit: 100, perkLabel: "Aile Asil profil çerçevesi ve 100 üye kapasitesi" },
-  { level: 6, minXp: 2600, title: "Zirve Ailesi", badgeCode: "family_lv6", frameItemId: null, giftUnlockId: null, memberLimit: 150, perkLabel: "Zirve Ailesi rozeti ve 150 üye kapasitesi" },
+  { level: 1, minXp: 0, title: "Başlangıç Ailesi", badgeCode: "family_lv1", frameItemId: null, giftUnlockId: null, memberLimit: 30, perkLabel: "Aile sohbeti, hediyeleşme ve 30 üye kapasitesi" },
+  { level: 2, minXp: 100_000, title: "Yükselen Aile", badgeCode: "family_lv2", frameItemId: null, giftUnlockId: null, memberLimit: 45, perkLabel: "Yükselen Aile rozeti ve 45 üye kapasitesi (+100.000 XP)" },
+  { level: 3, minXp: 300_000, title: "Parlayan Aile", badgeCode: "family_lv3", frameItemId: "frame_family_silver", giftUnlockId: null, memberLimit: 60, perkLabel: "Aile Gümüş profil çerçevesi ve 60 üye kapasitesi (+200.000 XP)" },
+  { level: 4, minXp: 700_000, title: "Seçkin Aile", badgeCode: "family_lv4", frameItemId: null, giftUnlockId: "family_crest", memberLimit: 80, perkLabel: "Aile Sancağı hediyesi kilidi ve 80 üye kapasitesi (+400.000 XP)" },
+  { level: 5, minXp: 1_500_000, title: "Asil Aile", badgeCode: "family_lv5", frameItemId: "frame_family_royal", giftUnlockId: null, memberLimit: 100, perkLabel: "Aile Asil profil çerçevesi ve 100 üye kapasitesi (+800.000 XP)" },
+  { level: 6, minXp: 3_100_000, title: "Zirve Ailesi", badgeCode: "family_lv6", frameItemId: null, giftUnlockId: null, memberLimit: 130, perkLabel: "Zirve Ailesi rozeti ve 130 üye kapasitesi (+1.600.000 XP)" },
+  { level: 7, minXp: 6_300_000, title: "Sancak Ailesi", badgeCode: "family_lv7", frameItemId: null, giftUnlockId: null, memberLimit: 160, perkLabel: "Sancak Ailesi rozeti ve 160 üye kapasitesi (+3.200.000 XP)" },
+  { level: 8, minXp: 12_700_000, title: "Hükümran Aile", badgeCode: "family_lv8", frameItemId: null, giftUnlockId: null, memberLimit: 200, perkLabel: "Hükümran Aile rozeti ve 200 üye kapasitesi (+6.400.000 XP)" },
+  { level: 9, minXp: 25_500_000, title: "Efsane Aile", badgeCode: "family_lv9", frameItemId: null, giftUnlockId: null, memberLimit: 250, perkLabel: "Efsane Aile rozeti ve 250 üye kapasitesi (+12.800.000 XP)" },
+  { level: 10, minXp: 51_100_000, title: "İmparatorluk Ailesi", badgeCode: "family_lv10", frameItemId: null, giftUnlockId: null, memberLimit: 300, perkLabel: "İmparatorluk Ailesi rozeti ve 300 üye kapasitesi (+25.600.000 XP)" },
 ];
 
 export const DEFAULT_FAMILY_XP_RULES = [
-  { eventType: "daily_checkin", xpAmount: 25, dailyUserCap: 1, label: "Günlük aile yoklaması (günde 1 kez +25 XP)" },
-  { eventType: "family_message", xpAmount: 5, dailyUserCap: 5, label: "Aile sohbetinde aktif mesaj (günde en fazla 5 kez +5 XP)" },
-  { eventType: "member_joined", xpAmount: 40, dailyUserCap: 1, label: "Yeni üye katılımı (kullanıcı başına 1 kez +40 XP)" },
-  { eventType: "room_gift_sent", xpAmount: 20, dailyUserCap: 10, label: "Canlı odada hediye gönderimi (işlem başına +20 XP)" },
+  { eventType: "family_gift_sent", xpAmount: 100_000, dailyUserCap: 1_000_000, label: "Aile içi hediye gönderimi: 10.000.000 kredi = +100.000 XP (100 kredi = +1 XP)" },
+  { eventType: "room_gift_sent", xpAmount: 100_000, dailyUserCap: 1_000_000, label: "Canlı odada hediye gönderimi: 10.000.000 kredi = +100.000 XP (100 kredi = +1 XP)" },
 ];
 
 export const describeFamilyError = (error, fallback = "İşlem şu anda tamamlanamadı. Bağlantını kontrol edip tekrar dene.") => {
   const message = String(error?.message || "");
   if (message.includes("Insufficient balance")) {
-    return "Yetersiz bakiye. Aile kurmak için 10.000.000 kredi gerekiyor.";
+    return "Bakiyen bu işlem için yeterli değil.";
   }
   if (message.includes("Already in a family")) {
     return "Aynı anda yalnızca bir aileye üye olabilirsin. Önce mevcut ailenden ayrılmalısın.";
@@ -665,6 +703,18 @@ export const describeFamilyError = (error, fallback = "İşlem şu anda tamamlan
   if (message.includes("Family membership required")) {
     return "Bu işlem için aile üyesi olmalısın.";
   }
+  if (message.includes("Recipient must be in the same family")) {
+    return "Hediye alıcısı aynı ailenin üyesi olmalı.";
+  }
+  if (message.includes("Recipient unavailable")) {
+    return "Bu kullanıcıya şu anda hediye gönderilemiyor.";
+  }
+  if (message.includes("Gift is unavailable")) {
+    return "Seçilen hediye şu anda kullanılamıyor.";
+  }
+  if (message.includes("Invalid gift quantity")) {
+    return "Geçersiz hediye adedi seçildi.";
+  }
   if (message.includes("Too many messages")) {
     return "Çok hızlı mesaj gönderiyorsun. Birkaç saniye bekleyip tekrar dene.";
   }
@@ -690,14 +740,15 @@ export const describeFamilyError = (error, fallback = "İşlem şu anda tamamlan
 };
 
 const FAMILY_SELECT_EXTENDED =
-  "id, owner_id, family_code, name, description, avatar_url, xp, level, icon, theme_colors, created_at, community_members(user_id, role)";
+  "id, owner_id, family_code, name, description, avatar_url, xp, gift_coins_total, level, icon, theme_colors, created_at, community_members(user_id, role)";
 const FAMILY_SELECT_LEGACY =
   "id, owner_id, name, description, icon, theme_colors, created_at, community_members(user_id, role)";
 
 const mapFamily = (community, currentUserId) => {
   const members = community.community_members || [];
-  const level = Math.max(1, Number(community.level) || 1);
   const xp = Math.max(0, Number(community.xp) || 0);
+  const level = Math.max(1, Number(community.level) || calculateFamilyLevelFromXp(xp));
+  const giftCoinsTotal = Math.max(0, Number(community.gift_coins_total) || 0);
   const membership = currentUserId ? members.find((member) => member.user_id === currentUserId) : null;
   return {
     id: community.id,
@@ -707,6 +758,7 @@ const mapFamily = (community, currentUserId) => {
     description: community.description || "",
     avatarUrl: community.avatar_url || null,
     xp,
+    giftCoinsTotal,
     level,
     icon: community.icon || "people",
     colors: Array.isArray(community.theme_colors) ? community.theme_colors : ["#2F80ED", "#1D4E89"],
@@ -931,13 +983,22 @@ export const updateFamilyProfile = async ({ communityId, name = null, descriptio
 
 export const listFamilyMessages = async ({ communityId, currentUserId }) => {
   const client = requireClient();
-  const { data, error } = await client
+  let { data, error } = await client
     .from("family_messages")
-    .select("id, community_id, sender_id, body, created_at, profiles!family_messages_sender_id_fkey(display_name, handle, avatar_color, avatar_url)")
+    .select("id, community_id, sender_id, body, kind, metadata, created_at, profiles!family_messages_sender_id_fkey(display_name, handle, avatar_color, avatar_url)")
     .eq("community_id", communityId)
     .order("created_at", { ascending: false })
     .limit(120);
-  throwIfError(error);
+  if (error) {
+    const legacy = await client
+      .from("family_messages")
+      .select("id, community_id, sender_id, body, created_at, profiles!family_messages_sender_id_fkey(display_name, handle, avatar_color, avatar_url)")
+      .eq("community_id", communityId)
+      .order("created_at", { ascending: false })
+      .limit(120);
+    throwIfError(legacy.error);
+    data = legacy.data;
+  }
   return (data || []).reverse().map((msg) => {
     const sender = profileFromJoin(msg.profiles);
     return {
@@ -949,6 +1010,8 @@ export const listFamilyMessages = async ({ communityId, currentUserId }) => {
       senderColor: sender?.avatar_color || "#2F80ED",
       senderAvatarUrl: sender?.avatar_url || null,
       text: msg.body,
+      kind: msg.kind || "text",
+      metadata: msg.metadata || {},
       own: msg.sender_id === currentUserId,
       createdAt: msg.created_at,
     };
@@ -969,11 +1032,47 @@ export const sendFamilyMessage = async ({ communityId, text, clientMessageId }) 
     communityId: row.community_id,
     userId: row.sender_id,
     text: row.body,
+    kind: row.kind || "text",
+    metadata: row.metadata || {},
     own: true,
     createdAt: row.created_at,
-    awardedXp: row.awarded_xp || 0,
-    familyXp: typeof row.family_xp === "number" ? row.family_xp : null,
+    awardedXp: Number(row.awarded_xp) || 0,
+    familyXp: row.family_xp != null ? Number(row.family_xp) : null,
     familyLevel: typeof row.family_level === "number" ? row.family_level : null,
+  };
+};
+
+export const sendFamilyGift = async ({
+  communityId,
+  giftId,
+  recipientId,
+  quantity = 1,
+  requestId,
+}) => {
+  const client = requireClient();
+  const { data, error } = await client.rpc("send_family_gift", {
+    p_community_id: communityId,
+    p_gift_id: giftId,
+    p_recipient_id: recipientId,
+    p_quantity: quantity,
+    p_request_id: requestId,
+  });
+  throwIfError(error);
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    messageId: row?.message_id || null,
+    messageBody: row?.message_body || "",
+    messageMetadata: row?.message_metadata || {},
+    createdAt: row?.created_at || new Date().toISOString(),
+    balance: typeof row?.balance === "number" ? row.balance : null,
+    promoBalance: typeof row?.promo_balance === "number" ? row.promo_balance : null,
+    paidBalance: typeof row?.paid_balance === "number" ? row.paid_balance : null,
+    giftName: row?.gift_name || "Hediye",
+    totalCost: Number(row?.total_cost) || 0,
+    awardedXp: Number(row?.awarded_xp) || 0,
+    familyXp: row?.family_xp != null ? Number(row.family_xp) : null,
+    familyLevel: typeof row?.family_level === "number" ? row.family_level : null,
+    giftCoinsTotal: row?.gift_coins_total != null ? Number(row.gift_coins_total) : null,
   };
 };
 
@@ -989,6 +1088,8 @@ export const subscribeToFamilyMessages = ({ communityId, onMessage }) => {
         communityId: message.community_id,
         userId: message.sender_id,
         text: message.body,
+        kind: message.kind || "text",
+        metadata: message.metadata || {},
         createdAt: message.created_at,
       }),
     )
@@ -1003,8 +1104,8 @@ export const claimFamilyCheckin = async (communityId) => {
   const row = Array.isArray(data) ? data[0] : data;
   return {
     claimed: Boolean(row?.claimed),
-    awardedXp: row?.awarded_xp || 0,
-    familyXp: typeof row?.family_xp === "number" ? row.family_xp : null,
+    awardedXp: Number(row?.awarded_xp) || 0,
+    familyXp: row?.family_xp != null ? Number(row.family_xp) : null,
     familyLevel: typeof row?.family_level === "number" ? row.family_level : null,
   };
 };
@@ -1059,6 +1160,7 @@ export const listRoomGiftCatalog = async () => {
   }
   return (data || []).map((row) => ({
     ...row,
+    icon: row.icon === "crown" ? "trophy" : row.icon,
     minFamilyLevel: row.min_family_level || 0,
   }));
 };

@@ -356,7 +356,7 @@ const resolveRoomBrand = (room = {}) => {
 const GIFT_CATALOG = [
   { id: "clap", icon: "sparkles", name: "Alkis", cost: 15, color: "#6AA8F5" },
   { id: "heart", icon: "heart", name: "Kalp", cost: 40, color: "#2F80ED" },
-  { id: "crown", icon: "crown", name: "Tac", cost: 120, color: "#1D5FBF" },
+  { id: "crown", icon: "trophy", name: "Tac", cost: 120, color: "#1D5FBF" },
   { id: "rocket", icon: "rocket", name: "Roket", cost: 300, color: "#8CC8FF" },
 ];
 const createRequestUuid = () => {
