@@ -531,20 +531,20 @@ function Onboarding({ visible, onComplete }) {
     {
       icon: "radio-outline",
       kicker: "SORA'YA HOŞ GELDİN",
-      title: "Sesinle baglan.",
-      copy: "Sakin sohbetlerden kalabalik topluluklara, sana iyi gelen odayi bul.",
+      title: "Sesinle bağlan.",
+      copy: "Sakin sohbetlerden kalabalık topluluklara, sana iyi gelen odayı bul.",
     },
     {
       icon: "people-outline",
-      kicker: "BIRLIKTE DINLE",
-      title: "Kendi cevrini kur.",
-      copy: "Sevdigin konusmacilari takip et, odalarini planla ve tekrar bir araya gel.",
+      kicker: "BİRLİKTE DİNLE",
+      title: "Kendi çevreni kur.",
+      copy: "Sevdiğin konuşmacıları takip et, odalarını planla ve tekrar bir araya gel.",
     },
     {
       icon: "sparkles-outline",
       kicker: "HAZIRSIN",
-      title: "Ilk odan seni bekliyor.",
-      copy: "Mikrofonun hazir oldugunda sahneye cikabilir veya sadece dinleyebilirsin.",
+      title: "İlk odan seni bekliyor.",
+      copy: "Mikrofonun hazır olduğunda sahneye çıkabilir veya sadece dinleyebilirsin.",
     },
   ];
   const slide = slides[slideIndex];
@@ -7293,10 +7293,15 @@ function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh, 
 
   useEffect(() => {
     if (!visible || !supabase) return;
-    listProfileItems().then(({ items, ownedIds }) => {
-      setProfileItems(items);
-      setOwnedItemIds(ownedIds);
-    }).catch(() => Alert.alert("Ürünler yüklenemedi", "Bağlantını kontrol edip yeniden dene."));
+    listProfileItems()
+      .then(({ items, ownedIds }) => {
+        setProfileItems(items || []);
+        setOwnedItemIds(ownedIds || []);
+      })
+      .catch(() => {
+        setProfileItems([]);
+        setOwnedItemIds([]);
+      });
   }, [visible]);
 
   const activePreview = profileItems.find((item) => item.id === previewItemId);
@@ -7336,7 +7341,7 @@ function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh, 
     if (!nextName || !/^[a-z0-9_]{3,24}$/.test(nextHandle)) {
       Alert.alert(
         "Bilgileri kontrol et",
-        "Adini ve 3-24 karakterlik kullanici adini yaz. Kullanici adinda sadece kucuk harf, sayi ve alt cizgi kullanabilirsin.",
+        "Adını ve 3-24 karakterlik kullanıcı adını yaz. Kullanıcı adında sadece küçük harf, sayı ve alt çizgi kullanabilirsin.",
       );
       return;
     }
@@ -7364,8 +7369,8 @@ function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh, 
           <Pressable onPress={onDismiss} style={styles.sheetClose}>
             <Ionicons name="close" size={20} color={COLORS.text} />
           </Pressable>
-          <Text style={styles.kicker}>PROFILIN</Text>
-          <Text style={styles.sheetTitle}>Kendini goster.</Text>
+          <Text style={styles.kicker}>PROFİLİN</Text>
+          <Text style={styles.sheetTitle}>Kendini göster.</Text>
           <View style={styles.avatarEditRow}>
             <Pressable
               onPress={pickAvatar}
@@ -7402,11 +7407,11 @@ function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh, 
               ) : null}
             </View>
           </View>
-          <Text style={styles.fieldLabel}>GORUNEN AD</Text>
+          <Text style={styles.fieldLabel}>GÖRÜNEN AD</Text>
           <TextInput
             value={name}
             onChangeText={setName}
-            placeholder="Adin"
+            placeholder="Adın"
             placeholderTextColor={COLORS.muted}
             style={styles.sheetInput}
             maxLength={36}
@@ -7422,35 +7427,39 @@ function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh, 
             style={styles.sheetInput}
             maxLength={24}
           />
-          <Text style={styles.fieldLabel}>KISA BIYOGRAFI</Text>
+          <Text style={styles.fieldLabel}>KISA BİYOGRAFİ</Text>
           <TextInput
             value={bio}
             onChangeText={setBio}
-            placeholder="Seni tanitan kisa bir not"
+            placeholder="Seni tanıtan kısa bir not"
             placeholderTextColor={COLORS.muted}
             style={styles.sheetInput}
             maxLength={180}
             multiline
           />
-          <Text style={styles.fieldLabel}>ÇERÇEVE VE PROFİL TEMASI</Text>
-          {activePreview ? (
-            <View style={{ padding: 12, marginBottom: 10, borderRadius: 14, backgroundColor: activePreview.appearance?.background || "#F1F7FB", borderWidth: activePreview.item_type === "frame" ? 3 : 0, borderColor: activePreview.appearance?.color || "transparent" }}>
-              <Text style={{ color: activePreview.appearance?.accent || COLORS.text, fontWeight: "800" }}>Önizleme · {activePreview.name}</Text>
-            </View>
+          {profileItems.length > 0 ? (
+            <>
+              <Text style={styles.fieldLabel}>ÇERÇEVE VE PROFİL TEMASI</Text>
+              {activePreview ? (
+                <View style={{ padding: 12, marginBottom: 10, borderRadius: 14, backgroundColor: activePreview.appearance?.background || "#F1F7FB", borderWidth: activePreview.item_type === "frame" ? 3 : 0, borderColor: activePreview.appearance?.color || "transparent" }}>
+                  <Text style={{ color: activePreview.appearance?.accent || COLORS.text, fontWeight: "800" }}>Önizleme · {activePreview.name}</Text>
+                </View>
+              ) : null}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+                {profileItems.map((item) => {
+                  const owned = ownedItemIds.includes(item.id);
+                  return <Pressable key={item.id} onPress={() => setPreviewItemId(item.id)} onLongPress={() => handleProfileItem(item)} style={[styles.transferOption, previewItemId === item.id && styles.transferOptionActive, { marginRight: 8 }]}>
+                    <Text style={[styles.transferOptionText, previewItemId === item.id && styles.transferOptionTextActive]}>{item.name}</Text>
+                    <Text style={[styles.walletActivityTime, { textAlign: "center" }]}>{owned ? "Sahipsin · dokun etkinleştir" : `${item.cost} kredi · basılı tut satın al`}</Text>
+                  </Pressable>;
+                })}
+              </ScrollView>
+              {activePreview ? <Pressable disabled={Boolean(itemBusy)} onPress={() => handleProfileItem(activePreview)} style={styles.transferCreateButton}><Text style={styles.transferCreateButtonText}>{ownedItemIds.includes(activePreview.id) ? "Profili etkinleştir" : `Önizle · ${activePreview.cost} kredi`}</Text></Pressable> : null}
+            </>
           ) : null}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
-            {profileItems.map((item) => {
-              const owned = ownedItemIds.includes(item.id);
-              return <Pressable key={item.id} onPress={() => setPreviewItemId(item.id)} onLongPress={() => handleProfileItem(item)} style={[styles.transferOption, previewItemId === item.id && styles.transferOptionActive, { marginRight: 8 }]}>
-                <Text style={[styles.transferOptionText, previewItemId === item.id && styles.transferOptionTextActive]}>{item.name}</Text>
-                <Text style={[styles.walletActivityTime, { textAlign: "center" }]}>{owned ? "Sahipsin · dokun etkinleştir" : `${item.cost} kredi · basılı tut satın al`}</Text>
-              </Pressable>;
-            })}
-          </ScrollView>
-          {activePreview ? <Pressable disabled={Boolean(itemBusy)} onPress={() => handleProfileItem(activePreview)} style={styles.transferCreateButton}><Text style={styles.transferCreateButtonText}>{ownedItemIds.includes(activePreview.id) ? "Profili etkinleştir" : `Önizle · ${activePreview.cost} kredi`}</Text></Pressable> : null}
           <Pressable onPress={save}>
             <LinearGradient colors={BRAND_GRADIENT} style={styles.createSubmit}>
-              <Text style={styles.createSubmitText}>Degisiklikleri kaydet</Text>
+              <Text style={styles.createSubmitText}>Değişiklikleri kaydet</Text>
               <Ionicons name="checkmark" size={20} color={COLORS.primaryInk} />
             </LinearGradient>
           </Pressable>
@@ -7727,11 +7736,21 @@ function AppContent() {
     isSupabaseConfigured ? undefined : null,
   );
   const [brandLaunchVisible, setBrandLaunchVisible] = useState(true);
+  const [brandLaunchMinDone, setBrandLaunchMinDone] = useState(false);
+  const [brandLaunchClosing, setBrandLaunchClosing] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setBrandLaunchVisible(false), 1100);
+    const timer = setTimeout(() => setBrandLaunchMinDone(true), 1300);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (!brandLaunchMinDone) return undefined;
+    if (isSupabaseConfigured && authSession === undefined) return undefined;
+    setBrandLaunchClosing(true);
+    const timer = setTimeout(() => setBrandLaunchVisible(false), 240);
+    return () => clearTimeout(timer);
+  }, [authSession, brandLaunchMinDone]);
 
   useEffect(() => {
     notificationDispatcher = (item) =>
@@ -7942,30 +7961,33 @@ function AppContent() {
     let active = true;
     supabase
       .from("profiles")
-      .select("handle, display_name, bio, avatar_color, active_frame_id, active_profile_theme_id")
+      .select("handle, display_name, bio, avatar_color, avatar_url")
       .eq("id", user.id)
       .maybeSingle()
       .then(({ data }) => {
         if (!active || !data) return;
         setProfile((current) => ({
+          ...current,
           name: data.display_name,
           handle: data.handle,
           bio: data.bio,
           color: data.avatar_color,
-          activeFrameId: data.active_frame_id,
-          activeProfileThemeId: data.active_profile_theme_id,
-          avatarUrl: current?.avatarUrl || null,
+          avatarUrl: data.avatar_url || null,
         }));
       })
       .catch(() => undefined);
-      supabase
+    supabase
       .from("profiles")
-      .select("avatar_url")
+      .select("active_frame_id, active_profile_theme_id")
       .eq("id", user.id)
       .maybeSingle()
       .then(({ data, error }) => {
         if (!active || error || !data) return;
-        setProfile((current) => ({ ...current, avatarUrl: data.avatar_url || null }));
+        setProfile((current) => ({
+          ...current,
+          activeFrameId: data.active_frame_id || null,
+          activeProfileThemeId: data.active_profile_theme_id || null,
+        }));
       })
       .catch(() => undefined);
     return () => {
@@ -8838,8 +8860,6 @@ function AppContent() {
           handle: normalizedHandle,
           bio: nextProfile.bio.trim(),
           avatar_color: nextProfile.color,
-          active_frame_id: nextProfile.activeFrameId || null,
-          active_profile_theme_id: nextProfile.activeProfileThemeId || null,
         })
         .eq("id", authSession.user.id);
       if (error) {
@@ -8850,6 +8870,16 @@ function AppContent() {
             : "Bağlantını kontrol edip tekrar dene.",
         );
         return;
+      }
+      if (nextProfile.activeFrameId || nextProfile.activeProfileThemeId) {
+        await supabase
+          .from("profiles")
+          .update({
+            active_frame_id: nextProfile.activeFrameId || null,
+            active_profile_theme_id: nextProfile.activeProfileThemeId || null,
+          })
+          .eq("id", authSession.user.id)
+          .then(() => undefined, () => undefined);
       }
     }
     setProfile(nextProfile);
@@ -9091,6 +9121,7 @@ function AppContent() {
       <BrandLaunch
         logoSource={SORA_LOGO}
         waiting={isSupabaseConfigured && authSession === undefined}
+        closing={brandLaunchClosing}
       />
     );
   if (isSupabaseConfigured && !authSession)
