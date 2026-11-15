@@ -114,6 +114,8 @@ import {
   updateRoomLayout,
   uploadRoomBackground,
   uploadRoomMusic,
+  uploadProfileAvatar,
+  removeProfileAvatar,
 } from "./src/room/roomApi";
 import {
   BanDurationSheet,
@@ -402,11 +404,13 @@ const Avatar = memo(function Avatar({
   size = 42,
   bordered = false,
   circle = false,
+  uri = null,
 }) {
   return (
     <View
       style={[
         styles.avatar,
+        uri ? { overflow: "hidden" } : null,
         {
           width: size,
           height: size,
@@ -416,9 +420,13 @@ const Avatar = memo(function Avatar({
         bordered && styles.avatarBorder,
       ]}
     >
-      <Text style={[styles.avatarText, { fontSize: size * 0.42 }]}>
-        {label}
-      </Text>
+      {uri ? (
+        <Image source={{ uri }} style={{ width: "100%", height: "100%" }} />
+      ) : (
+        <Text style={[styles.avatarText, { fontSize: size * 0.42 }]}>
+          {label}
+        </Text>
+      )}
     </View>
   );
 });
@@ -2131,7 +2139,18 @@ function Profile({
       .then((savedHistory) => {
         const parsedHistory = JSON.parse(savedHistory || "[]");
         if (Array.isArray(parsedHistory))
-          setRecentActivity(parsedHistory.slice(0, 3));
+          setRecentActivity(
+            parsedHistory
+              .filter(
+                (item, index, list) =>
+                  list.findIndex(
+                    (other) =>
+                      (item.roomId && other.roomId === item.roomId) ||
+                      other.title === item.title,
+                  ) === index,
+              )
+              .slice(0, 3),
+          );
       })
       .catch(() => undefined);
   }, []);
@@ -2190,19 +2209,28 @@ function Profile({
       {
         id: "first-listen",
         icon: "headset",
-        title: "Ilk dinleme",
+        title: "İlk dinleme",
+        hint: "Bir odaya katıl",
+        gradient: ["#5AA2FF", "#2F6FE0"],
+        tint: "#2F80ED",
         unlocked: recentActivity.length > 0,
       },
       {
         id: "host",
         icon: "mic",
         title: "Ev sahibi",
+        hint: "İlk odanı aç",
+        gradient: ["#FFC861", "#F08A24"],
+        tint: "#F08A24",
         unlocked: hostedRoomCount > 0,
       },
       {
         id: "curator",
         icon: "heart",
-        title: "Kesifci",
+        title: "Kaşif",
+        hint: `${Math.min(favoriteCount, 3)}/3 favori`,
+        gradient: ["#FF7AA8", "#D9417A"],
+        tint: "#D9417A",
         unlocked: favoriteCount >= 3,
       },
     ],
@@ -2261,6 +2289,7 @@ function Profile({
                 <Avatar
                   label={profile.name.charAt(0).toUpperCase()}
                   color={profile.color}
+                  uri={profile.avatarUrl}
                   size={68}
                   bordered
                   circle
@@ -2466,28 +2495,44 @@ function Profile({
         <Text style={styles.pfSection}>ROZETLER</Text>
         <View style={styles.pfBadgeRow}>
           {badges.map((badge) => (
-            <View key={badge.id} style={styles.pfBadge}>
-              <View
-                style={[
-                  styles.pfBadgeIcon,
-                  badge.unlocked && styles.pfBadgeIconOn,
-                ]}
+            <View
+              key={badge.id}
+              style={[styles.pfBadge, badge.unlocked && { borderColor: `${badge.tint}55` }]}
+            >
+              <LinearGradient
+                colors={badge.unlocked ? badge.gradient : ["#EEF2F7", "#E2E8F0"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.pfBadgeMedal}
               >
-                <Ionicons
-                  name={badge.unlocked ? badge.icon : "lock-closed"}
-                  size={18}
-                  color={badge.unlocked ? COLORS.primary : COLORS.muted}
-                />
-              </View>
-              <Text style={styles.pfBadgeText} numberOfLines={1}>
+                <View style={styles.pfBadgeMedalInner}>
+                  <Ionicons
+                    name={badge.icon}
+                    size={22}
+                    color={badge.unlocked ? "#FFFFFF" : "#A3AFBF"}
+                  />
+                </View>
+                {!badge.unlocked ? (
+                  <View style={styles.pfBadgeLock}>
+                    <Ionicons name="lock-closed" size={10} color="#FFFFFF" />
+                  </View>
+                ) : null}
+              </LinearGradient>
+              <Text
+                style={[styles.pfBadgeText, !badge.unlocked && { color: COLORS.muted }]}
+                numberOfLines={1}
+              >
                 {badge.title}
+              </Text>
+              <Text style={styles.pfBadgeHint} numberOfLines={1}>
+                {badge.unlocked ? "Kazanıldı" : badge.hint}
               </Text>
             </View>
           ))}
         </View>
         {recentActivity.length > 0 && (
           <>
-            <Text style={styles.pfSection}>SON DİNLEDİKLERİN</Text>
+            <Text style={styles.pfSection}>GEÇMİŞ</Text>
             {recentActivity.map((item) => (
               <View key={item.id} style={styles.pfActivityRow}>
                 <View
@@ -2505,7 +2550,7 @@ function Profile({
                     {item.title}
                   </Text>
                   <Text style={styles.pfActivityMeta}>
-                    {item.category} · {item.visitedAt}
+                    {item.category} · {formatHistoryTime(item)}
                   </Text>
                 </View>
                 <Ionicons name="headset-outline" size={18} color={COLORS.muted} />
@@ -2529,6 +2574,16 @@ function Profile({
     </>
   );
 }
+
+const formatHistoryTime = (item) => {
+  if (!item?.visitedTs) return item?.visitedAt || "";
+  const minutes = Math.floor((Date.now() - item.visitedTs) / 60000);
+  if (minutes < 1) return "Şimdi";
+  if (minutes < 60) return `${minutes} dk önce`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} sa önce`;
+  return `${Math.floor(hours / 24)} gün önce`;
+};
 
 const ProfileMetric = memo(function ProfileMetric({ number, label }) {
   return (
@@ -2706,6 +2761,7 @@ function ProfileDetailSheet({
                 <Avatar
                   label={name.charAt(0).toUpperCase()}
                   color={color}
+                  uri={person.avatarUrl || person.avatar_url || null}
                   size={88}
                   bordered
                   circle
@@ -5648,10 +5704,13 @@ function Room({
         initials: room.initials,
         color: roomBrand.accent,
         visitedAt: "Simdi",
+        visitedTs: Date.now(),
       };
       const nextHistory = [
         entry,
-        ...history.filter((item) => item.roomId !== room.id),
+        ...history.filter(
+          (item) => item.roomId !== room.id && item.title !== room.title,
+        ),
       ].slice(0, 6);
       await AsyncStorage.setItem(ROOM_HISTORY_KEY, JSON.stringify(nextHistory));
     } catch {}
@@ -7050,7 +7109,7 @@ function Room({
   );
 }
 
-function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh }) {
+function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh, onAvatarChange }) {
   const [name, setName] = useState(profile.name);
   const [handle, setHandle] = useState(profile.handle);
   const [bio, setBio] = useState(profile.bio || "");
@@ -7059,7 +7118,59 @@ function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh }
   const [ownedItemIds, setOwnedItemIds] = useState([]);
   const [previewItemId, setPreviewItemId] = useState(null);
   const [itemBusy, setItemBusy] = useState(null);
-  const colors = ["#80ADE6", "#8FC7EF", "#6EA1E8", "#7FAEEB", "#5F90D0"];
+  const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl || null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  useEffect(() => {
+    if (visible) setAvatarUrl(profile.avatarUrl || null);
+  }, [visible, profile.avatarUrl]);
+  const getSelfId = async () => {
+    if (!supabase) return null;
+    const { data } = await supabase.auth.getSession();
+    return data?.session?.user?.id || null;
+  };
+  const pickAvatar = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      if (asset.fileSize && asset.fileSize > 3 * 1024 * 1024) {
+        Alert.alert("Görsel çok büyük", "En fazla 3 MB boyutunda bir görsel seç.");
+        return;
+      }
+      const userId = await getSelfId();
+      if (!userId) {
+        setAvatarUrl(asset.uri);
+        return;
+      }
+      setAvatarBusy(true);
+      const url = await uploadProfileAvatar({ userId, asset });
+      setAvatarUrl(url);
+      onAvatarChange?.(url);
+    } catch (error) {
+      console.warn("Avatar upload failed", error);
+      Alert.alert("Resim yüklenemedi", "Bağlantını kontrol edip tekrar dene.");
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+  const clearAvatar = async () => {
+    try {
+      setAvatarBusy(true);
+      const userId = await getSelfId();
+      if (userId) await removeProfileAvatar({ userId });
+      setAvatarUrl(null);
+      onAvatarChange?.(null);
+    } catch {
+      Alert.alert("Resim kaldırılamadı", "Bağlantını kontrol edip tekrar dene.");
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (visible) {
@@ -7125,6 +7236,7 @@ function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh }
       handle: nextHandle,
       bio: bio.trim().slice(0, 180),
       color,
+      avatarUrl,
     });
   };
 
@@ -7144,6 +7256,42 @@ function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh }
           </Pressable>
           <Text style={styles.kicker}>PROFILIN</Text>
           <Text style={styles.sheetTitle}>Kendini goster.</Text>
+          <View style={styles.avatarEditRow}>
+            <Pressable
+              onPress={pickAvatar}
+              disabled={avatarBusy}
+              style={styles.avatarEditPress}
+              accessibilityLabel="Profil resmini değiştir"
+            >
+              <Avatar
+                label={(name || profile.name || "S").charAt(0).toUpperCase()}
+                color={profile.color}
+                uri={avatarUrl}
+                size={84}
+                circle
+              />
+              <View style={styles.avatarEditBadge}>
+                {avatarBusy ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Ionicons name="camera" size={16} color="#FFFFFF" />
+                )}
+              </View>
+            </Pressable>
+            <View style={{ flex: 1, gap: 6 }}>
+              <Pressable onPress={pickAvatar} disabled={avatarBusy} style={styles.avatarEditButton}>
+                <Ionicons name="image-outline" size={16} color={COLORS.primary} />
+                <Text style={styles.avatarEditButtonText}>
+                  {avatarUrl ? "Resmi değiştir" : "Profil resmi ekle"}
+                </Text>
+              </Pressable>
+              {avatarUrl ? (
+                <Pressable onPress={clearAvatar} disabled={avatarBusy}>
+                  <Text style={styles.avatarEditRemove}>Resmi kaldır</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
           <Text style={styles.fieldLabel}>GORUNEN AD</Text>
           <TextInput
             value={name}
@@ -7174,20 +7322,6 @@ function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh }
             maxLength={180}
             multiline
           />
-          <Text style={styles.fieldLabel}>PROFIL RENGI</Text>
-          <View style={styles.profileColors}>
-            {colors.map((item) => (
-              <Pressable
-                key={item}
-                onPress={() => setColor(item)}
-                style={[
-                  styles.profileColorOption,
-                  { backgroundColor: item },
-                  color === item && styles.profileColorSelected,
-                ]}
-              />
-            ))}
-          </View>
           <Text style={styles.fieldLabel}>ÇERÇEVE VE PROFİL TEMASI</Text>
           {activePreview ? (
             <View style={{ padding: 12, marginBottom: 10, borderRadius: 14, backgroundColor: activePreview.appearance?.background || "#F1F7FB", borderWidth: activePreview.item_type === "frame" ? 3 : 0, borderColor: activePreview.appearance?.color || "transparent" }}>
@@ -7700,14 +7834,25 @@ function AppContent() {
       .maybeSingle()
       .then(({ data }) => {
         if (!active || !data) return;
-        setProfile({
+        setProfile((current) => ({
           name: data.display_name,
           handle: data.handle,
           bio: data.bio,
           color: data.avatar_color,
           activeFrameId: data.active_frame_id,
           activeProfileThemeId: data.active_profile_theme_id,
-        });
+          avatarUrl: current?.avatarUrl || null,
+        }));
+      })
+      .catch(() => undefined);
+    supabase
+      .from("profiles")
+      .select("avatar_url")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!active || error || !data) return;
+        setProfile((current) => ({ ...current, avatarUrl: data.avatar_url || null }));
       })
       .catch(() => undefined);
     return () => {
@@ -9000,6 +9145,7 @@ function AppContent() {
         profile={profile}
         onDismiss={handleCloseProfileEditor}
         onSave={saveProfile}
+        onAvatarChange={(url) => setProfile((current) => ({ ...current, avatarUrl: url }))}
         onBalanceRefresh={refreshWalletData}
       />
       <AppSettingsSheet
@@ -9091,6 +9237,33 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  avatarEditRow: { flexDirection: "row", alignItems: "center", gap: 16, marginTop: 6, marginBottom: 8 },
+  avatarEditPress: { position: "relative" },
+  avatarEditBadge: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: COLORS.primary,
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarEditButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 14,
+    backgroundColor: "#EAF2FE",
+  },
+  avatarEditButtonText: { color: COLORS.primary, fontWeight: "800", fontSize: 14 },
+  avatarEditRemove: { color: "#D14B54", fontWeight: "700", fontSize: 13, paddingLeft: 4 },
   profileFollowRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -14393,7 +14566,38 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surfaceHigh,
   },
   pfBadgeIconOn: { backgroundColor: COLORS.primary },
-  pfBadgeText: { color: COLORS.textSecondary, fontSize: 10, fontWeight: "800" },
+  pfBadgeMedal: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 4,
+  },
+  pfBadgeMedalInner: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 25,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.45)",
+  },
+  pfBadgeLock: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#8190A2",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pfBadgeHint: { color: COLORS.muted, fontSize: 10, fontWeight: "600", marginTop: -4 },
+  pfBadgeText: { color: COLORS.text, fontSize: 12, fontWeight: "800" },
   pfActivityRow: {
     flexDirection: "row",
     alignItems: "center",

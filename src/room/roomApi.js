@@ -200,6 +200,29 @@ const readFileBytes = async (uri) => {
   return response.arrayBuffer();
 };
 
+export const uploadProfileAvatar = async ({ userId, asset }) => {
+  const client = requireClient();
+  const mimeType = asset.mimeType || "image/jpeg";
+  const extension = mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : "jpg";
+  const path = `${userId}/${safeFileName(null, extension)}`;
+  const bytes = await readFileBytes(asset.uri);
+  const { error: uploadError } = await client.storage
+    .from("avatars")
+    .upload(path, bytes, { contentType: mimeType, upsert: true });
+  throwIfError(uploadError);
+  const { data } = client.storage.from("avatars").getPublicUrl(path);
+  const avatarUrl = data?.publicUrl;
+  const { error } = await client.from("profiles").update({ avatar_url: avatarUrl }).eq("id", userId);
+  throwIfError(error);
+  return avatarUrl;
+};
+
+export const removeProfileAvatar = async ({ userId }) => {
+  const client = requireClient();
+  const { error } = await client.from("profiles").update({ avatar_url: null }).eq("id", userId);
+  throwIfError(error);
+};
+
 export const uploadRoomBackground = async ({ roomId, asset }) => {
   const client = requireClient();
   const mimeType = asset.mimeType || "image/jpeg";
