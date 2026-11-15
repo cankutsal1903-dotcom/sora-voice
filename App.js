@@ -13223,10 +13223,8 @@ const styles = StyleSheet.create({
   },
   roomSurface: {
     paddingHorizontal: 8,
-    paddingTop: 14,
+    paddingTop: 10,
     paddingBottom: 12,
-    marginTop: "auto",
-    marginBottom: "auto",
   },
   roomBody: {
     flexGrow: 1,
