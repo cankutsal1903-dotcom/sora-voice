@@ -170,6 +170,14 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
           }
         });
 
+        await AudioSession.configureAudio({
+          android: {
+            preferredOutputList: ["speaker", "headset", "bluetooth", "earpiece"],
+            audioTypeOptions: {
+              manageAudioFocus: false,
+            },
+          },
+        }).catch(() => undefined);
         await AudioSession.startAudioSession();
         await connectedRoom.connect(payload.serverUrl, payload.token);
         console.warn("[room-entry] LiveKit connected");

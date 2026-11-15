@@ -194,11 +194,21 @@ const safeFileName = (name, fallbackExtension) => {
   return `${Date.now()}-${random}${hasExtension ? `-${base}` : `.${fallbackExtension}`}`;
 };
 
-const readFileBytes = async (uri) => {
-  const response = await fetch(uri);
-  if (!response.ok && response.status !== 0) throw new Error("Dosya okunamadı.");
-  return response.arrayBuffer();
-};
+const readFileBytes = (uri) =>
+  new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.onload = () => {
+      if (xhr.response && xhr.response.byteLength >= 0) {
+        resolve(xhr.response);
+      } else {
+        reject(new Error("Dosya okunamadı."));
+      }
+    };
+    xhr.onerror = () => reject(new Error("Dosya okunamadı."));
+    xhr.responseType = "arraybuffer";
+    xhr.open("GET", uri, true);
+    xhr.send(null);
+  });
 
 export const uploadProfileAvatar = async ({ userId, asset }) => {
   const client = requireClient();

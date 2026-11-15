@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -45,8 +46,16 @@ const friendlyError = (error) => {
   return message;
 };
 
-function Avatar({ name, color, size = 48 }) {
-  return <View style={[styles.avatar, { width: size, height: size, borderRadius: size * 0.34, backgroundColor: color || "#7FCBEA" }]}><Text style={[styles.avatarText, { fontSize: size * 0.4 }]}>{(name || "S").charAt(0).toUpperCase()}</Text></View>;
+function Avatar({ name, color, size = 48, uri = null }) {
+  return (
+    <View style={[styles.avatar, { width: size, height: size, borderRadius: size * 0.34, backgroundColor: color || "#7FCBEA", overflow: "hidden" }]}>
+      {uri ? (
+        <Image source={{ uri }} style={{ width: "100%", height: "100%" }} />
+      ) : (
+        <Text style={[styles.avatarText, { fontSize: size * 0.4 }]}>{(name || "S").charAt(0).toUpperCase()}</Text>
+      )}
+    </View>
+  );
 }
 
 function EmptyState({ icon, title, description, action, onAction }) {
@@ -167,7 +176,7 @@ export function InboxScreen({ currentUserId, profile }) {
     return <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={8}>
       <View style={styles.chatHeader}>
         <Pressable onPress={() => setSelectedConversation(null)} accessibilityLabel="Sohbet listesine dön" style={styles.headerButton}><Ionicons name="arrow-back" size={21} color={COLORS.text} /></Pressable>
-        <Avatar name={selectedConversation.name} color={selectedConversation.color} size={42} />
+        <Avatar name={selectedConversation.name} color={selectedConversation.color} uri={selectedConversation.avatarUrl} size={42} />
         <View style={styles.chatHeaderCopy}><Text numberOfLines={1} style={styles.chatHeaderName}>{selectedConversation.name}</Text><Text style={styles.chatHeaderHandle}>@{selectedConversation.handle}</Text></View>
       </View>
       {error ? <Pressable onPress={() => openConversation(selectedConversation)} style={styles.errorBanner}><Ionicons name="alert-circle-outline" size={17} color={COLORS.danger} /><Text style={styles.errorText}>{error}</Text></Pressable> : null}
@@ -182,7 +191,7 @@ export function InboxScreen({ currentUserId, profile }) {
     <View style={styles.pageHeader}><View><Text style={styles.eyebrow}>MESAJLAR</Text><Text style={styles.pageTitle}>Sohbetlerin.</Text></View><Pressable onPress={() => setNewChatOpen(true)} accessibilityLabel="Yeni sohbet" style={styles.newButton}><Ionicons name="create-outline" size={20} color={COLORS.primaryInk} /></Pressable></View>
     <View style={styles.search}><Ionicons name="search-outline" size={18} color={COLORS.muted} /><TextInput value={query} onChangeText={setQuery} placeholder="Kişi ara" placeholderTextColor={COLORS.muted} style={styles.searchInput} autoCapitalize="none" /></View>
     {error ? <Pressable onPress={() => loadConversations()} style={styles.errorBanner}><Ionicons name="refresh-outline" size={17} color={COLORS.danger} /><Text style={styles.errorText}>{error} Tekrar dene.</Text></Pressable> : null}
-    {loading ? <View style={styles.center}><ActivityIndicator color={COLORS.primary} /><Text style={styles.loadingText}>Sohbetler yükleniyor...</Text></View> : !visibleConversations.length ? <EmptyState icon="chatbubbles-outline" title={query ? "Sonuç bulunamadı" : "Henüz sohbet yok"} description={query ? "Farklı bir isim veya kullanıcı adı ara." : "Gerçek bir kullanıcı adıyla yeni sohbet başlat."} action={query ? null : "Sohbet başlat"} onAction={() => setNewChatOpen(true)} /> : <ScrollView contentContainerStyle={styles.conversationList} showsVerticalScrollIndicator={false}>{visibleConversations.map((conversation) => <Pressable key={conversation.id} onPress={() => openConversation(conversation)} style={styles.conversationCard}><Avatar name={conversation.name} color={conversation.color} /><View style={styles.conversationCopy}><View style={styles.conversationTop}><Text numberOfLines={1} style={styles.conversationName}>{conversation.name}</Text><Text style={styles.conversationTime}>{formatMessageTime(conversation.lastMessageAt)}</Text></View><Text numberOfLines={1} style={styles.conversationMessage}>{conversation.lastMessage || ("@" + conversation.handle)}</Text></View></Pressable>)}</ScrollView>}
+    {loading ? <View style={styles.center}><ActivityIndicator color={COLORS.primary} /><Text style={styles.loadingText}>Sohbetler yükleniyor...</Text></View> : !visibleConversations.length ? <EmptyState icon="chatbubbles-outline" title={query ? "Sonuç bulunamadı" : "Henüz sohbet yok"} description={query ? "Farklı bir isim veya kullanıcı adı ara." : "Gerçek bir kullanıcı adıyla yeni sohbet başlat."} action={query ? null : "Sohbet başlat"} onAction={() => setNewChatOpen(true)} /> : <ScrollView contentContainerStyle={styles.conversationList} showsVerticalScrollIndicator={false}>{visibleConversations.map((conversation) => <Pressable key={conversation.id} onPress={() => openConversation(conversation)} style={styles.conversationCard}><Avatar name={conversation.name} color={conversation.color} uri={conversation.avatarUrl} /><View style={styles.conversationCopy}><View style={styles.conversationTop}><Text numberOfLines={1} style={styles.conversationName}>{conversation.name}</Text><Text style={styles.conversationTime}>{formatMessageTime(conversation.lastMessageAt)}</Text></View><Text numberOfLines={1} style={styles.conversationMessage}>{conversation.lastMessage || ("@" + conversation.handle)}</Text></View></Pressable>)}</ScrollView>}
     <Modal transparent visible={newChatOpen} animationType="slide" onRequestClose={() => setNewChatOpen(false)}><KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === "ios" ? "padding" : undefined}><Pressable style={StyleSheet.absoluteFill} onPress={() => setNewChatOpen(false)} /><View style={styles.sheet}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><View><Text style={styles.eyebrow}>YENİ SOHBET</Text><Text style={styles.sheetTitle}>Birini bul.</Text></View><Pressable onPress={() => setNewChatOpen(false)} style={styles.headerButton}><Ionicons name="close" size={21} color={COLORS.text} /></Pressable></View><Text style={styles.fieldLabel}>KULLANICI ADI</Text><View style={styles.handleInput}><Text style={styles.handlePrefix}>@</Text><TextInput value={newHandle} onChangeText={setNewHandle} placeholder="kullaniciadi" placeholderTextColor={COLORS.muted} autoCapitalize="none" autoCorrect={false} maxLength={24} style={styles.handleTextInput} /></View><Text style={styles.sheetHint}>Yalnızca kayıtlı Sora kullanıcılarıyla sohbet başlatabilirsin.</Text><Pressable disabled={startingChat} onPress={createConversation}><LinearGradient colors={[COLORS.primary, "#6AA8F5"]} style={styles.primaryAction}>{startingChat ? <ActivityIndicator color={COLORS.primaryInk} /> : <><Text style={styles.primaryActionText}>Sohbeti aç</Text><Ionicons name="arrow-forward" size={19} color={COLORS.primaryInk} /></>}</LinearGradient></Pressable></View></KeyboardAvoidingView></Modal>
   </View>;
 }

@@ -3364,12 +3364,16 @@ const ParticipantActionSheet = memo(function ParticipantActionSheet({
             <View
               style={[
                 styles.participantSheetAvatar,
-                { backgroundColor: participant.color || COLORS.accent },
+                { backgroundColor: participant.color || COLORS.accent, overflow: "hidden" },
               ]}
             >
-              <Text style={styles.participantSheetInitial}>
-                {participant.name?.charAt(0)?.toUpperCase() || "?"}
-              </Text>
+              {participant.avatarUrl ? (
+                <Image source={{ uri: participant.avatarUrl }} style={{ width: "100%", height: "100%" }} />
+              ) : (
+                <Text style={styles.participantSheetInitial}>
+                  {participant.name?.charAt(0)?.toUpperCase() || "?"}
+                </Text>
+              )}
             </View>
             <View style={styles.participantSheetInfo}>
               <Text style={styles.participantSheetName} numberOfLines={1}>
@@ -5206,6 +5210,10 @@ function Room({
             userId: participant.id,
             name: member?.name || participant.name,
             color: member?.color || "#7FCBEA",
+            avatarUrl:
+              (participant.id === userId ? profile?.avatarUrl : null) ||
+              member?.avatarUrl ||
+              null,
             role:
               participant.id === room.hostId
                 ? "host"
@@ -5216,7 +5224,7 @@ function Room({
             micBannedUntil: member?.micBannedUntil || null,
           };
         }),
-    [blockedUserIds, liveVoice.participants, room.hostId, roomMembers],
+    [blockedUserIds, liveVoice.participants, profile?.avatarUrl, room.hostId, roomMembers, userId],
   );
   useEffect(() => {
     if (!room.persisted || !supabase) return;
@@ -5238,10 +5246,15 @@ function Room({
       userId: room.hostId || `host-${room.id}`,
       name: room.host,
       color: roomBrand.accent,
+      avatarUrl: (isHost ? profile?.avatarUrl : room.hostAvatarUrl) || null,
       microphoneEnabled: isHost ? micOn : false,
     };
     return {
       ...base,
+      avatarUrl:
+        base.avatarUrl ||
+        (isHost ? profile?.avatarUrl : room.hostAvatarUrl) ||
+        null,
       role: "host",
       seat: 0,
       isSpeaking: activeSpeakerIds.includes(base.userId),
@@ -5251,7 +5264,9 @@ function Room({
     activeSpeakerIds,
     isHost,
     micOn,
+    profile?.avatarUrl,
     room.host,
+    room.hostAvatarUrl,
     room.hostId,
     room.id,
     roomBrand.accent,
@@ -6634,9 +6649,16 @@ function Room({
               }
               style={[StyleSheet.absoluteFill, { borderRadius: avatarSize / 2 }]}
             />
-            <Text style={[styles.roomSpeakerInitial, isHostSeat && styles.roomHostStageInitial]}>
-              {participant.name?.charAt(0)?.toUpperCase() || "?"}
-            </Text>
+            {participant.avatarUrl ? (
+              <Image
+                source={{ uri: participant.avatarUrl }}
+                style={[StyleSheet.absoluteFill, { borderRadius: (avatarSize - 4) / 2 }]}
+              />
+            ) : (
+              <Text style={[styles.roomSpeakerInitial, isHostSeat && styles.roomHostStageInitial]}>
+                {participant.name?.charAt(0)?.toUpperCase() || "?"}
+              </Text>
+            )}
             {participant.microphoneEnabled ? (
               <View style={styles.roomMicOnBadge}>
                 <Ionicons name="mic" size={9} color="#11131A" />
@@ -6890,9 +6912,16 @@ function Room({
                             { backgroundColor: participant.color },
                           ]}
                         >
-                          <Text style={styles.roomAudienceInitial}>
-                            {participant.name?.charAt(0)?.toUpperCase() || "?"}
-                          </Text>
+                          {participant.avatarUrl ? (
+                            <Image
+                              source={{ uri: participant.avatarUrl }}
+                              style={[StyleSheet.absoluteFill, { borderRadius: 999 }]}
+                            />
+                          ) : (
+                            <Text style={styles.roomAudienceInitial}>
+                              {participant.name?.charAt(0)?.toUpperCase() || "?"}
+                            </Text>
+                          )}
                           {participant.role === "moderator" ? (
                             <View style={styles.roomAudienceCrown}>
                               <Ionicons name="shield-checkmark" size={8} color="#11131A" />

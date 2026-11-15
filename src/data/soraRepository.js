@@ -2,7 +2,7 @@ import { supabase } from "../auth/supabase";
 import { fetchHostPresence } from "../room/roomApi";
 
 const FALLBACK_COLORS = ["#5140BD", "#252458"];
-const ROOM_SELECT = "*, profiles!rooms_host_id_fkey(display_name, handle, avatar_color)";
+const ROOM_SELECT = "*, profiles!rooms_host_id_fkey(display_name, handle, avatar_color, avatar_url)";
 
 const requireClient = () => {
   if (!supabase) throw new Error("Supabase yapılandırılmadı.");
@@ -21,6 +21,7 @@ export const mapRoom = (room) => {
     id: room.id,
     hostId: room.host_id,
     host: host?.display_name || "Sora kullanıcısı",
+    hostAvatarUrl: host?.avatar_url || null,
     initials: (host?.display_name || "S").charAt(0).toUpperCase(),
     title: room.title,
     description: room.description,
@@ -244,7 +245,7 @@ export const listRoomMembers = async (roomId) => {
   const client = requireClient();
   const { data, error } = await client
     .from("room_members")
-    .select("user_id, role, is_muted, removed_at, hand_raised_at, mic_banned_until, profiles!room_members_user_id_fkey(display_name, avatar_color)")
+    .select("user_id, role, is_muted, removed_at, hand_raised_at, mic_banned_until, profiles!room_members_user_id_fkey(display_name, avatar_color, avatar_url)")
     .eq("room_id", roomId)
     .is("removed_at", null);
   throwIfError(error);
@@ -256,6 +257,7 @@ export const listRoomMembers = async (roomId) => {
     micBannedUntil: member.mic_banned_until || null,
     name: profileFromJoin(member.profiles)?.display_name || "Sora kullanıcısı",
     color: profileFromJoin(member.profiles)?.avatar_color || "#7FCBEA",
+    avatarUrl: profileFromJoin(member.profiles)?.avatar_url || null,
   }));
 };
 
@@ -265,7 +267,7 @@ export const getPublicProfile = async (userId) => {
   const [profileResult, appearanceResult] = await Promise.all([
     client
       .from("profiles")
-      .select("id, handle, display_name, avatar_color, bio")
+      .select("id, handle, display_name, avatar_color, avatar_url, bio")
       .eq("id", userId)
       .maybeSingle(),
     client
@@ -283,6 +285,7 @@ export const getPublicProfile = async (userId) => {
     handle: data.handle,
     name: data.display_name,
     color: data.avatar_color,
+    avatarUrl: data.avatar_url || null,
     bio: data.bio,
     activeFrameId: appearance?.active_frame_id || null,
     activeProfileThemeId: appearance?.active_profile_theme_id || null,
@@ -502,12 +505,13 @@ export const resolveAdminSafetyReport = async ({ reportId, status, resolution = 
   return data;
 };
 
-const mapDirectConversation = (conversation) => ({
+const mapDirectConversation = (conversation, avatarByUserId = new Map()) => ({
   id: conversation.conversation_id,
   userId: conversation.other_user_id,
   name: conversation.other_display_name || "Sora kullanıcısı",
   handle: conversation.other_handle || "sora",
   color: conversation.other_avatar_color || "#7FCBEA",
+  avatarUrl: conversation.other_avatar_url || avatarByUserId.get(conversation.other_user_id) || null,
   lastMessage: conversation.last_message || "Henüz mesaj yok.",
   lastMessageAt: conversation.last_message_at,
 });
@@ -516,7 +520,19 @@ export const listDirectConversations = async () => {
   const client = requireClient();
   const { data, error } = await client.rpc("list_direct_conversations");
   throwIfError(error);
-  return (data || []).map(mapDirectConversation);
+  const rows = data || [];
+  const otherUserIds = [...new Set(rows.map((row) => row.other_user_id).filter(Boolean))];
+  const avatarByUserId = new Map();
+  if (otherUserIds.length > 0) {
+    const { data: profiles } = await client
+      .from("profiles")
+      .select("id, avatar_url")
+      .in("id", otherUserIds);
+    (profiles || []).forEach((item) => {
+      if (item?.id && item.avatar_url) avatarByUserId.set(item.id, item.avatar_url);
+    });
+  }
+  return rows.map((row) => mapDirectConversation(row, avatarByUserId));
 };
 
 export const startDirectConversation = async (handle) => {

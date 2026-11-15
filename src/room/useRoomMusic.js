@@ -88,6 +88,7 @@ export function useRoomMusic({ musicState, enabled = true }) {
             shouldPlayInBackground: true,
             allowsRecording: true,
             interruptionMode: "mixWithOthers",
+            interruptionModeAndroid: "duckOthers",
           }).catch(() => undefined);
           try {
             playerRef.current?.remove();
@@ -100,17 +101,25 @@ export function useRoomMusic({ musicState, enabled = true }) {
         }
         const player = playerRef.current;
         if (!player) return;
-        // Süre bilgisi yüklenene kadar kısa bir süre bekle.
-        for (let attempt = 0; attempt < 50 && !(player.duration > 0); attempt += 1) {
+        player.volume = effectiveVolumeRef.current;
+        if (playing) {
+          player.play();
+          setStatus("playing");
+        }
+        // Süre ve yükleme bilgisi hazır olana kadar kısa süre bekle, gerekiyorsa senkron konuma sar.
+        for (let attempt = 0; attempt < 15 && !player.isLoaded && !(player.duration > 0); attempt += 1) {
           await new Promise((resolve) => setTimeout(resolve, 200));
           if (cancelled) return;
         }
-        setDuration(player.duration || 0);
+        if (player.duration > 0) setDuration(player.duration);
         const target = musicPositionMs(
           { position_ms: positionMs, playing, started_at: startedAt },
           player.duration || 0,
         );
-        await player.seekTo(target / 1000);
+        const currentMs = Number.isFinite(player.currentTime) ? player.currentTime * 1000 : 0;
+        if (Math.abs(target - currentMs) > 1500) {
+          await player.seekTo(target / 1000).catch(() => undefined);
+        }
         if (cancelled) return;
         if (playing) {
           player.play();
@@ -133,6 +142,23 @@ export function useRoomMusic({ musicState, enabled = true }) {
   useEffect(() => {
     if (playerRef.current) playerRef.current.volume = roomVolume * localVolume;
   }, [localVolume, roomVolume, status]);
+
+  // Sesli sohbet bağlantısı kurulduğunda Android ses yönlendirmesi oynatıcıyı duraklatırsa otomatik sürdür.
+  useEffect(() => {
+    if (!path || !playing) return undefined;
+    const timer = setInterval(() => {
+      const player = playerRef.current;
+      if (!player || loadedPathRef.current !== path) return;
+      if (player.duration > 0) setDuration((prev) => (prev === player.duration ? prev : player.duration));
+      player.volume = effectiveVolumeRef.current;
+      if (player.isLoaded && !player.playing) {
+        try {
+          player.play();
+        } catch {}
+      }
+    }, 1800);
+    return () => clearInterval(timer);
+  }, [path, playing]);
 
   const retry = useCallback(() => setRetryNonce((value) => value + 1), []);
 
