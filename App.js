@@ -7809,30 +7809,37 @@ function AppContent() {
     });
   };
 
-  const resumeHostedRoom = (existingRoom) => {
-    // Odayı ağ çağrısını beklemeden hemen aç; "canlı" durumu arka planda güncellenir.
+  const [hostedRoomPrompt, setHostedRoomPrompt] = useState(null);
+  const [resumingHostedRoom, setResumingHostedRoom] = useState(false);
+
+  const resumeHostedRoom = async (existingRoom) => {
+    // Oda "inactive" olabilir: önce yeniden canlıya al, sonra gir (aksi halde
+    // join_room "Room is unavailable" döner).
     console.warn("[room-entry] resume hosted room pressed", Boolean(existingRoom?.id));
-    setCreateOpen(false);
-    openRoom(existingRoom);
-    setHostRoomPresence(existingRoom.id, true).catch((error) => {
+    setResumingHostedRoom(true);
+    let liveRoom = existingRoom;
+    try {
+      if (supabase && authSession?.user) {
+        liveRoom = (await setRemoteRoomPresence(existingRoom.id, true)) || existingRoom;
+        setRooms((currentRooms) => [
+          liveRoom,
+          ...currentRooms.filter((item) => item.id !== liveRoom.id),
+        ]);
+      }
+    } catch (error) {
       console.warn("Room presence sync failed", error);
-    });
+      setResumingHostedRoom(false);
+      Alert.alert("Odana dönülemedi", "Bağlantıyı kontrol edip tekrar dene.");
+      return;
+    }
+    setResumingHostedRoom(false);
+    setHostedRoomPrompt(null);
+    setCreateOpen(false);
+    openRoom(liveRoom);
   };
 
   const promptHostedRoom = (existingRoom) => {
-    Alert.alert(
-      "Zaten bir odan var",
-      `“${existingRoom.title}” odana dönebilirsin. Aynı anda yalnızca bir odan olabilir.`,
-      [
-        { text: "Vazgeç", style: "cancel" },
-        {
-          text: "Odama dön",
-          onPress: () => {
-            resumeHostedRoom(existingRoom);
-          },
-        },
-      ],
-    );
+    setHostedRoomPrompt(existingRoom);
   };
 
   const createRoom = async (newRoom) => {
@@ -8333,6 +8340,10 @@ function AppContent() {
     // kadar hatalı bir oda ekranı kısa süreliğine görünebiliyordu.
     if (!skipPasswordCheck && nextRoom.persisted && room?.id !== nextRoom.id) {
       try {
+        if (authSession?.user?.id && nextRoom.hostId === authSession.user.id) {
+          // Kendi odası listede "canlı" görünse de pasif kalmış olabilir.
+          await setRemoteRoomPresence(nextRoom.id, true).catch(() => undefined);
+        }
         await joinRoomWithPassword(nextRoom.id, null);
       } catch (error) {
         const message = String(error?.message || "");
@@ -8906,6 +8917,69 @@ function AppContent() {
         onDismiss={handleCloseCreate}
         onCreate={createRoom}
       />
+      <Modal
+        visible={Boolean(hostedRoomPrompt)}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => !resumingHostedRoom && setHostedRoomPrompt(null)}
+      >
+        <Pressable
+          style={styles.resumeBackdrop}
+          onPress={() => !resumingHostedRoom && setHostedRoomPrompt(null)}
+        >
+          <Pressable style={styles.resumeCard} onPress={() => undefined}>
+            <LinearGradient
+              colors={["#1E3A6B", "#13233F", "#0D1726"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.resumeHero}
+            >
+              <View style={styles.resumeGlow} pointerEvents="none" />
+              <View style={styles.resumeAvatarRing}>
+                <View style={styles.resumeAvatar}>
+                  <Text style={styles.resumeAvatarText}>
+                    {(profile?.name || "S").charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.resumeMicBadge}>
+                  <Ionicons name="mic" size={13} color="#FFFFFF" />
+                </View>
+              </View>
+              <Text style={styles.resumeKicker}>SENİN ODAN</Text>
+              <Text style={styles.resumeTitle} numberOfLines={1}>
+                {hostedRoomPrompt?.title || "Odan"}
+              </Text>
+              <Text style={styles.resumeSub} numberOfLines={2}>
+                Sahne seni bekliyor. Aynı anda yalnızca bir odan olabilir.
+              </Text>
+            </LinearGradient>
+            <View style={styles.resumeActions}>
+              <Pressable
+                style={({ pressed }) => [styles.resumePrimary, pressed && { opacity: 0.85 }]}
+                disabled={resumingHostedRoom}
+                onPress={() => hostedRoomPrompt && resumeHostedRoom(hostedRoomPrompt)}
+              >
+                {resumingHostedRoom ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="enter-outline" size={19} color="#FFFFFF" />
+                    <Text style={styles.resumePrimaryText}>Odana dön</Text>
+                  </>
+                )}
+              </Pressable>
+              <Pressable
+                style={styles.resumeSecondary}
+                disabled={resumingHostedRoom}
+                onPress={() => setHostedRoomPrompt(null)}
+              >
+                <Text style={styles.resumeSecondaryText}>Vazgeç</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
       <ProfileEditor
         visible={profileEditorOpen}
         profile={profile}
@@ -9002,6 +9076,93 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  resumeBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(5,10,20,0.72)",
+    justifyContent: "center",
+    paddingHorizontal: 26,
+  },
+  resumeCard: {
+    borderRadius: 28,
+    overflow: "hidden",
+    backgroundColor: "#0D1726",
+    borderWidth: 1,
+    borderColor: "rgba(118,175,255,0.18)",
+  },
+  resumeHero: {
+    alignItems: "center",
+    paddingTop: 30,
+    paddingBottom: 22,
+    paddingHorizontal: 22,
+  },
+  resumeGlow: {
+    position: "absolute",
+    top: -60,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: "rgba(47,128,237,0.22)",
+  },
+  resumeAvatarRing: {
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    borderWidth: 2,
+    borderColor: "rgba(118,175,255,0.9)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  resumeAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#2F80ED",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  resumeAvatarText: { color: "#FFFFFF", fontSize: 34, fontWeight: "800" },
+  resumeMicBadge: {
+    position: "absolute",
+    right: -2,
+    bottom: 2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#22C55E",
+    borderWidth: 2,
+    borderColor: "#13233F",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  resumeKicker: {
+    color: "#76AFFF",
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 2,
+    marginBottom: 6,
+  },
+  resumeTitle: { color: "#FFFFFF", fontSize: 26, fontWeight: "800" },
+  resumeSub: {
+    color: "#A9BEDB",
+    fontSize: 14,
+    textAlign: "center",
+    marginTop: 8,
+    lineHeight: 20,
+  },
+  resumeActions: { padding: 18, gap: 10 },
+  resumePrimary: {
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: "#2F80ED",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  resumePrimaryText: { color: "#FFFFFF", fontSize: 17, fontWeight: "800" },
+  resumeSecondary: { height: 44, alignItems: "center", justifyContent: "center" },
+  resumeSecondaryText: { color: "#A9BEDB", fontSize: 15, fontWeight: "700" },
   app: { flex: 1, backgroundColor: COLORS.background },
   safeArea: {
     flex: 1,
