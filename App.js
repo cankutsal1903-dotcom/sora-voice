@@ -64,6 +64,7 @@ import {
   joinRoomMembership,
   listBlockedUsers,
   listFollowedUserIds,
+  getFollowCounts,
   listRoomMembers,
   listRoomMessages,
   listRooms,
@@ -2103,7 +2104,6 @@ function Profile({
   );
   const actions = useMemo(
     () => [
-      ["person-circle-outline", "Profili görüntüle", openProfileDetails],
       [
         "gift-outline",
         dailyRewardClaimed ? "Günlük ödül alındı" : "Günlük ödül",
@@ -2282,23 +2282,6 @@ function Profile({
               </View>
               <Ionicons name="chevron-forward" size={21} color={COLORS.muted} />
             </Pressable>
-            <Pressable
-              onPress={shareProfile}
-              style={styles.profileShareButton}
-              accessibilityRole="button"
-              accessibilityLabel="Profili paylaş"
-            >
-              <Ionicons name="share-social-outline" size={18} color={COLORS.primary} />
-            </Pressable>
-          </View>
-        </Reveal>
-
-        <Reveal delay={45} distance={10}>
-          <View style={styles.profileMetricsRow}>
-            <ProfileMetric number={String(followedCount)} label="Takip" />
-            <ProfileMetric number={String(favoriteCount)} label="Favori" />
-            <ProfileMetric number={String(hostedRoomCount)} label="Oda" />
-            <ProfileMetric number={String(coins)} label="Kredi" />
           </View>
         </Reveal>
 
@@ -2337,7 +2320,7 @@ function Profile({
               >
                 <View style={styles.profileBannerCopy}>
                   <Text style={styles.profileBannerTitle}>Cüzdan</Text>
-                  <Text style={styles.profileBannerCaption}>{coins} kredi</Text>
+                  <Text style={styles.profileBannerCaption}>Bakiyeni yönet</Text>
                 </View>
                 <Ionicons name="wallet-outline" size={29} color="#9FC7FF" />
               </LinearGradient>
@@ -2604,6 +2587,25 @@ function ProfileDetailSheet({
     if (visible) setDetailTab("profile");
   }, [visible]);
 
+  const [followCounts, setFollowCounts] = useState(null);
+  useEffect(() => {
+    if (!visible || !isSelf || !supabase) return undefined;
+    let active = true;
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        const selfId = data?.session?.user?.id;
+        return selfId ? getFollowCounts(selfId) : null;
+      })
+      .then((counts) => {
+        if (active && counts) setFollowCounts(counts);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [isSelf, visible]);
+
   const person = remoteProfile || profile || {};
   const name = person.name || person.display_name || "Sora kullanıcısı";
   const handle = person.handle ? `@${person.handle.replace(/^@+/, "")}` : "Sora kullanıcısı";
@@ -2655,7 +2657,7 @@ function ProfileDetailSheet({
               </Pressable>
               <View style={styles.profileDetailTopActions}>
                 {loading ? <ActivityIndicator color="#FFFFFF" size="small" /> : null}
-                {isSelf && onShare ? (
+                {false && onShare ? (
                   <Pressable
                     onPress={onShare}
                     style={styles.profileDetailIconButton}
@@ -2728,6 +2730,19 @@ function ProfileDetailSheet({
           >
             <Text style={styles.profileDetailName}>{name}</Text>
             <Text style={styles.profileDetailHandle}>{handle}</Text>
+            {isSelf ? (
+              <View style={styles.profileFollowRow}>
+                <View style={styles.profileFollowItem}>
+                  <Text style={styles.profileFollowNumber}>{followCounts?.following ?? "–"}</Text>
+                  <Text style={styles.profileFollowLabel}>Takip</Text>
+                </View>
+                <View style={styles.profileFollowDivider} />
+                <View style={styles.profileFollowItem}>
+                  <Text style={styles.profileFollowNumber}>{followCounts?.followers ?? "–"}</Text>
+                  <Text style={styles.profileFollowLabel}>Takipçi</Text>
+                </View>
+              </View>
+            ) : null}
             {roomContext ? (
               <View style={styles.profileDetailRoleRow}>
                 <Ionicons name="mic-outline" size={16} color={COLORS.primary} />
@@ -9076,6 +9091,17 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  profileFollowRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    marginTop: 14,
+    gap: 18,
+  },
+  profileFollowItem: { alignItems: "flex-start" },
+  profileFollowNumber: { color: COLORS.text, fontSize: 19, fontWeight: "800" },
+  profileFollowLabel: { color: COLORS.muted, fontSize: 13, fontWeight: "600", marginTop: 1 },
+  profileFollowDivider: { width: 1, height: 26, backgroundColor: COLORS.line },
   resumeBackdrop: {
     flex: 1,
     backgroundColor: "rgba(5,10,20,0.72)",

@@ -289,6 +289,17 @@ export const getPublicProfile = async (userId) => {
   };
 };
 
+export const getFollowCounts = async (userId) => {
+  const client = requireClient();
+  const [following, followers] = await Promise.all([
+    client.from("follows").select("following_id", { count: "exact", head: true }).eq("follower_id", userId),
+    client.from("follows").select("follower_id", { count: "exact", head: true }).eq("following_id", userId),
+  ]);
+  throwIfError(following.error);
+  throwIfError(followers.error);
+  return { following: following.count || 0, followers: followers.count || 0 };
+};
+
 export const listFollowedUserIds = async (userId) => {
   const client = requireClient();
   const { data, error } = await client.from("follows").select("following_id").eq("follower_id", userId);
