@@ -3441,6 +3441,79 @@ const ParticipantActionSheet = memo(function ParticipantActionSheet({
   );
 });
 
+const SelfRoomSheet = memo(function SelfRoomSheet({
+  visible,
+  profile,
+  avatarUrl,
+  roleLabel,
+  canLeaveMic,
+  onOpenProfile,
+  onLeaveMic,
+  onDismiss,
+}) {
+  if (!visible) return null;
+  const name = profile?.name || "Sora kullanıcısı";
+  const handle = profile?.handle
+    ? `@${String(profile.handle).replace(/^@+/, "")}`
+    : "";
+  return (
+    <Modal
+      transparent
+      visible
+      animationType="slide"
+      onRequestClose={onDismiss}
+    >
+      <View style={styles.modalOverlay}>
+        <Pressable style={styles.modalDismiss} onPress={onDismiss} />
+        <View style={styles.sheet}>
+          <View style={styles.sheetHandle} />
+          <Pressable onPress={onDismiss} style={styles.sheetClose}>
+            <Ionicons name="close" size={18} color={COLORS.text} />
+          </Pressable>
+          <Pressable
+            onPress={onOpenProfile}
+            style={styles.selfSheetProfileCard}
+            accessibilityRole="button"
+            accessibilityLabel="Profilime git"
+          >
+            <Avatar
+              label={name.charAt(0).toUpperCase()}
+              color={profile?.color || COLORS.primaryLight}
+              uri={avatarUrl || null}
+              size={64}
+              circle
+              bordered
+            />
+            <View style={styles.participantSheetInfo}>
+              <Text style={styles.participantSheetName} numberOfLines={1}>
+                {name}
+              </Text>
+              <Text style={styles.participantSheetRole} numberOfLines={1}>
+                {[handle, roleLabel].filter(Boolean).join(" · ")}
+              </Text>
+            </View>
+            <View style={styles.selfSheetProfilePill}>
+              <Text style={styles.selfSheetProfilePillText}>Profil</Text>
+              <Ionicons name="chevron-forward" size={15} color={COLORS.primary} />
+            </View>
+          </Pressable>
+          {canLeaveMic ? (
+            <Pressable
+              onPress={onLeaveMic}
+              style={styles.selfSheetLeaveMicBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Mikrofondan kalk"
+            >
+              <Ionicons name="arrow-down-circle-outline" size={20} color={COLORS.danger} />
+              <Text style={styles.selfSheetLeaveMicText}>Mikrofondan kalk</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+    </Modal>
+  );
+});
+
 /* Konusan kisinin profil cercevesinden yayilan ses dalgasi. */
 const SpeakingRing = memo(function SpeakingRing({
   size = 64,
@@ -5090,6 +5163,7 @@ function Room({
   onToggleFollowHost,
   onHostPresenceChange,
   onMinimize,
+  onEditProfile,
   minimized = false,
 }) {
   useEffect(() => {
@@ -5110,6 +5184,8 @@ function Room({
   const [giftFlight, setGiftFlight] = useState(null);
   const [selectedParticipant, setSelectedParticipant] = useState(null);
   const [profileParticipant, setProfileParticipant] = useState(null);
+  const [selfSheetOpen, setSelfSheetOpen] = useState(false);
+  const [selfProfileOpen, setSelfProfileOpen] = useState(false);
   const [followedParticipantNames, setFollowedParticipantNames] = useState([]);
   const [roomLocked, setRoomLocked] = useState(Boolean(room.roomLocked));
   const [chatLocked, setChatLocked] = useState(Boolean(room.chatLocked));
@@ -5607,6 +5683,14 @@ function Room({
         Alert.alert(
           "İsteğin bekliyor",
           "Oda sahibi ya da bir yönetici onayladığında mikrofona çıkacaksın.",
+          [
+            { text: "Tamam", style: "cancel" },
+            {
+              text: "İsteği geri çek",
+              style: "destructive",
+              onPress: () => toggleHandRef.current?.(),
+            },
+          ],
         );
         return;
       }
@@ -5882,19 +5966,29 @@ function Room({
       Alert.alert(
         "İsteğin bekliyor",
         "Oda sahibi ya da bir yönetici onayladığında mikrofona çıkacaksın.",
+        [
+          { text: "Tamam", style: "cancel" },
+          { text: "İsteği geri çek", style: "destructive", onPress: toggleHand },
+        ],
       );
       return;
     }
     toggleHand();
   };
 
-  const handleOwnSeatPress = () => {
-    if (isHost || !iAmSeated) return;
-    Alert.alert("Mikrofon", "Mikrofondan inmek istiyor musun?", [
-      { text: "Vazgeç", style: "cancel" },
-      { text: "Mikrofondan in", style: "destructive", onPress: leaveSeat },
-    ]);
-  };
+  const handleOwnSeatPress = useCallback(() => {
+    setSelfSheetOpen(true);
+  }, []);
+
+  const handleOpenSelfProfile = useCallback(() => {
+    setSelfSheetOpen(false);
+    setSelfProfileOpen(true);
+  }, []);
+
+  const handleSelfLeaveMic = useCallback(() => {
+    setSelfSheetOpen(false);
+    leaveSeat();
+  }, [leaveSeat]);
 
   const toggleRoomLock = () =>
     setRoomLocked((current) => {
@@ -6614,14 +6708,14 @@ function Room({
         </Pressable>
       );
     }
-    const isSelfSeat = participant.userId === userId;
+    const isSelfSeat = participant.userId === userId || (isHostSeat && isHost);
     return (
       <Pressable
         style={slotStyle}
         key={participant.userId}
         delayLongPress={260}
         onPress={() => (isSelfSeat ? handleOwnSeatPress() : openParticipantMenu(participant))}
-        onLongPress={() => openParticipantMenu(participant)}
+        onLongPress={() => (isSelfSeat ? handleOwnSeatPress() : openParticipantMenu(participant))}
         accessibilityRole="button"
         accessibilityLabel={`${participant.name} kullanıcı menüsü`}
       >
@@ -6738,6 +6832,27 @@ function Room({
               <Text style={styles.roomTopBarTitle} numberOfLines={1}>
                 {roomDetails.title}
               </Text>
+              {!isHost && room.hostId ? (
+                <Pressable
+                  onPress={onToggleFollowHost}
+                  hitSlop={8}
+                  style={[
+                    styles.roomHeaderFollowPill,
+                    isFollowingHost && styles.roomHeaderFollowPillActive,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={isFollowingHost ? "Takipte" : "Takip et"}
+                >
+                  <Text
+                    style={[
+                      styles.roomHeaderFollowText,
+                      isFollowingHost && styles.roomHeaderFollowTextActive,
+                    ]}
+                  >
+                    {isFollowingHost ? "Takipte" : "Takip et"}
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
             <Text style={styles.roomHeaderCaption} numberOfLines={1}>
               {room.category || "Sohbet"} · {Math.max(liveVoice.participantCount, activeRoomParticipants.length)} kişi
@@ -6814,70 +6929,6 @@ function Room({
                   renderStageSeat(participant, index),
                 )}
               </View>
-
-              {/* Takip / mikrofon isteği */}
-              {!isHost && (
-                <View style={styles.roomStageActions}>
-                  {room.hostId ? (
-                    <Pressable
-                      onPress={onToggleFollowHost}
-                      style={[
-                        styles.roomFollowBtn,
-                        isFollowingHost && styles.roomFollowBtnActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.roomFollowBtnText,
-                          isFollowingHost && styles.roomFollowBtnTextActive,
-                        ]}
-                      >
-                        {isFollowingHost ? "Takipte" : "Takip et"}
-                      </Text>
-                    </Pressable>
-                  ) : null}
-                  <Pressable
-                    onPress={iAmSeated ? handleOwnSeatPress : canModerate ? toggleMicrophone : toggleHand}
-                    style={[
-                      styles.roomHandBtn,
-                      (handRaised || iAmSeated) && styles.roomHandBtnActive,
-                    ]}
-                    accessibilityLabel={
-                      iAmSeated
-                        ? "Mikrofondan in"
-                        : handRaised
-                          ? "Mikrofon isteğini geri çek"
-                          : "Mikrofon iste"
-                    }
-                  >
-                    <Ionicons
-                      name={
-                        iAmSeated
-                          ? "arrow-down-circle-outline"
-                          : handRaised
-                            ? "remove-circle-outline"
-                            : "hand-left-outline"
-                      }
-                      size={17}
-                      color={handRaised || iAmSeated ? "#11131A" : COLORS.primary}
-                    />
-                    <Text
-                      style={[
-                        styles.roomHandBtnText,
-                        (handRaised || iAmSeated) && { color: "#11131A" },
-                      ]}
-                    >
-                      {iAmSeated
-                        ? "Mikrofondan in"
-                        : handRaised
-                          ? "İsteği geri çek"
-                          : canModerate
-                            ? "Mikrofona çık"
-                            : "Mikrofon iste"}
-                    </Text>
-                  </Pressable>
-                </View>
-              )}
             </View>
 
             {/* Odadakiler */}
@@ -6900,8 +6951,16 @@ function Room({
                       key={participant.userId}
                       style={styles.roomAudienceItem}
                       delayLongPress={260}
-                      onPress={() => openParticipantMenu(participant)}
-                      onLongPress={() => openParticipantMenu(participant)}
+                      onPress={() =>
+                        participant.userId === userId
+                          ? handleOwnSeatPress()
+                          : openParticipantMenu(participant)
+                      }
+                      onLongPress={() =>
+                        participant.userId === userId
+                          ? handleOwnSeatPress()
+                          : openParticipantMenu(participant)
+                      }
                       accessibilityRole="button"
                       accessibilityLabel={`${participant.name} kullanıcı menüsü`}
                     >
@@ -7116,20 +7175,42 @@ function Room({
         onReport={handleSelectedReport}
         onDismiss={closeParticipantMenu}
       />
+      <SelfRoomSheet
+        visible={selfSheetOpen}
+        profile={profile}
+        avatarUrl={profile?.avatarUrl || myMember?.avatarUrl || null}
+        roleLabel={
+          isHost
+            ? "Oda sahibi"
+            : myRole === "moderator"
+              ? iAmSeated
+                ? "Yönetici · Mikrofonda"
+                : "Yönetici"
+              : iAmSeated
+                ? "Mikrofonda"
+                : "Dinleyici"
+        }
+        canLeaveMic={Boolean(iAmSeated && !isHost)}
+        onOpenProfile={handleOpenSelfProfile}
+        onLeaveMic={handleSelfLeaveMic}
+        onDismiss={() => setSelfSheetOpen(false)}
+      />
       <ProfileDetailSheet
-        visible={Boolean(profileParticipant)}
-        profile={profileParticipant}
-        userId={profileParticipant?.userId}
-        roomContext={{ ...room, title: roomDetails.title }}
-        isSelf={profileParticipant?.userId === userId}
+        visible={Boolean(selfProfileOpen || profileParticipant)}
+        profile={selfProfileOpen ? profile : profileParticipant}
+        userId={selfProfileOpen ? userId : profileParticipant?.userId}
+        roomContext={selfProfileOpen ? null : { ...room, title: roomDetails.title }}
+        isSelf={selfProfileOpen || profileParticipant?.userId === userId}
+        onEdit={onEditProfile}
         isFollowing={selectedIsFollowing}
-        canBlock={Boolean(room.persisted && profileParticipant?.userId)}
+        canBlock={Boolean(!selfProfileOpen && room.persisted && profileParticipant?.userId)}
         onToggleFollow={handleSelectedFollow}
         onBlock={handleSelectedBlock}
         onReport={handleSelectedReport}
-        staffActions={staffActionsFor(profileParticipant)}
+        staffActions={selfProfileOpen ? [] : staffActionsFor(profileParticipant)}
         onStaffAction={handleStaffAction}
         onDismiss={() => {
+          setSelfProfileOpen(false);
           setProfileParticipant(null);
           setSelectedParticipant(null);
         }}
@@ -7767,11 +7848,14 @@ function AppContent() {
       handle:
         metadata.handle || seed || `sora${String(user.id || "").slice(0, 6)}`,
     };
-    setProfile(nextProfile);
+    setProfile((current) => ({
+      ...nextProfile,
+      avatarUrl: current?.avatarUrl || null,
+    }));
     AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(nextProfile)).catch(
       () => undefined,
     );
-  }, [authSession]);
+  }, [authSession?.user?.id]);
 
   useEffect(() => {
     if (!authSession?.user || !supabase) return;
@@ -7874,7 +7958,7 @@ function AppContent() {
         }));
       })
       .catch(() => undefined);
-    supabase
+      supabase
       .from("profiles")
       .select("avatar_url")
       .eq("id", user.id)
@@ -7887,7 +7971,7 @@ function AppContent() {
     return () => {
       active = false;
     };
-  }, [authSession]);
+  }, [authSession?.user?.id]);
 
   useEffect(() => {
     let active = true;
@@ -9088,6 +9172,7 @@ function AppContent() {
                 initialMicrophoneOn={roomPreferences.microphoneEnabled}
                 onHostPresenceChange={setHostRoomPresence}
                 onMinimize={() => setRoomMinimized(true)}
+                onEditProfile={handleOpenProfileEditor}
                 minimized={roomMinimized}
               />
             </View>
@@ -13343,6 +13428,7 @@ const styles = StyleSheet.create({
 
   roomHeaderRoom: {
     flex: 1,
+    minWidth: 0,
   },
   roomHostStageSlot: {
     width: "100%",
@@ -13538,6 +13624,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.6,
   },
   roomTopBarTitle: {
+    flexShrink: 1,
     color: "#F3F7FF",
     fontSize: 15,
     fontWeight: "800",
@@ -14721,7 +14808,71 @@ const styles = StyleSheet.create({
   pfMenuTitle: { flex: 1, color: COLORS.text, fontSize: 14, fontWeight: "800" },
 
   /* ══ Oda: bütünleşik sohbet, alt bar ve oda sahibi kontrolleri ═════ */
-  roomTitleLine: { flexDirection: "row", alignItems: "center", gap: 5 },
+  roomTitleLine: { flexDirection: "row", alignItems: "center", gap: 7 },
+  roomHeaderFollowPill: {
+    flexShrink: 0,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: COLORS.primary,
+    borderWidth: 1,
+    borderColor: "rgba(156,198,255,0.45)",
+  },
+  roomHeaderFollowPillActive: {
+    backgroundColor: "rgba(118,175,255,0.16)",
+    borderColor: "rgba(118,175,255,0.38)",
+  },
+  roomHeaderFollowText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  roomHeaderFollowTextActive: {
+    color: "#9CC6FF",
+  },
+  selfSheetProfileCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 6,
+    marginBottom: 10,
+    padding: 12,
+    borderRadius: 18,
+    backgroundColor: COLORS.surfaceRaised,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  selfSheetProfilePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: COLORS.primarySoft,
+  },
+  selfSheetProfilePillText: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  selfSheetLeaveMicBtn: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 2,
+    borderRadius: 14,
+    backgroundColor: "rgba(217,79,92,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(217,79,92,0.24)",
+  },
+  selfSheetLeaveMicText: {
+    color: COLORS.danger,
+    fontSize: 14,
+    fontWeight: "800",
+  },
   roomTopBarLeave: {
     backgroundColor: "rgba(227,102,108,0.12)",
     borderColor: "rgba(227,102,108,0.2)",
