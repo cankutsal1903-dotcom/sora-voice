@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -40,18 +39,12 @@ import {
 } from "../data/soraRepository";
 import { describeRoomError, uploadFamilyAvatar, validateFamilyAvatarAsset } from "../room/roomApi";
 import { COLORS } from "../theme/colors";
-
-const FALLBACK_FAMILY_GIFTS = [
-  { id: "clap", name: "Alkış", icon: "sparkles", color: "#6AA8F5", cost: 15, minFamilyLevel: 0 },
-  { id: "heart", name: "Kalp", icon: "heart", color: "#2F80ED", cost: 40, minFamilyLevel: 0 },
-  { id: "crown", name: "Taç", icon: "trophy", color: "#1D5FBF", cost: 120, minFamilyLevel: 0 },
-  { id: "family_crest", name: "Aile Sancağı", icon: "shield", color: "#2F80ED", cost: 200, minFamilyLevel: 4 },
-  { id: "rocket", name: "Roket", icon: "rocket", color: "#54BBD3", cost: 300, minFamilyLevel: 0 },
-  { id: "crystal_mic", name: "Kristal Mikrofon", icon: "mic", color: "#3B82F6", cost: 5000, minFamilyLevel: 0 },
-  { id: "sapphire_wing", name: "Safir Kanat", icon: "airplane", color: "#2563EB", cost: 50000, minFamilyLevel: 0 },
-  { id: "northern_star", name: "Kuzey Yıldızı", icon: "planet", color: "#1D5FBF", cost: 250000, minFamilyLevel: 0 },
-  { id: "sora_palace", name: "Sora Kalesi", icon: "diamond", color: "#1E40AF", cost: 1000000, minFamilyLevel: 0 },
-];
+import {
+  DEFAULT_GIFT_CATALOG,
+  GIFT_CATEGORIES,
+  SoraGiftArtwork,
+} from "../ui/SoraGiftArtwork";
+import { KeyboardSafeView, useKeyboardInset } from "../ui/useKeyboardInset";
 
 const GIFT_QUANTITIES = [1, 10, 50, 100];
 
@@ -155,6 +148,7 @@ export function CommunityScreen({
   onOpenUserProfile,
 }) {
   const insets = useSafeAreaInsets();
+  const keyboard = useKeyboardInset();
   const [families, setFamilies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -206,7 +200,8 @@ export function CommunityScreen({
   const chatScrollRef = useRef(null);
 
   // Aile hediye kutusu
-  const [giftCatalog, setGiftCatalog] = useState(FALLBACK_FAMILY_GIFTS);
+  const [giftCatalog, setGiftCatalog] = useState(DEFAULT_GIFT_CATALOG);
+  const [giftCategory, setGiftCategory] = useState("all");
   const [giftSheetOpen, setGiftSheetOpen] = useState(false);
   const [giftRecipientId, setGiftRecipientId] = useState(null);
   const [giftQuantity, setGiftQuantity] = useState(1);
@@ -215,10 +210,25 @@ export function CommunityScreen({
   const giftRequestIdRef = useRef(null);
   const giftFingerprintRef = useRef("");
 
+  const visibleGiftCatalog = useMemo(() => {
+    if (giftCategory === "all") return giftCatalog;
+    return giftCatalog.filter((item) => item.category === giftCategory);
+  }, [giftCatalog, giftCategory]);
+
   const myFamily = useMemo(
     () => families.find((item) => item.joined) || null,
     [families],
   );
+
+  useEffect(() => {
+    if (keyboard.visible && myFamily?.id) {
+      const timer = setTimeout(() => {
+        chatScrollRef.current?.scrollToEnd?.({ animated: true });
+      }, 80);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [keyboard.visible, myFamily?.id]);
 
   useEffect(() => {
     onFamilyChange?.(myFamily);
@@ -1079,9 +1089,13 @@ export function CommunityScreen({
               pressed && { opacity: 0.9 },
             ]}
           >
-            <View style={[styles.giftMsgBadge, { backgroundColor: giftColor }]}>
-              <Ionicons name={giftIcon} size={20} color="#FFFFFF" />
-            </View>
+            <SoraGiftArtwork
+              giftId={meta.gift_id}
+              giftName={meta.gift_name}
+              fallbackIcon={giftIcon}
+              fallbackColor={giftColor}
+              size={44}
+            />
             <View style={{ flex: 1 }}>
               <Text style={styles.giftMsgTitle}>
                 {giftQty > 1 ? `${giftQty}x ` : ""}
@@ -1132,10 +1146,7 @@ export function CommunityScreen({
     <View style={styles.screen}>
       {myFamily ? (
         // ── Üye olunan aile varsa doğrudan Aile Sohbeti açılır ─────────────────
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
+        <KeyboardSafeView style={{ flex: 1 }}>
           <View style={styles.chatHeader}>
             <Pressable
               onPress={() => openFamilyDetail(myFamily.id, "levels")}
@@ -1232,6 +1243,7 @@ export function CommunityScreen({
               ref={chatScrollRef}
               contentContainerStyle={styles.messagesList}
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
               onContentSizeChange={() => chatScrollRef.current?.scrollToEnd?.({ animated: false })}
             >
               {messages.map(renderMessageItem)}
@@ -1241,7 +1253,7 @@ export function CommunityScreen({
           <View
             style={[
               styles.composerRow,
-              { marginBottom: 64 + Math.max(insets.bottom, 8) },
+              { marginBottom: keyboard.visible ? 0 : 64 + Math.max(insets.bottom, 8) },
             ]}
           >
             <Pressable
@@ -1276,7 +1288,7 @@ export function CommunityScreen({
               )}
             </Pressable>
           </View>
-        </KeyboardAvoidingView>
+        </KeyboardSafeView>
       ) : (
         // ── Kullanıcı henüz ailede değilse sade Keşfet + ID Arama + Aile Kurma ─
         <>
@@ -1401,9 +1413,31 @@ export function CommunityScreen({
               </View>
             </View>
 
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoryPillsRow}
+              style={{ flexGrow: 0, marginBottom: 10 }}
+            >
+              {GIFT_CATEGORIES.map((cat) => {
+                const active = giftCategory === cat.key;
+                return (
+                  <Pressable
+                    key={cat.key}
+                    onPress={() => setGiftCategory(cat.key)}
+                    style={[styles.categoryPill, active && styles.categoryPillActive]}
+                  >
+                    <Text style={[styles.categoryPillText, active && styles.categoryPillTextActive]}>
+                      {cat.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
               <View style={styles.giftGrid}>
-                {giftCatalog.map((gift) => {
+                {visibleGiftCatalog.map((gift) => {
                   const lockedByLevel =
                     Number(gift.minFamilyLevel || 0) > Number(myFamily?.level || 1);
                   const totalCost = Number(gift.cost || 0) * giftQuantity;
@@ -1419,8 +1453,14 @@ export function CommunityScreen({
                         pressed && { transform: [{ scale: 0.98 }] },
                       ]}
                     >
-                      <View style={[styles.giftItemIcon, { backgroundColor: gift.color || COLORS.primary }]}>
-                        <Ionicons name={resolveGiftIcon(gift.icon)} size={22} color="#FFFFFF" />
+                      <View style={{ marginBottom: 7 }}>
+                        <SoraGiftArtwork
+                          giftId={gift.id}
+                          giftName={gift.name}
+                          fallbackIcon={resolveGiftIcon(gift.icon)}
+                          fallbackColor={gift.color || COLORS.primary}
+                          size={50}
+                        />
                       </View>
                       <Text numberOfLines={1} style={styles.giftItemName}>
                         {gift.name}
@@ -1456,7 +1496,7 @@ export function CommunityScreen({
         animationType="slide"
         onRequestClose={() => setDiscoverModalOpen(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardSafeView style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setDiscoverModalOpen(false)} />
           <View style={[styles.sheet, { height: "84%" }]}>
             <View style={styles.sheetHandle} />
@@ -1471,7 +1511,7 @@ export function CommunityScreen({
             </View>
             {renderDiscoverContent({ insideModal: true })}
           </View>
-        </View>
+        </KeyboardSafeView>
       </Modal>
 
       {/* ── Yeni Aile Kurma Modalı (Fotoğraf seçimi + 10.000.000 kredi) ───── */}
@@ -1481,15 +1521,12 @@ export function CommunityScreen({
         animationType="slide"
         onRequestClose={() => !creating && setCreateOpen(false)}
       >
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
+        <KeyboardSafeView style={styles.modalOverlay}>
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={() => !creating && setCreateOpen(false)}
           />
-          <View style={styles.sheet}>
+          <View style={[styles.sheet, { maxHeight: "88%" }]}>
             <View style={styles.sheetHandle} />
             <View style={styles.sheetHeader}>
               <View>
@@ -1597,7 +1634,7 @@ export function CommunityScreen({
               </Pressable>
             </ScrollView>
           </View>
-        </KeyboardAvoidingView>
+        </KeyboardSafeView>
       </Modal>
 
       {/* ── Aile Detay, Seviyeler, Üyeler ve Düzenleme Modalı ──────────────── */}
@@ -1607,10 +1644,7 @@ export function CommunityScreen({
         animationType="slide"
         onRequestClose={closeFamilyDetail}
       >
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
+        <KeyboardSafeView style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeFamilyDetail} />
           <View style={[styles.sheet, { maxHeight: "88%" }]}>
             <View style={styles.sheetHandle} />
@@ -1686,7 +1720,11 @@ export function CommunityScreen({
                   ) : null}
                 </View>
 
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={{ paddingBottom: 16 }}
+                >
                   {detailTab === "levels" ? (
                     <View style={{ gap: 12 }}>
                       <View style={styles.levelHeroCard}>
@@ -1945,7 +1983,7 @@ export function CommunityScreen({
               </>
             )}
           </View>
-        </KeyboardAvoidingView>
+        </KeyboardSafeView>
       </Modal>
     </View>
   );
@@ -2351,6 +2389,23 @@ const styles = StyleSheet.create({
   },
   qtyPillText: { color: COLORS.textSecondary, fontSize: 11, fontWeight: "800" },
   qtyPillTextActive: { color: COLORS.primaryInk, fontWeight: "900" },
+  categoryPillsRow: { gap: 7, paddingRight: 6 },
+  categoryPill: {
+    paddingHorizontal: 12,
+    height: 31,
+    borderRadius: 10,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  categoryPillActive: {
+    backgroundColor: COLORS.primarySoft,
+    borderColor: COLORS.primary,
+  },
+  categoryPillText: { color: COLORS.textSecondary, fontSize: 11, fontWeight: "800" },
+  categoryPillTextActive: { color: COLORS.primary, fontWeight: "900" },
   giftGrid: { flexDirection: "row", flexWrap: "wrap", gap: 9 },
   giftItemCard: {
     width: "31.2%",

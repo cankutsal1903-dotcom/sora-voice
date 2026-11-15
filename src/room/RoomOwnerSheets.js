@@ -16,6 +16,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "../theme/colors";
+import { KeyboardSafeView } from "../ui/useKeyboardInset";
 import { DEFAULT_ROOM_ANNOUNCEMENT, ROOM_BAN_DURATIONS } from "./roomApi";
 
 // ── Ortak parçalar ────────────────────────────────────────────────────────
@@ -23,10 +24,7 @@ function SheetFrame({ visible, title, subtitle, onDismiss, children, scroll = tr
   const insets = useSafeAreaInsets();
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onDismiss}>
-      <KeyboardAvoidingView
-        style={sheetStyles.overlay}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      <KeyboardSafeView style={sheetStyles.overlay}>
         <Pressable style={sheetStyles.dismiss} onPress={onDismiss} accessibilityLabel="Kapat" />
         <View style={[sheetStyles.sheet, { paddingBottom: Math.max(insets.bottom, 14) + 12 }]}>
           <View style={sheetStyles.handle} />
@@ -52,7 +50,7 @@ function SheetFrame({ visible, title, subtitle, onDismiss, children, scroll = tr
             children
           )}
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardSafeView>
     </Modal>
   );
 }

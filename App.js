@@ -14,7 +14,6 @@ import {
   BackHandler,
   Easing,
   Image,
-  KeyboardAvoidingView,
   Linking,
   Modal,
   PanResponder,
@@ -54,9 +53,12 @@ import {
   updatePassword,
 } from "./src/auth/supabase";
 import {
+  DAILY_REWARD_COINS,
   claimDailyReward as claimRemoteDailyReward,
+  computeUserLevelProgress,
   createRoom as createRemoteRoom,
   deleteRoom as deleteRemoteRoom,
+  evenLevelCoinReward,
   getHostedRoom,
   getMyFamily,
   getPublicProfile,
@@ -70,6 +72,7 @@ import {
   listRoomMembers,
   listRoomMessages,
   listRooms,
+  listUserLevelRewardClaims,
   listWalletTransactions,
   sendRoomGift,
   listRoomGiftCatalog,
@@ -82,6 +85,7 @@ import {
   setUserBlocked,
   startScheduledRoom as startRemoteScheduledRoom,
   setRoomPresence as setRemoteRoomPresence,
+  syncMyUserLevel,
   updateRoom as updateRemoteRoom,
 } from "./src/data/soraRepository";
 import {
@@ -146,6 +150,18 @@ import { installGlobalErrorReporting } from "./src/observability/errorReporting"
 import { InboxScreen } from "./src/screens/InboxScreen";
 import { CommunityScreen } from "./src/screens/CommunityScreen";
 import { COLORS as APP_COLORS } from "./src/theme/colors";
+import {
+  DEFAULT_GIFT_CATALOG,
+  GIFT_CATEGORIES,
+  LEVEL_BADGE_TIERS,
+  SoraGiftArtwork,
+  SoraLevelCrest,
+  getBadgeTierConfigForLevel,
+} from "./src/ui/SoraGiftArtwork";
+import { KeyboardSafeView, useKeyboardInset } from "./src/ui/useKeyboardInset";
+
+const formatCredits = (value) =>
+  new Intl.NumberFormat("tr-TR").format(Math.max(0, Math.floor(Number(value) || 0)));
 
 const COLORS = APP_COLORS;
 
@@ -353,12 +369,7 @@ const resolveRoomBrand = (room = {}) => {
   return { colors, accent };
 };
 
-const GIFT_CATALOG = [
-  { id: "clap", icon: "sparkles", name: "Alkis", cost: 15, color: "#6AA8F5" },
-  { id: "heart", icon: "heart", name: "Kalp", cost: 40, color: "#2F80ED" },
-  { id: "crown", icon: "trophy", name: "Tac", cost: 120, color: "#1D5FBF" },
-  { id: "rocket", icon: "rocket", name: "Roket", cost: 300, color: "#8CC8FF" },
-];
+const GIFT_CATALOG = DEFAULT_GIFT_CATALOG;
 const createRequestUuid = () => {
   return globalThis.crypto?.randomUUID?.() || `xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`.replace(/[xy]/g, (c) => {
     const r = Math.floor(Math.random() * 16);
@@ -1502,10 +1513,7 @@ function Inbox({ profile }) {
         onRequestClose={() => setSelectedChat(null)}
       >
         <View style={styles.directMessageOverlay}>
-          <KeyboardAvoidingView
-            style={styles.directMessageSheet}
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-          >
+          <KeyboardSafeView style={styles.directMessageSheet} offset={0}>
             <View style={styles.directMessageHeader}>
               <Pressable
                 onPress={() => setSelectedChat(null)}
@@ -1568,7 +1576,7 @@ function Inbox({ profile }) {
                 <Ionicons name="send" size={17} color={COLORS.primaryInk} />
               </Pressable>
             </View>
-          </KeyboardAvoidingView>
+          </KeyboardSafeView>
         </View>
       </Modal>
     </ScrollView>
@@ -1601,16 +1609,14 @@ function NewMessageSheet({ visible, onDismiss, onCreate }) {
       animationType="slide"
       onRequestClose={onDismiss}
     >
-      <View style={styles.modalOverlay}>
+      <KeyboardSafeView style={styles.modalOverlay} offset={0}>
         <Pressable style={styles.modalDismiss} onPress={onDismiss} />
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
-          <View style={styles.sheet}>
-            <View style={styles.sheetHandle} />
-            <Pressable onPress={onDismiss} style={styles.sheetClose}>
-              <Ionicons name="close" size={20} color={COLORS.text} />
-            </Pressable>
+        <View style={[styles.sheet, { maxHeight: "88%" }]}>
+          <View style={styles.sheetHandle} />
+          <Pressable onPress={onDismiss} style={styles.sheetClose}>
+            <Ionicons name="close" size={20} color={COLORS.text} />
+          </Pressable>
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <Text style={styles.kicker}>YENI MESAJ</Text>
             <Text style={styles.sheetTitle}>Sohbet başlat.</Text>
             <Text style={styles.fieldLabel}>GORUNEN AD</Text>
@@ -1641,9 +1647,9 @@ function NewMessageSheet({ visible, onDismiss, onCreate }) {
                 <Ionicons name="send" size={19} color={COLORS.primaryInk} />
               </LinearGradient>
             </Pressable>
-          </View>
-        </KeyboardAvoidingView>
-      </View>
+          </ScrollView>
+        </View>
+      </KeyboardSafeView>
     </Modal>
   );
 }
@@ -1958,55 +1964,57 @@ function CreateCommunitySheet({ visible, onDismiss, onCreate }) {
       animationType="slide"
       onRequestClose={onDismiss}
     >
-      <View style={styles.modalOverlay}>
+      <KeyboardSafeView style={styles.modalOverlay} offset={0}>
         <Pressable style={styles.modalDismiss} onPress={onDismiss} />
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { maxHeight: "88%" }]}>
           <View style={styles.sheetHandle} />
           <Pressable onPress={onDismiss} style={styles.sheetClose}>
             <Ionicons name="close" size={20} color={COLORS.text} />
           </Pressable>
-          <Text style={styles.kicker}>YENI TOPLULUK</Text>
-          <Text style={styles.sheetTitle}>Cevreni kur.</Text>
-          <Text style={styles.fieldLabel}>TOPLULUK ADI</Text>
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder="Orn. Gece muhabbeti"
-            placeholderTextColor={COLORS.muted}
-            style={styles.sheetInput}
-            maxLength={28}
-          />
-          <Text style={styles.fieldLabel}>KISA ACIKLAMA</Text>
-          <TextInput
-            value={description}
-            onChangeText={setDescription}
-            placeholder="Toplulugun ne icin var?"
-            placeholderTextColor={COLORS.muted}
-            style={styles.sheetInput}
-            maxLength={56}
-          />
-          <Text style={styles.fieldLabel}>RENK</Text>
-          <View style={styles.communityColorList}>
-            {COMMUNITY_COLORS.map((colors, index) => (
-              <Pressable
-                key={colors[0]}
-                onPress={() => setColorIndex(index)}
-                style={[
-                  styles.communityColorOption,
-                  { backgroundColor: colors[0] },
-                  colorIndex === index && styles.communityColorSelected,
-                ]}
-              />
-            ))}
-          </View>
-          <Pressable onPress={create}>
-            <LinearGradient colors={BRAND_GRADIENT} style={styles.createSubmit}>
-              <Text style={styles.createSubmitText}>Toplulugu olustur</Text>
-              <Ionicons name="people" size={20} color={COLORS.primaryInk} />
-            </LinearGradient>
-          </Pressable>
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <Text style={styles.kicker}>YENI TOPLULUK</Text>
+            <Text style={styles.sheetTitle}>Cevreni kur.</Text>
+            <Text style={styles.fieldLabel}>TOPLULUK ADI</Text>
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder="Orn. Gece muhabbeti"
+              placeholderTextColor={COLORS.muted}
+              style={styles.sheetInput}
+              maxLength={28}
+            />
+            <Text style={styles.fieldLabel}>KISA ACIKLAMA</Text>
+            <TextInput
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Toplulugun ne icin var?"
+              placeholderTextColor={COLORS.muted}
+              style={styles.sheetInput}
+              maxLength={56}
+            />
+            <Text style={styles.fieldLabel}>RENK</Text>
+            <View style={styles.communityColorList}>
+              {COMMUNITY_COLORS.map((colors, index) => (
+                <Pressable
+                  key={colors[0]}
+                  onPress={() => setColorIndex(index)}
+                  style={[
+                    styles.communityColorOption,
+                    { backgroundColor: colors[0] },
+                    colorIndex === index && styles.communityColorSelected,
+                  ]}
+                />
+              ))}
+            </View>
+            <Pressable onPress={create}>
+              <LinearGradient colors={BRAND_GRADIENT} style={styles.createSubmit}>
+                <Text style={styles.createSubmitText}>Toplulugu olustur</Text>
+                <Ionicons name="people" size={20} color={COLORS.primaryInk} />
+              </LinearGradient>
+            </Pressable>
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardSafeView>
     </Modal>
   );
 }
@@ -2088,6 +2096,189 @@ function CommunityDetailsSheet({ group, joined, onDismiss, onToggleJoin }) {
   );
 }
 
+const USER_EVEN_LEVEL_PREVIEW = Array.from({ length: 30 }, (_, idx) => (idx + 1) * 2);
+
+const UserLevelSheet = memo(function UserLevelSheet({
+  visible,
+  level = 1,
+  userXp = 0,
+  syncing = false,
+  onSync,
+  onDismiss,
+}) {
+  const safeLevel = Math.max(1, Math.floor(Number(level) || 1));
+  const progress = useMemo(
+    () => computeUserLevelProgress(userXp, safeLevel),
+    [safeLevel, userXp],
+  );
+  const currentTier = useMemo(
+    () => getBadgeTierConfigForLevel(safeLevel),
+    [safeLevel],
+  );
+  const nextEvenLevel = safeLevel % 2 === 0 ? safeLevel + 2 : safeLevel + 1;
+  const nextEvenReward = evenLevelCoinReward(nextEvenLevel);
+
+  return (
+    <Modal
+      transparent
+      visible={visible}
+      animationType="slide"
+      onRequestClose={onDismiss}
+    >
+      <View style={styles.modalOverlay}>
+        <Pressable style={styles.modalDismiss} onPress={onDismiss} />
+        <View style={[styles.sheet, { maxHeight: "88%" }]}>
+          <View style={styles.sheetHandle} />
+          <Pressable onPress={onDismiss} style={styles.sheetClose}>
+            <Ionicons name="close" size={20} color={COLORS.text} />
+          </Pressable>
+          <Text style={styles.kicker}>SEVİYE VE ROZET SİSTEMİ</Text>
+          <Text style={styles.sheetTitle}>Seviye {String(safeLevel).padStart(2, "0")}</Text>
+
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 20, gap: 14 }}
+          >
+            <LinearGradient
+              colors={["#111C2D", "#1B3358"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.userLevelHeroCard}
+            >
+              <View style={styles.userLevelHeroTop}>
+                <SoraLevelCrest level={safeLevel} size={68} showLevel />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.userLevelHeroTitle}>
+                    Seviye {String(safeLevel).padStart(2, "0")} · {currentTier.title}
+                  </Text>
+                  <Text style={styles.userLevelHeroXp}>
+                    {formatCredits(progress.gainedInLevel)} / {formatCredits(progress.stepRequiredXp)} XP
+                  </Text>
+                  <View style={styles.userLevelProgressTrack}>
+                    <View
+                      style={[
+                        styles.userLevelProgressFill,
+                        { width: `${Math.max(4, Math.round(progress.ratio * 100))}%` },
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.userLevelHeroNext}>
+                    Sonraki kredi ödülü: Sv. {nextEvenLevel} · +{formatCredits(nextEvenReward)} kredi
+                  </Text>
+                </View>
+              </View>
+              {onSync ? (
+                <Pressable
+                  disabled={syncing}
+                  onPress={onSync}
+                  style={[styles.userLevelSyncBtn, syncing && { opacity: 0.6 }]}
+                >
+                  {syncing ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="sync-outline" size={15} color="#FFFFFF" />
+                      <Text style={styles.userLevelSyncText}>Seviye ve ödülleri doğrula</Text>
+                    </>
+                  )}
+                </Pressable>
+              ) : null}
+            </LinearGradient>
+
+            <View>
+              <Text style={styles.settingsCaption}>10 SEVİYEDE BİR YÜKSELEN ROZETLER</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 10, paddingVertical: 4 }}
+              >
+                {LEVEL_BADGE_TIERS.map((tier) => {
+                  const unlocked = safeLevel >= tier.minLevel;
+                  const active = currentTier.tierIndex === tier.tierIndex;
+                  return (
+                    <View
+                      key={tier.key}
+                      style={[
+                        styles.userTierCard,
+                        active && styles.userTierCardActive,
+                        !unlocked && { opacity: 0.62 },
+                      ]}
+                    >
+                      <SoraLevelCrest level={tier.minLevel} size={52} />
+                      <Text numberOfLines={1} style={styles.userTierRange}>
+                        {tier.rangeLabel}
+                      </Text>
+                      <Text numberOfLines={1} style={styles.userTierTitle}>
+                        {tier.title}
+                      </Text>
+                      <Text style={[styles.userTierState, unlocked && { color: COLORS.primary }]}>
+                        {active ? "Aktif rozet" : unlocked ? "Açıldı" : `Sv. ${tier.minLevel}`}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            <View>
+              <Text style={styles.settingsCaption}>ÇİFT SEVİYE KREDİ HEDİYELERİ (2, 4, 6...)</Text>
+              <View style={{ gap: 8 }}>
+                {USER_EVEN_LEVEL_PREVIEW.map((evenLvl) => {
+                  const reward = evenLevelCoinReward(evenLvl);
+                  const claimed = safeLevel >= evenLvl;
+                  const isNext = evenLvl === nextEvenLevel;
+                  const badgeMilestone = evenLvl % 10 === 0;
+                  return (
+                    <View
+                      key={evenLvl}
+                      style={[
+                        styles.evenRewardRow,
+                        claimed && styles.evenRewardRowClaimed,
+                        isNext && styles.evenRewardRowNext,
+                      ]}
+                    >
+                      <SoraLevelCrest level={evenLvl} size={38} />
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          <Text style={styles.evenRewardLevel}>Seviye {evenLvl}</Text>
+                          {badgeMilestone ? (
+                            <View style={styles.evenRewardMilestoneChip}>
+                              <Text style={styles.evenRewardMilestoneText}>Yeni Rozet Kademesi</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                        <Text style={styles.evenRewardCoins}>
+                          +{formatCredits(reward)} kredi hediye
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.evenRewardStatusPill,
+                          claimed && styles.evenRewardStatusClaimed,
+                          isNext && styles.evenRewardStatusNext,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.evenRewardStatusText,
+                            (claimed || isNext) && { color: COLORS.primary },
+                          ]}
+                        >
+                          {claimed ? "Alındı" : isNext ? "Sıradaki" : `Sv. ${evenLvl}`}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+});
+
 function Profile({
   profile,
   family = null,
@@ -2102,8 +2293,11 @@ function Profile({
   onOpenWallet,
   onOpenAdmin,
   onClaimDailyReward,
+  onSyncUserLevel,
 }) {
   const [safetyOpen, setSafetyOpen] = useState(false);
+  const [levelSheetOpen, setLevelSheetOpen] = useState(false);
+  const [syncingLevel, setSyncingLevel] = useState(false);
   const [recentActivity, setRecentActivity] = useState([]);
   const [activityStreak, setActivityStreak] = useState(1);
   const [followedCount, setFollowedCount] = useState(0);
@@ -2115,16 +2309,27 @@ function Profile({
     () => setProfileDetailsOpen(true),
     [],
   );
+  const handleManualLevelSync = useCallback(async () => {
+    if (!onSyncUserLevel || syncingLevel) return;
+    setSyncingLevel(true);
+    try {
+      await onSyncUserLevel({ showFeedback: true });
+    } finally {
+      setSyncingLevel(false);
+    }
+  }, [onSyncUserLevel, syncingLevel]);
   const actions = useMemo(
     () => [
       [
         "gift-outline",
-        dailyRewardClaimed ? "Günlük ödül alındı" : "Günlük ödül",
+        dailyRewardClaimed
+          ? "Günlük ödül alındı"
+          : `Günlük ödül · +${formatCredits(DAILY_REWARD_AMOUNT)}`,
         dailyRewardClaimed ? onOpenWallet : onClaimDailyReward,
       ],
-      ["shield-checkmark-outline", "Guvenlik merkezi", openSafetyCenter],
+      ["shield-checkmark-outline", "Güvenlik merkezi", openSafetyCenter],
       ...(adminRole
-        ? [["shield-half-outline", "Yonetim paneli", onOpenAdmin]]
+        ? [["shield-half-outline", "Yönetim paneli", onOpenAdmin]]
         : []),
       ["settings-outline", "Ayarlar", onOpenSettings],
     ],
@@ -2250,19 +2455,8 @@ function Profile({
     ],
     [recentActivity.length, hostedRoomCount, favoriteCount, family],
   );
-  const experiencePoints =
-    favoriteCount * 10 +
-    hostedRoomCount * 25 +
-    recentActivity.length * 5 +
-    Math.min(activityStreak, 7) * 4 +
-    (family ? family.level * 15 : 0);
-  const level = Math.max(
-    1,
-    Math.min(12, Math.floor(experiencePoints / 50) + 1),
-  );
-  const levelProgress = experiencePoints % 50;
-  const levelName =
-    level >= 7 ? "Sora elçisi" : level >= 4 ? "Oda kurucusu" : "Yeni ses";
+  const level = Math.max(1, Math.floor(Number(profile.userLevel) || 1));
+  const userXp = Math.max(0, Math.floor(Number(profile.userXp) || 0));
   const homeFrameAppearance = PROFILE_ITEM_APPEARANCE[profile.activeFrameId];
   const homeThemeAppearance = PROFILE_ITEM_APPEARANCE[profile.activeProfileThemeId];
   return (
@@ -2392,20 +2586,23 @@ function Profile({
           ))}
         </View>
 
-        <View style={styles.profileLevelSummary}>
-          <View style={styles.pfLevelIcon}>
-            <Ionicons name="medal-outline" size={18} color={COLORS.primary} />
-          </View>
+        <Pressable
+          onPress={() => setLevelSheetOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`Seviye ${String(level).padStart(2, "0")}`}
+          style={({ pressed }) => [
+            styles.profileLevelSummary,
+            pressed && { opacity: 0.86 },
+          ]}
+        >
+          <SoraLevelCrest level={level} size={38} />
           <View style={styles.pfLevelInfo}>
             <Text style={styles.pfLevelTitle}>
-              Seviye {String(level).padStart(2, "0")} · {levelName}
-            </Text>
-            <Text style={styles.pfLevelDesc} numberOfLines={1}>
-              {activityStreak} günlük seri · {badges.filter((badge) => badge.unlocked).length} rozet
+              Seviye {String(level).padStart(2, "0")}
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
-        </View>
+        </Pressable>
 
         <View style={styles.pfTabs}>
           <Pressable
@@ -2508,7 +2705,43 @@ function Profile({
           </View>
         )}
 
-        <Text style={styles.pfSection}>ROZETLER</Text>
+        <Text style={styles.pfSection}>SEVİYE ROZETLERİ</Text>
+        <View style={styles.pfBadgeRow}>
+          {LEVEL_BADGE_TIERS.map((tier) => {
+            const unlocked = level >= tier.minLevel;
+            return (
+              <Pressable
+                key={tier.key}
+                onPress={() => setLevelSheetOpen(true)}
+                style={[
+                  styles.pfBadge,
+                  unlocked && { borderColor: `${tier.borderColor}66` },
+                  !unlocked && { opacity: 0.62 },
+                ]}
+              >
+                <View style={{ marginBottom: 6 }}>
+                  <SoraLevelCrest level={tier.minLevel} size={46} />
+                  {!unlocked ? (
+                    <View style={styles.pfBadgeLock}>
+                      <Ionicons name="lock-closed" size={10} color="#FFFFFF" />
+                    </View>
+                  ) : null}
+                </View>
+                <Text
+                  style={[styles.pfBadgeText, !unlocked && { color: COLORS.muted }]}
+                  numberOfLines={1}
+                >
+                  {tier.title}
+                </Text>
+                <Text style={styles.pfBadgeHint} numberOfLines={1}>
+                  {unlocked ? tier.rangeLabel : `Sv. ${tier.minLevel}`}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={styles.pfSection}>ETKİNLİK ROZETLERİ</Text>
         <View style={styles.pfBadgeRow}>
           {badges.map((badge) => (
             <View
@@ -2586,6 +2819,14 @@ function Profile({
       <SecureSafetyCenterSheet
         visible={safetyOpen}
         onDismiss={() => setSafetyOpen(false)}
+      />
+      <UserLevelSheet
+        visible={levelSheetOpen}
+        level={level}
+        userXp={userXp}
+        syncing={syncingLevel}
+        onSync={handleManualLevelSync}
+        onDismiss={() => setLevelSheetOpen(false)}
       />
     </>
   );
@@ -2800,7 +3041,14 @@ function ProfileDetailSheet({
                 : null,
             ]}
           >
-            <Text style={styles.profileDetailName}>{name}</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              <Text style={styles.profileDetailName}>{name}</Text>
+              <SoraLevelCrest
+                level={Number(person.userLevel || person.user_level || 1)}
+                size={28}
+                showLevel
+              />
+            </View>
             <Text style={styles.profileDetailHandle}>
               {handle}
               {person.publicId ? ` · ID: ${person.publicId}` : ""}
@@ -3055,6 +3303,7 @@ const BottomTabButton = memo(function BottomTabButton({
 
 const BottomNavigation = memo(function BottomNavigation({ active, onChange }) {
   const insets = useSafeAreaInsets();
+  const keyboard = useKeyboardInset();
   const reducedMotion = useReducedMotion();
   const items = useMemo(
     () => [
@@ -3066,6 +3315,7 @@ const BottomNavigation = memo(function BottomNavigation({ active, onChange }) {
     [],
   );
   const handleTabPress = useCallback((key) => onChange(key), [onChange]);
+  if (keyboard.visible) return null;
   return (
     <View
       style={[
@@ -3253,14 +3503,25 @@ const GiftSheet = memo(function GiftSheet({
   onSend,
 }) {
   const [recipientId, setRecipientId] = useState(null);
+  const [giftCategory, setGiftCategory] = useState("all");
   const [sending, setSending] = useState(false);
   const sendingRef = useRef(false);
   const requestIdRef = useRef(null);
   const requestFingerprintRef = useRef(null);
   useEffect(() => {
-    if (visible) setRecipientId(recipients[0]?.userId || null);
+    if (visible) {
+      setRecipientId((prev) =>
+        recipients.some((item) => item.userId === prev)
+          ? prev
+          : recipients[0]?.userId || null,
+      );
+    }
   }, [visible, recipients]);
-  const selectedRecipient = recipients.find((item) => item.userId === recipientId);
+  const selectedRecipient = recipients.find((item) => item.userId === recipientId) || recipients[0] || null;
+  const visibleGifts = useMemo(() => {
+    if (giftCategory === "all") return gifts;
+    return gifts.filter((item) => item.category === giftCategory);
+  }, [giftCategory, gifts]);
   const confirmSend = (gift) => {
     const reqLevel = Number(gift.minFamilyLevel || 0);
     if (reqLevel > 0 && Number(userFamilyLevel || 0) < reqLevel) {
@@ -3274,23 +3535,37 @@ const GiftSheet = memo(function GiftSheet({
       Alert.alert("Alıcı seç", "Hediyeyi göndereceğin kişiyi seç.");
       return;
     }
-    Alert.alert("Hediyeyi onayla", `${selectedRecipient.name} kişisine ${gift.name} · ${gift.cost} kredi gönderilsin mi?`, [
-      { text: "Vazgeç", style: "cancel" },
-      { text: "Gönder", onPress: async () => {
-        if (sendingRef.current) return;
-        sendingRef.current = true;
-        const fingerprint = `${gift.id}:${selectedRecipient.userId}`;
-        if (requestFingerprintRef.current !== fingerprint) {
-          requestIdRef.current = createRequestUuid();
-          requestFingerprintRef.current = fingerprint;
-        }
-        setSending(true);
-        try {
-          const sent = await onSend(gift, selectedRecipient, requestIdRef.current);
-          if (sent) { requestIdRef.current = null; requestFingerprintRef.current = null; }
-        } finally { sendingRef.current = false; setSending(false); }
-      } },
-    ]);
+    const targetLabel = selectedRecipient.isSelf ? "Kendine" : `${selectedRecipient.name} kişisine`;
+    Alert.alert(
+      "Hediyeyi onayla",
+      `${targetLabel} ${gift.name} · ${formatCredits(gift.cost)} kredi gönderilsin mi?`,
+      [
+        { text: "Vazgeç", style: "cancel" },
+        {
+          text: "Gönder",
+          onPress: async () => {
+            if (sendingRef.current) return;
+            sendingRef.current = true;
+            const fingerprint = `${gift.id}:${selectedRecipient.userId}`;
+            if (requestFingerprintRef.current !== fingerprint) {
+              requestIdRef.current = createRequestUuid();
+              requestFingerprintRef.current = fingerprint;
+            }
+            setSending(true);
+            try {
+              const sent = await onSend(gift, selectedRecipient, requestIdRef.current);
+              if (sent) {
+                requestIdRef.current = null;
+                requestFingerprintRef.current = null;
+              }
+            } finally {
+              sendingRef.current = false;
+              setSending(false);
+            }
+          },
+        },
+      ],
+    );
   };
   return (
     <Modal
@@ -3301,57 +3576,136 @@ const GiftSheet = memo(function GiftSheet({
     >
       <View style={styles.modalOverlay}>
         <Pressable style={styles.modalDismiss} onPress={onDismiss} />
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { maxHeight: "86%" }]}>
           <View style={styles.sheetHandle} />
           <Pressable onPress={onDismiss} style={styles.sheetClose}>
             <Ionicons name="close" size={20} color={COLORS.text} />
           </Pressable>
-          <Text style={styles.kicker}>ODA HEDIYELERI</Text>
+          <Text style={styles.kicker}>ODA HEDİYELERİ</Text>
           <View style={styles.giftSheetHeading}>
-            <Text style={styles.sheetTitle}>Bir iz birak.</Text>
+            <Text style={styles.sheetTitle}>Hediye gönder</Text>
             <View style={styles.coinPill}>
               <Ionicons name="diamond" size={14} color="#6AA8F5" />
-              <Text style={styles.coinPillText}>{coins}</Text>
+              <Text style={styles.coinPillText}>{formatCredits(coins)}</Text>
             </View>
           </View>
-          <Text style={styles.giftHint}>Önce odadaki alıcıyı seç. Göndermeden önce hediye ve toplam kredi için onay istenir.</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-            {recipients.map((recipient) => (
-              <Pressable key={recipient.userId} onPress={() => setRecipientId(recipient.userId)} style={[styles.transferOption, recipientId === recipient.userId && styles.transferOptionActive]}>
-                <Text style={[styles.transferOptionText, recipientId === recipient.userId && styles.transferOptionTextActive]}>{recipient.name}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-          <View style={styles.giftGrid}>
-            {gifts.map((gift) => {
-              const lockedByFamily = Number(gift.minFamilyLevel || 0) > Number(userFamilyLevel || 0);
+          <Text style={styles.fieldLabel}>ALICI SEÇ</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.roomGiftRecipientRow}
+            style={{ flexGrow: 0, marginBottom: 12 }}
+          >
+            {recipients.map((recipient) => {
+              const active = selectedRecipient?.userId === recipient.userId;
               return (
                 <Pressable
-                  key={gift.id}
-                  disabled={sending}
-                  onPress={() => confirmSend(gift)}
-                  style={[styles.giftCard, lockedByFamily && { opacity: 0.68 }]}
+                  key={recipient.userId}
+                  onPress={() => setRecipientId(recipient.userId)}
+                  style={[
+                    styles.roomGiftRecipientCard,
+                    active && styles.roomGiftRecipientCardActive,
+                  ]}
                 >
-                  <View
-                    style={[styles.giftIcon, { backgroundColor: gift.color }]}
-                  >
-                    <Ionicons name={gift.icon} size={24} color="#FFFFFF" />
-                  </View>
-                  <Text style={styles.giftName}>{gift.name}</Text>
-                  <View style={styles.giftCost}>
-                    <Ionicons
-                      name={lockedByFamily ? "lock-closed-outline" : "diamond"}
-                      size={11}
-                      color="#6AA8F5"
+                  <View style={[styles.roomGiftAvatarRing, active && styles.roomGiftAvatarRingActive]}>
+                    <Avatar
+                      circle
+                      size={42}
+                      uri={recipient.avatarUrl || null}
+                      color={recipient.color || COLORS.primary}
+                      label={(recipient.name || "S").charAt(0).toUpperCase()}
                     />
-                    <Text style={styles.giftCostText}>
-                      {lockedByFamily ? `Aile Sv. ${gift.minFamilyLevel} · ${gift.cost}` : gift.cost}
-                    </Text>
+                    {active ? (
+                      <View style={styles.roomGiftRecipientCheck}>
+                        <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+                      </View>
+                    ) : null}
                   </View>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.roomGiftRecipientName,
+                      active && styles.roomGiftRecipientNameActive,
+                    ]}
+                  >
+                    {recipient.isSelf ? "Kendim" : recipient.name}
+                  </Text>
                 </Pressable>
               );
             })}
-          </View>
+          </ScrollView>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.roomGiftCategoryRow}
+            style={{ flexGrow: 0, marginBottom: 10 }}
+          >
+            {GIFT_CATEGORIES.map((cat) => {
+              const active = giftCategory === cat.key;
+              return (
+                <Pressable
+                  key={cat.key}
+                  onPress={() => setGiftCategory(cat.key)}
+                  style={[styles.roomGiftCategoryPill, active && styles.roomGiftCategoryPillActive]}
+                >
+                  <Text
+                    style={[
+                      styles.roomGiftCategoryText,
+                      active && styles.roomGiftCategoryTextActive,
+                    ]}
+                  >
+                    {cat.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
+            <View style={styles.roomGiftGrid3}>
+              {visibleGifts.map((gift) => {
+                const lockedByFamily = Number(gift.minFamilyLevel || 0) > Number(userFamilyLevel || 0);
+                return (
+                  <Pressable
+                    key={gift.id}
+                    disabled={sending}
+                    onPress={() => confirmSend(gift)}
+                    style={({ pressed }) => [
+                      styles.roomGiftGridCard,
+                      lockedByFamily && { opacity: 0.65 },
+                      pressed && { transform: [{ scale: 0.98 }] },
+                    ]}
+                  >
+                    <View style={{ marginBottom: 7 }}>
+                      <SoraGiftArtwork
+                        giftId={gift.id}
+                        giftName={gift.name}
+                        fallbackIcon={gift.icon}
+                        fallbackColor={gift.color}
+                        size={52}
+                      />
+                    </View>
+                    <Text numberOfLines={1} style={styles.giftName}>
+                      {gift.name}
+                    </Text>
+                    <View style={styles.giftCost}>
+                      <Ionicons
+                        name={lockedByFamily ? "lock-closed-outline" : "diamond"}
+                        size={11}
+                        color="#2F80ED"
+                      />
+                      <Text numberOfLines={1} style={styles.giftCostText}>
+                        {lockedByFamily
+                          ? `Sv. ${gift.minFamilyLevel} · ${formatCredits(gift.cost)}`
+                          : formatCredits(gift.cost)}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -3417,7 +3771,8 @@ const GiftFlight = memo(function GiftFlight({ gift }) {
             style={[
               styles.giftFlyer,
               {
-                backgroundColor: activeGift.color || COLORS.purple,
+                backgroundColor: "transparent",
+                borderWidth: 0,
                 opacity,
                 transform: [
                   { translateY },
@@ -3428,7 +3783,13 @@ const GiftFlight = memo(function GiftFlight({ gift }) {
               },
             ]}
           >
-            <Ionicons name={activeGift.icon} size={22} color="#FFFFFF" />
+            <SoraGiftArtwork
+              giftId={activeGift.id}
+              giftName={activeGift.name}
+              fallbackIcon={activeGift.icon}
+              fallbackColor={activeGift.color}
+              size={46}
+            />
           </Animated.View>
         );
       })}
@@ -3783,13 +4144,14 @@ const PollSheet = memo(function PollSheet({
       animationType="slide"
       onRequestClose={onDismiss}
     >
-      <View style={styles.modalOverlay}>
+      <KeyboardSafeView style={styles.modalOverlay}>
         <Pressable style={styles.modalDismiss} onPress={onDismiss} />
         <View style={styles.sheet}>
           <View style={styles.sheetHandle} />
           <Pressable onPress={onDismiss} style={styles.sheetClose}>
             <Ionicons name="close" size={20} color={COLORS.text} />
           </Pressable>
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {poll ? (
             <>
               <Text style={styles.kicker}>CANLI ANKET</Text>
@@ -3887,8 +4249,9 @@ const PollSheet = memo(function PollSheet({
               </Text>
             </View>
           )}
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardSafeView>
     </Modal>
   );
 });
@@ -3947,9 +4310,11 @@ const WalletSheet = memo(function WalletSheet({
                   KULLANILABİLİR BAKİYE
                 </Text>
                 <Text style={styles.walletBalanceAmount}>
-                  {coins} <Text style={styles.walletBalanceUnit}>kredi</Text>
+                  {formatCredits(coins)} <Text style={styles.walletBalanceUnit}>kredi</Text>
                 </Text>
-                <Text style={styles.walletActivityTime}>Promosyon {promoCoins} · Satın alınan {paidCoins}</Text>
+                <Text style={styles.walletActivityTime}>
+                  Promosyon {formatCredits(promoCoins)} · Satın alınan {formatCredits(paidCoins)}
+                </Text>
               </View>
               <View style={styles.walletBalanceIcon}>
                 <Ionicons name="diamond" size={28} color="#6AA8F5" />
@@ -3972,8 +4337,8 @@ const WalletSheet = memo(function WalletSheet({
                 </Text>
                 <Text style={styles.settingDescription}>
                   {dailyRewardClaimed
-                    ? "Yarın yeniden 75 kredi kazanabilirsin."
-                    : "Tek dokunuşla 75 kredi kazan."}
+                    ? `Yarın yeniden ${formatCredits(DAILY_REWARD_AMOUNT)} kredi kazanabilirsin.`
+                    : `Tek dokunuşla ${formatCredits(DAILY_REWARD_AMOUNT)} kredi kazan.`}
                 </Text>
               </View>
               <Pressable
@@ -3990,7 +4355,7 @@ const WalletSheet = memo(function WalletSheet({
                     dailyRewardClaimed && styles.walletClaimTextDisabled,
                   ]}
                 >
-                  {dailyRewardClaimed ? "Alındı" : "+75 al"}
+                  {dailyRewardClaimed ? "Alındı" : `+${formatCredits(DAILY_REWARD_AMOUNT)} al`}
                 </Text>
               </Pressable>
             </View>
@@ -4764,10 +5129,7 @@ function CreateRoomSheet({ visible, onDismiss, onCreate }) {
       animationType="slide"
       onRequestClose={onDismiss}
     >
-      <KeyboardAvoidingView
-        style={styles.modalOverlay}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
+      <KeyboardSafeView style={styles.modalOverlay}>
         <Pressable style={styles.modalDismiss} onPress={onDismiss} />
         <ScrollView
           style={styles.createRoomSheetScroll}
@@ -4845,7 +5207,7 @@ function CreateRoomSheet({ visible, onDismiss, onCreate }) {
             </Pressable>
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardSafeView>
     </Modal>
   );
 }
@@ -4886,67 +5248,69 @@ function ScheduleRoomSheet({ visible, onDismiss, onSchedule }) {
       animationType="slide"
       onRequestClose={onDismiss}
     >
-      <View style={styles.modalOverlay}>
+      <KeyboardSafeView style={styles.modalOverlay}>
         <Pressable style={styles.modalDismiss} onPress={onDismiss} />
         <View style={styles.sheet}>
           <View style={styles.sheetHandle} />
           <Pressable onPress={onDismiss} style={styles.sheetClose}>
             <Ionicons name="close" size={20} color={COLORS.text} />
           </Pressable>
-          <Text style={styles.kicker}>PLANLI SESLI ODA</Text>
-          <Text style={styles.sheetTitle}>Bulusmayi ayarla.</Text>
-          <Text style={styles.fieldLabel}>ODA ADI</Text>
-          <TextInput
-            value={title}
-            onChangeText={setTitle}
-            placeholder="Orn. Hafta sonu sohbeti"
-            placeholderTextColor={COLORS.muted}
-            style={styles.sheetInput}
-            maxLength={36}
-          />
-          <Text style={styles.fieldLabel}>NE ZAMAN?</Text>
-          <TextInput
-            value={startsAt}
-            onChangeText={setStartsAt}
-            placeholder="Orn. Bugun 21:30"
-            placeholderTextColor={COLORS.muted}
-            style={styles.sheetInput}
-            maxLength={28}
-          />
-          <Text style={styles.fieldLabel}>KATEGORI</Text>
-          <View style={styles.sheetCategories}>
-            {CATEGORIES.slice(1).map((item) => (
-              <Pressable
-                key={item.name}
-                onPress={() => setCategory(item.name)}
-                style={[
-                  styles.sheetCategory,
-                  category === item.name && styles.sheetCategoryActive,
-                ]}
-              >
-                <Text
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <Text style={styles.kicker}>PLANLI SESLİ ODA</Text>
+            <Text style={styles.sheetTitle}>Buluşmayı ayarla.</Text>
+            <Text style={styles.fieldLabel}>ODA ADI</Text>
+            <TextInput
+              value={title}
+              onChangeText={setTitle}
+              placeholder="Örn. Hafta sonu sohbeti"
+              placeholderTextColor={COLORS.muted}
+              style={styles.sheetInput}
+              maxLength={36}
+            />
+            <Text style={styles.fieldLabel}>NE ZAMAN?</Text>
+            <TextInput
+              value={startsAt}
+              onChangeText={setStartsAt}
+              placeholder="Örn. Bugün 21:30"
+              placeholderTextColor={COLORS.muted}
+              style={styles.sheetInput}
+              maxLength={28}
+            />
+            <Text style={styles.fieldLabel}>KATEGORİ</Text>
+            <View style={styles.sheetCategories}>
+              {CATEGORIES.slice(1).map((item) => (
+                <Pressable
+                  key={item.name}
+                  onPress={() => setCategory(item.name)}
                   style={[
-                    styles.sheetCategoryText,
-                    category === item.name && styles.sheetCategoryTextActive,
+                    styles.sheetCategory,
+                    category === item.name && styles.sheetCategoryActive,
                   ]}
                 >
-                  {item.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <Pressable onPress={schedule}>
-            <LinearGradient colors={BRAND_GRADIENT} style={styles.createSubmit}>
-              <Text style={styles.createSubmitText}>Odayi planla</Text>
-              <Ionicons
-                name="calendar-outline"
-                size={20}
-                color={COLORS.primaryInk}
-              />
-            </LinearGradient>
-          </Pressable>
+                  <Text
+                    style={[
+                      styles.sheetCategoryText,
+                      category === item.name && styles.sheetCategoryTextActive,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable onPress={schedule}>
+              <LinearGradient colors={BRAND_GRADIENT} style={styles.createSubmit}>
+                <Text style={styles.createSubmitText}>Odayı planla</Text>
+                <Ionicons
+                  name="calendar-outline"
+                  size={20}
+                  color={COLORS.primaryInk}
+                />
+              </LinearGradient>
+            </Pressable>
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardSafeView>
     </Modal>
   );
 }
@@ -5017,7 +5381,7 @@ const DEFAULT_APP_SETTINGS = {
   autoJoinMuted: true,
 };
 const DEFAULT_WALLET_BALANCE = 1250;
-const DAILY_REWARD_AMOUNT = 75;
+const DAILY_REWARD_AMOUNT = DAILY_REWARD_COINS;
 // Canlı uygulamada örnek oda, kullanıcı ve bildirim hiçbir koşulda gösterilmez.
 // Test verisi yalnızca geliştirme aracında özellikle açıldığında kullanılmalıdır.
 const DEMO_CONTENT_ENABLED = false;
@@ -5152,17 +5516,46 @@ const RoomComposer = memo(function RoomComposer({
 const RoomMessageRow = memo(function RoomMessageRow({
   item,
   canReport,
+  senderAvatarUrl = null,
+  senderColor = "#2F80ED",
+  onPressSender,
   onReport,
 }) {
   const handleReport = useCallback(() => onReport(item), [onReport, item]);
+  const handleSenderPress = useCallback(() => {
+    if (!item.system && !item.announcement && item.userId) {
+      onPressSender?.(item);
+    }
+  }, [item, onPressSender]);
+  const showAvatar = !item.system && !item.announcement;
+  const isGiftMsg = item.kind === "gift";
+  const giftMeta = item.metadata || {};
 
   return (
     <View style={styles.messageRow}>
+      {showAvatar ? (
+        <Pressable
+          onPress={handleSenderPress}
+          disabled={!item.userId}
+          hitSlop={4}
+          accessibilityLabel={`${item.user || "Kullanıcı"} profili`}
+          style={styles.roomMessageAvatarPress}
+        >
+          <Avatar
+            circle
+            size={28}
+            uri={senderAvatarUrl}
+            color={senderColor || "#2F80ED"}
+            label={(item.user || "S").charAt(0).toUpperCase()}
+          />
+        </Pressable>
+      ) : null}
       <View
         style={[
           styles.messageBubble,
           item.system && styles.messageBubbleSystem,
           item.announcement && styles.messageBubbleAnnouncement,
+          isGiftMsg && styles.messageBubbleGift,
         ]}
       >
         {item.announcement ? (
@@ -5172,6 +5565,17 @@ const RoomMessageRow = memo(function RoomMessageRow({
             color="#9CC6FF"
             style={styles.messageAnnouncementIcon}
           />
+        ) : null}
+        {isGiftMsg ? (
+          <View style={{ marginRight: 7 }}>
+            <SoraGiftArtwork
+              giftId={giftMeta.gift_id}
+              giftName={giftMeta.gift_name}
+              fallbackIcon={giftMeta.gift_icon}
+              fallbackColor={giftMeta.gift_color}
+              size={28}
+            />
+          </View>
         ) : null}
         <Text
           style={[
@@ -5208,24 +5612,42 @@ const RoomMessageList = memo(function RoomMessageList({
   messages,
   canReportBase,
   userId,
+  currentProfile,
+  participantById,
+  onPressSender,
   onReport,
 }) {
   return (
     <View style={styles.messageList}>
-      {messages.map((item) => (
-        <RoomMessageRow
-          key={item.id}
-          item={item}
-          canReport={Boolean(
-            canReportBase &&
-            !item.system &&
-            !item.pending &&
-            item.userId &&
-            item.userId !== userId,
-          )}
-          onReport={onReport}
-        />
-      ))}
+      {messages.map((item) => {
+        const mapped = item.userId ? participantById?.get(item.userId) : null;
+        const isSelf = Boolean(userId && item.userId === userId);
+        const senderAvatarUrl =
+          item.avatarUrl
+          || mapped?.avatarUrl
+          || (isSelf ? currentProfile?.avatarUrl || null : null);
+        const senderColor =
+          item.avatarColor
+          || mapped?.color
+          || (isSelf ? currentProfile?.color || COLORS.primary : "#2F80ED");
+        return (
+          <RoomMessageRow
+            key={item.id}
+            item={item}
+            senderAvatarUrl={senderAvatarUrl}
+            senderColor={senderColor}
+            onPressSender={onPressSender}
+            canReport={Boolean(
+              canReportBase &&
+              !item.system &&
+              !item.pending &&
+              item.userId &&
+              item.userId !== userId,
+            )}
+            onReport={onReport}
+          />
+        );
+      })}
     </View>
   );
 });
@@ -5611,6 +6033,10 @@ function Room({
             id: row.id,
             userId: row.sender_id,
             user: row.sender_name || "Sora kullanıcısı",
+            avatarUrl: row.sender_avatar_url || null,
+            avatarColor: row.sender_avatar_color || null,
+            kind: row.kind || "text",
+            metadata: row.metadata || null,
             text: row.body,
             system: row.kind === "system",
             createdAt: row.created_at,
@@ -5744,9 +6170,10 @@ function Room({
   const handleSendGiftFromSheet = useCallback(
     async (gift, recipient, requestId) => {
       const sent = await onSendGift({ gift, recipient, roomId: room.id, requestId });
-      if (!sent) return;
+      if (!sent) return false;
       setGiftOpen(false);
       setGiftFlight({ ...gift, recipientName: recipient.name, stamp: Date.now() });
+      return true;
     },
     [onSendGift, room.id],
   );
@@ -5972,6 +6399,8 @@ function Room({
           id: pendingId,
           userId,
           user: profile.name,
+          avatarUrl: profile?.avatarUrl || null,
+          avatarColor: profile?.color || COLORS.primary,
           text: cleanMessage,
           pending: true,
           createdAt: new Date().toISOString(),
@@ -6016,7 +6445,14 @@ function Room({
       messageGuard.record(cleanMessage);
       setMessages((current) => [
         ...current,
-        { id: String(Date.now()), user: profile.name, text: cleanMessage },
+        {
+          id: String(Date.now()),
+          userId,
+          user: profile.name,
+          avatarUrl: profile?.avatarUrl || null,
+          avatarColor: profile?.color || COLORS.primary,
+          text: cleanMessage,
+        },
       ]);
       return true;
     },
@@ -6026,6 +6462,8 @@ function Room({
       chatLocked,
       messageGuard,
       messageSending,
+      profile?.avatarUrl,
+      profile?.color,
       profile.name,
       room.id,
       room.persisted,
@@ -6756,6 +7194,90 @@ function Room({
         ? "Sohbet bağlanıyor…"
         : null;
 
+  const keyboard = useKeyboardInset();
+
+  useEffect(() => {
+    if (keyboard.visible) {
+      const timer = setTimeout(() => {
+        chatScrollRef.current?.scrollToEnd?.({ animated: true });
+      }, 90);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [keyboard.visible]);
+
+  const participantById = useMemo(() => {
+    const map = new Map();
+    for (const member of roomMembers) {
+      if (member?.userId) {
+        map.set(member.userId, {
+          userId: member.userId,
+          name: member.name,
+          avatarUrl: member.avatarUrl || null,
+          color: member.color || COLORS.primary,
+          role: member.role,
+          seat: member.seat,
+        });
+      }
+    }
+    for (const participant of activeRoomParticipants) {
+      if (participant?.userId) {
+        const prev = map.get(participant.userId);
+        map.set(participant.userId, {
+          ...prev,
+          ...participant,
+          avatarUrl: participant.avatarUrl || prev?.avatarUrl || null,
+          color: participant.color || prev?.color || COLORS.primary,
+        });
+      }
+    }
+    if (userId) {
+      const prev = map.get(userId);
+      map.set(userId, {
+        ...prev,
+        userId,
+        name: profile?.name || prev?.name || "Sen",
+        avatarUrl: profile?.avatarUrl || prev?.avatarUrl || null,
+        color: profile?.color || prev?.color || COLORS.primary,
+      });
+    }
+    return map;
+  }, [activeRoomParticipants, profile?.avatarUrl, profile?.color, profile?.name, roomMembers, userId]);
+
+  const roomGiftRecipients = useMemo(() => {
+    const others = activeRoomParticipants.filter((participant) => participant.userId !== userId);
+    const selfEntry = userId
+      ? [
+          {
+            userId,
+            name: profile?.name || "Kendim",
+            avatarUrl: profile?.avatarUrl || null,
+            color: profile?.color || COLORS.primary,
+            isSelf: true,
+          },
+        ]
+      : [];
+    return [...others, ...selfEntry];
+  }, [activeRoomParticipants, profile?.avatarUrl, profile?.color, profile?.name, userId]);
+
+  const handleMessageSenderPress = useCallback(
+    (msgItem) => {
+      if (!msgItem?.userId) return;
+      if (msgItem.userId === userId) {
+        handleOwnSeatPress();
+        return;
+      }
+      const found = participantById.get(msgItem.userId) || {
+        userId: msgItem.userId,
+        name: msgItem.user || "Sora kullanıcısı",
+        avatarUrl: msgItem.avatarUrl || null,
+        color: msgItem.avatarColor || COLORS.primary,
+      };
+      openParticipantMenu(found);
+    },
+    [handleOwnSeatPress, openParticipantMenu, participantById, userId],
+  );
+
   const audienceParticipants = activeRoomParticipants.filter(
     (participant) => !stageParticipants.some((speaker) => speaker.userId === participant.userId),
   );
@@ -6928,10 +7450,7 @@ function Room({
       {minimized ? null : (
         <StatusBar barStyle="light-content" backgroundColor="#11131A" />
       )}
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      <KeyboardSafeView style={{ flex: 1 }}>
         {/* ── Üst bar: küçült · oda bilgisi · menü · çıkış ── */}
         <View style={styles.roomTopBar}>
           <Pressable
@@ -7122,14 +7641,25 @@ function Room({
               messages={messages}
               canReportBase={room.persisted}
               userId={userId}
+              currentProfile={profile}
+              participantById={participantById}
+              onPressSender={handleMessageSenderPress}
               onReport={handleReportMessage}
             />
           </View>
         </ScrollView>
 
-        {/* Alt bar: sohbet + mikrofon + ses + müzik + hediye */}
+        {/* Alt bar: mesaj yazma alanı + hemen yanında hediye + mikrofon + ses + müzik */}
         <View style={styles.roomBottomBar}>
           <RoomComposer onSend={sendMessage} sending={messageSending} />
+          <Pressable
+            style={[styles.roomBarButton, styles.roomBarGift]}
+            onPress={handleOpenGift}
+            accessibilityRole="button"
+            accessibilityLabel="Hediye gönder"
+          >
+            <Ionicons name="gift" size={19} color="#FFFFFF" />
+          </Pressable>
           <Pressable
             style={[
               styles.roomBarButton,
@@ -7172,16 +7702,8 @@ function Room({
               color={musicPlaying ? COLORS.primaryLight : "#DBE8FB"}
             />
           </Pressable>
-          <Pressable
-            style={[styles.roomBarButton, styles.roomBarGift]}
-            onPress={handleOpenGift}
-            accessibilityRole="button"
-            accessibilityLabel="Hediye gönder"
-          >
-            <Ionicons name="gift" size={19} color="#FFFFFF" />
-          </Pressable>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardSafeView>
 
       <GiftFlight gift={giftFlight} />
 
@@ -7276,7 +7798,7 @@ function Room({
         coins={coins}
         userFamilyLevel={userFamilyLevel}
         gifts={roomGiftCatalog}
-        recipients={activeRoomParticipants.filter((participant) => participant.userId !== userId)}
+        recipients={roomGiftRecipients}
         onDismiss={handleCloseGift}
         onSend={handleSendGiftFromSheet}
       />
@@ -7485,13 +8007,14 @@ function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh, 
       animationType="slide"
       onRequestClose={onDismiss}
     >
-      <View style={styles.modalOverlay}>
+      <KeyboardSafeView style={styles.modalOverlay}>
         <Pressable style={styles.modalDismiss} onPress={onDismiss} />
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { maxHeight: "88%" }]}>
           <View style={styles.sheetHandle} />
           <Pressable onPress={onDismiss} style={styles.sheetClose}>
             <Ionicons name="close" size={20} color={COLORS.text} />
           </Pressable>
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <Text style={styles.kicker}>PROFİLİN</Text>
           <Text style={styles.sheetTitle}>Kendini göster.</Text>
           <View style={styles.avatarEditRow}>
@@ -7601,8 +8124,9 @@ function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh, 
               <Ionicons name="checkmark" size={20} color={COLORS.primaryInk} />
             </LinearGradient>
           </Pressable>
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardSafeView>
     </Modal>
   );
 }
@@ -8046,9 +8570,11 @@ function AppContent() {
     let active = true;
     const formatTransaction = (transaction) => ({
       id: transaction.id,
-      icon: ["daily_reward", "promo_grant"].includes(transaction.type) ? "gift" : "diamond",
+      icon: ["daily_reward", "promo_grant", "level_reward"].includes(transaction.type)
+        ? "gift"
+        : "diamond",
       color:
-        ["daily_reward", "promo_grant"].includes(transaction.type)
+        ["daily_reward", "promo_grant", "level_reward"].includes(transaction.type)
           ? "#2F80ED"
           : transaction.type === "bank_transfer"
             ? "#59C5FF"
@@ -8101,7 +8627,7 @@ function AppContent() {
     let active = true;
     supabase
       .from("profiles")
-      .select("handle, display_name, bio, avatar_color, avatar_url")
+      .select("handle, display_name, bio, avatar_color, avatar_url, user_level, user_xp")
       .eq("id", user.id)
       .maybeSingle()
       .then(({ data }) => {
@@ -8113,6 +8639,8 @@ function AppContent() {
           bio: data.bio,
           color: data.avatar_color,
           avatarUrl: data.avatar_url || null,
+          userLevel: Math.max(1, Number(data.user_level) || 1),
+          userXp: Math.max(0, Number(data.user_xp) || 0),
         }));
       })
       .catch(() => undefined);
@@ -8593,8 +9121,69 @@ function AppContent() {
       .catch(() => undefined);
   };
 
+  const syncUserLevelAndNotify = useCallback(
+    async ({ showFeedback = false } = {}) => {
+      if (!supabase || !authSession?.user) return null;
+      try {
+        const res = await syncMyUserLevel();
+        if (!res) return null;
+        setProfile((current) => ({
+          ...current,
+          userLevel: res.userLevel,
+          userXp: res.userXp,
+        }));
+        if (res.newlyAwardedCoins > 0) {
+          if (typeof res.balance === "number") {
+            setWalletBalance(res.balance);
+          } else {
+            setWalletBalance((val) => val + res.newlyAwardedCoins);
+          }
+          if (typeof res.promoBalance === "number") {
+            setPromoWalletBalance(res.promoBalance);
+          } else {
+            setPromoWalletBalance((val) => val + res.newlyAwardedCoins);
+          }
+          if (typeof res.paidBalance === "number") {
+            setPaidWalletBalance(res.paidBalance);
+          }
+          pushNotification({
+            id: `lvl-reward-${res.userLevel}-${Date.now()}`,
+            icon: "ribbon",
+            color: "#2F80ED",
+            text: `Seviye ${res.userLevel} ödülü: +${formatCredits(res.newlyAwardedCoins)} kredi cüzdanına eklendi.`,
+            time: "Şimdi",
+          });
+          if (showFeedback) {
+            Alert.alert(
+              "Seviye Ödülü Eklendi",
+              `Seviye ${res.userLevel} için +${formatCredits(res.newlyAwardedCoins)} kredi cüzdanına tanımlandı.`,
+            );
+          }
+        } else if (showFeedback) {
+          Alert.alert(
+            "Seviye Güncel",
+            `Mevcut seviyen: Seviye ${res.userLevel} (${formatCredits(res.userXp)} XP).`,
+          );
+        }
+        return res;
+      } catch {
+        if (showFeedback) {
+          Alert.alert("Seviye yenilenemedi", "Bağlantını kontrol edip tekrar dene.");
+        }
+        return null;
+      }
+    },
+    [authSession?.user],
+  );
+
+  useEffect(() => {
+    if (!authSession?.user?.id || !supabase) return;
+    syncUserLevelAndNotify().catch(() => undefined);
+  }, [authSession?.user?.id, syncUserLevelAndNotify]);
+
   const refreshWalletData = async () => {
     if (!supabase || !authSession?.user) return;
+    await syncUserLevelAndNotify().catch(() => undefined);
     const [wallet, transactions] = await Promise.all([
       getWallet(),
       listWalletTransactions(),
@@ -8608,9 +9197,11 @@ function AppContent() {
     setWalletActivities(
       transactions.map((transaction) => ({
         id: transaction.id,
-        icon: ["daily_reward", "promo_grant"].includes(transaction.type) ? "gift" : "diamond",
+        icon: ["daily_reward", "promo_grant", "level_reward"].includes(transaction.type)
+          ? "gift"
+          : "diamond",
         color:
-          ["daily_reward", "promo_grant"].includes(transaction.type)
+          ["daily_reward", "promo_grant", "level_reward"].includes(transaction.type)
             ? "#2F80ED"
             : transaction.type === "bank_transfer"
               ? "#59C5FF"
@@ -8634,7 +9225,7 @@ function AppContent() {
     if (walletBalance < gift.cost) {
       Alert.alert(
         "Bakiye yetersiz",
-        `${gift.name} hediyesi için ${gift.cost} kredi gerekiyor.`,
+        `${gift.name} hediyesi için ${formatCredits(gift.cost)} kredi gerekiyor.`,
       );
       return false;
     }
@@ -8650,7 +9241,8 @@ function AppContent() {
         text: `${recipient.name} kişisine ${gift.name}`, amount: -result.gift_cost,
         time: "Şimdi",
       }, ...items]);
-      pushNotification({ id: `gift-${requestKey}`, icon: gift.icon, color: gift.color, text: `${recipient.name} kişisine hediye gönderildi.`, time: "Şimdi" });
+      pushNotification({ id: `gift-${requestKey}`, icon: gift.icon, color: gift.color, text: `${recipient.name} kişisine ${gift.name} gönderildi.`, time: "Şimdi" });
+      refreshWalletData().catch(() => undefined);
       return true;
     } catch (error) {
       Alert.alert("Hediye gönderilemedi", error?.message?.includes("Insufficient")
@@ -8670,8 +9262,8 @@ function AppContent() {
   const claimDailyReward = async () => {
     if (dailyRewardClaimed) {
       Alert.alert(
-        "Odul zaten alindi",
-        "Yarin tekrar gunluk kredi kazanabilirsin.",
+        "Ödül zaten alındı",
+        "Yarın tekrar günlük kredi kazanabilirsin.",
       );
       return;
     }
@@ -8688,7 +9280,12 @@ function AppContent() {
         }
         setDailyRewardClaimed(true);
         setWalletBalance(wallet.balance);
-        setPromoWalletBalance((value) => value + DAILY_REWARD_AMOUNT);
+        setPromoWalletBalance((value) =>
+          wallet.promo_balance > 0 ? wallet.promo_balance : value + DAILY_REWARD_AMOUNT,
+        );
+        if (wallet.paid_balance >= 0) {
+          setPaidWalletBalance(wallet.paid_balance);
+        }
         setWalletActivities((currentActivities) => [
           {
             id: `reward-${Date.now()}`,
@@ -8704,9 +9301,10 @@ function AppContent() {
           id: `daily-reward-${Date.now()}`,
           icon: "gift",
           color: "#2F80ED",
-          text: `${DAILY_REWARD_AMOUNT} kredi günlük ödülü hesabına eklendi.`,
+          text: `${formatCredits(DAILY_REWARD_AMOUNT)} kredi günlük ödülü hesabına eklendi.`,
           time: "Şimdi",
         });
+        refreshWalletData().catch(() => undefined);
       } catch {
         Alert.alert("Ödül alınamadı", "Bağlantını kontrol edip tekrar dene.");
       }
@@ -8729,8 +9327,8 @@ function AppContent() {
           id: `daily-reward-${Date.now()}`,
           icon: "gift",
           color: "#2F80ED",
-          text: `${DAILY_REWARD_AMOUNT} kredi gunluk odulu hesabina eklendi.`,
-          time: "Simdi",
+          text: `${formatCredits(DAILY_REWARD_AMOUNT)} kredi günlük ödülü hesabına eklendi.`,
+          time: "Şimdi",
         },
         ...currentNotifications,
       ];
@@ -8744,9 +9342,9 @@ function AppContent() {
       id: `reward-${Date.now()}`,
       icon: "gift",
       color: "#2F80ED",
-      text: "Gunluk giris odulu",
+      text: "Günlük giriş ödülü",
       amount: DAILY_REWARD_AMOUNT,
-      time: "Simdi",
+      time: "Şimdi",
     });
   };
 
@@ -9362,6 +9960,7 @@ function AppContent() {
         onOpenWallet={handleOpenWallet}
         onOpenAdmin={handleOpenAdmin}
         onClaimDailyReward={claimDailyReward}
+        onSyncUserLevel={syncUserLevelAndNotify}
       />
     ),
   };
@@ -9559,6 +10158,7 @@ function AppContent() {
         promoCoins={promoWalletBalance}
         paidCoins={paidWalletBalance}
         activities={walletActivities}
+        dailyRewardClaimed={dailyRewardClaimed}
         onDismiss={handleCloseWallet}
         onClaimDailyReward={claimDailyReward}
         onRefresh={handleRefreshWallet}
@@ -15266,4 +15866,262 @@ const styles = StyleSheet.create({
   },
   profileStaffButtonDanger: { backgroundColor: "rgba(217,79,92,0.08)" },
   profileStaffButtonText: { flex: 1, color: COLORS.text, fontSize: 12, fontWeight: "800" },
+  userLevelHeroCard: {
+    padding: 18,
+    borderRadius: 22,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "rgba(120,175,255,0.28)",
+  },
+  userLevelHeroTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  userLevelHeroTitle: {
+    color: "#F8FAFC",
+    fontSize: 22,
+    fontWeight: "900",
+    letterSpacing: -0.5,
+  },
+  userLevelHeroXp: {
+    color: "#BFD6F6",
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  userLevelProgressTrack: {
+    height: 9,
+    borderRadius: 99,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    overflow: "hidden",
+    marginTop: 15,
+  },
+  userLevelProgressFill: {
+    height: "100%",
+    borderRadius: 99,
+    backgroundColor: "#63B3FF",
+  },
+  userLevelHeroNext: {
+    color: "#D8E7FC",
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 8,
+  },
+  userLevelSyncBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 6,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.20)",
+  },
+  userLevelSyncText: {
+    color: "#EAF3FF",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  userTierCard: {
+    width: 112,
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 18,
+    backgroundColor: COLORS.surfaceRaised,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  userTierCardActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: "#EDF4FF",
+  },
+  userTierRange: {
+    color: COLORS.muted,
+    fontSize: 10,
+    fontWeight: "800",
+    marginTop: 8,
+  },
+  userTierTitle: {
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: "900",
+    marginTop: 2,
+    textAlign: "center",
+  },
+  userTierState: {
+    color: COLORS.muted,
+    fontSize: 10,
+    fontWeight: "800",
+    marginTop: 4,
+  },
+  evenRewardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: COLORS.surfaceRaised,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  evenRewardRowClaimed: {
+    backgroundColor: "#F0F6FF",
+    borderColor: "rgba(47,128,237,0.28)",
+  },
+  evenRewardRowNext: {
+    backgroundColor: "#EDF4FF",
+    borderColor: COLORS.primary,
+  },
+  evenRewardLevel: {
+    color: COLORS.text,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  evenRewardMilestoneChip: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: "rgba(47,128,237,0.14)",
+  },
+  evenRewardMilestoneText: {
+    color: COLORS.primary,
+    fontSize: 9,
+    fontWeight: "800",
+  },
+  evenRewardCoins: {
+    color: "#3F5876",
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  evenRewardStatusPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  evenRewardStatusClaimed: {
+    backgroundColor: "rgba(47,128,237,0.12)",
+    borderColor: "rgba(47,128,237,0.32)",
+  },
+  evenRewardStatusNext: {
+    backgroundColor: "rgba(47,128,237,0.16)",
+    borderColor: COLORS.primary,
+  },
+  evenRewardStatusText: {
+    color: COLORS.muted,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  roomGiftRecipientRow: {
+    gap: 10,
+    paddingVertical: 4,
+    paddingBottom: 10,
+  },
+  roomGiftRecipientCard: {
+    width: 68,
+    alignItems: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    borderRadius: 16,
+    backgroundColor: COLORS.surfaceRaised,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  roomGiftRecipientCardActive: {
+    backgroundColor: "#EDF4FF",
+    borderColor: COLORS.primary,
+  },
+  roomGiftAvatarRing: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  roomGiftAvatarRingActive: {
+    borderColor: COLORS.primary,
+  },
+  roomGiftRecipientCheck: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: COLORS.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "#FFFFFF",
+  },
+  roomGiftRecipientName: {
+    color: COLORS.muted,
+    fontSize: 10,
+    fontWeight: "800",
+    marginTop: 5,
+    textAlign: "center",
+  },
+  roomGiftRecipientNameActive: {
+    color: COLORS.primary,
+  },
+  roomGiftCategoryRow: {
+    gap: 8,
+    paddingVertical: 6,
+    marginBottom: 6,
+  },
+  roomGiftCategoryPill: {
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: COLORS.surfaceRaised,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  roomGiftCategoryPillActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  roomGiftCategoryText: {
+    color: COLORS.muted,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  roomGiftCategoryTextActive: {
+    color: "#FFFFFF",
+  },
+  roomGiftGrid3: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    rowGap: 10,
+  },
+  roomGiftGridCard: {
+    width: "31.6%",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: 18,
+    backgroundColor: COLORS.surfaceRaised,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  roomMessageAvatarPress: {
+    marginTop: 2,
+    marginRight: 7,
+  },
+  messageBubbleGift: {
+    borderColor: "rgba(99,179,255,0.38)",
+    backgroundColor: "rgba(23,46,84,0.78)",
+  },
 });

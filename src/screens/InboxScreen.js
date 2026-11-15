@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Image,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -15,6 +14,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   listDirectConversations,
   listDirectMessages,
@@ -23,6 +23,7 @@ import {
   subscribeToDirectMessages,
 } from "../data/soraRepository";
 import { COLORS } from "../theme/colors";
+import { KeyboardSafeView, useKeyboardInset } from "../ui/useKeyboardInset";
 
 const formatMessageTime = (value) => {
   if (!value) return "";
@@ -63,6 +64,9 @@ function EmptyState({ icon, title, description, action, onAction }) {
 }
 
 export function InboxScreen({ currentUserId, profile }) {
+  const insets = useSafeAreaInsets();
+  const keyboard = useKeyboardInset();
+  const chatScrollRef = useRef(null);
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -75,6 +79,16 @@ export function InboxScreen({ currentUserId, profile }) {
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [newHandle, setNewHandle] = useState("");
   const [startingChat, setStartingChat] = useState(false);
+
+  useEffect(() => {
+    if (keyboard.visible && selectedConversation) {
+      const timer = setTimeout(() => {
+        chatScrollRef.current?.scrollToEnd?.({ animated: true });
+      }, 80);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [keyboard.visible, selectedConversation]);
 
   const loadConversations = useCallback(async ({ silent = false } = {}) => {
     if (!currentUserId) return;
@@ -173,18 +187,18 @@ export function InboxScreen({ currentUserId, profile }) {
   };
 
   if (selectedConversation) {
-    return <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={8}>
+    return <KeyboardSafeView style={styles.screen}>
       <View style={styles.chatHeader}>
         <Pressable onPress={() => setSelectedConversation(null)} accessibilityLabel="Sohbet listesine dön" style={styles.headerButton}><Ionicons name="arrow-back" size={21} color={COLORS.text} /></Pressable>
         <Avatar name={selectedConversation.name} color={selectedConversation.color} uri={selectedConversation.avatarUrl} size={42} />
         <View style={styles.chatHeaderCopy}><Text numberOfLines={1} style={styles.chatHeaderName}>{selectedConversation.name}</Text><Text style={styles.chatHeaderHandle}>@{selectedConversation.handle}</Text></View>
       </View>
       {error ? <Pressable onPress={() => openConversation(selectedConversation)} style={styles.errorBanner}><Ionicons name="alert-circle-outline" size={17} color={COLORS.danger} /><Text style={styles.errorText}>{error}</Text></Pressable> : null}
-      {messagesLoading ? <View style={styles.center}><ActivityIndicator color={COLORS.primary} /></View> : <ScrollView contentContainerStyle={styles.messageList} keyboardShouldPersistTaps="handled">
+      {messagesLoading ? <View style={styles.center}><ActivityIndicator color={COLORS.primary} /></View> : <ScrollView ref={chatScrollRef} onContentSizeChange={() => chatScrollRef.current?.scrollToEnd?.({ animated: false })} contentContainerStyle={styles.messageList} keyboardShouldPersistTaps="handled">
         {!messages.length ? <EmptyState icon="chatbubble-ellipses-outline" title="İlk mesajı sen gönder" description="Bu konuşmadaki mesajlar hesabına bağlı olarak saklanır." /> : messages.map((message) => <View key={message.id} style={[styles.messageRow, message.own && styles.messageRowOwn]}><View style={[styles.messageBubble, message.own && styles.messageBubbleOwn]}><Text style={[styles.messageBody, message.own && styles.messageBodyOwn]}>{message.text}</Text><Text style={[styles.messageTime, message.own && styles.messageTimeOwn]}>{formatMessageTime(message.createdAt)}</Text></View></View>)}
       </ScrollView>}
-      <View style={styles.composer}><TextInput value={draft} onChangeText={setDraft} onSubmitEditing={submitMessage} returnKeyType="send" placeholder="Mesaj yaz..." placeholderTextColor={COLORS.muted} style={styles.composerInput} maxLength={500} multiline /><Pressable disabled={!draft.trim() || sending} onPress={submitMessage} style={[styles.sendButton, (!draft.trim() || sending) && styles.sendButtonDisabled]}>{sending ? <ActivityIndicator size="small" color={COLORS.primaryInk} /> : <Ionicons name="send" size={18} color={COLORS.primaryInk} />}</Pressable></View>
-    </KeyboardAvoidingView>;
+      <View style={[styles.composer, { marginBottom: keyboard.visible ? 0 : 64 + Math.max(insets.bottom, 8) }]}><TextInput value={draft} onChangeText={setDraft} onSubmitEditing={submitMessage} returnKeyType="send" placeholder="Mesaj yaz..." placeholderTextColor={COLORS.muted} style={styles.composerInput} maxLength={500} multiline /><Pressable disabled={!draft.trim() || sending} onPress={submitMessage} style={[styles.sendButton, (!draft.trim() || sending) && styles.sendButtonDisabled]}>{sending ? <ActivityIndicator size="small" color={COLORS.primaryInk} /> : <Ionicons name="send" size={18} color={COLORS.primaryInk} />}</Pressable></View>
+    </KeyboardSafeView>;
   }
 
   return <View style={styles.screen}>
@@ -192,7 +206,7 @@ export function InboxScreen({ currentUserId, profile }) {
     <View style={styles.search}><Ionicons name="search-outline" size={18} color={COLORS.muted} /><TextInput value={query} onChangeText={setQuery} placeholder="Kişi ara" placeholderTextColor={COLORS.muted} style={styles.searchInput} autoCapitalize="none" /></View>
     {error ? <Pressable onPress={() => loadConversations()} style={styles.errorBanner}><Ionicons name="refresh-outline" size={17} color={COLORS.danger} /><Text style={styles.errorText}>{error} Tekrar dene.</Text></Pressable> : null}
     {loading ? <View style={styles.center}><ActivityIndicator color={COLORS.primary} /><Text style={styles.loadingText}>Sohbetler yükleniyor...</Text></View> : !visibleConversations.length ? <EmptyState icon="chatbubbles-outline" title={query ? "Sonuç bulunamadı" : "Henüz sohbet yok"} description={query ? "Farklı bir isim veya kullanıcı adı ara." : "Gerçek bir kullanıcı adıyla yeni sohbet başlat."} action={query ? null : "Sohbet başlat"} onAction={() => setNewChatOpen(true)} /> : <ScrollView contentContainerStyle={styles.conversationList} showsVerticalScrollIndicator={false}>{visibleConversations.map((conversation) => <Pressable key={conversation.id} onPress={() => openConversation(conversation)} style={styles.conversationCard}><Avatar name={conversation.name} color={conversation.color} uri={conversation.avatarUrl} /><View style={styles.conversationCopy}><View style={styles.conversationTop}><Text numberOfLines={1} style={styles.conversationName}>{conversation.name}</Text><Text style={styles.conversationTime}>{formatMessageTime(conversation.lastMessageAt)}</Text></View><Text numberOfLines={1} style={styles.conversationMessage}>{conversation.lastMessage || ("@" + conversation.handle)}</Text></View></Pressable>)}</ScrollView>}
-    <Modal transparent visible={newChatOpen} animationType="slide" onRequestClose={() => setNewChatOpen(false)}><KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === "ios" ? "padding" : undefined}><Pressable style={StyleSheet.absoluteFill} onPress={() => setNewChatOpen(false)} /><View style={styles.sheet}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><View><Text style={styles.eyebrow}>YENİ SOHBET</Text><Text style={styles.sheetTitle}>Birini bul.</Text></View><Pressable onPress={() => setNewChatOpen(false)} style={styles.headerButton}><Ionicons name="close" size={21} color={COLORS.text} /></Pressable></View><Text style={styles.fieldLabel}>KULLANICI ADI</Text><View style={styles.handleInput}><Text style={styles.handlePrefix}>@</Text><TextInput value={newHandle} onChangeText={setNewHandle} placeholder="kullaniciadi" placeholderTextColor={COLORS.muted} autoCapitalize="none" autoCorrect={false} maxLength={24} style={styles.handleTextInput} /></View><Text style={styles.sheetHint}>Yalnızca kayıtlı Sora kullanıcılarıyla sohbet başlatabilirsin.</Text><Pressable disabled={startingChat} onPress={createConversation}><LinearGradient colors={[COLORS.primary, "#6AA8F5"]} style={styles.primaryAction}>{startingChat ? <ActivityIndicator color={COLORS.primaryInk} /> : <><Text style={styles.primaryActionText}>Sohbeti aç</Text><Ionicons name="arrow-forward" size={19} color={COLORS.primaryInk} /></>}</LinearGradient></Pressable></View></KeyboardAvoidingView></Modal>
+    <Modal transparent visible={newChatOpen} animationType="slide" onRequestClose={() => setNewChatOpen(false)}><KeyboardSafeView style={styles.modalOverlay}><Pressable style={StyleSheet.absoluteFill} onPress={() => setNewChatOpen(false)} /><View style={styles.sheet}><View style={styles.sheetHandle} /><ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}><View style={styles.sheetHeader}><View><Text style={styles.eyebrow}>YENİ SOHBET</Text><Text style={styles.sheetTitle}>Birini bul.</Text></View><Pressable onPress={() => setNewChatOpen(false)} style={styles.headerButton}><Ionicons name="close" size={21} color={COLORS.text} /></Pressable></View><Text style={styles.fieldLabel}>KULLANICI ADI</Text><View style={styles.handleInput}><Text style={styles.handlePrefix}>@</Text><TextInput value={newHandle} onChangeText={setNewHandle} placeholder="kullaniciadi" placeholderTextColor={COLORS.muted} autoCapitalize="none" autoCorrect={false} maxLength={24} style={styles.handleTextInput} /></View><Text style={styles.sheetHint}>Yalnızca kayıtlı Sora kullanıcılarıyla sohbet başlatabilirsin.</Text><Pressable disabled={startingChat} onPress={createConversation}><LinearGradient colors={[COLORS.primary, "#6AA8F5"]} style={styles.primaryAction}>{startingChat ? <ActivityIndicator color={COLORS.primaryInk} /> : <><Text style={styles.primaryActionText}>Sohbeti aç</Text><Ionicons name="arrow-forward" size={19} color={COLORS.primaryInk} /></>}</LinearGradient></Pressable></ScrollView></View></KeyboardSafeView></Modal>
   </View>;
 }
 

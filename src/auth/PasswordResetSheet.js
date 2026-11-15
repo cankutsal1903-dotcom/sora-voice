@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { KeyboardSafeView } from "../ui/useKeyboardInset";
 
 export function PasswordResetSheet({ visible, onDismiss, onUpdatePassword }) {
   const [password, setPassword] = useState("");
@@ -36,7 +37,31 @@ export function PasswordResetSheet({ visible, onDismiss, onUpdatePassword }) {
     }
   };
 
-  return <Modal transparent visible={visible} animationType="slide" onRequestClose={onDismiss}><View style={styles.overlay}><Pressable style={styles.dismiss} onPress={onDismiss} /><View style={styles.sheet}><View style={styles.handle} /><View style={styles.icon}><Ionicons name="key-outline" size={24} color="#111820" /></View><Text style={styles.kicker}>GÜVENLİK DOĞRULAMASI</Text><Text style={styles.title}>Yeni parolanı belirle.</Text><Text style={styles.subtitle}>Bu bağlantı ile hesabının parolasını güvenle yenileyebilirsin.</Text><Text style={styles.label}>YENİ PAROLA</Text><TextInput value={password} onChangeText={setPassword} secureTextEntry placeholder="En az 6 karakter" placeholderTextColor="#8190A2" style={styles.input} /><Text style={styles.label}>YENİ PAROLA TEKRAR</Text><TextInput value={confirmation} onChangeText={setConfirmation} secureTextEntry placeholder="Parolanı tekrar yaz" placeholderTextColor="#8190A2" style={styles.input} />{error ? <Text style={styles.error}>{error}</Text> : null}<Pressable disabled={submitting} onPress={submit} style={[styles.submit, submitting && styles.disabled]}><Text style={styles.submitText}>{submitting ? "Kaydediliyor" : "Parolayı güncelle"}</Text><Ionicons name="checkmark" size={20} color="#111820" /></Pressable></View></View></Modal>;
+  return (
+    <Modal transparent visible={visible} animationType="slide" onRequestClose={onDismiss}>
+      <KeyboardSafeView style={styles.overlay}>
+        <Pressable style={styles.dismiss} onPress={onDismiss} />
+        <View style={styles.sheet}>
+          <View style={styles.handle} />
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <View style={styles.icon}><Ionicons name="key-outline" size={24} color="#111820" /></View>
+            <Text style={styles.kicker}>GÜVENLİK DOĞRULAMASI</Text>
+            <Text style={styles.title}>Yeni parolanı belirle.</Text>
+            <Text style={styles.subtitle}>Bu bağlantı ile hesabının parolasını güvenle yenileyebilirsin.</Text>
+            <Text style={styles.label}>YENİ PAROLA</Text>
+            <TextInput value={password} onChangeText={setPassword} secureTextEntry placeholder="En az 6 karakter" placeholderTextColor="#8190A2" style={styles.input} />
+            <Text style={styles.label}>YENİ PAROLA TEKRAR</Text>
+            <TextInput value={confirmation} onChangeText={setConfirmation} secureTextEntry placeholder="Parolanı tekrar yaz" placeholderTextColor="#8190A2" style={styles.input} />
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            <Pressable disabled={submitting} onPress={submit} style={[styles.submit, submitting && styles.disabled]}>
+              <Text style={styles.submitText}>{submitting ? "Kaydediliyor" : "Parolayı güncelle"}</Text>
+              <Ionicons name="checkmark" size={20} color="#FFFFFF" />
+            </Pressable>
+          </ScrollView>
+        </View>
+      </KeyboardSafeView>
+    </Modal>
+  );
 }
 
 const styles = StyleSheet.create({

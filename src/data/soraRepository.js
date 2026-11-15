@@ -206,36 +206,82 @@ export const startScheduledRoom = async (roomId) => {
 
 export const listRoomMessages = async (roomId) => {
   const client = requireClient();
-  const { data, error } = await client
+  let { data, error } = await client
     .from("room_messages")
-    .select("id, body, kind, created_at, sender_id, sender_name")
+    .select("id, body, kind, metadata, created_at, sender_id, sender_name, sender_avatar_url, sender_avatar_color")
     .eq("room_id", roomId)
     .order("created_at", { ascending: false })
     .limit(100);
-  throwIfError(error);
-  return (data || []).reverse().map((message) => ({
-    id: message.id,
-    userId: message.sender_id,
-    user: message.sender_name || "Sora kullanıcısı",
-    text: message.body,
-    system: message.kind === "system",
-    createdAt: message.created_at,
-  }));
+  if (error) {
+    const legacy = await client
+      .from("room_messages")
+      .select("id, body, kind, created_at, sender_id, sender_name")
+      .eq("room_id", roomId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    throwIfError(legacy.error);
+    data = legacy.data;
+  }
+  const rows = (data || []).reverse();
+  const missingSenderIds = [
+    ...new Set(
+      rows
+        .filter((row) => row.sender_id && (!row.sender_avatar_url && !row.sender_avatar_color))
+        .map((row) => row.sender_id),
+    ),
+  ];
+  const profileBySender = new Map();
+  if (missingSenderIds.length > 0) {
+    const { data: senderProfiles } = await client
+      .from("profiles")
+      .select("id, display_name, avatar_url, avatar_color")
+      .in("id", missingSenderIds);
+    (senderProfiles || []).forEach((item) => {
+      if (item?.id) profileBySender.set(item.id, item);
+    });
+  }
+  return rows.map((message) => {
+    const fallbackProfile = profileBySender.get(message.sender_id);
+    return {
+      id: message.id,
+      userId: message.sender_id,
+      user: message.sender_name || fallbackProfile?.display_name || "Sora kullanıcısı",
+      avatarUrl: message.sender_avatar_url || fallbackProfile?.avatar_url || null,
+      avatarColor: message.sender_avatar_color || fallbackProfile?.avatar_color || "#5F96DF",
+      text: message.body,
+      kind: message.kind || "text",
+      metadata: message.metadata || {},
+      system: message.kind === "system",
+      createdAt: message.created_at,
+    };
+  });
 };
 
 export const sendRoomMessage = async ({ roomId, userId, text }) => {
   const client = requireClient();
-  const { data, error } = await client
+  let { data, error } = await client
     .from("room_messages")
     .insert({ room_id: roomId, sender_id: userId, body: text })
-    .select("id, body, kind, created_at, sender_id, sender_name")
+    .select("id, body, kind, metadata, created_at, sender_id, sender_name, sender_avatar_url, sender_avatar_color")
     .single();
-  throwIfError(error);
+  if (error) {
+    const legacy = await client
+      .from("room_messages")
+      .insert({ room_id: roomId, sender_id: userId, body: text })
+      .select("id, body, kind, created_at, sender_id, sender_name")
+      .single();
+    throwIfError(legacy.error);
+    data = legacy.data;
+  }
   return {
     id: data.id,
     userId: data.sender_id,
     user: data.sender_name || "Sora kullanıcısı",
+    avatarUrl: data.sender_avatar_url || null,
+    avatarColor: data.sender_avatar_color || null,
     text: data.body,
+    kind: data.kind || "text",
+    metadata: data.metadata || {},
     system: data.kind === "system",
     createdAt: data.created_at,
   };
@@ -273,7 +319,7 @@ export const listRoomMembers = async (roomId) => {
 export const getPublicProfile = async (userId) => {
   if (!userId) return null;
   const client = requireClient();
-  const [profileResult, appearanceResult, publicIdResult] = await Promise.all([
+  const [profileResult, appearanceResult, publicIdResult, levelResult] = await Promise.all([
     client
       .from("profiles")
       .select("id, handle, display_name, avatar_color, avatar_url, bio")
@@ -289,12 +335,18 @@ export const getPublicProfile = async (userId) => {
       .select("public_id")
       .eq("id", userId)
       .maybeSingle(),
+    client
+      .from("profiles")
+      .select("user_level, user_xp")
+      .eq("id", userId)
+      .maybeSingle(),
   ]);
   const { data, error } = profileResult;
   throwIfError(error);
   if (!data) return null;
   const appearance = appearanceResult.error ? null : appearanceResult.data;
   const publicIdRow = publicIdResult.error ? null : publicIdResult.data;
+  const levelRow = levelResult.error ? null : levelResult.data;
   return {
     userId: data.id,
     publicId: publicIdRow?.public_id || null,
@@ -305,6 +357,8 @@ export const getPublicProfile = async (userId) => {
     bio: data.bio,
     activeFrameId: appearance?.active_frame_id || null,
     activeProfileThemeId: appearance?.active_profile_theme_id || null,
+    userLevel: Math.max(1, Number(levelRow?.user_level) || 1),
+    userXp: Math.max(0, Number(levelRow?.user_xp) || 0),
   };
 };
 
@@ -355,9 +409,11 @@ export const listWalletTransactions = async () => {
   return data || [];
 };
 
+export const DAILY_REWARD_COINS = 2_000_000;
+
 export const claimDailyReward = async () => {
   const client = requireClient();
-  const { data, error } = await client.rpc("claim_daily_reward", { p_amount: 75 });
+  const { data, error } = await client.rpc("claim_daily_reward", { p_amount: DAILY_REWARD_COINS });
   throwIfError(error);
   return data?.[0] || { balance: 0, claimed: false };
 };
@@ -1150,19 +1206,135 @@ export const listRoomGiftCatalog = async () => {
   const client = requireClient();
   let { data, error } = await client
     .from("gift_catalog")
-    .select("id,name,icon,color,cost,min_family_level")
+    .select("id,name,icon,color,cost,min_family_level,category,sort_order")
     .eq("active", true)
-    .order("cost");
+    .order("sort_order", { ascending: true })
+    .order("cost", { ascending: true });
   if (error) {
-    const legacy = await client.from("gift_catalog").select("id,name,icon,color,cost").eq("active", true).order("cost");
+    const legacy = await client
+      .from("gift_catalog")
+      .select("id,name,icon,color,cost,min_family_level")
+      .eq("active", true)
+      .order("cost");
     throwIfError(legacy.error);
     data = legacy.data;
   }
   return (data || []).map((row) => ({
     ...row,
     icon: row.icon === "crown" ? "trophy" : row.icon,
+    category: row.category || "affordable",
+    sortOrder: Number(row.sort_order) || 100,
     minFamilyLevel: row.min_family_level || 0,
   }));
+};
+
+const EVEN_LEVEL_REWARD_MAP = {
+  2: 250_000,
+  4: 500_000,
+  6: 750_000,
+  8: 1_000_000,
+  10: 1_400_000,
+  12: 1_800_000,
+  14: 2_200_000,
+  16: 2_700_000,
+  18: 3_200_000,
+  20: 3_800_000,
+  22: 4_400_000,
+  24: 5_000_000,
+  26: 5_700_000,
+  28: 6_400_000,
+  30: 7_200_000,
+  32: 8_000_000,
+  34: 8_800_000,
+  36: 9_600_000,
+  38: 10_200_000,
+  40: 10_800_000,
+  42: 11_200_000,
+  44: 11_400_000,
+  46: 16_000_000,
+  48: 22_000_000,
+  50: 30_000_000,
+  52: 38_000_000,
+  54: 46_000_000,
+  56: 55_000_000,
+  58: 65_000_000,
+  60: 75_000_000,
+};
+
+export const evenLevelCoinReward = (rawLevel) => {
+  const lvl = Math.floor(Number(rawLevel) || 0);
+  if (lvl < 2 || lvl % 2 !== 0) return 0;
+  if (EVEN_LEVEL_REWARD_MAP[lvl] != null) return EVEN_LEVEL_REWARD_MAP[lvl];
+  return Math.min(250_000_000, 75_000_000 + Math.floor((lvl - 60) / 2) * 10_000_000);
+};
+
+export const minXpForUserLevel = (rawLevel) => {
+  const lvl = Math.max(1, Math.floor(Number(rawLevel) || 1));
+  if (lvl <= 1) return 0;
+  return 250 * (lvl - 1) * lvl;
+};
+
+export const calculateUserLevelFromXp = (rawXp) => {
+  const xp = Math.max(0, Math.floor(Number(rawXp) || 0));
+  let lvl = 1;
+  while (lvl < 120 && xp >= minXpForUserLevel(lvl + 1)) {
+    lvl += 1;
+  }
+  return lvl;
+};
+
+export const computeUserLevelProgress = (rawXp, rawLevel) => {
+  const xp = Math.max(0, Math.floor(Number(rawXp) || 0));
+  const level = Math.max(1, Math.floor(Number(rawLevel) || 0), calculateUserLevelFromXp(xp));
+  const currentMinXp = minXpForUserLevel(level);
+  const nextMinXp = minXpForUserLevel(level + 1);
+  const stepRequiredXp = Math.max(1, nextMinXp - currentMinXp);
+  const gainedInLevel = Math.max(0, xp - currentMinXp);
+  const remainingXp = Math.max(0, nextMinXp - xp);
+  const nextEvenLevel = level % 2 === 0 ? level + 2 : level + 1;
+  return {
+    level,
+    xp,
+    currentMinXp,
+    nextMinXp,
+    stepRequiredXp,
+    gainedInLevel,
+    remainingXp,
+    ratio: Math.min(1, gainedInLevel / stepRequiredXp),
+    nextEvenLevel,
+    nextEvenCoinReward: evenLevelCoinReward(nextEvenLevel),
+  };
+};
+
+export const syncMyUserLevel = async () => {
+  const client = requireClient();
+  const { data, error } = await client.rpc("sync_my_user_level");
+  throwIfError(error);
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
+  return {
+    userLevel: Math.max(1, Number(row.user_level) || 1),
+    userXp: Math.max(0, Number(row.user_xp) || 0),
+    badgeTier: Math.max(0, Number(row.badge_tier) || 0),
+    badgeCode: row.badge_code || "sora_crest_t0",
+    badgeName: row.badge_name || "Başlangıç Arması",
+    newlyAwardedCoins: Math.max(0, Number(row.newly_awarded_coins) || 0),
+    balance: typeof row.balance === "number" ? row.balance : null,
+    promoBalance: typeof row.promo_balance === "number" ? row.promo_balance : null,
+    paidBalance: typeof row.paid_balance === "number" ? row.paid_balance : null,
+  };
+};
+
+export const listUserLevelRewardClaims = async (userId) => {
+  if (!userId) return [];
+  const client = requireClient();
+  const { data, error } = await client
+    .from("user_level_reward_claims")
+    .select("level, coins_awarded, badge_tier, claimed_at")
+    .eq("user_id", userId)
+    .order("level", { ascending: true });
+  if (error) return [];
+  return data || [];
 };
 
 export const listProfileItems = async () => {

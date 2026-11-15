@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { KeyboardSafeView } from "../ui/useKeyboardInset";
 import {
   isHandleAvailable,
   normalizePhoneNumber,
@@ -160,7 +161,31 @@ export function AuthScreen() {
 
   const subtitle = screen === "otp" ? "Telefon numaranı güvenle doğrula." : screen === "phone" ? "Telefon numaranla hızlı ve güvenli giriş yap." : isRegistering ? "Profilini oluştur, topluluğunu bul ve odalara katıl." : "Odaların, takiplerin ve profilin seni bekliyor.";
 
-  return <LinearGradient colors={["#F3F7FC", "#F3F7FC", "#EAF3FD"]} style={styles.screen}><SafeAreaView style={styles.safe}><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.content}><View style={styles.hero}><Image source={SORA_LOGO} style={styles.logo} accessibilityLabel="Sora logosu" /><Text style={styles.kicker}>SORA HESABI</Text><Text style={styles.title}>{screen === "otp" ? "Kodunu doğrula." : screen === "phone" ? "Telefonla devam et." : isRegistering ? "Sesinle yerini al." : "Sohbete geri dön."}</Text><Text style={styles.subtitle}>{subtitle}</Text></View>{screen === "email" ? emailCard : screen === "phone" ? phoneCard : otpCard}<View style={styles.providerHint}><Ionicons name="shield-checkmark-outline" size={16} color={BRAND} /><Text style={styles.providerHintText}>Hesabın güvenli oturumla cihazında saklanır.</Text></View></KeyboardAvoidingView></SafeAreaView></LinearGradient>;
+  return (
+    <LinearGradient colors={["#F3F7FC", "#F3F7FC", "#EAF3FD"]} style={styles.screen}>
+      <SafeAreaView style={styles.safe}>
+        <KeyboardSafeView style={styles.safe}>
+          <ScrollView
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.hero}>
+              <Image source={SORA_LOGO} style={styles.logo} accessibilityLabel="Sora logosu" />
+              <Text style={styles.kicker}>SORA HESABI</Text>
+              <Text style={styles.title}>{screen === "otp" ? "Kodunu doğrula." : screen === "phone" ? "Telefonla devam et." : isRegistering ? "Sesinle yerini al." : "Sohbete geri dön."}</Text>
+              <Text style={styles.subtitle}>{subtitle}</Text>
+            </View>
+            {screen === "email" ? emailCard : screen === "phone" ? phoneCard : otpCard}
+            <View style={styles.providerHint}>
+              <Ionicons name="shield-checkmark-outline" size={16} color={BRAND} />
+              <Text style={styles.providerHintText}>Hesabın güvenli oturumla cihazında saklanır.</Text>
+            </View>
+          </ScrollView>
+        </KeyboardSafeView>
+      </SafeAreaView>
+    </LinearGradient>
+  );
 }
 
 const CARD_SHADOW = {
@@ -175,7 +200,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   safe: { flex: 1 },
   content: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: "center",
     paddingHorizontal: 24,
     paddingVertical: 20,

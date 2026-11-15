@@ -13,6 +13,7 @@ import {
   setUserBlocked,
 } from "../data/soraRepository";
 import { COLORS } from "../theme/colors";
+import { KeyboardSafeView } from "../ui/useKeyboardInset";
 
 const REPORT_REASONS = [
   ["spam", "Spam", "mail-unread-outline"],
@@ -29,14 +30,14 @@ const STATUS_LABELS = { open: "Bekliyor", reviewing: "İnceleniyor", actioned: "
 
 function SheetFrame({ visible, onDismiss, children, tall = false }) {
   return <Modal transparent visible={visible} animationType="slide" onRequestClose={onDismiss}>
-    <View style={styles.overlay}>
+    <KeyboardSafeView style={styles.overlay}>
       <Pressable style={styles.dismissArea} onPress={onDismiss} />
       <View style={[styles.sheet, tall && styles.tallSheet]}>
         <View style={styles.handle} />
         <Pressable onPress={onDismiss} style={styles.closeButton}><Ionicons name="close" size={20} color={COLORS.text} /></Pressable>
         {children}
       </View>
-    </View>
+    </KeyboardSafeView>
   </Modal>;
 }
 
@@ -82,22 +83,24 @@ export function ReportSheet({ target, onDismiss }) {
   };
 
   return <SheetFrame visible={Boolean(target)} onDismiss={onDismiss} tall>
-    <Text style={styles.kicker}>GÜVENLİK BİLDİRİMİ</Text>
-    <Text style={styles.title}>{target?.name || "İçeriği"} bildir</Text>
-    <Text style={styles.description}>En uygun nedeni seç. Bildirim kimliğin karşı tarafa gösterilmez.</Text>
-    <ScrollView style={styles.reasonScroll} contentContainerStyle={styles.reasonGrid}>
-      {REPORT_REASONS.map(([key, label, icon]) => <Pressable key={key} onPress={() => setCategory(key)} style={[styles.reason, category === key && styles.reasonActive]}>
-        <Ionicons name={icon} size={17} color={category === key ? COLORS.primaryInk : COLORS.muted} />
-        <Text style={[styles.reasonText, category === key && styles.reasonTextActive]}>{label}</Text>
-      </Pressable>)}
+    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent}>
+      <Text style={styles.kicker}>GÜVENLİK BİLDİRİMİ</Text>
+      <Text style={styles.title}>{target?.name || "İçeriği"} bildir</Text>
+      <Text style={styles.description}>En uygun nedeni seç. Bildirim kimliğin karşı tarafa gösterilmez.</Text>
+      <View style={[styles.reasonGrid, { marginBottom: 17 }]}>
+        {REPORT_REASONS.map(([key, label, icon]) => <Pressable key={key} onPress={() => setCategory(key)} style={[styles.reason, category === key && styles.reasonActive]}>
+          <Ionicons name={icon} size={17} color={category === key ? COLORS.primaryInk : COLORS.muted} />
+          <Text style={[styles.reasonText, category === key && styles.reasonTextActive]}>{label}</Text>
+        </Pressable>)}
+      </View>
+      <Text style={styles.label}>AYRINTI (İSTEĞE BAĞLI)</Text>
+      <TextInput value={details} onChangeText={setDetails} placeholder="Ne olduğunu kısaca anlat" placeholderTextColor={COLORS.muted} style={styles.detailsInput} maxLength={500} multiline />
+      <Text style={styles.counter}>{details.length}/500</Text>
+      <Pressable disabled={submitting} onPress={submit} style={[styles.primaryButton, submitting && styles.disabledButton]}>
+        <Text style={styles.primaryButtonText}>{submitting ? "Gönderiliyor" : "Güvenli biçimde gönder"}</Text>
+        <Ionicons name="shield-checkmark" size={19} color={COLORS.primaryInk} />
+      </Pressable>
     </ScrollView>
-    <Text style={styles.label}>AYRINTI (İSTEĞE BAĞLI)</Text>
-    <TextInput value={details} onChangeText={setDetails} placeholder="Ne olduğunu kısaca anlat" placeholderTextColor={COLORS.muted} style={styles.detailsInput} maxLength={500} multiline />
-    <Text style={styles.counter}>{details.length}/500</Text>
-    <Pressable disabled={submitting} onPress={submit} style={[styles.primaryButton, submitting && styles.disabledButton]}>
-      <Text style={styles.primaryButtonText}>{submitting ? "Gönderiliyor" : "Güvenli biçimde gönder"}</Text>
-      <Ionicons name="shield-checkmark" size={19} color={COLORS.primaryInk} />
-    </Pressable>
   </SheetFrame>;
 }
 
