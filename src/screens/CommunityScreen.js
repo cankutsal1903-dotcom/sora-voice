@@ -1050,6 +1050,14 @@ export function CommunityScreen({
 
   const canAffordFamily = typeof coins !== "number" || coins >= FAMILY_CREATION_COST;
 
+  const memberById = useMemo(() => {
+    const map = new Map();
+    for (const m of familyMembers) {
+      if (m?.userId) map.set(m.userId, m);
+    }
+    return map;
+  }, [familyMembers]);
+
   const renderMessageItem = (msg) => {
     const isGift = msg.kind === "gift";
     const meta = msg.metadata || {};
@@ -1059,25 +1067,40 @@ export function CommunityScreen({
     const giftCost = Number(meta.total_cost) || 0;
     const giftXp = Number(meta.awarded_xp) || 0;
 
+    const knownMember = msg.userId ? memberById.get(msg.userId) : null;
+    const resolvedAvatarUrl = msg.own
+      ? (profile?.avatarUrl || msg.senderAvatarUrl || knownMember?.avatarUrl || null)
+      : (msg.senderAvatarUrl || knownMember?.avatarUrl || null);
+    const resolvedSenderName = msg.own
+      ? (profile?.name || msg.senderName || "Sen")
+      : (msg.senderName || knownMember?.name || "Aile üyesi");
+    const resolvedSenderColor = msg.own
+      ? (profile?.color || msg.senderColor || COLORS.primary)
+      : (msg.senderColor || knownMember?.color || COLORS.primary);
+
+    const avatarNode = (
+      <Pressable
+        onPress={() => msg.userId && onOpenUserProfile?.(msg.userId)}
+        onLongPress={() => msg.userId && openGiftSheet(msg.userId)}
+        delayLongPress={240}
+        accessibilityRole="button"
+        accessibilityLabel={`${resolvedSenderName} profili`}
+      >
+        <MemberAvatar
+          uri={resolvedAvatarUrl}
+          name={resolvedSenderName}
+          color={resolvedSenderColor}
+          size={34}
+        />
+      </Pressable>
+    );
+
     return (
       <View
         key={msg.id}
         style={[styles.msgRow, msg.own && styles.msgRowOwn]}
       >
-        {!msg.own ? (
-          <Pressable
-            onPress={() => msg.userId && onOpenUserProfile?.(msg.userId)}
-            onLongPress={() => msg.userId && openGiftSheet(msg.userId)}
-            delayLongPress={240}
-          >
-            <MemberAvatar
-              uri={msg.senderAvatarUrl}
-              name={msg.senderName}
-              color={msg.senderColor}
-              size={32}
-            />
-          </Pressable>
-        ) : null}
+        {!msg.own ? avatarNode : null}
 
         {isGift ? (
           <Pressable
@@ -1128,7 +1151,7 @@ export function CommunityScreen({
             ]}
           >
             {!msg.own ? (
-              <Text style={styles.msgSender}>{msg.senderName}</Text>
+              <Text style={styles.msgSender}>{resolvedSenderName}</Text>
             ) : null}
             <Text style={[styles.msgText, msg.own && styles.msgTextOwn]}>
               {msg.text}
@@ -1138,6 +1161,8 @@ export function CommunityScreen({
             </Text>
           </Pressable>
         )}
+
+        {msg.own ? avatarNode : null}
       </View>
     );
   };
@@ -1257,11 +1282,17 @@ export function CommunityScreen({
             ]}
           >
             <Pressable
-              onPress={() => openGiftSheet(null)}
-              accessibilityLabel="Hediye kutusu"
-              style={styles.composerGiftBtn}
+              onPress={() => currentUserId && onOpenUserProfile?.(currentUserId)}
+              style={styles.composerAvatarWrap}
+              accessibilityRole="button"
+              accessibilityLabel="Profil fotoğrafın"
             >
-              <Ionicons name="gift-outline" size={20} color={COLORS.primary} />
+              <MemberAvatar
+                uri={profile?.avatarUrl || null}
+                name={profile?.name || "Sen"}
+                color={profile?.color || COLORS.primary}
+                size={34}
+              />
             </Pressable>
             <TextInput
               value={draft}
@@ -1272,6 +1303,13 @@ export function CommunityScreen({
               multiline
               style={styles.composerInput}
             />
+            <Pressable
+              onPress={() => openGiftSheet(null)}
+              accessibilityLabel="Hediye kutusu"
+              style={styles.composerGiftBtn}
+            >
+              <Ionicons name="gift-outline" size={20} color={COLORS.primary} />
+            </Pressable>
             <Pressable
               disabled={sendingMessage || !draft.trim()}
               onPress={handleSendMessage}
@@ -2214,7 +2252,7 @@ const styles = StyleSheet.create({
   messagesList: { padding: 16, paddingBottom: 20, gap: 10 },
   msgRow: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
   msgRowOwn: { justifyContent: "flex-end" },
-  msgBubble: { maxWidth: "78%", paddingHorizontal: 13, paddingVertical: 9, borderRadius: 18 },
+  msgBubble: { maxWidth: "74%", paddingHorizontal: 13, paddingVertical: 9, borderRadius: 18 },
   msgBubbleOther: {
     backgroundColor: COLORS.surface,
     borderWidth: 1,
@@ -2228,7 +2266,7 @@ const styles = StyleSheet.create({
   msgTime: { color: COLORS.muted, fontSize: 9, marginTop: 4, alignSelf: "flex-end" },
   msgTimeOwn: { color: "rgba(255,255,255,0.78)" },
   giftMsgCard: {
-    maxWidth: "84%",
+    maxWidth: "78%",
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
@@ -2281,6 +2319,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 8,
+  },
+  composerAvatarWrap: {
+    height: 42,
+    justifyContent: "center",
+    alignItems: "center",
   },
   composerGiftBtn: {
     width: 42,

@@ -57,6 +57,7 @@ import {
   claimDailyReward as claimRemoteDailyReward,
   computeUserLevelProgress,
   createRoom as createRemoteRoom,
+  deactivateStaleHostedRooms,
   deleteRoom as deleteRemoteRoom,
   evenLevelCoinReward,
   getHostedRoom,
@@ -2287,11 +2288,9 @@ function Profile({
   hostedRoomCount,
   myRooms = [],
   dailyRewardClaimed,
-  adminRole,
   onEdit,
   onOpenSettings,
   onOpenWallet,
-  onOpenAdmin,
   onClaimDailyReward,
   onSyncUserLevel,
 }) {
@@ -2328,20 +2327,14 @@ function Profile({
         dailyRewardClaimed ? onOpenWallet : onClaimDailyReward,
       ],
       ["shield-checkmark-outline", "Güvenlik merkezi", openSafetyCenter],
-      ...(adminRole
-        ? [["shield-half-outline", "Yönetim paneli", onOpenAdmin]]
-        : []),
       ["settings-outline", "Ayarlar", onOpenSettings],
     ],
     [
-      adminRole,
       dailyRewardClaimed,
       onClaimDailyReward,
-      onOpenAdmin,
       onOpenSettings,
       onOpenWallet,
       openSafetyCenter,
-      openProfileDetails,
     ],
   );
   useEffect(() => {
@@ -2457,6 +2450,7 @@ function Profile({
   );
   const level = Math.max(1, Math.floor(Number(profile.userLevel) || 1));
   const userXp = Math.max(0, Math.floor(Number(profile.userXp) || 0));
+  const badgeTier = getBadgeTierConfigForLevel(level);
   const homeFrameAppearance = PROFILE_ITEM_APPEARANCE[profile.activeFrameId];
   const homeThemeAppearance = PROFILE_ITEM_APPEARANCE[profile.activeProfileThemeId];
   return (
@@ -2503,14 +2497,17 @@ function Profile({
                   bordered
                   circle
                 />
-                <View style={styles.profileHomeLevelBadge}>
-                  <Text style={styles.profileHomeLevelText}>L{level}</Text>
-                </View>
               </View>
               <View style={styles.profileHomeCopy}>
-                <Text style={styles.profileHomeName} numberOfLines={1}>
-                  {profile.name}
-                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text style={[styles.profileHomeName, { flexShrink: 1 }]} numberOfLines={1}>
+                    {profile.name}
+                  </Text>
+                  <SoraLevelCrest level={level} size={24} />
+                  <View style={styles.profileLevelInlinePill}>
+                    <Text style={styles.profileLevelInlineText}>Sv. {level}</Text>
+                  </View>
+                </View>
                 <Text style={styles.profileHomeHandle} numberOfLines={1}>
                   @{profile.handle}
                   {profile.publicId ? ` · ID: ${profile.publicId}` : ""}
@@ -2595,10 +2592,15 @@ function Profile({
             pressed && { opacity: 0.86 },
           ]}
         >
-          <SoraLevelCrest level={level} size={38} />
+          <SoraLevelCrest level={level} size={44} />
           <View style={styles.pfLevelInfo}>
             <Text style={styles.pfLevelTitle}>
               Seviye {String(level).padStart(2, "0")}
+            </Text>
+          </View>
+          <View style={styles.profileBadgeTierChip}>
+            <Text style={styles.profileBadgeTierChipText} numberOfLines={1}>
+              {badgeTier.title}
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
@@ -2814,6 +2816,10 @@ function Profile({
         isSelf
         onEdit={onEdit}
         onShare={shareProfile}
+        onOpenLevel={() => {
+          setProfileDetailsOpen(false);
+          setLevelSheetOpen(true);
+        }}
         onDismiss={() => setProfileDetailsOpen(false)}
       />
       <SecureSafetyCenterSheet
@@ -2862,6 +2868,7 @@ function ProfileDetailSheet({
   onDismiss,
   onEdit,
   onShare,
+  onOpenLevel,
   onToggleFollow,
   onBlock,
   onReport,
@@ -2922,6 +2929,10 @@ function ProfileDetailSheet({
   const name = person.name || person.display_name || "Sora kullanıcısı";
   const handle = person.handle ? `@${person.handle.replace(/^@+/, "")}` : "Sora kullanıcısı";
   const color = person.color || person.avatar_color || COLORS.primaryLight;
+  const personLevel = Math.max(1, Math.floor(Number(person.userLevel || person.user_level || 1)));
+  const personXp = Math.max(0, Math.floor(Number(person.userXp || person.user_xp || 0)));
+  const personBadgeTier = getBadgeTierConfigForLevel(personLevel);
+  const personLevelProgress = computeUserLevelProgress(personXp, personLevel);
   const frameAppearance = PROFILE_ITEM_APPEARANCE[person.activeFrameId];
   const themeAppearance = PROFILE_ITEM_APPEARANCE[person.activeProfileThemeId];
   const role = person.role;
@@ -3041,13 +3052,14 @@ function ProfileDetailSheet({
                 : null,
             ]}
           >
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              <Text style={styles.profileDetailName}>{name}</Text>
-              <SoraLevelCrest
-                level={Number(person.userLevel || person.user_level || 1)}
-                size={28}
-                showLevel
-              />
+            <View style={styles.profileDetailNameRow}>
+              <Text style={styles.profileDetailName} numberOfLines={1}>
+                {name}
+              </Text>
+              <SoraLevelCrest level={personLevel} size={28} />
+              <View style={styles.profileLevelInlinePill}>
+                <Text style={styles.profileLevelInlineText}>Sv. {personLevel}</Text>
+              </View>
             </View>
             <Text style={styles.profileDetailHandle}>
               {handle}
@@ -3123,15 +3135,57 @@ function ProfileDetailSheet({
               </View>
             </View>
           ) : (
-            <View style={styles.profileDetailSection}>
-              <Text style={styles.profileDetailSectionTitle}>Hakkında</Text>
-              <Text style={styles.profileDetailBio}>
-                {person.bio || "Henüz bir profil açıklaması eklenmemiş."}
-              </Text>
-              {loading ? (
-                <Text style={styles.profileDetailLoading}>Profil bilgileri yükleniyor…</Text>
-              ) : null}
-            </View>
+            <>
+              <Pressable
+                disabled={!onOpenLevel}
+                onPress={onOpenLevel}
+                accessibilityRole={onOpenLevel ? "button" : "summary"}
+                style={({ pressed }) => [
+                  styles.profileDetailLevelCard,
+                  pressed && onOpenLevel && { opacity: 0.88 },
+                ]}
+              >
+                <View style={styles.profileDetailLevelTop}>
+                  <SoraLevelCrest level={personLevel} size={52} showLevelTag />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.profileDetailLevelTitle}>
+                      Seviye {String(personLevel).padStart(2, "0")}
+                    </Text>
+                    <Text style={styles.profileDetailLevelBadgeName}>
+                      {personBadgeTier.title}
+                    </Text>
+                  </View>
+                  {onOpenLevel ? (
+                    <Ionicons name="chevron-forward" size={19} color={COLORS.muted} />
+                  ) : null}
+                </View>
+                {(isSelf || personXp > 0) ? (
+                  <View style={styles.profileDetailLevelTrack}>
+                    <View
+                      style={[
+                        styles.profileDetailLevelFill,
+                        {
+                          width: `${Math.max(
+                            6,
+                            Math.min(100, Math.round((personLevelProgress.ratio || 0) * 100)),
+                          )}%`,
+                        },
+                      ]}
+                    />
+                  </View>
+                ) : null}
+              </Pressable>
+
+              <View style={styles.profileDetailSection}>
+                <Text style={styles.profileDetailSectionTitle}>Hakkında</Text>
+                <Text style={styles.profileDetailBio}>
+                  {person.bio || "Henüz bir profil açıklaması eklenmemiş."}
+                </Text>
+                {loading ? (
+                  <Text style={styles.profileDetailLoading}>Profil bilgileri yükleniyor…</Text>
+                ) : null}
+              </View>
+            </>
           )}
           {!isSelf ? (
             <View style={styles.profileDetailActions}>
@@ -8372,6 +8426,8 @@ function AppContent() {
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("discover");
   const [room, setRoom] = useState(null);
+  const openRoomIdRef = useRef(null);
+  openRoomIdRef.current = room?.id || null;
   const [myFamily, setMyFamily] = useState(null);
   const [inspectedUserId, setInspectedUserId] = useState(null);
   const [roomMinimized, setRoomMinimized] = useState(false);
@@ -8586,36 +8642,39 @@ function AppContent() {
         timeStyle: "short",
       }).format(new Date(transaction.created_at)),
     });
-    Promise.all([
-      listRooms("live"),
-      listRooms("scheduled"),
-      listFollowedUserIds(user.id),
-      getWallet(),
-      listWalletTransactions(),
-    ])
-      .then(
-        ([
-          liveRooms,
-          plannedRooms,
-          follows,
-          wallet,
-          transactions,
-        ]) => {
-          if (!active) return;
-          setRooms([...liveRooms, ...SEEDED_ROOMS]);
-          setScheduledRooms([...plannedRooms, ...SEEDED_SCHEDULED_ROOMS]);
-          setFollowedUserIds(follows);
-          setWalletBalance(wallet.balance);
-          setPromoWalletBalance(wallet.promo_balance || 0);
-          setPaidWalletBalance(wallet.paid_balance || 0);
-          setDailyRewardClaimed(
-            wallet.last_daily_reward_at ===
-              new Date().toISOString().slice(0, 10),
-          );
-          setWalletActivities(transactions.map(formatTransaction));
-        },
-      )
-      .catch(() => undefined);
+    (async () => {
+      if (!openRoomIdRef.current) {
+        await deactivateStaleHostedRooms(user.id, null).catch(() => undefined);
+      }
+      const [
+        liveRooms,
+        plannedRooms,
+        follows,
+        wallet,
+        transactions,
+      ] = await Promise.all([
+        listRooms("live"),
+        listRooms("scheduled"),
+        listFollowedUserIds(user.id),
+        getWallet(),
+        listWalletTransactions(),
+      ]);
+      if (!active) return;
+      const visibleLiveRooms = liveRooms.filter(
+        (item) => item.hostId !== user.id || item.id === openRoomIdRef.current,
+      );
+      setRooms([...visibleLiveRooms, ...SEEDED_ROOMS]);
+      setScheduledRooms([...plannedRooms, ...SEEDED_SCHEDULED_ROOMS]);
+      setFollowedUserIds(follows);
+      setWalletBalance(wallet.balance);
+      setPromoWalletBalance(wallet.promo_balance || 0);
+      setPaidWalletBalance(wallet.paid_balance || 0);
+      setDailyRewardClaimed(
+        wallet.last_daily_reward_at ===
+          new Date().toISOString().slice(0, 10),
+      );
+      setWalletActivities(transactions.map(formatTransaction));
+    })().catch(() => undefined);
     return () => {
       active = false;
     };
@@ -9467,7 +9526,18 @@ function AppContent() {
     const refreshLiveRooms = () =>
       listRooms("live")
         .then((liveRooms) => {
-          if (active) setRooms(liveRooms);
+          if (!active) return;
+          const selfId = authSession?.user?.id;
+          const staleOwnRoom = selfId
+            ? liveRooms.find((item) => item.hostId === selfId && item.id !== openRoomIdRef.current)
+            : null;
+          if (staleOwnRoom && selfId) {
+            deactivateStaleHostedRooms(selfId, openRoomIdRef.current).catch(() => undefined);
+          }
+          const filtered = selfId
+            ? liveRooms.filter((item) => item.hostId !== selfId || item.id === openRoomIdRef.current)
+            : liveRooms;
+          setRooms(filtered);
         })
         .catch(() => undefined);
     const channel = supabase
@@ -9954,11 +10024,9 @@ function AppContent() {
         hostedRoomCount={hostedRoomCount}
         myRooms={myHostedRooms}
         dailyRewardClaimed={dailyRewardClaimed}
-        adminRole={adminRole}
         onEdit={handleOpenProfileEditor}
         onOpenSettings={handleOpenSettings}
         onOpenWallet={handleOpenWallet}
-        onOpenAdmin={handleOpenAdmin}
         onClaimDailyReward={claimDailyReward}
         onSyncUserLevel={syncUserLevelAndNotify}
       />
@@ -10168,11 +10236,6 @@ function AppContent() {
         notifications={notifications}
         onDismiss={handleCloseNotifications}
         onClear={clearNotifications}
-      />
-      <AdminPanelSheet
-        visible={adminPanelOpen && Boolean(adminRole)}
-        role={adminRole}
-        onDismiss={handleCloseAdminPanel}
       />
       <Onboarding visible={onboardingOpen} onComplete={completeOnboarding} />
     </View>
@@ -15227,14 +15290,84 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     marginTop: -3,
     paddingHorizontal: 20,
-    paddingTop: 56,
+    paddingTop: 32,
     paddingBottom: 18,
     borderRadius: 22,
     backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.line,
   },
-  profileDetailName: { color: COLORS.text, fontSize: 22, fontWeight: "900" },
+  profileDetailNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  profileDetailName: { color: COLORS.text, fontSize: 22, fontWeight: "900", flexShrink: 1 },
+  profileLevelInlinePill: {
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "rgba(47,128,237,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(47,128,237,0.28)",
+  },
+  profileLevelInlineText: {
+    color: COLORS.primary,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  profileBadgeTierChip: {
+    maxWidth: 150,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(47,128,237,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(47,128,237,0.24)",
+  },
+  profileBadgeTierChipText: {
+    color: COLORS.primary,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  profileDetailLevelCard: {
+    marginHorizontal: 16,
+    marginTop: 14,
+    padding: 16,
+    borderRadius: 20,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  profileDetailLevelTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  profileDetailLevelTitle: {
+    color: COLORS.text,
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  profileDetailLevelBadgeName: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: "800",
+    marginTop: 2,
+  },
+  profileDetailLevelTrack: {
+    height: 7,
+    borderRadius: 99,
+    backgroundColor: COLORS.surfaceRaised,
+    overflow: "hidden",
+    marginTop: 12,
+  },
+  profileDetailLevelFill: {
+    height: "100%",
+    borderRadius: 99,
+    backgroundColor: COLORS.primary,
+  },
   profileDetailHandle: { color: COLORS.mutedDark, fontSize: 13, fontWeight: "700", marginTop: 5 },
   profileDetailRoleRow: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 12 },
   profileDetailRoleText: { color: COLORS.textSecondary, fontSize: 12, fontWeight: "700", flexShrink: 1 },

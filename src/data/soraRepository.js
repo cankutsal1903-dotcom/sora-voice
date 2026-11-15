@@ -65,9 +65,10 @@ export const listRooms = async (state = "live") => {
   const blockedIds = new Set(blocksError ? [] : (blocks || []).map((block) => block.blocked_id));
   let visibleRows = (data || []).filter((room) => !blockedIds.has(room.host_id));
   if (state === "live") {
-    // Uygulama arka plana alındığında Android zamanlayıcıları ve soketleri bekletebilir;
-    // oda sahibi gerçekten çıkana kadar (state = 'inactive') aktif odalar keşfette korunur.
-    const backgroundGraceSince = Date.now() - 60 * 60_000;
+    // Oda açıkken 20 sn'de bir kalp atışı gönderilir. 45 sn'yi aşan kayıtlarda
+    // LiveKit sunucusundan oda sahibinin gerçekten bağlı olup olmadığı doğrulanır;
+    // böylece arka plandaki aktif odalar keşfette kalır, kapatılmış hayalet odalar düşer.
+    const backgroundGraceSince = Date.now() - 45_000;
     const staleRows = visibleRows.filter((room) => new Date(room.last_active_at).getTime() < backgroundGraceSince);
     let presentIds = new Set();
     if (staleRows.length) {
@@ -166,6 +167,25 @@ export const getHostedRoom = async (userId) => {
     .maybeSingle();
   throwIfError(inactiveRoomError);
   return inactiveRoom ? mapRoom(inactiveRoom) : null;
+};
+
+export const deactivateStaleHostedRooms = async (userId, activeRoomId = null) => {
+  if (!userId) return;
+  const client = requireClient();
+  let query = client
+    .from("rooms")
+    .update({
+      state: "inactive",
+      listener_count: 0,
+      last_active_at: new Date().toISOString(),
+    })
+    .eq("host_id", userId)
+    .eq("state", "live");
+  if (activeRoomId) {
+    query = query.neq("id", activeRoomId);
+  }
+  const { error } = await query;
+  throwIfError(error);
 };
 
 export const setRoomPresence = async (roomId, isActive, { resetListeners = false } = {}) => {
