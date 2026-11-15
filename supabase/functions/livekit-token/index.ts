@@ -83,7 +83,7 @@ const getAuthorization = (request: Request) => {
 };
 
 const getUserClient = (authorization: string) => {
-  if (!authorization) throw new Error("Authentication required");
+  if (!authorization) throw new HttpError("Authentication required", 401);
   return createClient(supabaseUrl, supabaseKey, {
     global: { headers: { Authorization: authorization } },
   });
