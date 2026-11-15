@@ -365,7 +365,9 @@ app.post("/rooms/:roomId/seat", async (request, response) => {
         throw error;
       }
     } else {
-      seat = validSeats.find((index) => index >= FIRST_REGULAR_SEAT_INDEX && !occupied.has(index)) ?? null;
+      seat = validSeats.find((index) => index >= FIRST_REGULAR_SEAT_INDEX && !occupied.has(index))
+        ?? validSeats.find((index) => !occupied.has(index))
+        ?? null;
       if (seat === null) {
         const error = new Error("No free seat");
         error.status = 409;

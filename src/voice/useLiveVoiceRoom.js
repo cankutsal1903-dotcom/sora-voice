@@ -18,6 +18,15 @@ const initialState = {
   error: null,
 };
 
+const AUTO_RETRY_DELAYS_MS = [1200, 2500, 5000, 8000];
+
+const NON_RETRYABLE_REASONS = new Set([
+  DisconnectReason.CLIENT_INITIATED,
+  DisconnectReason.DUPLICATE_IDENTITY,
+  DisconnectReason.PARTICIPANT_REMOVED,
+  DisconnectReason.ROOM_DELETED,
+]);
+
 const parseSeat = (participant) => {
   const value = Number.parseInt(participant?.attributes?.seat || "", 10);
   return Number.isInteger(value) ? value : null;
@@ -26,15 +35,56 @@ const parseSeat = (participant) => {
 export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, startWithMicrophone }) {
   const liveKitRoomRef = useRef(null);
   const speakerEnabledRef = useRef(true);
+  const autoRetryCountRef = useRef(0);
+  const intentionalDisconnectRef = useRef(false);
   const [state, setState] = useState(initialState);
   const [connectionAttempt, setConnectionAttempt] = useState(0);
   const tokenServerUrl = process.env.EXPO_PUBLIC_TOKEN_SERVER_URL?.replace(/\/$/, "");
   const enabled = Boolean(tokenServerUrl);
 
   useEffect(() => {
+    autoRetryCountRef.current = 0;
+    intentionalDisconnectRef.current = false;
+  }, [roomName]);
+
+  useEffect(() => {
     let active = true;
     let connectedRoom;
     let tokenFetchController;
+    let retryTimer;
+
+    const scheduleAutoRetry = (fallbackErrorMessage) => {
+      if (!active || intentionalDisconnectRef.current) return false;
+      const attemptIndex = autoRetryCountRef.current;
+      if (attemptIndex >= AUTO_RETRY_DELAYS_MS.length) {
+        setState((current) => ({
+          ...current,
+          status: "error",
+          microphoneEnabled: false,
+          canPublish: false,
+          localSeat: null,
+          activeSpeakerIds: [],
+          error: fallbackErrorMessage || "Ses bağlantısı kurulamadı. Yeniden deneyebilirsin.",
+        }));
+        return false;
+      }
+      const delayMs = AUTO_RETRY_DELAYS_MS[attemptIndex];
+      autoRetryCountRef.current = attemptIndex + 1;
+      setState((current) => ({
+        ...current,
+        status: "reconnecting",
+        microphoneEnabled: false,
+        activeSpeakerIds: [],
+        error: null,
+      }));
+      clearTimeout(retryTimer);
+      retryTimer = setTimeout(() => {
+        if (active && !intentionalDisconnectRef.current) {
+          setConnectionAttempt((attempt) => attempt + 1);
+        }
+      }, delayMs);
+      return true;
+    };
 
     const applySpeakerState = () => {
       if (!connectedRoom) return;
@@ -114,7 +164,13 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
         return;
       }
 
-      setState({ ...initialState, status: "connecting" });
+      intentionalDisconnectRef.current = false;
+      setState((current) => ({
+        ...initialState,
+        status: autoRetryCountRef.current > 0 ? "reconnecting" : "connecting",
+        participants: current.participants,
+        participantCount: current.participantCount,
+      }));
       tokenFetchController = new AbortController();
       console.warn("[room-entry] token request started");
       const tokenFetchTimeout = setTimeout(
@@ -134,7 +190,9 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
         console.warn("[room-entry] token response received", response.status);
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || !payload.token || !payload.serverUrl) {
-          throw new Error(payload.error || "Ses oturumu oluşturulamadı.");
+          const authOrPolicyError = new Error(payload.error || "Ses oturumu oluşturulamadı.");
+          authOrPolicyError.httpStatus = response.status;
+          throw authOrPolicyError;
         }
         console.warn("[room-entry] token payload accepted");
 
@@ -151,13 +209,15 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
           }));
         });
         connectedRoom.on(RoomEvent.Reconnecting, () => {
-          if (active) setState((current) => ({ ...current, status: "reconnecting" }));
+          if (active) setState((current) => ({ ...current, status: "reconnecting", error: null }));
         });
         connectedRoom.on(RoomEvent.Reconnected, () => {
-          if (active) setState((current) => ({ ...current, status: "connected" }));
+          autoRetryCountRef.current = 0;
+          if (active) setState((current) => ({ ...current, status: "connected", error: null }));
         });
         connectedRoom.on(RoomEvent.Disconnected, (reason) => {
-          if (active) {
+          if (!active) return;
+          if (intentionalDisconnectRef.current || NON_RETRYABLE_REASONS.has(reason)) {
             setState((current) => ({
               ...current,
               status: "disconnected",
@@ -167,7 +227,9 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
               activeSpeakerIds: [],
               removedByModerator: reason === DisconnectReason.PARTICIPANT_REMOVED,
             }));
+            return;
           }
+          scheduleAutoRetry("Ses bağlantısı kesildi. Yeniden deneyebilirsin.");
         });
 
         await AudioSession.configureAudio({
@@ -186,6 +248,7 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
           return;
         }
 
+        autoRetryCountRef.current = 0;
         const canPublishNow = Boolean(connectedRoom.localParticipant.permissions?.canPublish ?? payload.canPublish);
         if (startWithMicrophone && canPublishNow) {
           await connectedRoom.localParticipant.setMicrophoneEnabled(true);
@@ -206,17 +269,22 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
           "[room-entry] voice connection failed",
           error?.name || "Error",
         );
-        if (active) {
+        if (active && !intentionalDisconnectRef.current) {
+          const httpStatus = error?.httpStatus || 0;
           const aborted = error?.name === "AbortError";
-          setState({
-            ...initialState,
-            status: "error",
-            error: aborted
-              ? "Ses sunucusuna ulaşılamadı. Bağlantını kontrol edip yeniden dene."
-              : error instanceof Error
-                ? error.message
-                : "Ses bağlantısı kurulamadı.",
-          });
+          const friendlyMessage = aborted
+            ? "Ses sunucusuna ulaşılamadı. Bağlantını kontrol edip yeniden dene."
+            : error instanceof Error
+              ? error.message
+              : "Ses bağlantısı kurulamadı.";
+          const nonRetryableHttp = httpStatus === 401 || httpStatus === 403 || httpStatus === 404;
+          if (nonRetryableHttp || !scheduleAutoRetry(friendlyMessage)) {
+            setState({
+              ...initialState,
+              status: "error",
+              error: friendlyMessage,
+            });
+          }
         }
       } finally {
         clearTimeout(tokenFetchTimeout);
@@ -226,6 +294,7 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
     connect();
     return () => {
       active = false;
+      clearTimeout(retryTimer);
       tokenFetchController?.abort();
       if (connectedRoom) {
         participantEvents.forEach((event) => connectedRoom.off(event, updateParticipants));
@@ -261,12 +330,15 @@ export function useLiveVoiceRoom({ roomName, profile, userId, accessToken, start
   }, []);
 
   const disconnect = useCallback(async () => {
+    intentionalDisconnectRef.current = true;
     const room = liveKitRoomRef.current;
     if (!room) return;
     await room.disconnect();
   }, []);
 
   const reconnect = useCallback(() => {
+    autoRetryCountRef.current = 0;
+    intentionalDisconnectRef.current = false;
     setConnectionAttempt((attempt) => attempt + 1);
   }, []);
 

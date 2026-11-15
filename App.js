@@ -11,6 +11,7 @@ import {
   Animated,
   ActivityIndicator,
   AppState,
+  BackHandler,
   Easing,
   Image,
   KeyboardAvoidingView,
@@ -57,6 +58,7 @@ import {
   createRoom as createRemoteRoom,
   deleteRoom as deleteRemoteRoom,
   getHostedRoom,
+  getMyFamily,
   getPublicProfile,
   getRoom,
   getCurrentAdminRole,
@@ -139,7 +141,7 @@ import {
   clearAllReminders,
   scheduleReminder,
 } from "./src/notifications/localReminders";
-import { AudioBars, BrandLaunch, LivePulse, Reveal } from "./src/ui/Motion";
+import { AudioBars, BrandLaunch, LivePulse, Reveal, useReducedMotion } from "./src/ui/Motion";
 import { installGlobalErrorReporting } from "./src/observability/errorReporting";
 import { InboxScreen } from "./src/screens/InboxScreen";
 import { CommunityScreen } from "./src/screens/CommunityScreen";
@@ -367,6 +369,8 @@ const PROFILE_ITEM_APPEARANCE = {
   frame_sky: { color: "#58A0F0", width: 3 },
   frame_amber: { color: "#2F80ED", width: 3 },
   frame_lilac: { color: "#7C9ED4", width: 3 },
+  frame_family_silver: { color: "#4C9AFF", width: 3.5 },
+  frame_family_royal: { color: "#1D5FBF", width: 4 },
   theme_ocean: { background: "#E7F2FF", accent: "#258FB8" },
   theme_midnight: { background: "#E8EEF8", accent: "#315FAD" },
   theme_sunrise: { background: "#F2F7FD", accent: "#5388CB" },
@@ -1868,7 +1872,7 @@ function Community({ onNotify }) {
         </View>
       )}
       <Text style={styles.sectionTitle}>
-        {joinedOnly ? "Topluluklarin" : "Topluluklar"}
+        {joinedOnly ? "Ailelerin" : "Aileler"}
       </Text>
       {visibleGroups.map((group) => {
         const joined = joinedGroupIds.includes(group.id);
@@ -1911,9 +1915,9 @@ function Community({ onNotify }) {
           <View style={styles.emptyIcon}>
             <Ionicons name="people-outline" size={26} color={COLORS.muted} />
           </View>
-          <Text style={styles.emptyTitle}>Henüz topluluk yok</Text>
+          <Text style={styles.emptyTitle}>Henüz aile yok</Text>
           <Text style={styles.emptyDescription}>
-            Keşfet bölümünden ilgini çeken bir topluluğa katıl.
+            Keşfet bölümünden ilgini çeken bir aileye katıl.
           </Text>
         </View>
       )}
@@ -1929,8 +1933,8 @@ function CreateCommunitySheet({ visible, onDismiss, onCreate }) {
     const cleanName = name.trim();
     if (!cleanName) {
       Alert.alert(
-        "Topluluk adi gerekli",
-        "Devam etmek icin topluluguna bir ad ver.",
+        "Aile adı gerekli",
+        "Devam etmek için ailene bir ad ver.",
       );
       return;
     }
@@ -2069,7 +2073,7 @@ function CommunityDetailsSheet({ group, joined, onDismiss, onToggleJoin }) {
             </Pressable>
             <Pressable onPress={onToggleJoin} style={styles.communityJoinWide}>
               <Text style={styles.communityJoinWideText}>
-                {joined ? "Topluluktasin" : "Topluluga katil"}
+                {joined ? "Ailedesin" : "Aileye katıl"}
               </Text>
               <Ionicons
                 name={joined ? "checkmark" : "arrow-forward"}
@@ -2086,6 +2090,7 @@ function CommunityDetailsSheet({ group, joined, onDismiss, onToggleJoin }) {
 
 function Profile({
   profile,
+  family = null,
   coins,
   favoriteCount,
   hostedRoomCount,
@@ -2233,21 +2238,31 @@ function Profile({
         tint: "#D9417A",
         unlocked: favoriteCount >= 3,
       },
+      {
+        id: "family",
+        icon: "shield-checkmark",
+        title: family ? `Aile Sv. ${family.level}` : "Aile üyesi",
+        hint: family ? family.name : "Bir aileye katıl",
+        gradient: ["#2F80ED", "#1D4E89"],
+        tint: "#2F80ED",
+        unlocked: Boolean(family),
+      },
     ],
-    [recentActivity.length, hostedRoomCount, favoriteCount],
+    [recentActivity.length, hostedRoomCount, favoriteCount, family],
   );
   const experiencePoints =
     favoriteCount * 10 +
     hostedRoomCount * 25 +
     recentActivity.length * 5 +
-    Math.min(activityStreak, 7) * 4;
+    Math.min(activityStreak, 7) * 4 +
+    (family ? family.level * 15 : 0);
   const level = Math.max(
     1,
     Math.min(12, Math.floor(experiencePoints / 50) + 1),
   );
   const levelProgress = experiencePoints % 50;
   const levelName =
-    level >= 7 ? "Topluluk sesi" : level >= 4 ? "Oda kurucusu" : "Yeni ses";
+    level >= 7 ? "Sora elçisi" : level >= 4 ? "Oda kurucusu" : "Yeni ses";
   const homeFrameAppearance = PROFILE_ITEM_APPEARANCE[profile.activeFrameId];
   const homeThemeAppearance = PROFILE_ITEM_APPEARANCE[profile.activeProfileThemeId];
   return (
@@ -2304,9 +2319,10 @@ function Profile({
                 </Text>
                 <Text style={styles.profileHomeHandle} numberOfLines={1}>
                   @{profile.handle}
+                  {profile.publicId ? ` · ID: ${profile.publicId}` : ""}
                 </Text>
                 <Text style={styles.profileHomeBio} numberOfLines={1}>
-                  {profile.bio || "Sora ses topluluğundaki profilin"}
+                  {profile.bio || "Sora ses dünyasındaki profilin"}
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={21} color={COLORS.muted} />
@@ -2785,7 +2801,10 @@ function ProfileDetailSheet({
             ]}
           >
             <Text style={styles.profileDetailName}>{name}</Text>
-            <Text style={styles.profileDetailHandle}>{handle}</Text>
+            <Text style={styles.profileDetailHandle}>
+              {handle}
+              {person.publicId ? ` · ID: ${person.publicId}` : ""}
+            </Text>
             {isSelf ? (
               <View style={styles.profileFollowRow}>
                 <View style={styles.profileFollowItem}>
@@ -2945,14 +2964,104 @@ const ProfileStat = memo(function ProfileStat({ number, label }) {
   );
 });
 
+const BottomTabButton = memo(function BottomTabButton({
+  tabKey,
+  icon,
+  activeIcon,
+  label,
+  selected,
+  reducedMotion,
+  onSelect,
+}) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (reducedMotion || !selected) {
+      scaleAnim.setValue(1);
+      return;
+    }
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 1.04,
+        duration: 95,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 130,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [reducedMotion, scaleAnim, selected]);
+
+  const handlePressIn = useCallback(() => {
+    if (reducedMotion) return;
+    Animated.timing(scaleAnim, {
+      toValue: 0.95,
+      duration: 90,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start();
+  }, [reducedMotion, scaleAnim]);
+
+  const handlePressOut = useCallback(() => {
+    if (reducedMotion) return;
+    Animated.timing(scaleAnim, {
+      toValue: 1,
+      duration: 120,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [reducedMotion, scaleAnim]);
+
+  return (
+    <Pressable
+      onPress={() => onSelect(tabKey)}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      accessibilityRole="tab"
+      accessibilityLabel={label}
+      accessibilityState={{ selected }}
+      style={({ pressed }) => [
+        styles.tabItem,
+        selected && styles.tabItemActive,
+        !selected && pressed && styles.tabItemPressed,
+      ]}
+    >
+      <Animated.View
+        style={[
+          styles.tabItemInner,
+          !reducedMotion && { transform: [{ scale: scaleAnim }] },
+        ]}
+      >
+        <Ionicons
+          name={selected ? activeIcon : icon}
+          size={20}
+          color={selected ? COLORS.primary : COLORS.muted}
+        />
+        <Text
+          numberOfLines={1}
+          maxFontSizeMultiplier={1.15}
+          style={[styles.tabLabel, selected && styles.tabLabelActive]}
+        >
+          {label}
+        </Text>
+      </Animated.View>
+    </Pressable>
+  );
+});
+
 const BottomNavigation = memo(function BottomNavigation({ active, onChange }) {
   const insets = useSafeAreaInsets();
+  const reducedMotion = useReducedMotion();
   const items = useMemo(
     () => [
-      ["discover", "compass-outline", "Keşfet"],
-      ["inbox", "chatbubble-ellipses-outline", "Mesajlar"],
-      ["community", "people-outline", "Topluluk"],
-      ["profile", "person-outline", "Profil"],
+      ["discover", "compass-outline", "compass", "Keşfet"],
+      ["inbox", "chatbubble-ellipses-outline", "chatbubble-ellipses", "Mesajlar"],
+      ["community", "people-outline", "people", "Aile"],
+      ["profile", "person-outline", "person", "Profil"],
     ],
     [],
   );
@@ -2961,38 +3070,21 @@ const BottomNavigation = memo(function BottomNavigation({ active, onChange }) {
     <View
       style={[
         styles.bottomNavigation,
-        { paddingBottom: Math.max(insets.bottom, 10) },
+        { paddingBottom: Math.max(insets.bottom, 8) },
       ]}
     >
       <View style={styles.tabRow}>
-        {items.map(([key, icon, label]) => (
-          <Pressable
+        {items.map(([key, icon, activeIcon, label]) => (
+          <BottomTabButton
             key={key}
-            onPress={() => handleTabPress(key)}
-            accessibilityRole="tab"
-            accessibilityLabel={label}
-            accessibilityState={{ selected: active === key }}
-            style={[styles.tabItem, active === key && styles.tabItemActive]}
-          >
-            <View
-              style={[
-                styles.tabIconWrap,
-                active === key && styles.tabIconWrapActive,
-              ]}
-            >
-              <Ionicons
-                name={icon}
-                size={21}
-                color={active === key ? COLORS.primary : COLORS.muted}
-              />
-            </View>
-            <Text
-              numberOfLines={1}
-              style={[styles.tabLabel, active === key && styles.tabLabelActive]}
-            >
-              {label}
-            </Text>
-          </Pressable>
+            tabKey={key}
+            icon={icon}
+            activeIcon={activeIcon}
+            label={label}
+            selected={active === key}
+            reducedMotion={reducedMotion}
+            onSelect={handleTabPress}
+          />
         ))}
       </View>
     </View>
@@ -3154,6 +3246,7 @@ const RoomSettingsSheet = memo(function RoomSettingsSheet({
 const GiftSheet = memo(function GiftSheet({
   visible,
   coins,
+  userFamilyLevel = 0,
   gifts = GIFT_CATALOG,
   recipients = [],
   onDismiss,
@@ -3169,6 +3262,14 @@ const GiftSheet = memo(function GiftSheet({
   }, [visible, recipients]);
   const selectedRecipient = recipients.find((item) => item.userId === recipientId);
   const confirmSend = (gift) => {
+    const reqLevel = Number(gift.minFamilyLevel || 0);
+    if (reqLevel > 0 && Number(userFamilyLevel || 0) < reqLevel) {
+      Alert.alert(
+        "Aile seviyesi gerekli",
+        `Bu hediyeyi göndermek için en az Seviye ${reqLevel} bir ailede yer almalısın.`,
+      );
+      return;
+    }
     if (!selectedRecipient) {
       Alert.alert("Alıcı seç", "Hediyeyi göndereceğin kişiyi seç.");
       return;
@@ -3222,25 +3323,34 @@ const GiftSheet = memo(function GiftSheet({
             ))}
           </ScrollView>
           <View style={styles.giftGrid}>
-            {gifts.map((gift) => (
-              <Pressable
-                key={gift.id}
-                disabled={sending}
-                onPress={() => confirmSend(gift)}
-                style={styles.giftCard}
-              >
-                <View
-                  style={[styles.giftIcon, { backgroundColor: gift.color }]}
+            {gifts.map((gift) => {
+              const lockedByFamily = Number(gift.minFamilyLevel || 0) > Number(userFamilyLevel || 0);
+              return (
+                <Pressable
+                  key={gift.id}
+                  disabled={sending}
+                  onPress={() => confirmSend(gift)}
+                  style={[styles.giftCard, lockedByFamily && { opacity: 0.68 }]}
                 >
-                  <Ionicons name={gift.icon} size={24} color="#FFFFFF" />
-                </View>
-                <Text style={styles.giftName}>{gift.name}</Text>
-                <View style={styles.giftCost}>
-                  <Ionicons name="diamond" size={11} color="#6AA8F5" />
-                  <Text style={styles.giftCostText}>{gift.cost}</Text>
-                </View>
-              </Pressable>
-            ))}
+                  <View
+                    style={[styles.giftIcon, { backgroundColor: gift.color }]}
+                  >
+                    <Ionicons name={gift.icon} size={24} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.giftName}>{gift.name}</Text>
+                  <View style={styles.giftCost}>
+                    <Ionicons
+                      name={lockedByFamily ? "lock-closed-outline" : "diamond"}
+                      size={11}
+                      color="#6AA8F5"
+                    />
+                    <Text style={styles.giftCostText}>
+                      {lockedByFamily ? `Aile Sv. ${gift.minFamilyLevel} · ${gift.cost}` : gift.cost}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
           </View>
         </View>
       </View>
@@ -5164,6 +5274,7 @@ function Room({
   onHostPresenceChange,
   onMinimize,
   onEditProfile,
+  userFamilyLevel = 0,
   minimized = false,
 }) {
   useEffect(() => {
@@ -5560,29 +5671,39 @@ function Room({
     return () => clearInterval(interval);
   }, [canModerate, liveVoice.participantCount, liveVoice.status, refreshMembers, room.persisted]);
 
+  const voiceStatusRef = useRef(liveVoice.status);
+  const voiceReconnectRef = useRef(liveVoice.reconnect);
+  useEffect(() => {
+    voiceStatusRef.current = liveVoice.status;
+    voiceReconnectRef.current = liveVoice.reconnect;
+  }, [liveVoice.reconnect, liveVoice.status]);
+
+  useEffect(() => {
+    // Uygulama arka plana alınıp öne geldiğinde bağlantı koptuysa sessizce yeniden bağlan.
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active" && ["error", "disconnected"].includes(voiceStatusRef.current)) {
+        voiceReconnectRef.current?.();
+      }
+    });
+    return () => subscription.remove();
+  }, []);
+
   useEffect(() => {
     if (!isHost || !room.persisted || !onHostPresenceChange) return undefined;
     const setPresence = (isActive) =>
       onHostPresenceChange(room.id, isActive).catch(() => undefined);
-    if (liveVoice.status !== "connected") {
-      if (["error", "disconnected", "local"].includes(liveVoice.status)) {
-        setPresence(false);
-      }
-      return undefined;
-    }
     setPresence(true);
     const heartbeat = setInterval(() => setPresence(true), 20_000);
-    // Uygulama arka plana alındığında oda keşfette görünmeye devam eder;
-    // yalnızca odadan çıkınca ya da bağlantı kopunca pasif olur.
+    // Uygulama arka plana alındığında veya oda küçültüldüğünde oda keşfette kalır;
+    // pasifleştirme yalnızca odadan gerçekten çıkıldığında (leaveCurrentRoom) yapılır.
     const subscription = AppState.addEventListener("change", (nextState) => {
       if (nextState === "active") setPresence(true);
     });
     return () => {
       clearInterval(heartbeat);
       subscription.remove();
-      setPresence(false);
     };
-  }, [isHost, liveVoice.status, onHostPresenceChange, room.id, room.persisted]);
+  }, [isHost, onHostPresenceChange, room.id, room.persisted]);
 
   useEffect(() => {
     if (!messagesReady || room.persisted) return;
@@ -6215,7 +6336,7 @@ function Room({
         : { key: "assign", label: "Mikrofona al", icon: "mic-outline" },
     ];
     if (isHost && roomDetails.coupleSeat && participant.seat !== COUPLE_SEAT_INDEX) {
-      actions.push({ key: "couple", label: "Çift koltuğuna al", icon: "heart-outline" });
+      actions.push({ key: "couple", label: "Konuk koltuğuna al", icon: "mic-outline" });
     }
     if (isHost) {
       actions.push(
@@ -6687,23 +6808,22 @@ function Room({
           style={slotStyle}
           onPress={() => handleEmptySeatPress(seatIndex)}
           accessibilityRole="button"
-          accessibilityLabel={isCoupleSeat ? "Boş çift koltuğu" : `Boş ${seatIndex}. koltuk`}
+          accessibilityLabel={isCoupleSeat ? "Boş konuk koltuğu" : `Boş ${seatIndex}. koltuk`}
         >
           <View
             style={[
               styles.roomEmptySeat,
               { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 },
-              isCoupleSeat && styles.roomCoupleSeat,
             ]}
           >
             <Ionicons
-              name={isCoupleSeat ? "heart-outline" : "mic-outline"}
+              name="mic-outline"
               size={compactStage ? 24 : 28}
-              color={isCoupleSeat ? "rgba(255,160,200,0.85)" : "rgba(118,175,255,0.78)"}
+              color="rgba(118,175,255,0.78)"
             />
           </View>
-          <Text style={[styles.roomEmptySeatLabel, isCoupleSeat && styles.roomCoupleSeatLabel]}>
-            {isCoupleSeat ? "Çift" : seatIndex}
+          <Text style={styles.roomEmptySeatLabel}>
+            {isCoupleSeat ? "Konuk" : seatIndex}
           </Text>
         </Pressable>
       );
@@ -6721,7 +6841,7 @@ function Room({
       >
         <View style={styles.roomAvatarWrap}>
           {participant.isSpeaking ? (
-            <SpeakingRing size={avatarSize + 14} color={isCoupleSeat ? "#FF8FC0" : COLORS.primary} />
+            <SpeakingRing size={avatarSize + 14} color={COLORS.primary} />
           ) : null}
           <View
             style={[
@@ -6729,7 +6849,6 @@ function Room({
               { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 },
               isHostSeat && styles.roomHostStageAvatar,
               participant.role === "host" && styles.roomSpeakerAvatarHost,
-              isCoupleSeat && styles.roomCoupleSeatAvatar,
               participant.microphoneEnabled && styles.roomSpeakerAvatarActive,
             ]}
           >
@@ -6737,9 +6856,7 @@ function Room({
               colors={
                 isHostSeat
                   ? ["#8CC8FF", "#347CE0"]
-                  : isCoupleSeat
-                    ? ["#F29AC2", "#9C4D86"]
-                    : ["#527DB8", "#203D66"]
+                  : ["#527DB8", "#203D66"]
               }
               style={[StyleSheet.absoluteFill, { borderRadius: avatarSize / 2 }]}
             />
@@ -6777,8 +6894,8 @@ function Room({
           {isHostSeat ? `1 · ${participant.name}` : participant.name}
         </Text>
         {!isHostSeat ? (
-          <Text style={[styles.roomSpeakerRole, isCoupleSeat && styles.roomCoupleSeatLabel]} numberOfLines={1}>
-            {participant.isSpeaking ? "Konuşuyor" : isCoupleSeat ? "Çift" : `${seatIndex}`}
+          <Text style={styles.roomSpeakerRole} numberOfLines={1}>
+            {participant.isSpeaking ? "Konuşuyor" : isCoupleSeat ? "Konuk" : `${seatIndex}`}
           </Text>
         ) : null}
       </Pressable>
@@ -6856,7 +6973,7 @@ function Room({
             </View>
             <Text style={styles.roomHeaderCaption} numberOfLines={1}>
               {room.category || "Sohbet"} · {Math.max(liveVoice.participantCount, activeRoomParticipants.length)} kişi
-              {musicPlaying ? " · ♪ müzik" : ""}
+              {musicPlaying ? " · müzik" : ""}
             </Text>
           </View>
           <Pressable
@@ -6882,21 +6999,19 @@ function Room({
           </Pressable>
         </View>
 
-        {liveVoice.status !== "connected" && (
+        {liveVoice.status === "error" ? (
           <View style={styles.roomConnectionNotice}>
-            <Ionicons name="radio-outline" size={13} color="#A9BEDB" />
+            <Ionicons name="alert-circle-outline" size={14} color="#A9BEDB" />
             <Text style={styles.roomConnectionText}>{voiceErrorText}</Text>
-            {["error", "disconnected", "local"].includes(liveVoice.status) && (
-              <Pressable
-                style={styles.roomRetryPill}
-                onPress={retryVoiceConnection}
-              >
-                <Ionicons name="refresh" size={12} color={COLORS.primary} />
-                <Text style={styles.roomRetryText}>Yeniden bağlan</Text>
-              </Pressable>
-            )}
+            <Pressable
+              style={styles.roomRetryPill}
+              onPress={retryVoiceConnection}
+            >
+              <Ionicons name="refresh" size={12} color={COLORS.primary} />
+              <Text style={styles.roomRetryText}>Yeniden dene</Text>
+            </Pressable>
           </View>
-        )}
+        ) : null}
 
         {/* Sahne ve sohbet tek bir akışta */}
         <ScrollView
@@ -7159,6 +7274,7 @@ function Room({
       <GiftSheet
         visible={giftOpen}
         coins={coins}
+        userFamilyLevel={userFamilyLevel}
         gifts={roomGiftCatalog}
         recipients={activeRoomParticipants.filter((participant) => participant.userId !== userId)}
         onDismiss={handleCloseGift}
@@ -7314,6 +7430,13 @@ function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh, 
       }).catch(() => Alert.alert("Ürün etkinleştirilemedi", "Biraz sonra yeniden dene.")).finally(() => setItemBusy(null));
       return;
     }
+    if (item.purchasable === false) {
+      Alert.alert(
+        "Aile seviye ödülü",
+        "Bu çerçeve doğrudan kredi ile satılmaz; aile seviyen yükseldiğinde ücretsiz açılır.",
+      );
+      return;
+    }
     Alert.alert("Önizleme ve satın alma", `${item.name} · ${item.cost} kredi. Satın almak istiyor musun?`, [
       { text: "Vazgeç", style: "cancel" },
       { text: "Satın al", onPress: async () => {
@@ -7448,13 +7571,28 @@ function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh, 
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
                 {profileItems.map((item) => {
                   const owned = ownedItemIds.includes(item.id);
+                  const subtitle = owned
+                    ? "Sahipsin · dokun etkinleştir"
+                    : item.purchasable === false
+                      ? "Aile seviye ödülü"
+                      : `${item.cost} kredi · basılı tut satın al`;
                   return <Pressable key={item.id} onPress={() => setPreviewItemId(item.id)} onLongPress={() => handleProfileItem(item)} style={[styles.transferOption, previewItemId === item.id && styles.transferOptionActive, { marginRight: 8 }]}>
                     <Text style={[styles.transferOptionText, previewItemId === item.id && styles.transferOptionTextActive]}>{item.name}</Text>
-                    <Text style={[styles.walletActivityTime, { textAlign: "center" }]}>{owned ? "Sahipsin · dokun etkinleştir" : `${item.cost} kredi · basılı tut satın al`}</Text>
+                    <Text style={[styles.walletActivityTime, { textAlign: "center" }]}>{subtitle}</Text>
                   </Pressable>;
                 })}
               </ScrollView>
-              {activePreview ? <Pressable disabled={Boolean(itemBusy)} onPress={() => handleProfileItem(activePreview)} style={styles.transferCreateButton}><Text style={styles.transferCreateButtonText}>{ownedItemIds.includes(activePreview.id) ? "Profili etkinleştir" : `Önizle · ${activePreview.cost} kredi`}</Text></Pressable> : null}
+              {activePreview ? (
+                <Pressable disabled={Boolean(itemBusy)} onPress={() => handleProfileItem(activePreview)} style={styles.transferCreateButton}>
+                  <Text style={styles.transferCreateButtonText}>
+                    {ownedItemIds.includes(activePreview.id)
+                      ? "Profili etkinleştir"
+                      : activePreview.purchasable === false
+                        ? "Aile seviye ödülü"
+                        : `Önizle · ${activePreview.cost} kredi`}
+                  </Text>
+                </Pressable>
+              ) : null}
             </>
           ) : null}
           <Pressable onPress={save}>
@@ -7710,6 +7848,8 @@ function AppContent() {
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("discover");
   const [room, setRoom] = useState(null);
+  const [myFamily, setMyFamily] = useState(null);
+  const [inspectedUserId, setInspectedUserId] = useState(null);
   const [roomMinimized, setRoomMinimized] = useState(false);
   const [passwordPromptRoom, setPasswordPromptRoom] = useState(null);
   const [passwordPromptError, setPasswordPromptError] = useState(null);
@@ -7988,6 +8128,24 @@ function AppContent() {
           activeFrameId: data.active_frame_id || null,
           activeProfileThemeId: data.active_profile_theme_id || null,
         }));
+      })
+      .catch(() => undefined);
+    supabase
+      .from("profiles")
+      .select("public_id")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!active || error || !data?.public_id) return;
+        setProfile((current) => ({
+          ...current,
+          publicId: data.public_id,
+        }));
+      })
+      .catch(() => undefined);
+    getMyFamily(user.id)
+      .then((family) => {
+        if (active) setMyFamily(family);
       })
       .catch(() => undefined);
     return () => {
@@ -8630,6 +8788,11 @@ function AppContent() {
       return;
     }
 
+    if (room?.id === nextRoom.id) {
+      setRoomMinimized(false);
+      return;
+    }
+
     // Odayı ekranda açmadan önce sunucuda üyelik, ban ve şifre denetimini yap.
     // Bağlantı veya yetki hatasında kapalı davran; aksi halde token çağrısına
     // kadar hatalı bir oda ekranı kısa süreliğine görünebiliyordu.
@@ -8637,7 +8800,7 @@ function AppContent() {
       try {
         if (authSession?.user?.id && nextRoom.hostId === authSession.user.id) {
           // Kendi odası listede "canlı" görünse de pasif kalmış olabilir.
-          await setRemoteRoomPresence(nextRoom.id, true).catch(() => undefined);
+          await setRemoteRoomPresence(nextRoom.id, true, { resetListeners: true }).catch(() => undefined);
         }
         await joinRoomWithPassword(nextRoom.id, null);
       } catch (error) {
@@ -8649,6 +8812,13 @@ function AppContent() {
         }
         Alert.alert("Odaya girilemiyor", describeRoomError(error));
         return;
+      }
+    }
+
+    if (room?.persisted && room.id !== nextRoom.id) {
+      leaveRoomMembership(room.id).catch(() => undefined);
+      if (room.hostId === authSession?.user?.id) {
+        setHostRoomPresence(room.id, false).catch(() => undefined);
       }
     }
 
@@ -8752,12 +8922,25 @@ function AppContent() {
   }, [authSession?.user?.id]);
 
   const leaveCurrentRoom = () => {
-    if (room?.persisted && room.hostId === authSession?.user?.id) {
-      setHostRoomPresence(room.id, false).catch(() => undefined);
-    }
+    const leavingRoom = room;
     setRoomMinimized(false);
     setRoom(null);
+    if (leavingRoom?.persisted) {
+      leaveRoomMembership(leavingRoom.id).catch(() => undefined);
+      if (leavingRoom.hostId === authSession?.user?.id) {
+        setHostRoomPresence(leavingRoom.id, false).catch(() => undefined);
+      }
+    }
   };
+
+  useEffect(() => {
+    if (!room || roomMinimized) return undefined;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      setRoomMinimized(true);
+      return true;
+    });
+    return () => sub.remove();
+  }, [room, roomMinimized]);
 
   const clearNotifications = () => {
     setNotifications([]);
@@ -9154,10 +9337,20 @@ function AppContent() {
     inbox: (
       <InboxScreen currentUserId={authSession?.user?.id} profile={profile} />
     ),
-    community: <CommunityScreen currentUserId={authSession?.user?.id} />,
+    community: (
+      <CommunityScreen
+        currentUserId={authSession?.user?.id}
+        profile={profile}
+        coins={walletBalance}
+        onBalanceRefresh={refreshWalletData}
+        onFamilyChange={setMyFamily}
+        onOpenUserProfile={setInspectedUserId}
+      />
+    ),
     profile: (
       <Profile
         profile={profile}
+        family={myFamily}
         coins={walletBalance}
         favoriteCount={favoriteRoomIds.length}
         hostedRoomCount={hostedRoomCount}
@@ -9174,40 +9367,41 @@ function AppContent() {
   };
   return (
     <View style={styles.app}>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView edges={["top", "left", "right"]} style={styles.safeArea}>
         <StatusBar barStyle="dark-content" />
         {screens[activeTab]}
         <BottomNavigation active={activeTab} onChange={setActiveTab} />
       </SafeAreaView>
       {room ? (
         <>
-          <Modal
-            visible={!roomMinimized}
-            animationType="none"
-            statusBarTranslucent
-            onRequestClose={() => setRoomMinimized(true)}
+          <View
+            pointerEvents={roomMinimized ? "none" : "auto"}
+            style={[
+              StyleSheet.absoluteFill,
+              styles.roomOverlay,
+              roomMinimized && styles.roomOverlayMinimized,
+            ]}
           >
-            <View style={styles.roomOverlay}>
-              <Room
-                room={room}
-                profile={profile}
-                userId={authSession?.user?.id}
-                accessToken={authSession?.access_token}
-                coins={walletBalance}
-                onSendGift={sendGift}
-                onLeave={leaveCurrentRoom}
-                onUpdateRoom={updateRoomSettings}
-                isFollowingHost={followedUserIds.includes(room.hostId)}
-                onToggleFollowHost={toggleFollowHost}
-                initialSpeakerOn={roomPreferences.speakerEnabled}
-                initialMicrophoneOn={roomPreferences.microphoneEnabled}
-                onHostPresenceChange={setHostRoomPresence}
-                onMinimize={() => setRoomMinimized(true)}
-                onEditProfile={handleOpenProfileEditor}
-                minimized={roomMinimized}
-              />
-            </View>
-          </Modal>
+            <Room
+              room={room}
+              profile={profile}
+              userId={authSession?.user?.id}
+              accessToken={authSession?.access_token}
+              coins={walletBalance}
+              userFamilyLevel={myFamily?.level || 0}
+              onSendGift={sendGift}
+              onLeave={leaveCurrentRoom}
+              onUpdateRoom={updateRoomSettings}
+              isFollowingHost={followedUserIds.includes(room.hostId)}
+              onToggleFollowHost={toggleFollowHost}
+              initialSpeakerOn={roomPreferences.speakerEnabled}
+              initialMicrophoneOn={roomPreferences.microphoneEnabled}
+              onHostPresenceChange={setHostRoomPresence}
+              onMinimize={() => setRoomMinimized(true)}
+              onEditProfile={handleOpenProfileEditor}
+              minimized={roomMinimized}
+            />
+          </View>
           {roomMinimized ? (
             <RoomMiniBubble
               room={room}
@@ -9217,6 +9411,18 @@ function AppContent() {
           ) : null}
         </>
       ) : null}
+      <ProfileDetailSheet
+        visible={Boolean(inspectedUserId)}
+        userId={inspectedUserId}
+        profile={inspectedUserId === authSession?.user?.id ? profile : null}
+        isSelf={Boolean(inspectedUserId && inspectedUserId === authSession?.user?.id)}
+        isFollowing={Boolean(inspectedUserId && followedUserIds.includes(inspectedUserId))}
+        onEdit={() => {
+          setInspectedUserId(null);
+          handleOpenProfileEditor();
+        }}
+        onDismiss={() => setInspectedUserId(null)}
+      />
       <CreateRoomSheet
         visible={createOpen}
         onDismiss={handleCloseCreate}
@@ -9847,30 +10053,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     maxWidth: 260,
   },
-  bottomNavigation: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: Platform.OS === "android" ? 24 : 0,
-    height: 77,
-    paddingHorizontal: 9,
-    paddingTop: 9,
-    backgroundColor: COLORS.surface,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.line,
-    flexDirection: "row",
-    justifyContent: "space-around",
-  },
-  tabItem: { width: 70, alignItems: "center" },
-  tabIconWrap: {
-    height: 31,
-    width: 45,
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: 14,
-    position: "relative",
-  },
-  tabIconWrapActive: { backgroundColor: COLORS.primarySoft },
   tabBadge: {
     width: 7,
     height: 7,
@@ -9882,13 +10064,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: COLORS.surface,
   },
-  tabLabel: {
-    color: COLORS.muted,
-    fontSize: 10,
-    fontWeight: "700",
-    marginTop: 3,
-  },
-  tabLabelActive: { color: COLORS.text },
   screenHeading: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -13194,32 +13369,51 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 12,
-    paddingTop: 7,
-    paddingBottom: 10,
-    backgroundColor: "rgba(255,255,255,0.98)",
+    paddingHorizontal: 10,
+    paddingTop: 6,
+    paddingBottom: 8,
+    backgroundColor: COLORS.surface,
     borderTopWidth: 1,
     borderTopColor: COLORS.line,
     ...ELEVATION.raised,
   },
-  tabRow: { flexDirection: "row", alignItems: "center", width: "100%" },
+  tabRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%",
+    gap: 6,
+  },
   tabItem: {
     flex: 1,
     minWidth: 0,
-    minHeight: 51,
+    minHeight: 52,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 2,
-    borderRadius: 14,
+  },
+  tabItemInner: {
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 0,
   },
   tabItemActive: {
     backgroundColor: COLORS.primarySoft,
+    borderColor: "rgba(47,128,237,0.20)",
+  },
+  tabItemPressed: {
+    backgroundColor: "rgba(47,128,237,0.06)",
   },
   tabLabel: {
     color: COLORS.muted,
-    fontSize: 10,
+    fontSize: 11,
+    lineHeight: 14,
     fontWeight: "700",
-    marginTop: 4,
+    marginTop: 3,
+    textAlign: "center",
   },
   tabLabelActive: {
     color: COLORS.primary,
@@ -14072,6 +14266,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#11131A",
     zIndex: 200,
     elevation: 200,
+  },
+  roomOverlayMinimized: {
+    opacity: 0,
+    zIndex: -1,
+    elevation: 0,
   },
   roomBubble: {
     position: "absolute",
@@ -14933,16 +15132,6 @@ const styles = StyleSheet.create({
   roomHostPairSlot: { width: "36%" },
   roomSpeakerGridCompact: { rowGap: 4 },
   roomSpeakerSlotCompact: { minHeight: 76, paddingVertical: 2, gap: 4 },
-  roomCoupleSeat: {
-    backgroundColor: "rgba(120,52,96,0.55)",
-    borderColor: "rgba(255,160,200,0.4)",
-    shadowColor: "#FF8FC0",
-  },
-  roomCoupleSeatAvatar: { borderColor: "rgba(255,160,200,0.75)" },
-  roomCoupleSeatLabel: {
-    color: "#FFC6DE",
-    backgroundColor: "rgba(228,111,160,0.18)",
-  },
   roomAdminBadge: { backgroundColor: "#9CD3FF" },
   roomChatFlow: {
     paddingHorizontal: 8,

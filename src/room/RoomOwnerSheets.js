@@ -307,7 +307,7 @@ export const RoomMenuSheet = memo(function RoomMenuSheet({
               <MenuTile
                 icon="grid-outline"
                 label="Mikrofon Sayısı"
-                state={`${seatCount}${coupleSeat ? " + çift" : ""}`}
+                state={`${seatCount}${coupleSeat ? " + konuk" : ""}`}
                 onPress={() => onAction("seats")}
               />
             ) : null}
@@ -561,7 +561,7 @@ function SeatPreview({ count, couple }) {
     <View style={sheetStyles.seatPreview}>
       <View style={sheetStyles.seatPreviewRow}>
         <View style={[sheetStyles.seatDot, sheetStyles.seatDotHost]} />
-        {couple ? <View style={[sheetStyles.seatDot, sheetStyles.seatDotCouple]} /> : null}
+        {couple ? <View style={sheetStyles.seatDot} /> : null}
       </View>
       {Array.from({ length: rows }).map((_, row) => (
         <View key={row} style={sheetStyles.seatPreviewRow}>
@@ -608,8 +608,8 @@ export function RoomSeatsSheet({ visible, seatCount, coupleSeat, saving, onSave,
         ))}
       </View>
       <MenuSwitchRow
-        icon="heart-outline"
-        title="Çift koltuğu"
+        icon="mic-outline"
+        title="Konuk koltuğu"
         description="Oda sahibinin hemen yanına bir mikrofon daha açar"
         value={couple}
         onToggle={() => setCouple((value) => !value)}
@@ -1161,7 +1161,6 @@ const sheetStyles = StyleSheet.create({
   seatPreviewRow: { flexDirection: "row", gap: 5, justifyContent: "center" },
   seatDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: "rgba(47,128,237,0.35)" },
   seatDotHost: { width: 18, height: 18, borderRadius: 9, backgroundColor: COLORS.primary },
-  seatDotCouple: { width: 18, height: 18, borderRadius: 9, backgroundColor: "#E46FA0" },
   personRow: {
     flexDirection: "row",
     alignItems: "center",

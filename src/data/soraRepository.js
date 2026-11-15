@@ -65,8 +65,10 @@ export const listRooms = async (state = "live") => {
   const blockedIds = new Set(blocksError ? [] : (blocks || []).map((block) => block.blocked_id));
   let visibleRows = (data || []).filter((room) => !blockedIds.has(room.host_id));
   if (state === "live") {
-    const freshSince = Date.now() - 90_000;
-    const staleRows = visibleRows.filter((room) => new Date(room.last_active_at).getTime() < freshSince);
+    // Uygulama arka plana alındığında Android zamanlayıcıları ve soketleri bekletebilir;
+    // oda sahibi gerçekten çıkana kadar (state = 'inactive') aktif odalar keşfette korunur.
+    const backgroundGraceSince = Date.now() - 60 * 60_000;
+    const staleRows = visibleRows.filter((room) => new Date(room.last_active_at).getTime() < backgroundGraceSince);
     let presentIds = new Set();
     if (staleRows.length) {
       try {
@@ -81,7 +83,7 @@ export const listRooms = async (state = "live") => {
       }
     }
     visibleRows = visibleRows.filter(
-      (room) => new Date(room.last_active_at).getTime() >= freshSince || presentIds.has(room.id),
+      (room) => new Date(room.last_active_at).getTime() >= backgroundGraceSince || presentIds.has(room.id),
     );
   }
   return visibleRows.map(mapRoom);
@@ -166,15 +168,22 @@ export const getHostedRoom = async (userId) => {
   return inactiveRoom ? mapRoom(inactiveRoom) : null;
 };
 
-export const setRoomPresence = async (roomId, isActive) => {
+export const setRoomPresence = async (roomId, isActive, { resetListeners = false } = {}) => {
   const client = requireClient();
+  const patch = isActive
+    ? {
+        state: "live",
+        ...(resetListeners ? { listener_count: 1 } : {}),
+        last_active_at: new Date().toISOString(),
+      }
+    : {
+        state: "inactive",
+        listener_count: 0,
+        last_active_at: new Date().toISOString(),
+      };
   const { data, error } = await client
     .from("rooms")
-    .update({
-      state: isActive ? "live" : "inactive",
-      listener_count: isActive ? 1 : 0,
-      last_active_at: new Date().toISOString(),
-    })
+    .update(patch)
     .eq("id", roomId)
     .select(ROOM_SELECT)
     .single();
@@ -264,7 +273,7 @@ export const listRoomMembers = async (roomId) => {
 export const getPublicProfile = async (userId) => {
   if (!userId) return null;
   const client = requireClient();
-  const [profileResult, appearanceResult] = await Promise.all([
+  const [profileResult, appearanceResult, publicIdResult] = await Promise.all([
     client
       .from("profiles")
       .select("id, handle, display_name, avatar_color, avatar_url, bio")
@@ -275,13 +284,20 @@ export const getPublicProfile = async (userId) => {
       .select("active_frame_id, active_profile_theme_id")
       .eq("id", userId)
       .maybeSingle(),
+    client
+      .from("profiles")
+      .select("public_id")
+      .eq("id", userId)
+      .maybeSingle(),
   ]);
   const { data, error } = profileResult;
   throwIfError(error);
   if (!data) return null;
   const appearance = appearanceResult.error ? null : appearanceResult.data;
+  const publicIdRow = publicIdResult.error ? null : publicIdResult.data;
   return {
     userId: data.id,
+    publicId: publicIdRow?.public_id || null,
     handle: data.handle,
     name: data.display_name,
     color: data.avatar_color,
@@ -599,56 +615,405 @@ export const subscribeToDirectMessages = ({ conversationId, onMessage }) => {
   return () => client.removeChannel(channel);
 };
 
-const mapCommunity = (community, currentUserId) => {
+export const FAMILY_CREATION_COST = 10_000_000;
+
+export const DEFAULT_FAMILY_LEVEL_CONFIGS = [
+  { level: 1, minXp: 0, title: "Başlangıç Ailesi", badgeCode: "family_lv1", frameItemId: null, giftUnlockId: null, memberLimit: 30, perkLabel: "Aile sohbeti ve 30 üye kapasitesi" },
+  { level: 2, minXp: 150, title: "Yükselen Aile", badgeCode: "family_lv2", frameItemId: null, giftUnlockId: null, memberLimit: 45, perkLabel: "Yükselen Aile rozeti ve 45 üye kapasitesi" },
+  { level: 3, minXp: 400, title: "Parlayan Aile", badgeCode: "family_lv3", frameItemId: "frame_family_silver", giftUnlockId: null, memberLimit: 60, perkLabel: "Aile Gümüş profil çerçevesi ve 60 üye kapasitesi" },
+  { level: 4, minXp: 800, title: "Seçkin Aile", badgeCode: "family_lv4", frameItemId: null, giftUnlockId: "family_crest", memberLimit: 80, perkLabel: "Odada Aile Sancağı hediyesi kilidi ve 80 üye kapasitesi" },
+  { level: 5, minXp: 1500, title: "Asil Aile", badgeCode: "family_lv5", frameItemId: "frame_family_royal", giftUnlockId: null, memberLimit: 100, perkLabel: "Aile Asil profil çerçevesi ve 100 üye kapasitesi" },
+  { level: 6, minXp: 2600, title: "Zirve Ailesi", badgeCode: "family_lv6", frameItemId: null, giftUnlockId: null, memberLimit: 150, perkLabel: "Zirve Ailesi rozeti ve 150 üye kapasitesi" },
+];
+
+export const DEFAULT_FAMILY_XP_RULES = [
+  { eventType: "daily_checkin", xpAmount: 25, dailyUserCap: 1, label: "Günlük aile yoklaması (günde 1 kez +25 XP)" },
+  { eventType: "family_message", xpAmount: 5, dailyUserCap: 5, label: "Aile sohbetinde aktif mesaj (günde en fazla 5 kez +5 XP)" },
+  { eventType: "member_joined", xpAmount: 40, dailyUserCap: 1, label: "Yeni üye katılımı (kullanıcı başına 1 kez +40 XP)" },
+  { eventType: "room_gift_sent", xpAmount: 20, dailyUserCap: 10, label: "Canlı odada hediye gönderimi (işlem başına +20 XP)" },
+];
+
+export const describeFamilyError = (error, fallback = "İşlem şu anda tamamlanamadı. Bağlantını kontrol edip tekrar dene.") => {
+  const message = String(error?.message || "");
+  if (message.includes("Insufficient balance")) {
+    return "Yetersiz bakiye. Aile kurmak için 10.000.000 kredi gerekiyor.";
+  }
+  if (message.includes("Already in a family")) {
+    return "Aynı anda yalnızca bir aileye üye olabilirsin. Önce mevcut ailenden ayrılmalısın.";
+  }
+  if (message.includes("Family name already taken")) {
+    return "Bu aile adı zaten kullanılıyor. Farklı bir ad dene.";
+  }
+  if (message.includes("Family name must be between")) {
+    return "Aile adı 3 ile 40 karakter arasında olmalı.";
+  }
+  if (message.includes("Family description must be")) {
+    return "Aile açıklaması en fazla 240 karakter olabilir.";
+  }
+  if (message.includes("Family not found")) {
+    return "Aranan aile bulunamadı.";
+  }
+  if (message.includes("Family is full")) {
+    return "Bu ailenin üye kapasitesi dolu.";
+  }
+  if (message.includes("Family owner cannot leave")) {
+    return "Aile kurucusu kendi ailesinden ayrılamaz.";
+  }
+  if (message.includes("Only family owner can update")) {
+    return "Aile bilgilerini yalnızca aile kurucusu düzenleyebilir.";
+  }
+  if (message.includes("Family membership required")) {
+    return "Bu işlem için aile üyesi olmalısın.";
+  }
+  if (message.includes("Too many messages")) {
+    return "Çok hızlı mesaj gönderiyorsun. Birkaç saniye bekleyip tekrar dene.";
+  }
+  if (message.includes("Message must be between")) {
+    return "Mesaj metni 1 ile 1000 karakter arasında olmalı.";
+  }
+  if (message.includes("Invalid avatar URL")) {
+    return "Aile profil fotoğrafı adresi geçersiz.";
+  }
+  if (message.includes("Family level required")) {
+    return "Bu hediyeyi göndermek için aile seviyen yeterli değil.";
+  }
+  if (message.includes("Authentication required")) {
+    return "Devam etmek için oturum açmalısın.";
+  }
+  if (message.includes("Could not find the function") || (message.includes("function") && message.includes("does not exist"))) {
+    return "Aile veritabanı güncellemesi henüz sunucuda etkinleştirilmedi.";
+  }
+  if (message.includes("Network request failed") || message.includes("Failed to fetch")) {
+    return "İnternet bağlantısı kurulamadı. Bağlantını kontrol edip tekrar dene.";
+  }
+  return fallback;
+};
+
+const FAMILY_SELECT_EXTENDED =
+  "id, owner_id, family_code, name, description, avatar_url, xp, level, icon, theme_colors, created_at, community_members(user_id, role)";
+const FAMILY_SELECT_LEGACY =
+  "id, owner_id, name, description, icon, theme_colors, created_at, community_members(user_id, role)";
+
+const mapFamily = (community, currentUserId) => {
   const members = community.community_members || [];
+  const level = Math.max(1, Number(community.level) || 1);
+  const xp = Math.max(0, Number(community.xp) || 0);
+  const membership = currentUserId ? members.find((member) => member.user_id === currentUserId) : null;
   return {
     id: community.id,
     ownerId: community.owner_id,
+    familyCode: community.family_code || null,
     name: community.name,
     description: community.description || "",
+    avatarUrl: community.avatar_url || null,
+    xp,
+    level,
     icon: community.icon || "people",
-    colors: Array.isArray(community.theme_colors) ? community.theme_colors : FALLBACK_COLORS,
+    colors: Array.isArray(community.theme_colors) ? community.theme_colors : ["#2F80ED", "#1D4E89"],
     createdAt: community.created_at,
     memberCount: members.length,
-    joined: members.some((member) => member.user_id === currentUserId),
-    role: members.find((member) => member.user_id === currentUserId)?.role || null,
+    joined: Boolean(membership),
+    role: membership?.role || null,
   };
 };
 
-export const listCommunities = async (currentUserId) => {
+export const listFamilies = async (currentUserId) => {
   const client = requireClient();
-  const { data, error } = await client
+  let { data, error } = await client
     .from("communities")
-    .select("id, owner_id, name, description, icon, theme_colors, created_at, community_members(user_id, role)")
+    .select(FAMILY_SELECT_EXTENDED)
+    .order("level", { ascending: false })
+    .order("xp", { ascending: false })
     .order("created_at", { ascending: false });
-  throwIfError(error);
-  return (data || []).map((community) => mapCommunity(community, currentUserId));
+  if (error) {
+    const legacyResult = await client
+      .from("communities")
+      .select(FAMILY_SELECT_LEGACY)
+      .order("created_at", { ascending: false });
+    throwIfError(legacyResult.error);
+    data = legacyResult.data;
+  }
+  return (data || []).map((community) => mapFamily(community, currentUserId));
 };
 
-export const createCommunity = async ({ userId, name, description, icon = "people", colors = FALLBACK_COLORS }) => {
+export const listCommunities = listFamilies;
+
+export const getMyFamily = async (currentUserId) => {
+  if (!currentUserId) return null;
+  const client = requireClient();
+  const { data: membership, error: memberError } = await client
+    .from("community_members")
+    .select("community_id, role")
+    .eq("user_id", currentUserId)
+    .order("joined_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (memberError || !membership?.community_id) return null;
+
+  let { data, error } = await client
+    .from("communities")
+    .select(FAMILY_SELECT_EXTENDED)
+    .eq("id", membership.community_id)
+    .maybeSingle();
+  if (error) {
+    const legacy = await client
+      .from("communities")
+      .select(FAMILY_SELECT_LEGACY)
+      .eq("id", membership.community_id)
+      .maybeSingle();
+    if (legacy.error || !legacy.data) return null;
+    data = legacy.data;
+  }
+  return data ? mapFamily(data, currentUserId) : null;
+};
+
+export const findFamilyByCode = async (rawCode, currentUserId) => {
+  const code = String(rawCode || "").replace(/\D/g, "").trim();
+  if (!/^[1-9][0-9]{7}$/.test(code)) {
+    throw new Error("Lütfen 8 haneli geçerli bir aile ID numarası gir.");
+  }
   const client = requireClient();
   const { data, error } = await client
     .from("communities")
-    .insert({ owner_id: userId, name, description, icon, theme_colors: colors })
-    .select("id, owner_id, name, description, icon, theme_colors, created_at")
-    .single();
-  throwIfError(error);
-  return { ...mapCommunity({ ...data, community_members: [{ user_id: userId, role: "owner" }] }, userId), memberCount: 1 };
+    .select(FAMILY_SELECT_EXTENDED)
+    .eq("family_code", code)
+    .maybeSingle();
+  if (error) {
+    if (String(error.message || "").includes("family_code")) {
+      throw new Error("8 haneli aile ID araması henüz veritabanında etkinleştirilmedi.");
+    }
+    throw error;
+  }
+  return data ? mapFamily(data, currentUserId) : null;
 };
 
-export const setCommunityMembership = async ({ communityId, userId, joined }) => {
+export const getFamilyDetails = async (communityId, currentUserId) => {
+  if (!communityId) return null;
   const client = requireClient();
-  if (joined) {
-    const { error } = await client.from("community_members").insert({ community_id: communityId, user_id: userId, role: "member" });
-    if (error?.code !== "23505") throwIfError(error);
-    return;
+  const [familyRes, membersRes, levelsRes, rulesRes, rewardsRes] = await Promise.all([
+    client.from("communities").select(FAMILY_SELECT_EXTENDED).eq("id", communityId).maybeSingle(),
+    client
+      .from("community_members")
+      .select("user_id, role, joined_at, profiles(id, display_name, handle, avatar_color, avatar_url)")
+      .eq("community_id", communityId)
+      .order("joined_at", { ascending: true }),
+    client.from("family_level_configs").select("*").order("level", { ascending: true }),
+    client.from("family_xp_rules").select("*").order("xp_amount", { ascending: false }),
+    currentUserId
+      ? client.from("family_reward_grants").select("level, frame_item_id, badge_code, granted_at").eq("community_id", communityId).eq("user_id", currentUserId)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  let familyRow = familyRes.data;
+  if (familyRes.error) {
+    const legacy = await client.from("communities").select(FAMILY_SELECT_LEGACY).eq("id", communityId).maybeSingle();
+    throwIfError(legacy.error);
+    familyRow = legacy.data;
   }
-  const { error } = await client
-    .from("community_members")
-    .delete()
-    .eq("community_id", communityId)
-    .eq("user_id", userId);
+  if (!familyRow) return null;
+
+  const memberRows = membersRes.error ? [] : (membersRes.data || []);
+  const memberIds = memberRows.map((row) => row.user_id).filter(Boolean);
+  const publicIdByUser = new Map();
+  if (memberIds.length > 0) {
+    const { data: idRows } = await client.from("profiles").select("id, public_id").in("id", memberIds);
+    (idRows || []).forEach((item) => {
+      if (item?.id && item.public_id) publicIdByUser.set(item.id, item.public_id);
+    });
+  }
+
+  let checkedInToday = false;
+  if (currentUserId && memberIds.includes(currentUserId)) {
+    const todayUtc = new Date().toISOString().slice(0, 10);
+    const { data: checkinRow } = await client
+      .from("family_xp_events")
+      .select("id")
+      .eq("community_id", communityId)
+      .eq("actor_id", currentUserId)
+      .eq("event_type", "daily_checkin")
+      .eq("event_date", todayUtc)
+      .limit(1)
+      .maybeSingle();
+    checkedInToday = Boolean(checkinRow?.id);
+  }
+
+  const members = memberRows.map((row) => {
+    const p = profileFromJoin(row.profiles);
+    return {
+      userId: row.user_id,
+      role: row.role || "member",
+      joinedAt: row.joined_at,
+      name: p?.display_name || "Sora kullanıcısı",
+      handle: p?.handle || "sora",
+      color: p?.avatar_color || "#2F80ED",
+      avatarUrl: p?.avatar_url || null,
+      publicId: publicIdByUser.get(row.user_id) || null,
+    };
+  });
+
+  const levelConfigs = !levelsRes.error && Array.isArray(levelsRes.data) && levelsRes.data.length > 0
+    ? levelsRes.data.map((row) => ({
+        level: row.level,
+        minXp: row.min_xp,
+        title: row.title,
+        badgeCode: row.badge_code || null,
+        frameItemId: row.frame_item_id || null,
+        giftUnlockId: row.gift_unlock_id || null,
+        memberLimit: row.member_limit || 40,
+        perkLabel: row.perk_label,
+      }))
+    : DEFAULT_FAMILY_LEVEL_CONFIGS;
+
+  const xpRules = !rulesRes.error && Array.isArray(rulesRes.data) && rulesRes.data.length > 0
+    ? rulesRes.data.map((row) => ({
+        eventType: row.event_type,
+        xpAmount: row.xp_amount,
+        dailyUserCap: row.daily_user_cap,
+        label: row.label,
+      }))
+    : DEFAULT_FAMILY_XP_RULES;
+
+  return {
+    family: mapFamily(familyRow, currentUserId),
+    members,
+    levelConfigs,
+    xpRules,
+    rewardGrants: rewardsRes.error ? [] : (rewardsRes.data || []),
+    checkedInToday,
+  };
+};
+
+export const createFamily = async ({ name, description = "", avatarUrl = null, requestId }) => {
+  const client = requireClient();
+  const { data, error } = await client.rpc("create_family", {
+    p_name: name,
+    p_description: description,
+    p_avatar_url: avatarUrl,
+    p_request_id: requestId,
+  });
   throwIfError(error);
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    familyId: row?.family_id || null,
+    familyCode: row?.family_code || null,
+    balance: typeof row?.balance === "number" ? row.balance : null,
+    promoBalance: typeof row?.promo_balance === "number" ? row.promo_balance : null,
+    paidBalance: typeof row?.paid_balance === "number" ? row.paid_balance : null,
+  };
+};
+
+export const joinFamily = async (communityId) => {
+  const client = requireClient();
+  const { data, error } = await client.rpc("join_family", { p_community_id: communityId });
+  throwIfError(error);
+  return (Array.isArray(data) ? data[0] : data) || null;
+};
+
+export const leaveFamily = async (communityId) => {
+  const client = requireClient();
+  const { data, error } = await client.rpc("leave_family", { p_community_id: communityId });
+  throwIfError(error);
+  return Boolean(data);
+};
+
+export const updateFamilyProfile = async ({ communityId, name = null, description = null, avatarUrl = null, clearAvatar = false }) => {
+  const client = requireClient();
+  const { data, error } = await client.rpc("update_family_profile", {
+    p_community_id: communityId,
+    p_name: name,
+    p_description: description,
+    p_avatar_url: avatarUrl,
+    p_clear_avatar: Boolean(clearAvatar),
+  });
+  throwIfError(error);
+  return Array.isArray(data) ? data[0] : data;
+};
+
+export const listFamilyMessages = async ({ communityId, currentUserId }) => {
+  const client = requireClient();
+  const { data, error } = await client
+    .from("family_messages")
+    .select("id, community_id, sender_id, body, created_at, profiles!family_messages_sender_id_fkey(display_name, handle, avatar_color, avatar_url)")
+    .eq("community_id", communityId)
+    .order("created_at", { ascending: false })
+    .limit(120);
+  throwIfError(error);
+  return (data || []).reverse().map((msg) => {
+    const sender = profileFromJoin(msg.profiles);
+    return {
+      id: msg.id,
+      communityId: msg.community_id,
+      userId: msg.sender_id,
+      senderName: sender?.display_name || "Sora kullanıcısı",
+      senderHandle: sender?.handle || "sora",
+      senderColor: sender?.avatar_color || "#2F80ED",
+      senderAvatarUrl: sender?.avatar_url || null,
+      text: msg.body,
+      own: msg.sender_id === currentUserId,
+      createdAt: msg.created_at,
+    };
+  });
+};
+
+export const sendFamilyMessage = async ({ communityId, text, clientMessageId }) => {
+  const client = requireClient();
+  const { data, error } = await client.rpc("send_family_message", {
+    p_community_id: communityId,
+    p_body: text,
+    p_client_message_id: clientMessageId,
+  });
+  throwIfError(error);
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    id: row.id,
+    communityId: row.community_id,
+    userId: row.sender_id,
+    text: row.body,
+    own: true,
+    createdAt: row.created_at,
+    awardedXp: row.awarded_xp || 0,
+    familyXp: typeof row.family_xp === "number" ? row.family_xp : null,
+    familyLevel: typeof row.family_level === "number" ? row.family_level : null,
+  };
+};
+
+export const subscribeToFamilyMessages = ({ communityId, onMessage }) => {
+  const client = requireClient();
+  const channel = client
+    .channel(`family-messages:${communityId}`)
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "family_messages", filter: `community_id=eq.${communityId}` },
+      ({ new: message }) => onMessage({
+        id: message.id,
+        communityId: message.community_id,
+        userId: message.sender_id,
+        text: message.body,
+        createdAt: message.created_at,
+      }),
+    )
+    .subscribe();
+  return () => client.removeChannel(channel);
+};
+
+export const claimFamilyCheckin = async (communityId) => {
+  const client = requireClient();
+  const { data, error } = await client.rpc("claim_family_checkin", { p_community_id: communityId });
+  throwIfError(error);
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    claimed: Boolean(row?.claimed),
+    awardedXp: row?.awarded_xp || 0,
+    familyXp: typeof row?.family_xp === "number" ? row.family_xp : null,
+    familyLevel: typeof row?.family_level === "number" ? row.family_level : null,
+  };
+};
+
+export const claimFamilyLevelRewards = async (communityId) => {
+  const client = requireClient();
+  const { data, error } = await client.rpc("claim_family_level_rewards", { p_community_id: communityId });
+  throwIfError(error);
+  return Number(data) || 0;
 };
 
 export const subscribeToCommunities = (onChange) => {
@@ -682,23 +1047,49 @@ export const sendRoomGift = async ({ roomId, giftId, recipientId, requestId }) =
 
 export const listRoomGiftCatalog = async () => {
   const client = requireClient();
-  const { data, error } = await client.from("gift_catalog")
-    .select("id,name,icon,color,cost").eq("active", true).order("cost");
-  throwIfError(error);
-  return data || [];
+  let { data, error } = await client
+    .from("gift_catalog")
+    .select("id,name,icon,color,cost,min_family_level")
+    .eq("active", true)
+    .order("cost");
+  if (error) {
+    const legacy = await client.from("gift_catalog").select("id,name,icon,color,cost").eq("active", true).order("cost");
+    throwIfError(legacy.error);
+    data = legacy.data;
+  }
+  return (data || []).map((row) => ({
+    ...row,
+    minFamilyLevel: row.min_family_level || 0,
+  }));
 };
 
 export const listProfileItems = async () => {
   const client = requireClient();
   const { data: userData, error: userError } = await client.auth.getUser();
   throwIfError(userError);
-  const [catalog, owned, profile] = await Promise.all([
-    client.from("profile_item_catalog").select("id,name,item_type,appearance,cost").eq("active", true).order("cost"),
+  let catalog = await client
+    .from("profile_item_catalog")
+    .select("id,name,item_type,appearance,cost,purchasable")
+    .eq("active", true)
+    .order("cost");
+  if (catalog.error) {
+    catalog = await client
+      .from("profile_item_catalog")
+      .select("id,name,item_type,appearance,cost")
+      .eq("active", true)
+      .order("cost");
+  }
+  const [owned, profile] = await Promise.all([
     client.from("user_profile_items").select("item_id"),
     client.from("profiles").select("active_frame_id,active_profile_theme_id").eq("id", userData.user.id).maybeSingle(),
   ]);
-  throwIfError(catalog.error); throwIfError(owned.error); throwIfError(profile.error);
-  return { items: catalog.data || [], ownedIds: (owned.data || []).map((row) => row.item_id), active: profile.data || {} };
+  throwIfError(catalog.error);
+  throwIfError(owned.error);
+  return {
+    items: (catalog.data || []).map((row) => ({ ...row, purchasable: row.purchasable !== false })),
+    ownedIds: (owned.data || []).map((row) => row.item_id),
+    active: profile.error ? {} : (profile.data || {}),
+  };
 };
 
 export const purchaseProfileItem = async ({ itemId, requestId }) => {

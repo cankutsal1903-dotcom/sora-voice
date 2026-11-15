@@ -323,7 +323,7 @@ const authorizeSeat = async (request: Request, roomId: string) => {
   } else {
     seat = validSeats.find(
       (index) => index >= FIRST_REGULAR_SEAT_INDEX && !occupied.has(index),
-    ) ?? null;
+    ) ?? validSeats.find((index) => !occupied.has(index)) ?? null;
     if (seat === null) return json({ error: "No free seat" }, 409);
   }
   await applyLiveKitPermission(

@@ -227,6 +227,50 @@ export const uploadProfileAvatar = async ({ userId, asset }) => {
   return avatarUrl;
 };
 
+export const FAMILY_AVATAR_MAX_BYTES = 3 * 1024 * 1024;
+const ALLOWED_FAMILY_AVATAR_MIMES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+export const validateFamilyAvatarAsset = (asset, byteLength = null) => {
+  if (!asset?.uri) {
+    throw new Error("Görsel seçilemedi.");
+  }
+  const rawMime = String(asset.mimeType || "image/jpeg").toLowerCase().trim();
+  const normalizedMime = rawMime === "image/jpg" ? "image/jpeg" : rawMime;
+  if (!ALLOWED_FAMILY_AVATAR_MIMES.has(normalizedMime)) {
+    throw new Error("Yalnızca JPEG, PNG veya WebP görselleri yüklenebilir.");
+  }
+  const reportedSize = typeof asset.fileSize === "number" ? asset.fileSize : null;
+  if (reportedSize !== null && reportedSize > FAMILY_AVATAR_MAX_BYTES) {
+    throw new Error("Aile profil fotoğrafı en fazla 3 MB olabilir.");
+  }
+  if (byteLength !== null) {
+    if (byteLength <= 0) throw new Error("Seçilen görsel okunamadı.");
+    if (byteLength > FAMILY_AVATAR_MAX_BYTES) {
+      throw new Error("Aile profil fotoğrafı en fazla 3 MB olabilir.");
+    }
+  }
+  const extension = normalizedMime === "image/png" ? "png" : normalizedMime === "image/webp" ? "webp" : "jpg";
+  return { mimeType: normalizedMime, extension };
+};
+
+export const uploadFamilyAvatar = async ({ userId, asset }) => {
+  if (!userId) throw new Error("Oturum bulunamadı.");
+  const client = requireClient();
+  const initialCheck = validateFamilyAvatarAsset(asset);
+  const bytes = await readFileBytes(asset.uri);
+  const { mimeType, extension } = validateFamilyAvatarAsset(asset, bytes.byteLength);
+  const path = `${userId}/${safeFileName(asset.fileName || null, initialCheck.extension || extension)}`;
+  const { error: uploadError } = await client.storage
+    .from("family-avatars")
+    .upload(path, bytes, { contentType: mimeType, upsert: false });
+  throwIfError(uploadError);
+  const { data } = client.storage.from("family-avatars").getPublicUrl(path);
+  if (!data?.publicUrl) {
+    throw new Error("Fotoğraf bağlantısı oluşturulamadı.");
+  }
+  return data.publicUrl;
+};
+
 export const removeProfileAvatar = async ({ userId }) => {
   const client = requireClient();
   const { error } = await client.from("profiles").update({ avatar_url: null }).eq("id", userId);
