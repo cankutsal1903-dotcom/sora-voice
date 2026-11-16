@@ -166,21 +166,31 @@ const issueToken = async (request: Request) => {
   if (membershipError) {
     return json({ error: membershipError.message }, 403);
   }
-  const role = membership?.[0]?.role;
-  const muted = Boolean(membership?.[0]?.is_muted);
+  const { data: roomRow } = await userClient
+    .from("rooms")
+    .select("host_id")
+    .eq("id", cleanRoomName)
+    .maybeSingle();
+  const isRoomHost = Boolean(roomRow?.host_id && roomRow.host_id === user.id);
+
+  const rawRole = membership?.[0]?.role;
+  const role = isRoomHost ? "host" : rawRole;
+  const muted = isRoomHost ? false : Boolean(membership?.[0]?.is_muted);
   if (!role) {
     return json({ error: "Room membership could not be created" }, 403);
   }
 
+  const canPublish = roomRoleCanPublish(role, muted, isRoomHost);
   const token = new AccessToken(liveKitApiKey, liveKitApiSecret, {
     identity: user.id,
     name: cleanName,
     ttl: "10m",
+    attributes: isRoomHost ? { seat: "0" } : undefined,
   });
   token.addGrant({
     roomJoin: true,
     room: cleanRoomName,
-    canPublish: roomRoleCanPublish(role, muted, false),
+    canPublish,
     canSubscribe: true,
     canPublishData: true,
     roomAdmin: false,
@@ -190,6 +200,7 @@ const issueToken = async (request: Request) => {
     token: await token.toJwt(),
     role,
     muted,
+    canPublish,
   });
 };
 
@@ -300,7 +311,12 @@ const authorizeSeat = async (request: Request, roomId: string) => {
     });
   }
 
-  if (targetId === seatAuth.host_id) return json({ ok: true, seat: 0 });
+  if (targetId === seatAuth.host_id) {
+    await applyLiveKitPermission(roomId, targetId, "host", false, 0).catch(
+      () => undefined,
+    );
+    return json({ ok: true, seat: 0 });
+  }
   const participants = await listSeatedParticipants(roomId);
   if (!participants.some((participant) => participant.identity === targetId)) {
     return json({ error: "Participant is not connected" }, 409);

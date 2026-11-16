@@ -6301,13 +6301,25 @@ function Room({
       return;
     }
     if (liveVoice.enabled) {
+      if (liveVoice.status !== "connected") {
+        Alert.alert(
+          "Bağlantı hazırlanıyor",
+          "Mikrofonu açmak için ses odasının bağlanmasını bekle.",
+        );
+        return;
+      }
       try {
-        const updated = await liveVoice.setMicrophoneEnabled(!micOn);
-        if (!updated)
+        let updated = await liveVoice.setMicrophoneEnabled(!micOn);
+        if (!updated && !micOn && isHost) {
+          await runSeatAction("take").catch(() => undefined);
+          updated = await liveVoice.setMicrophoneEnabled(true);
+        }
+        if (!updated) {
           Alert.alert(
-            "Bağlantı hazırlanıyor",
-            "Mikrofonu açmak için ses odasının bağlanmasını bekle.",
+            "Mikrofon yetkisi yenileniyor",
+            "Oda ses izni güncelleniyor, bir saniye sonra tekrar dokun.",
           );
+        }
       } catch {
         Alert.alert(
           "Mikrofon değiştirilemedi",
