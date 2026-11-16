@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 
@@ -55,283 +55,42 @@ export const DEFAULT_GIFT_CATALOG = [
   { id: "kraliyet_sahnesi", name: "Kraliyet Sahnesi", icon: "trophy", color: "#142952", cost: 12_000_000, category: "luxury", minFamilyLevel: 0, sortOrder: 47 },
 ];
 
-// 34 hediyenin her biri için özel katmanlı görsel kompozisyon tarifleri
-const GIFT_RECIPES = {
-  // ── Uygun fiyatlı ──
-  minik_kalp: {
-    grad: ["#FF7EB3", "#FF477E", "#B51756"],
-    ring: "rgba(255,225,238,0.52)",
-    motif: "halo",
-    main: { pack: "mci", name: "heart-multiple", color: "#FFFFFF", scale: 0.5 },
-    subTopRight: { pack: "mci", name: "star-four-points", color: "#FFE58F", scale: 0.24 },
-    subBottomLeft: { pack: "ion", name: "heart", color: "#FFD6E7", scale: 0.22 },
-  },
-  kahve_molasi: {
-    grad: ["#D79A68", "#9C5B2E", "#4A2611"],
-    ring: "rgba(255,233,204,0.45)",
-    motif: "pedestal",
-    main: { pack: "mci", name: "coffee", color: "#FFF8EE", scale: 0.5 },
-    subTopRight: { pack: "mci", name: "waves", color: "#FFE3B8", scale: 0.24, rotate: "-90deg" },
-    subBottomLeft: { pack: "ion", name: "heart", color: "#FFB59E", scale: 0.2 },
-  },
-  renkli_balon: {
-    grad: ["#6EC6FF", "#3A86FF", "#5E3BEE"],
-    ring: "rgba(255,255,255,0.46)",
-    motif: "halo",
-    main: { pack: "mci", name: "balloon", color: "#FFFFFF", scale: 0.52 },
-    subTopRight: { pack: "mci", name: "balloon", color: "#FFD166", scale: 0.28, rotate: "16deg" },
-    subBottomLeft: { pack: "mci", name: "balloon", color: "#FF7096", scale: 0.26, rotate: "-14deg" },
-  },
-  sans_kurabiyesi: {
-    grad: ["#FFD166", "#E89020", "#8F4A08"],
-    ring: "rgba(255,248,214,0.55)",
-    motif: "diamond",
-    main: { pack: "mci", name: "cookie", color: "#FFFDF5", scale: 0.48 },
-    subTopRight: { pack: "mci", name: "star-four-points", color: "#FFFFFF", scale: 0.25 },
-    subBottomLeft: { pack: "ion", name: "sparkles", color: "#FFE8A3", scale: 0.22 },
-  },
-  gulumseme: {
-    grad: ["#FFE066", "#FF9F1C", "#E0630E"],
-    ring: "rgba(255,250,220,0.55)",
-    motif: "rays",
-    main: { pack: "mci", name: "emoticon-happy", color: "#FFFFFF", scale: 0.52 },
-    subTopRight: { pack: "mci", name: "star-four-points", color: "#FFF5BA", scale: 0.24 },
-  },
-  tatli_kedi: {
-    grad: ["#A992FA", "#7452E3", "#3B2285"],
-    ring: "rgba(235,226,255,0.48)",
-    motif: "halo",
-    main: { pack: "mci", name: "cat", color: "#FFFFFF", scale: 0.52 },
-    subTopRight: { pack: "mci", name: "paw", color: "#FFB8D9", scale: 0.24, rotate: "18deg" },
-    subBottomLeft: { pack: "ion", name: "heart", color: "#FFD166", scale: 0.2 },
-  },
-  ucan_opucuk: {
-    grad: ["#FF6B9D", "#E62E6B", "#880E4F"],
-    ring: "rgba(255,214,230,0.5)",
-    motif: "arc",
-    main: { pack: "mci", name: "emoticon-kiss", color: "#FFFFFF", scale: 0.48 },
-    subTopRight: { pack: "ion", name: "heart", color: "#FFE082", scale: 0.26, rotate: "15deg" },
-    subBottomLeft: { pack: "mci", name: "feather", color: "#FFD6E7", scale: 0.22, rotate: "-25deg" },
-  },
-  parilti: {
-    grad: ["#64DFDF", "#2F80ED", "#1B3B82"],
-    ring: "rgba(210,248,255,0.58)",
-    motif: "diamond",
-    main: { pack: "mci", name: "shimmer", color: "#FFFFFF", scale: 0.52 },
-    subTopRight: { pack: "mci", name: "star-four-points", color: "#FFE680", scale: 0.25 },
-    subBottomLeft: { pack: "mci", name: "flare", color: "#B8F2FF", scale: 0.24 },
-  },
-
-  // ── Oda temalı ──
-  soz_sende: {
-    grad: ["#56CCF2", "#2F80ED", "#143A78"],
-    ring: "rgba(179,232,255,0.54)",
-    motif: "waves",
-    main: { pack: "mci", name: "account-voice", color: "#FFFFFF", scale: 0.5 },
-    subTopRight: { pack: "ion", name: "mic", color: "#FFE082", scale: 0.24 },
-  },
-  alkis_yagmuru: {
-    grad: ["#4FACFE", "#1F6AE1", "#12347A"],
-    ring: "rgba(255,232,163,0.55)",
-    motif: "rays",
-    main: { pack: "mci", name: "hand-clap", color: "#FFFFFF", scale: 0.5 },
-    subTopRight: { pack: "ion", name: "sparkles", color: "#FFD166", scale: 0.25 },
-    subBottomLeft: { pack: "mci", name: "star-four-points", color: "#9EE7FF", scale: 0.22 },
-  },
-  sahne_isigi: {
-    grad: ["#FFC857", "#E68A1E", "#1E355E"],
-    ring: "rgba(255,238,186,0.58)",
-    motif: "beam",
-    main: { pack: "mci", name: "spotlight-beam", color: "#FFFFFF", scale: 0.52 },
-    subTopRight: { pack: "ion", name: "star", color: "#FFE885", scale: 0.24 },
-  },
-  dj_seti: {
-    grad: ["#9D50BB", "#4776E6", "#131E42"],
-    ring: "rgba(148,226,255,0.56)",
-    motif: "vinyl",
-    main: { pack: "mci", name: "disc-player", color: "#FFFFFF", scale: 0.5 },
-    subTopRight: { pack: "ion", name: "musical-notes", color: "#70F3FF", scale: 0.24 },
-    subBottomLeft: { pack: "mci", name: "headphones", color: "#FFD166", scale: 0.23 },
-  },
-  konusma_taci: {
-    grad: ["#F7C948", "#2F80ED", "#122B59"],
-    ring: "rgba(255,226,133,0.68)",
-    motif: "royal",
-    main: { pack: "mci", name: "crown-circle", color: "#FFF8DC", scale: 0.52 },
-    subBottomLeft: { pack: "ion", name: "mic", color: "#9EE7FF", scale: 0.23 },
-    subTopRight: { pack: "mci", name: "star-four-points", color: "#FFE885", scale: 0.24 },
-  },
-  mikrofon_yildizi: {
-    grad: ["#6A9CFD", "#2759C9", "#0E2254"],
-    ring: "rgba(255,225,130,0.58)",
-    motif: "diamond",
-    main: { pack: "mci", name: "microphone-variant", color: "#FFFFFF", scale: 0.5 },
-    subTopRight: { pack: "ion", name: "star", color: "#FFD166", scale: 0.26 },
-    subBottomLeft: { pack: "mci", name: "star-four-points", color: "#90E0EF", scale: 0.22 },
-  },
-  dinleyici_destegi: {
-    grad: ["#48CAE4", "#2563EB", "#132A63"],
-    ring: "rgba(190,242,255,0.52)",
-    motif: "waves",
-    main: { pack: "mci", name: "headphones", color: "#FFFFFF", scale: 0.5 },
-    subTopRight: { pack: "ion", name: "heart", color: "#FF7AA8", scale: 0.25 },
-  },
-  oda_yildizi: {
-    grad: ["#3A8DFF", "#1D4ED8", "#0B1D4A"],
-    ring: "rgba(255,220,115,0.72)",
-    motif: "royal",
-    main: { pack: "mci", name: "trophy-award", color: "#FFE57F", scale: 0.52 },
-    subTopRight: { pack: "mci", name: "crown", color: "#FFF3B0", scale: 0.25 },
-    subBottomLeft: { pack: "mci", name: "star-four-points", color: "#80EAFF", scale: 0.23 },
-  },
-
-  // ── Orta seviye ──
-  gul_buketi: {
-    grad: ["#FF5D8F", "#C9184A", "#590D22"],
-    ring: "rgba(255,226,180,0.6)",
-    motif: "pedestal",
-    main: { pack: "ion", name: "rose", color: "#FFFFFF", scale: 0.5 },
-    subTopRight: { pack: "mci", name: "flower-tulip", color: "#FFB3C6", scale: 0.26, rotate: "16deg" },
-    subBottomLeft: { pack: "mci", name: "flower", color: "#FFE599", scale: 0.24 },
-  },
-  neon_mikrofon: {
-    grad: ["#00F5D4", "#0088FF", "#1E1052"],
-    ring: "rgba(0,245,212,0.72)",
-    motif: "waves",
-    main: { pack: "mci", name: "microphone-variant", color: "#FFFFFF", scale: 0.52 },
-    subTopRight: { pack: "mci", name: "flare", color: "#00F5D4", scale: 0.26 },
-    subBottomLeft: { pack: "ion", name: "musical-notes", color: "#FF70A6", scale: 0.22 },
-  },
-  disko_topu: {
-    grad: ["#B57BFF", "#5B3FE8", "#181240"],
-    ring: "rgba(220,205,255,0.65)",
-    motif: "rays",
-    main: { pack: "mci", name: "decagram", color: "#E8F7FF", scale: 0.52 },
-    subTopRight: { pack: "ion", name: "sparkles", color: "#FFE66D", scale: 0.26 },
-    subBottomLeft: { pack: "mci", name: "lightbulb-spot", color: "#72EFDD", scale: 0.24 },
-  },
-  yildiz_yagmuru: {
-    grad: ["#3F7CAC", "#1C3F75", "#09152E"],
-    ring: "rgba(255,224,130,0.64)",
-    motif: "meteor",
-    main: { pack: "mci", name: "star-shooting", color: "#FFE57F", scale: 0.54 },
-    subTopRight: { pack: "ion", name: "star", color: "#FFFFFF", scale: 0.23 },
-    subBottomLeft: { pack: "mci", name: "star-four-points", color: "#80EAFF", scale: 0.24 },
-  },
-  kristal_kelebek: {
-    grad: ["#72EFDD", "#2196F3", "#152866"],
-    ring: "rgba(202,248,255,0.7)",
-    motif: "diamond",
-    main: { pack: "mci", name: "butterfly", color: "#FFFFFF", scale: 0.52 },
-    subTopRight: { pack: "mci", name: "diamond-stone", color: "#B8F8FF", scale: 0.24 },
-    subBottomLeft: { pack: "mci", name: "shimmer", color: "#FFE89E", scale: 0.23 },
-  },
-  ay_isigi: {
-    grad: ["#5E81F4", "#283E78", "#0C1633"],
-    ring: "rgba(218,232,255,0.62)",
-    motif: "halo",
-    main: { pack: "mci", name: "weather-night", color: "#FFF5CC", scale: 0.52 },
-    subTopRight: { pack: "mci", name: "star-four-points", color: "#FFFFFF", scale: 0.24 },
-    subBottomLeft: { pack: "mci", name: "waves", color: "#9BC5FF", scale: 0.22 },
-  },
-  gokkusagi: {
-    grad: ["#56CCF2", "#3A86FF", "#274690"],
-    ring: "rgba(255,226,138,0.7)",
-    motif: "rainbow",
-    main: { pack: "mci", name: "looks", color: "#FFE680", scale: 0.56 },
-    subTopRight: { pack: "ion", name: "sparkles", color: "#FFFFFF", scale: 0.24 },
-    subBottomLeft: { pack: "mci", name: "star-four-points", color: "#FF9EBB", scale: 0.22 },
-  },
-  altin_tac: {
-    grad: ["#FFE074", "#C98A12", "#1B2E59"],
-    ring: "rgba(255,236,168,0.82)",
-    motif: "royal",
-    main: { pack: "mci", name: "crown", color: "#FFF9E2", scale: 0.54 },
-    subTopRight: { pack: "mci", name: "diamond-stone", color: "#80EAFF", scale: 0.24 },
-    subBottomLeft: { pack: "mci", name: "star-four-points", color: "#FFE57F", scale: 0.22 },
-  },
-  ferrari: {
-    grad: ["#FF3B47", "#B81422", "#1A0B10"],
-    ring: "rgba(255,215,102,0.72)",
-    motif: "track",
-    main: { pack: "mci", name: "car-sports", color: "#FFFFFF", scale: 0.56 },
-    subTopRight: { pack: "mci", name: "shield-star", color: "#FFD60A", scale: 0.25 },
-    subBottomLeft: { pack: "mci", name: "fire", color: "#FF9F1C", scale: 0.24, rotate: "-20deg" },
-  },
-  lamborghini: {
-    grad: ["#FFD23F", "#C97A00", "#12161F"],
-    ring: "rgba(255,232,128,0.78)",
-    motif: "diamond",
-    main: { pack: "mci", name: "car-convertible", color: "#FFFDF5", scale: 0.56 },
-    subTopRight: { pack: "mci", name: "car-turbocharger", color: "#70F3FF", scale: 0.24 },
-    subBottomLeft: { pack: "mci", name: "flare", color: "#FFE66D", scale: 0.25 },
-  },
-
-  // ── Gösterişli ──
-  elmas_aslan: {
-    grad: ["#70E1F5", "#1E56B5", "#091838"],
-    ring: "rgba(186,247,255,0.86)",
-    motif: "imperial",
-    main: { pack: "mci", name: "shield-crown", color: "#E8FCFF", scale: 0.54 },
-    subTopRight: { pack: "mci", name: "diamond-stone", color: "#FFE57F", scale: 0.27 },
-    subBottomLeft: { pack: "mci", name: "crown", color: "#FFD166", scale: 0.24 },
-  },
-  gokyuzu_treni: {
-    grad: ["#56CCF2", "#2558C9", "#0B193D"],
-    ring: "rgba(184,236,255,0.78)",
-    motif: "arc",
-    main: { pack: "mci", name: "train-variant", color: "#FFFFFF", scale: 0.52 },
-    subTopRight: { pack: "mci", name: "star-shooting", color: "#FFE57F", scale: 0.27 },
-    subBottomLeft: { pack: "mci", name: "waves", color: "#9EE7FF", scale: 0.24 },
-  },
-  kraliyet_arabasi: {
-    grad: ["#F6C945", "#8C5808", "#162447"],
-    ring: "rgba(255,233,153,0.84)",
-    motif: "imperial",
-    main: { pack: "mci", name: "horse-variant", color: "#FFF9E6", scale: 0.5 },
-    subTopRight: { pack: "mci", name: "crown", color: "#FFE066", scale: 0.28 },
-    subBottomLeft: { pack: "mci", name: "star-circle", color: "#A8E6FF", scale: 0.24 },
-  },
-  isik_selalesi: {
-    grad: ["#64F4FF", "#1A82E8", "#0A2152"],
-    ring: "rgba(186,250,255,0.82)",
-    motif: "beam",
-    main: { pack: "mci", name: "waterfall", color: "#FFFFFF", scale: 0.54 },
-    subTopRight: { pack: "mci", name: "shimmer", color: "#FFE885", scale: 0.26 },
-    subBottomLeft: { pack: "mci", name: "waves", color: "#90F1FF", scale: 0.24 },
-  },
-  kozmik_balina: {
-    grad: ["#38BDF8", "#2541B2", "#090F2C"],
-    ring: "rgba(148,232,255,0.8)",
-    motif: "meteor",
-    main: { pack: "mci", name: "dolphin", color: "#E6FAFF", scale: 0.54 },
-    subTopRight: { pack: "mci", name: "star-shooting", color: "#FFE57F", scale: 0.27 },
-    subBottomLeft: { pack: "ion", name: "moon", color: "#B8E8FF", scale: 0.22 },
-  },
-  efsanevi_anka: {
-    grad: ["#FFBE0B", "#FB5607", "#3A0CA3"],
-    ring: "rgba(255,224,115,0.88)",
-    motif: "imperial",
-    main: { pack: "mci", name: "bird", color: "#FFF8E7", scale: 0.52 },
-    subTopRight: { pack: "mci", name: "fire", color: "#FFE066", scale: 0.28 },
-    subBottomLeft: { pack: "mci", name: "feather", color: "#FFB703", scale: 0.26, rotate: "-18deg" },
-  },
-  yildiz_gemisi: {
-    grad: ["#4CC9F0", "#1D4ED8", "#070E26"],
-    ring: "rgba(156,238,255,0.86)",
-    motif: "meteor",
-    main: { pack: "mci", name: "rocket-launch", color: "#FFFFFF", scale: 0.54 },
-    subTopRight: { pack: "mci", name: "space-station", color: "#FFE57F", scale: 0.26 },
-    subBottomLeft: { pack: "mci", name: "flare", color: "#72EFDD", scale: 0.25 },
-  },
-  kraliyet_sahnesi: {
-    grad: ["#FFD166", "#1D4ED8", "#0A1433"],
-    ring: "rgba(255,230,138,0.92)",
-    motif: "imperial",
-    main: { pack: "mci", name: "castle", color: "#FFF8DC", scale: 0.52 },
-    subTopRight: { pack: "mci", name: "crown", color: "#FFE066", scale: 0.28 },
-    subBottomLeft: { pack: "mci", name: "spotlight-beam", color: "#80EAFF", scale: 0.26 },
-  },
+// Original transparent collectible illustrations, bundled locally for offline use.
+export const GIFT_ARTWORK_SOURCES = {
+  minik_kalp: require("../../assets/gifts/v2/minik_kalp.png"),
+  gulumseme: require("../../assets/gifts/v2/gulumseme.png"),
+  kahve_molasi: require("../../assets/gifts/v2/kahve_molasi.png"),
+  renkli_balon: require("../../assets/gifts/v2/renkli_balon.png"),
+  sans_kurabiyesi: require("../../assets/gifts/v2/sans_kurabiyesi.png"),
+  parilti: require("../../assets/gifts/v2/parilti.png"),
+  ucan_opucuk: require("../../assets/gifts/v2/ucan_opucuk.png"),
+  tatli_kedi: require("../../assets/gifts/v2/tatli_kedi.png"),
+  dinleyici_destegi: require("../../assets/gifts/v2/dinleyici_destegi.png"),
+  soz_sende: require("../../assets/gifts/v2/soz_sende.png"),
+  alkis_yagmuru: require("../../assets/gifts/v2/alkis_yagmuru.png"),
+  sahne_isigi: require("../../assets/gifts/v2/sahne_isigi.png"),
+  mikrofon_yildizi: require("../../assets/gifts/v2/mikrofon_yildizi.png"),
+  dj_seti: require("../../assets/gifts/v2/dj_seti.png"),
+  konusma_taci: require("../../assets/gifts/v2/konusma_taci.png"),
+  oda_yildizi: require("../../assets/gifts/v2/oda_yildizi.png"),
+  gul_buketi: require("../../assets/gifts/v2/gul_buketi.png"),
+  neon_mikrofon: require("../../assets/gifts/v2/neon_mikrofon.png"),
+  disko_topu: require("../../assets/gifts/v2/disko_topu.png"),
+  ay_isigi: require("../../assets/gifts/v2/ay_isigi.png"),
+  yildiz_yagmuru: require("../../assets/gifts/v2/yildiz_yagmuru.png"),
+  gokkusagi: require("../../assets/gifts/v2/gokkusagi.png"),
+  kristal_kelebek: require("../../assets/gifts/v2/kristal_kelebek.png"),
+  altin_tac: require("../../assets/gifts/v2/altin_tac.png"),
+  ferrari: require("../../assets/gifts/v2/ferrari.png"),
+  lamborghini: require("../../assets/gifts/v2/lamborghini.png"),
+  isik_selalesi: require("../../assets/gifts/v2/isik_selalesi.png"),
+  gokyuzu_treni: require("../../assets/gifts/v2/gokyuzu_treni.png"),
+  kraliyet_arabasi: require("../../assets/gifts/v2/kraliyet_arabasi.png"),
+  kozmik_balina: require("../../assets/gifts/v2/kozmik_balina.png"),
+  efsanevi_anka: require("../../assets/gifts/v2/efsanevi_anka.png"),
+  elmas_aslan: require("../../assets/gifts/v2/elmas_aslan.png"),
+  yildiz_gemisi: require("../../assets/gifts/v2/yildiz_gemisi.png"),
+  kraliyet_sahnesi: require("../../assets/gifts/v2/kraliyet_sahnesi.png"),
 };
 
 const NAME_TO_GIFT_ID = Object.fromEntries(
@@ -339,273 +98,39 @@ const NAME_TO_GIFT_ID = Object.fromEntries(
 );
 
 export const resolveGiftRecipeKey = (giftId, giftName) => {
-  if (giftId && GIFT_RECIPES[giftId]) return giftId;
-  if (giftName) {
-    const byName = NAME_TO_GIFT_ID[String(giftName).trim().toLocaleLowerCase("tr-TR")];
-    if (byName && GIFT_RECIPES[byName]) return byName;
-  }
-  return null;
+  if (giftId && Object.hasOwn(GIFT_ARTWORK_SOURCES, giftId)) return giftId;
+  const normalizedName = String(giftName || "").trim().toLocaleLowerCase("tr-TR");
+  return Object.hasOwn(NAME_TO_GIFT_ID, normalizedName) ? NAME_TO_GIFT_ID[normalizedName] : null;
 };
 
-function VectorGlyph({ spec, size }) {
-  if (!spec) return null;
-  const px = Math.max(9, Math.round(size * (spec.scale || 0.45)));
-  const IconComp = spec.pack === "ion" ? Ionicons : MaterialCommunityIcons;
-  return <IconComp name={spec.name} size={px} color={spec.color || "#FFFFFF"} />;
-}
-
-/**
- * 34 hediyenin her biri için katmanlı gradyan, geometrik hale/çerçeve ve çoklu vektör rozet sahnesi.
- */
+/** Shared original illustration for catalog, chat receipt, and the animated gift scene. */
 export const SoraGiftArtwork = memo(function SoraGiftArtwork({
   giftId,
   giftName,
-  fallbackIcon = "sparkles",
+  fallbackIcon = "gift",
   fallbackColor = "#2F80ED",
   size = 54,
 }) {
   const key = resolveGiftRecipeKey(giftId, giftName);
-  const recipe = key ? GIFT_RECIPES[key] : null;
-  const radius = Math.round(size * 0.34);
-
-  if (!recipe) {
+  const source = GIFT_ARTWORK_SOURCES[key];
+  if (source) {
     return (
-      <LinearGradient
-        colors={[fallbackColor, "#153263"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[
-          artStyles.box,
-          { width: size, height: size, borderRadius: radius, borderColor: "rgba(255,255,255,0.34)" },
-        ]}
-      >
-        <View style={[artStyles.sheen, { width: size * 0.8, height: size * 0.42, borderRadius: radius }]} />
-        <Ionicons name={fallbackIcon || "sparkles"} size={Math.round(size * 0.46)} color="#FFFFFF" />
-      </LinearGradient>
+      <Image
+        source={source}
+        resizeMode="contain"
+        resizeMethod="resize"
+        accessible={false}
+        fadeDuration={0}
+        style={{ width: size, height: size }}
+      />
     );
   }
-
-  const innerRingSize = Math.round(size * 0.76);
-  const diamondSize = Math.round(size * 0.62);
-
+  // Future server-only catalog items remain usable until their illustration is shipped.
+  const icon = Ionicons.glyphMap?.[fallbackIcon] ? fallbackIcon : "gift";
   return (
-    <LinearGradient
-      colors={recipe.grad}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[
-        artStyles.box,
-        {
-          width: size,
-          height: size,
-          borderRadius: radius,
-          borderColor: recipe.ring,
-          borderWidth: recipe.motif === "imperial" || recipe.motif === "royal" ? 1.8 : 1.2,
-        },
-      ]}
-    >
-      {/* Üst cam yansıması */}
-      <View
-        pointerEvents="none"
-        style={[
-          artStyles.sheen,
-          {
-            width: size * 0.92,
-            height: size * 0.44,
-            top: -size * 0.08,
-            borderRadius: radius,
-          },
-        ]}
-      />
-
-      {/* Özel motif arka katmanları */}
-      {(recipe.motif === "halo" || recipe.motif === "waves" || recipe.motif === "vinyl") && (
-        <View
-          pointerEvents="none"
-          style={[
-            artStyles.innerRing,
-            {
-              width: innerRingSize,
-              height: innerRingSize,
-              borderRadius: innerRingSize / 2,
-              borderColor: recipe.ring,
-            },
-          ]}
-        />
-      )}
-
-      {recipe.motif === "waves" && (
-        <View
-          pointerEvents="none"
-          style={[
-            artStyles.innerRing,
-            {
-              width: Math.round(size * 0.9),
-              height: Math.round(size * 0.9),
-              borderRadius: size,
-              borderColor: "rgba(255,255,255,0.18)",
-            },
-          ]}
-        />
-      )}
-
-      {(recipe.motif === "diamond" || recipe.motif === "imperial") && (
-        <View
-          pointerEvents="none"
-          style={[
-            artStyles.diamondPlate,
-            {
-              width: diamondSize,
-              height: diamondSize,
-              borderRadius: Math.max(5, Math.round(size * 0.11)),
-              borderColor: recipe.ring,
-            },
-          ]}
-        />
-      )}
-
-      {(recipe.motif === "royal" || recipe.motif === "imperial") && (
-        <View
-          pointerEvents="none"
-          style={[
-            artStyles.royalBase,
-            {
-              width: Math.round(size * 0.64),
-              height: Math.max(4, Math.round(size * 0.09)),
-              bottom: Math.round(size * 0.1),
-              backgroundColor: recipe.ring,
-            },
-          ]}
-        />
-      )}
-
-      {(recipe.motif === "rays" || recipe.motif === "beam") && (
-        <>
-          <View
-            pointerEvents="none"
-            style={[
-              artStyles.lightBeam,
-              {
-                width: Math.round(size * 0.26),
-                height: Math.round(size * 1.25),
-                transform: [{ rotate: "32deg" }],
-              },
-            ]}
-          />
-          <View
-            pointerEvents="none"
-            style={[
-              artStyles.lightBeam,
-              {
-                width: Math.round(size * 0.18),
-                height: Math.round(size * 1.25),
-                transform: [{ rotate: "-32deg" }],
-              },
-            ]}
-          />
-        </>
-      )}
-
-      {recipe.motif === "meteor" && (
-        <>
-          <View
-            pointerEvents="none"
-            style={[
-              artStyles.meteorStreak,
-              { width: size * 0.56, top: size * 0.24, left: size * 0.08 },
-            ]}
-          />
-          <View
-            pointerEvents="none"
-            style={[
-              artStyles.meteorStreak,
-              { width: size * 0.42, bottom: size * 0.22, right: size * 0.1 },
-            ]}
-          />
-        </>
-      )}
-
-      {recipe.motif === "rainbow" && (
-        <View
-          pointerEvents="none"
-          style={[
-            artStyles.rainbowArc,
-            {
-              width: Math.round(size * 0.82),
-              height: Math.round(size * 0.82),
-              borderRadius: size,
-            },
-          ]}
-        />
-      )}
-
-      {recipe.motif === "track" && (
-        <View
-          pointerEvents="none"
-          style={[
-            artStyles.speedTrack,
-            {
-              width: Math.round(size * 0.8),
-              bottom: Math.round(size * 0.15),
-            },
-          ]}
-        />
-      )}
-
-      {(recipe.motif === "pedestal" || recipe.motif === "arc") && (
-        <View
-          pointerEvents="none"
-          style={[
-            artStyles.pedestalArc,
-            {
-              width: Math.round(size * 0.68),
-              height: Math.round(size * 0.22),
-              bottom: Math.round(size * 0.1),
-              borderColor: recipe.ring,
-            },
-          ]}
-        />
-      )}
-
-      {/* Ana ikon */}
-      <View style={artStyles.mainGlyph}>
-        <VectorGlyph spec={recipe.main} size={size} />
-      </View>
-
-      {/* Sağ üst vurgu ikonu */}
-      {recipe.subTopRight ? (
-        <View
-          pointerEvents="none"
-          style={[
-            artStyles.subTopRight,
-            {
-              top: Math.max(3, Math.round(size * 0.08)),
-              right: Math.max(3, Math.round(size * 0.08)),
-              transform: recipe.subTopRight.rotate ? [{ rotate: recipe.subTopRight.rotate }] : undefined,
-            },
-          ]}
-        >
-          <VectorGlyph spec={recipe.subTopRight} size={size} />
-        </View>
-      ) : null}
-
-      {/* Sol alt vurgu ikonu */}
-      {recipe.subBottomLeft ? (
-        <View
-          pointerEvents="none"
-          style={[
-            artStyles.subBottomLeft,
-            {
-              bottom: Math.max(3, Math.round(size * 0.09)),
-              left: Math.max(3, Math.round(size * 0.09)),
-              transform: recipe.subBottomLeft.rotate ? [{ rotate: recipe.subBottomLeft.rotate }] : undefined,
-            },
-          ]}
-        >
-          <VectorGlyph spec={recipe.subBottomLeft} size={size} />
-        </View>
-      ) : null}
-    </LinearGradient>
+    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
+      <Ionicons name={icon} size={Math.round(size * 0.58)} color={fallbackColor} />
+    </View>
   );
 });
 
@@ -927,74 +452,6 @@ export const SoraLevelCrest = memo(function SoraLevelCrest({
 });
 
 const artStyles = StyleSheet.create({
-  box: {
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    position: "relative",
-  },
-  sheen: {
-    position: "absolute",
-    left: -4,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    transform: [{ rotate: "-14deg" }],
-  },
-  innerRing: {
-    position: "absolute",
-    borderWidth: 1.2,
-  },
-  diamondPlate: {
-    position: "absolute",
-    borderWidth: 1.3,
-    backgroundColor: "rgba(255,255,255,0.09)",
-    transform: [{ rotate: "45deg" }],
-  },
-  royalBase: {
-    position: "absolute",
-    borderRadius: 99,
-    opacity: 0.75,
-  },
-  lightBeam: {
-    position: "absolute",
-    backgroundColor: "rgba(255,255,255,0.14)",
-  },
-  meteorStreak: {
-    position: "absolute",
-    height: 2,
-    borderRadius: 2,
-    backgroundColor: "rgba(255,235,153,0.52)",
-    transform: [{ rotate: "-32deg" }],
-  },
-  rainbowArc: {
-    position: "absolute",
-    bottom: -14,
-    borderWidth: 3,
-    borderColor: "rgba(255,214,102,0.45)",
-  },
-  speedTrack: {
-    position: "absolute",
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: "rgba(255,214,102,0.55)",
-  },
-  pedestalArc: {
-    position: "absolute",
-    borderBottomWidth: 2,
-    borderRadius: 99,
-  },
-  mainGlyph: {
-    zIndex: 3,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  subTopRight: {
-    position: "absolute",
-    zIndex: 4,
-  },
-  subBottomLeft: {
-    position: "absolute",
-    zIndex: 4,
-  },
   crestRoot: {
     alignItems: "center",
     justifyContent: "center",

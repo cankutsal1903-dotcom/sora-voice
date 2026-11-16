@@ -1225,13 +1225,14 @@ export const setRoomHandRaise = async ({ roomId, raised }) => {
   return data;
 };
 
-export const sendRoomGift = async ({ roomId, giftId, recipientId, requestId }) => {
+export const sendRoomGift = async ({ roomId, giftId, recipientId, quantity = 1, requestId }) => {
   const client = requireClient();
   const { data, error } = await client.rpc("send_room_gift", {
     p_room_id: roomId,
     p_gift_id: giftId,
     p_recipient_id: recipientId,
     p_request_id: requestId,
+    p_quantity: quantity,
   });
   throwIfError(error);
   return data?.[0] || null;

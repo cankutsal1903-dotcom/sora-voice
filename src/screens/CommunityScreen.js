@@ -41,12 +41,13 @@ import { describeRoomError, uploadFamilyAvatar, validateFamilyAvatarAsset } from
 import { COLORS } from "../theme/colors";
 import {
   DEFAULT_GIFT_CATALOG,
-  GIFT_CATEGORIES,
   SoraGiftArtwork,
 } from "../ui/SoraGiftArtwork";
+import { GiftComboButton } from "../ui/GiftComboButton";
 import { KeyboardSafeView, useKeyboardInset } from "../ui/useKeyboardInset";
+import { SoraGiftEffect } from "../ui/SoraGiftEffect";
 
-const GIFT_QUANTITIES = [1, 10, 50, 100];
+const GIFT_QUANTITIES = [1, 5, 10, 50, 100];
 
 const resolveGiftIcon = (iconName) => {
   if (!iconName || iconName === "crown") return "trophy";
@@ -106,7 +107,7 @@ function FamilyAvatar({ uri, name, size = 52, radius = 18 }) {
   );
 }
 
-function MemberAvatar({ uri, name, color = "#2F80ED", size = 36 }) {
+function MemberAvatar({ uri, name, color = "#2F80ED", size = 38 }) {
   const initial = String(name || "S").trim().charAt(0).toUpperCase() || "S";
   if (uri) {
     return (
@@ -117,6 +118,8 @@ function MemberAvatar({ uri, name, color = "#2F80ED", size = 36 }) {
           height: size,
           borderRadius: size / 2,
           backgroundColor: COLORS.primarySoft,
+          borderWidth: 1.5,
+          borderColor: "rgba(47,128,237,0.22)",
         }}
       />
     );
@@ -128,6 +131,8 @@ function MemberAvatar({ uri, name, color = "#2F80ED", size = 36 }) {
         height: size,
         borderRadius: size / 2,
         backgroundColor: color || COLORS.primary,
+        borderWidth: 1.5,
+        borderColor: "rgba(255,255,255,0.72)",
         alignItems: "center",
         justifyContent: "center",
       }}
@@ -201,24 +206,34 @@ export function CommunityScreen({
 
   // Aile hediye kutusu
   const [giftCatalog, setGiftCatalog] = useState(DEFAULT_GIFT_CATALOG);
-  const [giftCategory, setGiftCategory] = useState("all");
+  const [selectedGiftId, setSelectedGiftId] = useState(DEFAULT_GIFT_CATALOG[0]?.id || null);
   const [giftSheetOpen, setGiftSheetOpen] = useState(false);
   const [giftRecipientId, setGiftRecipientId] = useState(null);
   const [giftQuantity, setGiftQuantity] = useState(1);
   const [sendingGift, setSendingGift] = useState(false);
-  const giftInFlightRef = useRef(false);
-  const giftRequestIdRef = useRef(null);
-  const giftFingerprintRef = useRef("");
+  const [comboState, setComboState] = useState(null);
+  const [giftEffect, setGiftEffect] = useState(null);
+  const playedGiftIdsRef = useRef(new Set());
+  const playGiftEffect = useCallback((gift) => {
+    const eventId = gift?.eventId;
+    if (!eventId || playedGiftIdsRef.current.has(eventId)) return;
+    playedGiftIdsRef.current.add(eventId);
+    if (playedGiftIdsRef.current.size > 160) {
+      playedGiftIdsRef.current.delete(playedGiftIdsRef.current.values().next().value);
+    }
+    setGiftEffect({ ...gift, stamp: Date.now() });
+  }, []);
 
-  const visibleGiftCatalog = useMemo(() => {
-    if (giftCategory === "all") return giftCatalog;
-    return giftCatalog.filter((item) => item.category === giftCategory);
-  }, [giftCatalog, giftCategory]);
+  const visibleGiftCatalog = giftCatalog;
 
   const myFamily = useMemo(
     () => families.find((item) => item.joined) || null,
     [families],
   );
+  useEffect(() => {
+    playedGiftIdsRef.current.clear();
+    setGiftEffect(null);
+  }, [myFamily?.id]);
 
   useEffect(() => {
     if (keyboard.visible && myFamily?.id) {
@@ -318,6 +333,17 @@ export function CommunityScreen({
     const unsubscribe = subscribeToFamilyMessages({
       communityId: myFamily.id,
       onMessage: (incoming) => {
+        if (incoming.kind === "gift" && incoming.metadata?.gift_id) {
+          const meta = incoming.metadata;
+          playGiftEffect({
+            id: meta.gift_id,
+            name: meta.gift_name || "Hediye",
+            color: meta.gift_color,
+            recipientName: meta.recipient_name,
+            quantity: Number(meta.quantity) || 1,
+            eventId: incoming.id,
+          });
+        }
         setMessages((prev) => {
           if (prev.some((item) => item.id === incoming.id)) return prev;
           const isOwn = incoming.userId === currentUserId;
@@ -349,6 +375,7 @@ export function CommunityScreen({
     currentUserId,
     loadMessages,
     myFamily?.id,
+    playGiftEffect,
     profile?.avatarUrl,
     profile?.color,
     profile?.handle,
@@ -411,13 +438,17 @@ export function CommunityScreen({
       || currentUserId;
     setGiftRecipientId(preferred);
     setGiftQuantity(1);
+    setSelectedGiftId((prev) =>
+      giftCatalog.some((item) => item.id === prev) ? prev : giftCatalog[0]?.id || null,
+    );
+    setComboState(null);
     setGiftSheetOpen(true);
     getFamilyDetails(myFamily.id, currentUserId)
       .then((details) => {
         if (details?.members) setFamilyMembers(details.members);
       })
       .catch(() => undefined);
-  }, [currentUserId, giftRecipients, myFamily?.id]);
+  }, [currentUserId, giftCatalog, giftRecipients, myFamily?.id]);
 
   const selectedGiftRecipient = useMemo(
     () =>
@@ -427,7 +458,98 @@ export function CommunityScreen({
     [giftRecipientId, giftRecipients],
   );
 
-  const handleConfirmSendGift = useCallback((gift) => {
+  const selectedGift = useMemo(
+    () =>
+      visibleGiftCatalog.find((item) => item.id === selectedGiftId)
+      || visibleGiftCatalog[0]
+      || null,
+    [selectedGiftId, visibleGiftCatalog],
+  );
+
+  const executeSendFamilyGift = useCallback(async ({ gift, recipient, quantity }) => {
+    if (!myFamily?.id || !gift || !recipient?.userId) return false;
+    setSendingGift(true);
+    try {
+      const requestId = createUuid();
+      const result = await sendFamilyGift({
+        communityId: myFamily.id,
+        giftId: gift.id,
+        recipientId: recipient.userId,
+        quantity,
+        requestId,
+      });
+      playGiftEffect({
+        ...gift,
+        name: result.giftName || gift.name,
+        recipientName: recipient.name,
+        quantity,
+        eventId: result.messageId || requestId,
+      });
+
+      if (result.messageId) {
+        setMessages((prev) => {
+          if (prev.some((item) => item.id === result.messageId)) return prev;
+          return [
+            ...prev,
+            {
+              id: result.messageId,
+              communityId: myFamily.id,
+              userId: currentUserId,
+              senderName: profile?.name || "Sen",
+              senderHandle: profile?.handle || "sora",
+              senderColor: profile?.color || COLORS.primary,
+              senderAvatarUrl: profile?.avatarUrl || null,
+              text: result.messageBody,
+              kind: "gift",
+              metadata: result.messageMetadata || {},
+              own: true,
+              createdAt: result.createdAt,
+            },
+          ];
+        });
+      }
+
+      setFamilies((prev) =>
+        prev.map((item) =>
+          item.id === myFamily.id
+            ? {
+                ...item,
+                xp: typeof result.familyXp === "number" ? result.familyXp : item.xp,
+                level: typeof result.familyLevel === "number" ? result.familyLevel : item.level,
+                giftCoinsTotal:
+                  typeof result.giftCoinsTotal === "number"
+                    ? result.giftCoinsTotal
+                    : item.giftCoinsTotal,
+              }
+            : item,
+        ),
+      );
+
+      requestAnimationFrame(() => {
+        chatScrollRef.current?.scrollToEnd?.({ animated: true });
+      });
+      onBalanceRefresh?.().catch?.(() => undefined);
+      return true;
+    } catch (err) {
+      setComboState(null);
+      Alert.alert("Hediye gönderilemedi", describeFamilyError(err));
+      return false;
+    } finally {
+      setSendingGift(false);
+    }
+  }, [
+    currentUserId,
+    myFamily?.id,
+    onBalanceRefresh,
+    playGiftEffect,
+    profile?.avatarUrl,
+    profile?.color,
+    profile?.handle,
+    profile?.name,
+  ]);
+
+  const handleSendSelectedGift = useCallback(() => {
+    const gift = selectedGift;
     if (!myFamily?.id || !gift || sendingGift) return;
     const recipient = selectedGiftRecipient;
     if (!recipient?.userId) {
@@ -450,107 +572,54 @@ export function CommunityScreen({
       );
       return;
     }
-    const xpPreview = Math.floor(totalCost / FAMILY_COINS_PER_XP);
-    const targetText = recipient.isSelf ? "Kendine" : `${recipient.name} kişisine`;
-    const xpText = xpPreview > 0
-      ? `Aileye +${formatCredits(xpPreview)} XP kazandırır.`
-      : "Harcama aile hediye havuzuna eklenir (her 100 kredi = +1 XP).";
 
-    Alert.alert(
-      "Hediyeyi onayla",
-      `${targetText} ${giftQuantity > 1 ? `${giftQuantity}x ` : ""}${gift.name} (${formatCredits(totalCost)} kredi) gönderilsin mi?\n${xpText}`,
-      [
-        { text: "Vazgeç", style: "cancel" },
-        {
-          text: "Gönder",
-          onPress: async () => {
-            if (giftInFlightRef.current) return;
-            giftInFlightRef.current = true;
-            setSendingGift(true);
-            try {
-              const fingerprint = `${myFamily.id}:${recipient.userId}:${gift.id}:${giftQuantity}`;
-              if (giftFingerprintRef.current !== fingerprint || !giftRequestIdRef.current) {
-                giftFingerprintRef.current = fingerprint;
-                giftRequestIdRef.current = createUuid();
-              }
-              const result = await sendFamilyGift({
-                communityId: myFamily.id,
-                giftId: gift.id,
-                recipientId: recipient.userId,
-                quantity: giftQuantity,
-                requestId: giftRequestIdRef.current,
-              });
-              giftRequestIdRef.current = null;
-              giftFingerprintRef.current = "";
-              setGiftSheetOpen(false);
-
-              if (result.messageId) {
-                setMessages((prev) => {
-                  if (prev.some((item) => item.id === result.messageId)) return prev;
-                  return [
-                    ...prev,
-                    {
-                      id: result.messageId,
-                      communityId: myFamily.id,
-                      userId: currentUserId,
-                      senderName: profile?.name || "Sen",
-                      senderHandle: profile?.handle || "sora",
-                      senderColor: profile?.color || COLORS.primary,
-                      senderAvatarUrl: profile?.avatarUrl || null,
-                      text: result.messageBody,
-                      kind: "gift",
-                      metadata: result.messageMetadata || {},
-                      own: true,
-                      createdAt: result.createdAt,
-                    },
-                  ];
-                });
-              }
-
-              setFamilies((prev) =>
-                prev.map((item) =>
-                  item.id === myFamily.id
-                    ? {
-                        ...item,
-                        xp: typeof result.familyXp === "number" ? result.familyXp : item.xp,
-                        level: typeof result.familyLevel === "number" ? result.familyLevel : item.level,
-                        giftCoinsTotal:
-                          typeof result.giftCoinsTotal === "number"
-                            ? result.giftCoinsTotal
-                            : item.giftCoinsTotal,
-                      }
-                    : item,
-                ),
-              );
-
-              requestAnimationFrame(() => {
-                chatScrollRef.current?.scrollToEnd?.({ animated: true });
-              });
-              await onBalanceRefresh?.();
-            } catch (err) {
-              Alert.alert("Hediye gönderilemedi", describeFamilyError(err));
-            } finally {
-              giftInFlightRef.current = false;
-              setSendingGift(false);
-            }
-          },
-        },
-      ],
-    );
+    setGiftSheetOpen(false);
+    setComboState({
+      gift,
+      recipient,
+      quantity: giftQuantity,
+      count: 1,
+      triggerKey: Date.now(),
+    });
+    executeSendFamilyGift({ gift, recipient, quantity: giftQuantity });
   }, [
     coins,
-    currentUserId,
+    executeSendFamilyGift,
     giftQuantity,
     myFamily?.id,
     myFamily?.level,
-    onBalanceRefresh,
-    profile?.avatarUrl,
-    profile?.color,
-    profile?.handle,
-    profile?.name,
+    selectedGift,
     selectedGiftRecipient,
     sendingGift,
   ]);
+
+  const handleComboGiftPress = useCallback(() => {
+    if (!comboState?.gift || !comboState?.recipient?.userId) return;
+    const { gift, recipient, quantity } = comboState;
+    const totalCost = Number(gift.cost || 0) * quantity;
+    if (typeof coins === "number" && coins < totalCost) {
+      setComboState(null);
+      Alert.alert(
+        "Bakiye yetersiz",
+        `${quantity}x ${gift.name} için ${formatCredits(totalCost)} kredi gerekiyor.`,
+      );
+      return;
+    }
+    setComboState((prev) =>
+      prev
+        ? {
+            ...prev,
+            count: (prev.count || 1) + 1,
+            triggerKey: Date.now() + Math.random(),
+          }
+        : null,
+    );
+    executeSendFamilyGift({ gift, recipient, quantity });
+  }, [coins, comboState, executeSendFamilyGift]);
+
+  const handleExpireCombo = useCallback(() => {
+    setComboState(null);
+  }, []);
 
   const openFamilyDetail = useCallback(async (familyId, initialTab = "levels") => {
     if (!familyId) return;
@@ -1083,6 +1152,7 @@ export function CommunityScreen({
         onPress={() => msg.userId && onOpenUserProfile?.(msg.userId)}
         onLongPress={() => msg.userId && openGiftSheet(msg.userId)}
         delayLongPress={240}
+        style={styles.msgAvatarPress}
         accessibilityRole="button"
         accessibilityLabel={`${resolvedSenderName} profili`}
       >
@@ -1090,7 +1160,7 @@ export function CommunityScreen({
           uri={resolvedAvatarUrl}
           name={resolvedSenderName}
           color={resolvedSenderColor}
-          size={34}
+          size={38}
         />
       </Pressable>
     );
@@ -1102,65 +1172,72 @@ export function CommunityScreen({
       >
         {!msg.own ? avatarNode : null}
 
-        {isGift ? (
-          <Pressable
-            onLongPress={() => msg.userId && openGiftSheet(msg.userId)}
-            delayLongPress={240}
-            style={({ pressed }) => [
-              styles.giftMsgCard,
-              msg.own && styles.giftMsgCardOwn,
-              pressed && { opacity: 0.9 },
-            ]}
-          >
-            <SoraGiftArtwork
-              giftId={meta.gift_id}
-              giftName={meta.gift_name}
-              fallbackIcon={giftIcon}
-              fallbackColor={giftColor}
-              size={44}
-            />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.giftMsgTitle}>
-                {giftQty > 1 ? `${giftQty}x ` : ""}
-                {meta.gift_name || "Aile Hediyesi"}
-              </Text>
-              <Text style={styles.giftMsgBody}>{msg.text}</Text>
-              <View style={styles.giftMsgMetaRow}>
-                {giftCost > 0 ? (
-                  <Text style={styles.giftMsgMetaChip}>
-                    {formatCredits(giftCost)} kredi
-                  </Text>
-                ) : null}
-                {giftXp > 0 ? (
-                  <Text style={styles.giftMsgXpChip}>
-                    +{formatCredits(giftXp)} XP
-                  </Text>
-                ) : null}
-                <Text style={styles.giftMsgTime}>{formatMessageTime(msg.createdAt)}</Text>
+        <View style={[styles.msgContentCol, msg.own && styles.msgContentColOwn]}>
+          {!msg.own ? (
+            <Text numberOfLines={1} style={styles.msgSender}>
+              {resolvedSenderName}
+            </Text>
+          ) : null}
+
+          {isGift ? (
+            <Pressable
+              onLongPress={() => msg.userId && openGiftSheet(msg.userId)}
+              delayLongPress={240}
+              style={({ pressed }) => [
+                styles.giftMsgCard,
+                msg.own && styles.giftMsgCardOwn,
+                pressed && { opacity: 0.9 },
+              ]}
+            >
+              <SoraGiftArtwork
+                giftId={meta.gift_id}
+                giftName={meta.gift_name}
+                fallbackIcon={giftIcon}
+                fallbackColor={giftColor}
+                size={42}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.giftMsgTitle}>
+                  {giftQty > 1 ? `${giftQty}x ` : ""}
+                  {meta.gift_name || "Aile Hediyesi"}
+                </Text>
+                <Text style={styles.giftMsgBody}>{msg.text}</Text>
+                <View style={styles.giftMsgMetaRow}>
+                  {giftCost > 0 ? (
+                    <Text style={styles.giftMsgMetaChip}>
+                      {formatCredits(giftCost)} kredi
+                    </Text>
+                  ) : null}
+                  {giftXp > 0 ? (
+                    <Text style={styles.giftMsgXpChip}>
+                      +{formatCredits(giftXp)} XP
+                    </Text>
+                  ) : null}
+                  <Text style={styles.giftMsgTime}>{formatMessageTime(msg.createdAt)}</Text>
+                </View>
               </View>
-            </View>
-          </Pressable>
-        ) : (
-          <Pressable
-            onLongPress={() => msg.userId && openGiftSheet(msg.userId)}
-            delayLongPress={240}
-            style={({ pressed }) => [
-              styles.msgBubble,
-              msg.own ? styles.msgBubbleOwn : styles.msgBubbleOther,
-              pressed && { opacity: 0.88 },
-            ]}
-          >
-            {!msg.own ? (
-              <Text style={styles.msgSender}>{resolvedSenderName}</Text>
-            ) : null}
-            <Text style={[styles.msgText, msg.own && styles.msgTextOwn]}>
-              {msg.text}
-            </Text>
-            <Text style={[styles.msgTime, msg.own && styles.msgTimeOwn]}>
-              {formatMessageTime(msg.createdAt)}
-            </Text>
-          </Pressable>
-        )}
+            </Pressable>
+          ) : (
+            <Pressable
+              onLongPress={() => msg.userId && openGiftSheet(msg.userId)}
+              delayLongPress={240}
+              style={({ pressed }) => [
+                styles.msgBubble,
+                msg.own ? styles.msgBubbleOwn : styles.msgBubbleOther,
+                pressed && { opacity: 0.88 },
+              ]}
+            >
+              <View style={styles.msgInlineRow}>
+                <Text style={[styles.msgText, msg.own && styles.msgTextOwn]}>
+                  {msg.text}
+                </Text>
+                <Text style={[styles.msgTime, msg.own && styles.msgTimeOwn]}>
+                  {formatMessageTime(msg.createdAt)}
+                </Text>
+              </View>
+            </Pressable>
+          )}
+        </View>
 
         {msg.own ? avatarNode : null}
       </View>
@@ -1275,6 +1352,13 @@ export function CommunityScreen({
             </ScrollView>
           )}
 
+          <GiftComboButton
+            combo={giftSheetOpen ? null : comboState}
+            onPress={handleComboGiftPress}
+            onExpire={handleExpireCombo}
+            bottomOffset={keyboard.visible ? 68 : 132 + Math.max(insets.bottom, 8)}
+          />
+
           <View
             style={[
               styles.composerRow,
@@ -1291,7 +1375,7 @@ export function CommunityScreen({
                 uri={profile?.avatarUrl || null}
                 name={profile?.name || "Sen"}
                 color={profile?.color || COLORS.primary}
-                size={34}
+                size={38}
               />
             </Pressable>
             <TextInput
@@ -1451,31 +1535,10 @@ export function CommunityScreen({
               </View>
             </View>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoryPillsRow}
-              style={{ flexGrow: 0, marginBottom: 10 }}
-            >
-              {GIFT_CATEGORIES.map((cat) => {
-                const active = giftCategory === cat.key;
-                return (
-                  <Pressable
-                    key={cat.key}
-                    onPress={() => setGiftCategory(cat.key)}
-                    style={[styles.categoryPill, active && styles.categoryPillActive]}
-                  >
-                    <Text style={[styles.categoryPillText, active && styles.categoryPillTextActive]}>
-                      {cat.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
               <View style={styles.giftGrid}>
                 {visibleGiftCatalog.map((gift) => {
+                  const active = selectedGift?.id === gift.id;
                   const lockedByLevel =
                     Number(gift.minFamilyLevel || 0) > Number(myFamily?.level || 1);
                   const totalCost = Number(gift.cost || 0) * giftQuantity;
@@ -1484,9 +1547,10 @@ export function CommunityScreen({
                     <Pressable
                       key={gift.id}
                       disabled={sendingGift}
-                      onPress={() => handleConfirmSendGift(gift)}
+                      onPress={() => setSelectedGiftId(gift.id)}
                       style={({ pressed }) => [
                         styles.giftItemCard,
+                        active && styles.giftItemCardActive,
                         lockedByLevel && { opacity: 0.62 },
                         pressed && { transform: [{ scale: 0.98 }] },
                       ]}
@@ -1497,7 +1561,7 @@ export function CommunityScreen({
                           giftName={gift.name}
                           fallbackIcon={resolveGiftIcon(gift.icon)}
                           fallbackColor={gift.color || COLORS.primary}
-                          size={50}
+                          size={70}
                         />
                       </View>
                       <Text numberOfLines={1} style={styles.giftItemName}>
@@ -1523,6 +1587,36 @@ export function CommunityScreen({
                 })}
               </View>
             </ScrollView>
+
+            {selectedGift ? (
+              <View style={styles.giftSendBar}>
+                <View style={{ flex: 1 }}>
+                  <Text numberOfLines={1} style={styles.giftSendTitle}>
+                    {giftQuantity}x {selectedGift.name}
+                  </Text>
+                  <Text numberOfLines={1} style={styles.giftSendMeta}>
+                    {formatCredits(Number(selectedGift.cost || 0) * giftQuantity)} kredi
+                    {Math.floor((Number(selectedGift.cost || 0) * giftQuantity) / FAMILY_COINS_PER_XP) > 0
+                      ? ` · +${formatCredits(Math.floor((Number(selectedGift.cost || 0) * giftQuantity) / FAMILY_COINS_PER_XP))} XP`
+                      : ""}
+                  </Text>
+                </View>
+                <Pressable
+                  disabled={sendingGift}
+                  onPress={handleSendSelectedGift}
+                  accessibilityRole="button"
+                  accessibilityLabel="Hediyeyi gönder"
+                  style={({ pressed }) => [
+                    styles.giftSendButton,
+                    sendingGift && { opacity: 0.6 },
+                    pressed && { transform: [{ scale: 0.97 }] },
+                  ]}
+                >
+                  <Ionicons name="paper-plane" size={15} color="#FFFFFF" />
+                  <Text style={styles.giftSendButtonText}>Gönder</Text>
+                </Pressable>
+              </View>
+            ) : null}
           </View>
         </View>
       </Modal>
@@ -2023,6 +2117,7 @@ export function CommunityScreen({
           </View>
         </KeyboardSafeView>
       </Modal>
+      <SoraGiftEffect gift={giftEffect} />
     </View>
   );
 }
@@ -2249,10 +2344,27 @@ const styles = StyleSheet.create({
     borderColor: "rgba(47,128,237,0.24)",
   },
   giftHeaderPillText: { color: COLORS.primary, fontSize: 11, fontWeight: "900" },
-  messagesList: { padding: 16, paddingBottom: 20, gap: 10 },
-  msgRow: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
+  messagesList: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 20, gap: 11 },
+  msgRow: { flexDirection: "row", alignItems: "flex-end", gap: 9 },
   msgRowOwn: { justifyContent: "flex-end" },
-  msgBubble: { maxWidth: "74%", paddingHorizontal: 13, paddingVertical: 9, borderRadius: 18 },
+  msgAvatarPress: { width: 38, height: 38, alignItems: "center", justifyContent: "center" },
+  msgContentCol: { maxWidth: "75%", alignItems: "flex-start" },
+  msgContentColOwn: { alignItems: "flex-end" },
+  msgSender: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    fontWeight: "800",
+    marginBottom: 3,
+    marginLeft: 4,
+  },
+  msgBubble: {
+    minHeight: 38,
+    minWidth: 64,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    borderRadius: 19,
+    justifyContent: "center",
+  },
   msgBubbleOther: {
     backgroundColor: COLORS.surface,
     borderWidth: 1,
@@ -2260,19 +2372,27 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 6,
   },
   msgBubbleOwn: { backgroundColor: COLORS.primary, borderBottomRightRadius: 6 },
-  msgSender: { color: COLORS.primary, fontSize: 11, fontWeight: "900", marginBottom: 2 },
-  msgText: { color: COLORS.text, fontSize: 13, lineHeight: 18 },
+  msgInlineRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "flex-end",
+    justifyContent: "flex-end",
+    columnGap: 8,
+    rowGap: 2,
+  },
+  msgText: { color: COLORS.text, fontSize: 13.5, lineHeight: 19, flexShrink: 1 },
   msgTextOwn: { color: COLORS.primaryInk },
-  msgTime: { color: COLORS.muted, fontSize: 9, marginTop: 4, alignSelf: "flex-end" },
-  msgTimeOwn: { color: "rgba(255,255,255,0.78)" },
+  msgTime: { color: COLORS.muted, fontSize: 9.5, lineHeight: 14, marginLeft: "auto" },
+  msgTimeOwn: { color: "rgba(255,255,255,0.8)" },
   giftMsgCard: {
-    maxWidth: "78%",
+    maxWidth: "100%",
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 18,
+    borderBottomLeftRadius: 6,
     backgroundColor: "#EAF3FD",
     borderWidth: 1,
     borderColor: "rgba(47,128,237,0.32)",
@@ -2280,6 +2400,8 @@ const styles = StyleSheet.create({
   giftMsgCardOwn: {
     backgroundColor: "#E3F0FF",
     borderColor: "rgba(29,95,191,0.40)",
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 6,
   },
   giftMsgBadge: {
     width: 40,
@@ -2312,7 +2434,7 @@ const styles = StyleSheet.create({
   giftMsgTime: { color: COLORS.muted, fontSize: 9, marginLeft: "auto" },
   composerRow: {
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 9,
     backgroundColor: COLORS.surface,
     borderTopWidth: 1,
     borderTopColor: COLORS.lineSoft,
@@ -2321,14 +2443,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   composerAvatarWrap: {
-    height: 42,
+    width: 40,
+    height: 40,
     justifyContent: "center",
     alignItems: "center",
   },
   composerGiftBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: COLORS.primarySoft,
     borderWidth: 1,
     borderColor: "rgba(47,128,237,0.24)",
@@ -2337,21 +2460,21 @@ const styles = StyleSheet.create({
   },
   composerInput: {
     flex: 1,
-    minHeight: 42,
+    minHeight: 40,
     maxHeight: 96,
-    borderRadius: 14,
-    paddingHorizontal: 13,
-    paddingVertical: 10,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     backgroundColor: COLORS.background,
     borderWidth: 1,
     borderColor: COLORS.line,
     color: COLORS.text,
-    fontSize: 13,
+    fontSize: 13.5,
   },
   sendBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: COLORS.primary,
     alignItems: "center",
     justifyContent: "center",
@@ -2456,10 +2579,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderRadius: 16,
     backgroundColor: COLORS.background,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: COLORS.lineSoft,
     alignItems: "center",
   },
+  giftItemCardActive: {
+    backgroundColor: COLORS.primarySoft,
+    borderColor: COLORS.primary,
+  },
+  giftSendBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingTop: 10,
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.lineSoft,
+  },
+  giftSendTitle: { color: COLORS.text, fontSize: 13, fontWeight: "900" },
+  giftSendMeta: { color: COLORS.primary, fontSize: 11, fontWeight: "800", marginTop: 2 },
+  giftSendButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    height: 42,
+    paddingHorizontal: 20,
+    borderRadius: 13,
+    backgroundColor: COLORS.primary,
+  },
+  giftSendButtonText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
   giftItemIcon: {
     width: 44,
     height: 44,

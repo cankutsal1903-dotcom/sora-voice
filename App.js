@@ -161,6 +161,7 @@ import {
   getBadgeTierConfigForLevel,
 } from "./src/ui/SoraGiftArtwork";
 import { SoraGiftEffect } from "./src/ui/SoraGiftEffect";
+import { GiftComboButton } from "./src/ui/GiftComboButton";
 import { KeyboardSafeView, useKeyboardInset } from "./src/ui/useKeyboardInset";
 
 const formatCredits = (value) =>
@@ -3549,6 +3550,8 @@ const RoomSettingsSheet = memo(function RoomSettingsSheet({
   );
 });
 
+const ROOM_GIFT_QUANTITIES = [1, 5, 10, 50, 100];
+
 const GiftSheet = memo(function GiftSheet({
   visible,
   coins,
@@ -3559,11 +3562,8 @@ const GiftSheet = memo(function GiftSheet({
   onSend,
 }) {
   const [recipientId, setRecipientId] = useState(null);
-  const [giftCategory, setGiftCategory] = useState("all");
-  const [sending, setSending] = useState(false);
-  const sendingRef = useRef(false);
-  const requestIdRef = useRef(null);
-  const requestFingerprintRef = useRef(null);
+  const [quantity, setQuantity] = useState(1);
+  const [selectedGiftId, setSelectedGiftId] = useState(gifts[0]?.id || null);
   useEffect(() => {
     if (visible) {
       setRecipientId((prev) =>
@@ -3571,15 +3571,20 @@ const GiftSheet = memo(function GiftSheet({
           ? prev
           : recipients[0]?.userId || null,
       );
+      setQuantity(1);
+      setSelectedGiftId((prev) =>
+        gifts.some((item) => item.id === prev) ? prev : gifts[0]?.id || null,
+      );
     }
-  }, [visible, recipients]);
+  }, [visible, recipients, gifts]);
   const selectedRecipient = recipients.find((item) => item.userId === recipientId) || recipients[0] || null;
-  const visibleGifts = useMemo(() => {
-    if (giftCategory === "all") return gifts;
-    return gifts.filter((item) => item.category === giftCategory);
-  }, [giftCategory, gifts]);
-  const confirmSend = (gift) => {
-    const reqLevel = Number(gift.minFamilyLevel || 0);
+  const selectedGift = useMemo(
+    () => gifts.find((item) => item.id === selectedGiftId) || gifts[0] || null,
+    [gifts, selectedGiftId],
+  );
+  const handlePressSend = () => {
+    if (!selectedGift) return;
+    const reqLevel = Number(selectedGift.minFamilyLevel || 0);
     if (reqLevel > 0 && Number(userFamilyLevel || 0) < reqLevel) {
       Alert.alert(
         "Aile seviyesi gerekli",
@@ -3591,37 +3596,15 @@ const GiftSheet = memo(function GiftSheet({
       Alert.alert("Alıcı seç", "Hediyeyi göndereceğin kişiyi seç.");
       return;
     }
-    const targetLabel = selectedRecipient.isSelf ? "Kendine" : `${selectedRecipient.name} kişisine`;
-    Alert.alert(
-      "Hediyeyi onayla",
-      `${targetLabel} ${gift.name} · ${formatCredits(gift.cost)} kredi gönderilsin mi?`,
-      [
-        { text: "Vazgeç", style: "cancel" },
-        {
-          text: "Gönder",
-          onPress: async () => {
-            if (sendingRef.current) return;
-            sendingRef.current = true;
-            const fingerprint = `${gift.id}:${selectedRecipient.userId}`;
-            if (requestFingerprintRef.current !== fingerprint) {
-              requestIdRef.current = createRequestUuid();
-              requestFingerprintRef.current = fingerprint;
-            }
-            setSending(true);
-            try {
-              const sent = await onSend(gift, selectedRecipient, requestIdRef.current);
-              if (sent) {
-                requestIdRef.current = null;
-                requestFingerprintRef.current = null;
-              }
-            } finally {
-              sendingRef.current = false;
-              setSending(false);
-            }
-          },
-        },
-      ],
-    );
+    const totalCost = Number(selectedGift.cost || 0) * quantity;
+    if (typeof coins === "number" && coins < totalCost) {
+      Alert.alert(
+        "Bakiye yetersiz",
+        `${quantity}x ${selectedGift.name} için ${formatCredits(totalCost)} kredi gerekiyor.`,
+      );
+      return;
+    }
+    onSend(selectedGift, selectedRecipient, quantity);
   };
   return (
     <Modal
@@ -3691,44 +3674,44 @@ const GiftSheet = memo(function GiftSheet({
             })}
           </ScrollView>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.roomGiftCategoryRow}
-            style={{ flexGrow: 0, marginBottom: 10 }}
-          >
-            {GIFT_CATEGORIES.map((cat) => {
-              const active = giftCategory === cat.key;
-              return (
-                <Pressable
-                  key={cat.key}
-                  onPress={() => setGiftCategory(cat.key)}
-                  style={[styles.roomGiftCategoryPill, active && styles.roomGiftCategoryPillActive]}
-                >
-                  <Text
-                    style={[
-                      styles.roomGiftCategoryText,
-                      active && styles.roomGiftCategoryTextActive,
-                    ]}
+          <View style={styles.roomGiftQtyHeader}>
+            <Text style={styles.fieldLabel}>ADET</Text>
+            <View style={styles.roomGiftQtyRow}>
+              {ROOM_GIFT_QUANTITIES.map((qty) => {
+                const active = quantity === qty;
+                return (
+                  <Pressable
+                    key={qty}
+                    onPress={() => setQuantity(qty)}
+                    style={[styles.roomGiftQtyPill, active && styles.roomGiftQtyPillActive]}
                   >
-                    {cat.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+                    <Text
+                      style={[
+                        styles.roomGiftQtyText,
+                        active && styles.roomGiftQtyTextActive,
+                      ]}
+                    >
+                      {qty}x
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
             <View style={styles.roomGiftGrid3}>
-              {visibleGifts.map((gift) => {
+              {gifts.map((gift) => {
+                const active = selectedGift?.id === gift.id;
                 const lockedByFamily = Number(gift.minFamilyLevel || 0) > Number(userFamilyLevel || 0);
+                const totalCost = Number(gift.cost || 0) * quantity;
                 return (
                   <Pressable
                     key={gift.id}
-                    disabled={sending}
-                    onPress={() => confirmSend(gift)}
+                    onPress={() => setSelectedGiftId(gift.id)}
                     style={({ pressed }) => [
                       styles.roomGiftGridCard,
+                      active && styles.roomGiftGridCardActive,
                       lockedByFamily && { opacity: 0.65 },
                       pressed && { transform: [{ scale: 0.98 }] },
                     ]}
@@ -3739,7 +3722,7 @@ const GiftSheet = memo(function GiftSheet({
                         giftName={gift.name}
                         fallbackIcon={gift.icon}
                         fallbackColor={gift.color}
-                        size={52}
+                        size={70}
                       />
                     </View>
                     <Text numberOfLines={1} style={styles.giftName}>
@@ -3753,8 +3736,8 @@ const GiftSheet = memo(function GiftSheet({
                       />
                       <Text numberOfLines={1} style={styles.giftCostText}>
                         {lockedByFamily
-                          ? `Sv. ${gift.minFamilyLevel} · ${formatCredits(gift.cost)}`
-                          : formatCredits(gift.cost)}
+                          ? `Sv. ${gift.minFamilyLevel} · ${formatCredits(totalCost)}`
+                          : formatCredits(totalCost)}
                       </Text>
                     </View>
                   </Pressable>
@@ -3762,6 +3745,34 @@ const GiftSheet = memo(function GiftSheet({
               })}
             </View>
           </ScrollView>
+
+          {selectedGift ? (
+            <View style={styles.roomGiftSendBar}>
+              <View style={{ flex: 1 }}>
+                <Text numberOfLines={1} style={styles.roomGiftSendTitle}>
+                  {quantity}x {selectedGift.name}
+                </Text>
+                <Text numberOfLines={1} style={styles.roomGiftSendSub}>
+                  {selectedRecipient
+                    ? `${selectedRecipient.isSelf ? "Kendim" : selectedRecipient.name} · `
+                    : ""}
+                  {formatCredits(Number(selectedGift.cost || 0) * quantity)} kredi
+                </Text>
+              </View>
+              <Pressable
+                onPress={handlePressSend}
+                accessibilityRole="button"
+                accessibilityLabel="Hediyeyi gönder"
+                style={({ pressed }) => [
+                  styles.roomGiftSendBtn,
+                  pressed && { transform: [{ scale: 0.97 }] },
+                ]}
+              >
+                <Ionicons name="paper-plane" size={15} color="#FFFFFF" />
+                <Text style={styles.roomGiftSendBtnText}>Gönder</Text>
+              </Pressable>
+            </View>
+          ) : null}
         </View>
       </View>
     </Modal>
@@ -5678,7 +5689,11 @@ function Room({
   const [giftOpen, setGiftOpen] = useState(false);
   const [roomGiftCatalog, setRoomGiftCatalog] = useState(GIFT_CATALOG);
   const [giftFlight, setGiftFlight] = useState(null);
+  const [roomCombo, setRoomCombo] = useState(null);
+  const roomKeyboard = useKeyboardInset();
   const playedGiftIdsRef = useRef(new Set());
+  const giftRoomMinimizedRef = useRef(minimized);
+  useEffect(() => { giftRoomMinimizedRef.current = minimized; }, [minimized]);
   const playGiftEffect = useCallback((gift) => {
     const eventId = gift?.eventId;
     if (!eventId || playedGiftIdsRef.current.has(eventId)) return;
@@ -5686,11 +5701,12 @@ function Room({
     if (playedGiftIdsRef.current.size > 160) {
       playedGiftIdsRef.current.delete(playedGiftIdsRef.current.values().next().value);
     }
-    if (!minimized) setGiftFlight({ ...gift, stamp: Date.now() });
-  }, [minimized]);
+    if (!giftRoomMinimizedRef.current) setGiftFlight({ ...gift, stamp: Date.now() });
+  }, []);
   useEffect(() => {
     playedGiftIdsRef.current.clear();
     setGiftFlight(null);
+    setRoomCombo(null);
   }, [room.id]);
   const [selectedParticipant, setSelectedParticipant] = useState(null);
   const [profileParticipant, setProfileParticipant] = useState(null);
@@ -5823,7 +5839,7 @@ function Room({
   const micOn = liveVoice.enabled && liveVoice.microphoneEnabled;
   const activeSpeakerIds = liveVoice.activeSpeakerIds || [];
   const seatCapacity = roomDetails.seatCount === 13 ? 13 : 9;
-  const compactStage = seatCapacity > 9;
+  const compactStage = seatCapacity > 9 || roomKeyboard.visible;
   const hostStageParticipant = useMemo(() => {
     const found = activeRoomParticipants.find(
       (participant) => participant.userId === room.hostId,
@@ -5948,23 +5964,12 @@ function Room({
     setChatAccessReady(!room.persisted);
     setChatRealtimeStatus(room.persisted ? "connecting" : "local");
     setMessages(initialMessages);
-    const loadMessages = room.persisted
-      ? joinRoomMembership(room.id).then(() => listRoomMessages(room.id))
-      : AsyncStorage.getItem(ROOM_MESSAGES_KEY).then((savedMessages) => {
-          const roomMessages = JSON.parse(savedMessages || "{}");
-          return Array.isArray(roomMessages[room.id]) &&
-            roomMessages[room.id].length
-            ? roomMessages[room.id]
-            : initialMessages;
-        });
-    loadMessages
-      .then((loadedMessages) => {
+    const prepareMembership = room.persisted
+      ? joinRoomMembership(room.id)
+      : Promise.resolve();
+    prepareMembership
+      .then(() => {
         if (!active) return;
-        setMessages(
-          room.persisted
-            ? mergeRoomMessages(initialMessages, loadedMessages || [])
-            : loadedMessages,
-        );
         setChatAccessReady(true);
       })
       .catch(() => {
@@ -6052,14 +6057,6 @@ function Room({
         if (!active) return;
         if (status === "SUBSCRIBED") {
           setChatRealtimeStatus("live");
-          listRoomMessages(room.id)
-            .then((latestMessages) => {
-              if (active)
-                setMessages((current) =>
-                  mergeRoomMessages(current, latestMessages),
-                );
-            })
-            .catch(() => undefined);
         } else if (["CHANNEL_ERROR", "TIMED_OUT"].includes(status)) {
           setChatRealtimeStatus("error");
         } else if (status === "CLOSED") {
@@ -6120,25 +6117,6 @@ function Room({
     };
   }, [isHost, onHostPresenceChange, room.id, room.persisted]);
 
-  useEffect(() => {
-    if (!messagesReady || room.persisted) return;
-    AsyncStorage.getItem(ROOM_MESSAGES_KEY)
-      .then((savedMessages) => {
-        const currentMessages = JSON.parse(savedMessages || "{}");
-        const nextMessages = {
-          ...(currentMessages && typeof currentMessages === "object"
-            ? currentMessages
-            : {}),
-          [room.id]: messages.slice(-100),
-        };
-        return AsyncStorage.setItem(
-          ROOM_MESSAGES_KEY,
-          JSON.stringify(nextMessages),
-        );
-      })
-      .catch(() => undefined);
-  }, [messages, messagesReady, room.id]);
-
   const handleToggleSpeaker = useCallback(
     () =>
       setSpeakerOn((value) => {
@@ -6152,26 +6130,109 @@ function Room({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveVoice.status]);
   const handleOpenSettings = useCallback(() => setSettingsOpen(true), []);
-  const handleOpenGift = useCallback(() => setGiftOpen(true), []);
+  const handleOpenGift = useCallback(() => {
+    setRoomCombo(null);
+    setGiftOpen(true);
+  }, []);
   const handleCloseGift = useCallback(() => setGiftOpen(false), []);
   const handleCloseSettings = useCallback(() => setSettingsOpen(false), []);
   const handleCloseReport = useCallback(() => setReportTarget(null), []);
-  const handleSendGiftFromSheet = useCallback(
-    async (gift, recipient, requestId) => {
-      const sent = await onSendGift({ gift, recipient, roomId: room.id, requestId });
-      if (!sent) return false;
-      setGiftOpen(false);
+
+  const executeRoomGiftSend = useCallback(
+    async ({ gift, recipient, quantity = 1 }) => {
+      const requestId = createRequestUuid();
+      const sent = await onSendGift({
+        gift,
+        recipient,
+        quantity,
+        roomId: room.id,
+        requestId,
+      });
+      if (!sent) {
+        setRoomCombo(null);
+        return false;
+      }
       playGiftEffect({
         ...gift,
         name: sent.gift_name || gift.name,
         recipientName: recipient.name,
-        quantity: 1,
+        quantity,
         eventId: sent.message_id || requestId,
       });
+      if (sent.message_id) {
+        setMessages((current) =>
+          mergeRoomMessages(current, [
+            {
+              id: sent.message_id,
+              userId,
+              user: profile?.name || "Sen",
+              avatarUrl: profile?.avatarUrl || null,
+              avatarColor: profile?.color || COLORS.primary,
+              kind: "gift",
+              metadata: {
+                gift_id: gift.id,
+                gift_name: sent.gift_name || gift.name,
+                gift_icon: gift.icon,
+                gift_color: gift.color,
+                quantity,
+                gift_cost: sent.gift_cost,
+                recipient_id: recipient.userId,
+                recipient_name: recipient.name,
+              },
+              text: sent.message_body,
+              system: false,
+              createdAt: new Date().toISOString(),
+            },
+          ]),
+        );
+      }
       return true;
     },
-    [onSendGift, playGiftEffect, room.id],
+    [onSendGift, playGiftEffect, profile?.avatarUrl, profile?.color, profile?.name, room.id, userId],
   );
+
+  const handleSendGiftFromSheet = useCallback(
+    (gift, recipient, quantity = 1) => {
+      setGiftOpen(false);
+      setRoomCombo({
+        gift,
+        recipient,
+        quantity,
+        count: 1,
+        triggerKey: Date.now(),
+      });
+      executeRoomGiftSend({ gift, recipient, quantity });
+    },
+    [executeRoomGiftSend],
+  );
+
+  const handleRoomComboPress = useCallback(() => {
+    if (!roomCombo?.gift || !roomCombo?.recipient?.userId) return;
+    const { gift, recipient, quantity } = roomCombo;
+    const totalCost = Number(gift.cost || 0) * quantity;
+    if (typeof coins === "number" && coins < totalCost) {
+      setRoomCombo(null);
+      Alert.alert(
+        "Bakiye yetersiz",
+        `${quantity}x ${gift.name} için ${formatCredits(totalCost)} kredi gerekiyor.`,
+      );
+      return;
+    }
+    setRoomCombo((prev) =>
+      prev
+        ? {
+            ...prev,
+            count: (prev.count || 1) + 1,
+            triggerKey: Date.now() + Math.random(),
+          }
+        : null,
+    );
+    executeRoomGiftSend({ gift, recipient, quantity });
+  }, [coins, executeRoomGiftSend, roomCombo]);
+
+  const handleExpireRoomCombo = useCallback(() => {
+    setRoomCombo(null);
+  }, []);
 
   useEffect(() => {
     AsyncStorage.getItem(FOLLOWED_USERS_KEY)
@@ -7548,107 +7609,109 @@ function Room({
           </View>
         ) : null}
 
-        {/* Sahne ve sohbet tek bir akışta */}
+        {/* Sahne sabit kalır, yalnızca sohbet alanı dikey kayar */}
+        <View style={styles.roomSurface}>
+          {/* Sahne: oda sahibi (+ çift koltuğu) + 4'erli sıralar */}
+          <View style={styles.roomStage}>
+            <LinearGradient
+              colors={["rgba(47,128,237,0.16)", "rgba(82,104,174,0.035)", "rgba(47,128,237,0)"]}
+              locations={[0, 0.48, 1]}
+              style={styles.roomStageGlow}
+              pointerEvents="none"
+            />
+            <View style={styles.roomHostSeatRow}>
+              {renderStageSeat(hostStageParticipant, 0, "host")}
+              {roomDetails.coupleSeat
+                ? renderStageSeat(seatedByIndex.get(COUPLE_SEAT_INDEX) || null, COUPLE_SEAT_INDEX, "couple")
+                : null}
+            </View>
+            <View style={[styles.roomSpeakerGrid, compactStage && styles.roomSpeakerGridCompact]}>
+              {regularSeatRows.flat().map(({ index, participant }) =>
+                renderStageSeat(participant, index),
+              )}
+            </View>
+          </View>
+
+          {/* Odadakiler */}
+          {audienceParticipants.length > 0 && !roomKeyboard.visible && (
+            <View style={styles.roomAudienceSection}>
+              <View style={styles.roomChatHead}>
+                <Text style={styles.roomChatTitle}>Dinleyiciler</Text>
+                <Text style={styles.roomChatCount}>
+                  {audienceParticipants.length} kişi
+                </Text>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.roomAudienceRow}
+                keyboardShouldPersistTaps="handled"
+              >
+                {audienceParticipants.map((participant) => (
+                  <Pressable
+                    key={participant.userId}
+                    style={styles.roomAudienceItem}
+                    delayLongPress={260}
+                    onPress={() =>
+                      participant.userId === userId
+                        ? handleOwnSeatPress()
+                        : openParticipantMenu(participant)
+                    }
+                    onLongPress={() =>
+                      participant.userId === userId
+                        ? handleOwnSeatPress()
+                        : openParticipantMenu(participant)
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel={`${participant.name} kullanıcı menüsü`}
+                  >
+                    <View style={styles.roomAvatarWrap}>
+                      <View
+                        style={[
+                          styles.roomAudienceAvatar,
+                          { backgroundColor: participant.color },
+                        ]}
+                      >
+                        {participant.avatarUrl ? (
+                          <Image
+                            source={{ uri: participant.avatarUrl }}
+                            style={[StyleSheet.absoluteFill, { borderRadius: 999 }]}
+                          />
+                        ) : (
+                          <Text style={styles.roomAudienceInitial}>
+                            {participant.name?.charAt(0)?.toUpperCase() || "?"}
+                          </Text>
+                        )}
+                        {participant.role === "moderator" ? (
+                          <View style={styles.roomAudienceCrown}>
+                            <Ionicons name="shield-checkmark" size={8} color="#11131A" />
+                          </View>
+                        ) : null}
+                      </View>
+                    </View>
+                    <Text style={styles.roomAudienceName} numberOfLines={1}>
+                      {participant.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </View>
+
         <ScrollView
           ref={chatScrollRef}
-          style={{ flex: 1 }}
-          contentContainerStyle={styles.roomBody}
+          style={styles.roomChatScroll}
+          contentContainerStyle={styles.roomChatScrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          overScrollMode="never"
+          bounces={false}
           onScroll={handleChatScroll}
           scrollEventThrottle={64}
           onContentSizeChange={handleChatContentSize}
         >
-          <View style={styles.roomSurface}>
-            {/* Sahne: oda sahibi (+ çift koltuğu) + 4'erli sıralar */}
-            <View style={styles.roomStage}>
-              <LinearGradient
-                colors={["rgba(47,128,237,0.16)", "rgba(82,104,174,0.035)", "rgba(47,128,237,0)"]}
-                locations={[0, 0.48, 1]}
-                style={styles.roomStageGlow}
-                pointerEvents="none"
-              />
-              <View style={styles.roomHostSeatRow}>
-                {renderStageSeat(hostStageParticipant, 0, "host")}
-                {roomDetails.coupleSeat
-                  ? renderStageSeat(seatedByIndex.get(COUPLE_SEAT_INDEX) || null, COUPLE_SEAT_INDEX, "couple")
-                  : null}
-              </View>
-              <View style={[styles.roomSpeakerGrid, compactStage && styles.roomSpeakerGridCompact]}>
-                {regularSeatRows.flat().map(({ index, participant }) =>
-                  renderStageSeat(participant, index),
-                )}
-              </View>
-            </View>
-
-            {/* Odadakiler */}
-            {audienceParticipants.length > 0 && (
-              <View style={styles.roomAudienceSection}>
-                <View style={styles.roomChatHead}>
-                  <Text style={styles.roomChatTitle}>Dinleyiciler</Text>
-                  <Text style={styles.roomChatCount}>
-                    {audienceParticipants.length} kişi
-                  </Text>
-                </View>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.roomAudienceRow}
-                  keyboardShouldPersistTaps="handled"
-                >
-                  {audienceParticipants.map((participant) => (
-                    <Pressable
-                      key={participant.userId}
-                      style={styles.roomAudienceItem}
-                      delayLongPress={260}
-                      onPress={() =>
-                        participant.userId === userId
-                          ? handleOwnSeatPress()
-                          : openParticipantMenu(participant)
-                      }
-                      onLongPress={() =>
-                        participant.userId === userId
-                          ? handleOwnSeatPress()
-                          : openParticipantMenu(participant)
-                      }
-                      accessibilityRole="button"
-                      accessibilityLabel={`${participant.name} kullanıcı menüsü`}
-                    >
-                      <View style={styles.roomAvatarWrap}>
-                        <View
-                          style={[
-                            styles.roomAudienceAvatar,
-                            { backgroundColor: participant.color },
-                          ]}
-                        >
-                          {participant.avatarUrl ? (
-                            <Image
-                              source={{ uri: participant.avatarUrl }}
-                              style={[StyleSheet.absoluteFill, { borderRadius: 999 }]}
-                            />
-                          ) : (
-                            <Text style={styles.roomAudienceInitial}>
-                              {participant.name?.charAt(0)?.toUpperCase() || "?"}
-                            </Text>
-                          )}
-                          {participant.role === "moderator" ? (
-                            <View style={styles.roomAudienceCrown}>
-                              <Ionicons name="shield-checkmark" size={8} color="#11131A" />
-                            </View>
-                          ) : null}
-                        </View>
-                      </View>
-                      <Text style={styles.roomAudienceName} numberOfLines={1}>
-                        {participant.name}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-          </View>
-
-          {/* Sohbet: ayrı bir kutu değil, odanın akışının devamı */}
+          {/* Sohbet: ayrı bir kutu değil, yalnızca burası aşağıya kayar */}
           <View style={styles.roomChatFlow}>
             {chatStatusText ? (
               <Text style={styles.roomChatStatus}>{chatStatusText}</Text>
@@ -7664,6 +7727,13 @@ function Room({
             />
           </View>
         </ScrollView>
+
+        <GiftComboButton
+          combo={minimized || giftOpen ? null : roomCombo}
+          onPress={handleRoomComboPress}
+          onExpire={handleExpireRoomCombo}
+          bottomOffset={70}
+        />
 
         {/* Alt bar: mesaj yazma alanı + hemen yanında hediye + mikrofon + ses + müzik */}
         <View style={styles.roomBottomBar}>
@@ -9238,32 +9308,47 @@ function AppContent() {
     );
   };
 
-  const sendGift = async ({ gift, recipient, roomId, requestId }) => {
+  const sendGift = async ({ gift, recipient, quantity = 1, roomId, requestId }) => {
     if (!supabase || !authSession?.user) {
       Alert.alert("Giriş gerekli", "Hediye göndermek için hesabınla giriş yap.");
       return false;
     }
     if (!recipient?.userId || !roomId) return false;
-    if (walletBalance < gift.cost) {
+    const cleanQty = Math.max(1, Math.floor(Number(quantity) || 1));
+    const totalCost = Number(gift.cost || 0) * cleanQty;
+    if (walletBalance < totalCost) {
       Alert.alert(
         "Bakiye yetersiz",
-        `${gift.name} hediyesi için ${formatCredits(gift.cost)} kredi gerekiyor.`,
+        `${cleanQty > 1 ? `${cleanQty}x ` : ""}${gift.name} hediyesi için ${formatCredits(totalCost)} kredi gerekiyor.`,
       );
       return false;
     }
     try {
       const requestKey = requestId || createRequestUuid();
-      const result = await sendRoomGift({ roomId, giftId: gift.id, recipientId: recipient.userId, requestId: requestKey });
+      const result = await sendRoomGift({
+        roomId,
+        giftId: gift.id,
+        recipientId: recipient.userId,
+        quantity: cleanQty,
+        requestId: requestKey,
+      });
       if (!result) throw new Error("Gift response missing");
+      const qtyPrefix = cleanQty > 1 ? `${cleanQty}x ` : "";
       setWalletBalance(result.balance);
       setPromoWalletBalance(result.promo_balance || 0);
       setPaidWalletBalance(result.paid_balance || 0);
       setWalletActivities((items) => [{
         id: `gift-${requestKey}`, icon: "diamond", color: gift.color,
-        text: `${recipient.name} kişisine ${gift.name}`, amount: -result.gift_cost,
+        text: `${recipient.name} kişisine ${qtyPrefix}${gift.name}`, amount: -result.gift_cost,
         time: "Şimdi",
       }, ...items]);
-      pushNotification({ id: `gift-${requestKey}`, icon: gift.icon, color: gift.color, text: `${recipient.name} kişisine ${gift.name} gönderildi.`, time: "Şimdi" });
+      pushNotification({
+        id: `gift-${requestKey}`,
+        icon: gift.icon,
+        color: gift.color,
+        text: `${recipient.name} kişisine ${qtyPrefix}${gift.name} gönderildi.`,
+        time: "Şimdi",
+      });
       refreshWalletData().catch(() => undefined);
       return result;
     } catch (error) {
@@ -9556,6 +9641,18 @@ function AppContent() {
     const leavingRoom = room;
     setRoomMinimized(false);
     setRoom(null);
+    if (leavingRoom?.id) {
+      AsyncStorage.getItem(ROOM_MESSAGES_KEY)
+        .then((savedMessages) => {
+          const parsed = JSON.parse(savedMessages || "{}");
+          if (parsed && typeof parsed === "object" && leavingRoom.id in parsed) {
+            delete parsed[leavingRoom.id];
+            return AsyncStorage.setItem(ROOM_MESSAGES_KEY, JSON.stringify(parsed));
+          }
+          return undefined;
+        })
+        .catch(() => undefined);
+    }
     if (leavingRoom?.persisted) {
       leaveRoomMembership(leavingRoom.id).catch(() => undefined);
       if (leavingRoom.hostId === authSession?.user?.id) {
@@ -14693,9 +14790,20 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   roomSurface: {
-    paddingHorizontal: 8,
+    flexShrink: 0,
+    paddingHorizontal: 16,
     paddingTop: 10,
-    paddingBottom: 12,
+    paddingBottom: 8,
+  },
+  roomChatScroll: {
+    flex: 1,
+    minHeight: 72,
+  },
+  roomChatScrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 8,
+    paddingTop: 2,
+    paddingBottom: 10,
   },
   roomBody: {
     flexGrow: 1,
@@ -16316,8 +16424,80 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     borderRadius: 18,
     backgroundColor: COLORS.surfaceRaised,
+    borderWidth: 1.5,
+    borderColor: COLORS.line,
+  },
+  roomGiftGridCardActive: {
+    backgroundColor: COLORS.primarySoft,
+    borderColor: COLORS.primary,
+  },
+  roomGiftQtyHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  roomGiftQtyRow: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  roomGiftQtyPill: {
+    paddingHorizontal: 11,
+    height: 30,
+    borderRadius: 9,
+    backgroundColor: COLORS.surfaceRaised,
     borderWidth: 1,
     borderColor: COLORS.line,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  roomGiftQtyPillActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  roomGiftQtyText: {
+    color: COLORS.muted,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  roomGiftQtyTextActive: {
+    color: "#FFFFFF",
+    fontWeight: "900",
+  },
+  roomGiftSendBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingTop: 10,
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.line,
+  },
+  roomGiftSendTitle: {
+    color: COLORS.text,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  roomGiftSendSub: {
+    color: COLORS.primary,
+    fontSize: 11,
+    fontWeight: "800",
+    marginTop: 2,
+  },
+  roomGiftSendBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    height: 42,
+    paddingHorizontal: 20,
+    borderRadius: 13,
+    backgroundColor: COLORS.primary,
+  },
+  roomGiftSendBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "900",
   },
   roomMessageAvatarPress: {
     marginTop: 2,
