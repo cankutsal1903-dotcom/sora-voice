@@ -491,8 +491,25 @@ class SupabaseClient:
         except ValueError:
             raise ApiError("Sunucudan geçersiz yanıt alındı.", status)
 
+    def resolve_login_email(self, login_text):
+        clean = (login_text or "").strip()
+        if "@" in clean and not clean.startswith("@"):
+            return clean
+        url = "%s/rest/v1/rpc/resolve_admin_login_email" % self.config.url
+        headers = {"apikey": self.config.key, "Content-Type": "application/json"}
+        status, payload = self._http("POST", url, headers, {"p_login": clean})
+        if 200 <= status < 300 and payload:
+            try:
+                resolved = json.loads(payload.decode("utf-8"))
+                if isinstance(resolved, str) and resolved.strip():
+                    return resolved.strip()
+            except ValueError:
+                pass
+        return clean
+
     def sign_in(self, email, password):
-        data = self._auth_post("password", {"email": email, "password": password})
+        resolved_email = self.resolve_login_email(email)
+        data = self._auth_post("password", {"email": resolved_email, "password": password})
         with self._lock:
             return self._store_session(data)
 
@@ -1087,7 +1104,7 @@ class MainWindow(Gtk.ApplicationWindow):
         outer.pack_start(subtitle, False, False, 4)
 
         self.email_entry = Gtk.Entry()
-        self.email_entry.set_placeholder_text("Yönetici e-posta adresi")
+        self.email_entry.set_placeholder_text("E-posta, @kullaniciadi veya 8 haneli ID")
         prefs = read_json_file(PREFS_PATH) or read_json_file(os.path.join(LEGACY_CONFIG_DIR, "prefs.json")) or {}
         if isinstance(prefs, dict) and prefs.get("last_email"):
             self.email_entry.set_text(prefs["last_email"])

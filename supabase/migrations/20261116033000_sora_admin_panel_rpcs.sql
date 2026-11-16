@@ -206,16 +206,16 @@ begin
 
   return query
   select
-    (select count(*) from public.profiles),
-    coalesce((select sum(w.balance::bigint) from public.wallets w), 0::bigint),
-    (select count(*) from public.rooms r where r.state = 'live'),
-    (select count(*) from public.communities),
-    (select count(*) from public.user_sanctions s where s.active and s.action in ('ban', 'suspend') and (s.expires_at is null or s.expires_at > now())),
-    (select count(*) from public.user_sanctions s where s.active and s.action = 'chat_mute' and (s.expires_at is null or s.expires_at > now())),
-    (select count(*) from public.safety_reports sr where sr.status in ('open', 'reviewing')),
-    (select count(*) from public.bank_transfer_requests bt where bt.status = 'awaiting_transfer'),
-    (select count(*) from public.room_background_requests rb where rb.status = 'pending'),
-    coalesce(v_role, 'admin');
+    (select count(*) from public.profiles)::bigint,
+    coalesce((select sum(w.balance) from public.wallets w), 0)::bigint,
+    (select count(*) from public.rooms r where r.state = 'live')::bigint,
+    (select count(*) from public.communities)::bigint,
+    (select count(*) from public.user_sanctions s where s.active and s.action in ('ban', 'suspend') and (s.expires_at is null or s.expires_at > now()))::bigint,
+    (select count(*) from public.user_sanctions s where s.active and s.action = 'chat_mute' and (s.expires_at is null or s.expires_at > now()))::bigint,
+    (select count(*) from public.safety_reports sr where sr.status in ('open', 'reviewing'))::bigint,
+    (select count(*) from public.bank_transfer_requests bt where bt.status = 'awaiting_transfer')::bigint,
+    (select count(*) from public.room_background_requests rb where rb.status = 'pending')::bigint,
+    coalesce(v_role, 'admin')::text;
 end;
 $$;
 
@@ -1132,6 +1132,39 @@ begin
 end;
 $$;
 
+-- 16. Admin Giriş Kolaylığı: @kullaniciadi veya 8 haneli ID girilirse yalnızca admin hesapları için e-postayı çözer
+create or replace function public.resolve_admin_login_email(p_login text)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = public, auth, pg_temp
+as $$
+declare
+  v_clean text := trim(coalesce(p_login, ''));
+  v_handle text := lower(regexp_replace(trim(coalesce(p_login, '')), '^@+', ''));
+  v_email text;
+begin
+  if v_clean = '' then
+    return null;
+  end if;
+  if position('@' in v_clean) > 1 then
+    return v_clean;
+  end if;
+
+  select u.email into v_email
+  from public.app_admins a
+  join public.profiles p on p.id = a.user_id
+  join auth.users u on u.id = a.user_id
+  where lower(p.handle) = v_handle
+     or p.public_id = v_clean
+  limit 1;
+
+  return v_email;
+end;
+$$;
+
+grant execute on function public.resolve_admin_login_email(text) to anon, authenticated;
 revoke all on function public.admin_resolve_user_id(text) from public, anon, authenticated;
 grant execute on function public.admin_dashboard_summary() to authenticated;
 grant execute on function public.admin_search_users(text, integer) to authenticated;
