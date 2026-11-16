@@ -160,6 +160,7 @@ import {
   SoraLevelCrest,
   getBadgeTierConfigForLevel,
 } from "./src/ui/SoraGiftArtwork";
+import { SoraGiftEffect } from "./src/ui/SoraGiftEffect";
 import { KeyboardSafeView, useKeyboardInset } from "./src/ui/useKeyboardInset";
 
 const formatCredits = (value) =>
@@ -3767,99 +3768,6 @@ const GiftSheet = memo(function GiftSheet({
   );
 });
 
-const GIFT_FLIGHT_LANES = [0, 1, 2, 3, 4];
-
-/* Odaya hediye gonderildiginde yukari dogru ucan hediye animasyonu. */
-const GiftFlight = memo(function GiftFlight({ gift }) {
-  const progress = useRef(new Animated.Value(0)).current;
-  const [activeGift, setActiveGift] = useState(null);
-
-  useEffect(() => {
-    if (!gift) return undefined;
-    setActiveGift(gift);
-    progress.setValue(0);
-    const animation = Animated.timing(progress, {
-      toValue: 1,
-      duration: 1600,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    });
-    animation.start(({ finished }) => {
-      if (finished) setActiveGift(null);
-    });
-    return () => animation.stop();
-  }, [gift, progress]);
-
-  if (!activeGift) return null;
-
-  const bannerOpacity = progress.interpolate({
-    inputRange: [0, 0.15, 0.7, 1],
-    outputRange: [0, 1, 1, 0],
-  });
-
-  return (
-    <View pointerEvents="none" style={styles.giftFlightLayer}>
-      {GIFT_FLIGHT_LANES.map((lane) => {
-        const translateY = progress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [240, -320],
-        });
-        const translateX = progress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [(lane - 2) * 16, (lane - 2) * 70],
-        });
-        const opacity = progress.interpolate({
-          inputRange: [0, 0.12, 0.8, 1],
-          outputRange: [0, 1, 1, 0],
-        });
-        const scale = progress.interpolate({
-          inputRange: [0, 0.25, 1],
-          outputRange: [0.5, 1.15, 0.85],
-        });
-        const rotate = progress.interpolate({
-          inputRange: [0, 1],
-          outputRange: ["0deg", `${(lane - 2) * 20}deg`],
-        });
-        return (
-          <Animated.View
-            key={`gift-lane-${lane}`}
-            style={[
-              styles.giftFlyer,
-              {
-                backgroundColor: "transparent",
-                borderWidth: 0,
-                opacity,
-                transform: [
-                  { translateY },
-                  { translateX },
-                  { scale },
-                  { rotate },
-                ],
-              },
-            ]}
-          >
-            <SoraGiftArtwork
-              giftId={activeGift.id}
-              giftName={activeGift.name}
-              fallbackIcon={activeGift.icon}
-              fallbackColor={activeGift.color}
-              size={46}
-            />
-          </Animated.View>
-        );
-      })}
-      <Animated.View
-        style={[styles.giftFlyerBanner, { opacity: bannerOpacity }]}
-      >
-        <Ionicons name="sparkles" size={14} color="#76AFFF" />
-        <Text style={styles.giftFlyerBannerText}>
-          {activeGift.name} gönderildi
-        </Text>
-      </Animated.View>
-    </View>
-  );
-});
-
 /* Bir koltuga/katilimciya uzun basinca acilan kullanici menusu. */
 const ParticipantActionSheet = memo(function ParticipantActionSheet({
   participant,
@@ -5770,6 +5678,20 @@ function Room({
   const [giftOpen, setGiftOpen] = useState(false);
   const [roomGiftCatalog, setRoomGiftCatalog] = useState(GIFT_CATALOG);
   const [giftFlight, setGiftFlight] = useState(null);
+  const playedGiftIdsRef = useRef(new Set());
+  const playGiftEffect = useCallback((gift) => {
+    const eventId = gift?.eventId;
+    if (!eventId || playedGiftIdsRef.current.has(eventId)) return;
+    playedGiftIdsRef.current.add(eventId);
+    if (playedGiftIdsRef.current.size > 160) {
+      playedGiftIdsRef.current.delete(playedGiftIdsRef.current.values().next().value);
+    }
+    if (!minimized) setGiftFlight({ ...gift, stamp: Date.now() });
+  }, [minimized]);
+  useEffect(() => {
+    playedGiftIdsRef.current.clear();
+    setGiftFlight(null);
+  }, [room.id]);
   const [selectedParticipant, setSelectedParticipant] = useState(null);
   const [profileParticipant, setProfileParticipant] = useState(null);
   const [selfSheetOpen, setSelfSheetOpen] = useState(false);
@@ -6083,6 +6005,7 @@ function Room({
           filter: `room_id=eq.${room.id}`,
         },
         (payload) => {
+          if (!active) return;
           const row = payload.new;
           const incoming = {
             id: row.id,
@@ -6097,6 +6020,17 @@ function Room({
             createdAt: row.created_at,
           };
           setMessages((current) => mergeRoomMessages(current, [incoming]));
+          if (row.kind === "gift" && row.metadata?.gift_id) {
+            const meta = row.metadata;
+            playGiftEffect({
+              id: meta.gift_id,
+              name: meta.gift_name || "Hediye",
+              color: meta.gift_color,
+              recipientName: meta.recipient_name,
+              quantity: Number(meta.quantity) || 1,
+              eventId: row.id,
+            });
+          }
         },
       )
       .on(
@@ -6136,7 +6070,7 @@ function Room({
       active = false;
       supabase.removeChannel(channel);
     };
-  }, [chatAccessReady, room.id, room.persisted]);
+  }, [chatAccessReady, playGiftEffect, room.id, room.persisted]);
 
   const refreshMembers = useCallback(() => {
     if (!room.persisted) return Promise.resolve();
@@ -6227,10 +6161,16 @@ function Room({
       const sent = await onSendGift({ gift, recipient, roomId: room.id, requestId });
       if (!sent) return false;
       setGiftOpen(false);
-      setGiftFlight({ ...gift, recipientName: recipient.name, stamp: Date.now() });
+      playGiftEffect({
+        ...gift,
+        name: sent.gift_name || gift.name,
+        recipientName: recipient.name,
+        quantity: 1,
+        eventId: sent.message_id || requestId,
+      });
       return true;
     },
-    [onSendGift, room.id],
+    [onSendGift, playGiftEffect, room.id],
   );
 
   useEffect(() => {
@@ -6301,11 +6241,20 @@ function Room({
       return;
     }
     if (liveVoice.enabled) {
-      if (liveVoice.status !== "connected") {
+      if (["idle", "connecting", "reconnecting"].includes(liveVoice.status)) {
+        if (isHost || liveVoice.canPublish) {
+          pendingMicRef.current = !pendingMicRef.current;
+          return;
+        }
         Alert.alert(
           "Bağlantı hazırlanıyor",
           "Mikrofonu açmak için ses odasının bağlanmasını bekle.",
         );
+        return;
+      }
+      if (liveVoice.status !== "connected") {
+        liveVoice.reconnect?.();
+        if (isHost) pendingMicRef.current = true;
         return;
       }
       try {
@@ -6366,11 +6315,11 @@ function Room({
   }, [appendSystemMessage, isHost, liveVoice.localSeat]);
 
   useEffect(() => {
-    if (pendingMicRef.current && liveVoice.canPublish) {
+    if (pendingMicRef.current && liveVoice.status === "connected" && liveVoice.canPublish) {
       pendingMicRef.current = false;
       liveVoice.setMicrophoneEnabled(true).catch(() => undefined);
     }
-  }, [liveVoice.canPublish, liveVoice.setMicrophoneEnabled]);
+  }, [liveVoice.canPublish, liveVoice.setMicrophoneEnabled, liveVoice.status]);
 
   // İstek onaylanınca / reddedilince el kaldırma durumunu eşitle.
   useEffect(() => {
@@ -7772,7 +7721,7 @@ function Room({
         </View>
       </KeyboardSafeView>
 
-      <GiftFlight gift={giftFlight} />
+      <SoraGiftEffect gift={minimized ? null : giftFlight} />
 
       <RoomMenuSheet
         visible={settingsOpen}
@@ -9316,7 +9265,7 @@ function AppContent() {
       }, ...items]);
       pushNotification({ id: `gift-${requestKey}`, icon: gift.icon, color: gift.color, text: `${recipient.name} kişisine ${gift.name} gönderildi.`, time: "Şimdi" });
       refreshWalletData().catch(() => undefined);
-      return true;
+      return result;
     } catch (error) {
       Alert.alert("Hediye gönderilemedi", error?.message?.includes("Insufficient")
         ? "Bakiye yetersiz. Cüzdanındaki kredi miktarı yenileniyor."
@@ -15147,43 +15096,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#FFFFFF",
   },
-  giftFlightLayer: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "flex-end",
-    zIndex: 40,
-  },
-  giftFlyer: {
-    position: "absolute",
-    bottom: 168,
-    left: "50%",
-    marginLeft: -22,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.4)",
-    shadowColor: "#000000",
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
-  },
-  giftFlyerBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 196,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: "rgba(17,19,26,0.85)",
-    borderWidth: 1,
-    borderColor: "rgba(118,175,255,0.4)",
-  },
-  giftFlyerBannerText: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
   participantSheetHead: {
     flexDirection: "row",
     alignItems: "center",
