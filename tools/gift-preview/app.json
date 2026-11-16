@@ -1,0 +1,7 @@
+{
+  "expo": {
+    "name": "Sora Gift Preview",
+    "slug": "sora-gift-preview",
+    "web": { "bundler": "metro", "output": "single" }
+  }
+}

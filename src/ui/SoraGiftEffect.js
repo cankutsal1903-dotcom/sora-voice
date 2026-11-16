@@ -96,6 +96,12 @@ const GiftScene = memo(function GiftScene({ gift, onComplete }) {
   const reducedMotion = useReducedMotion();
   const { width, height } = useWindowDimensions();
   const key = resolveGiftRecipeKey(gift.id || gift.giftId, gift.name || gift.giftName);
+  const [artworkReady, setArtworkReady] = useState(!key);
+  const handleArtworkLoad = useCallback(() => setArtworkReady(true), []);
+  const handleArtworkError = useCallback(() => {
+    console.warn("[gift-effect] artwork failed to load", key || "unknown");
+    onComplete();
+  }, [key, onComplete]);
   const recipe = GIFT_EFFECT_RECIPES[key] || FALLBACK_GIFT_EFFECT;
   const unit = Math.min(width, 440);
   const artworkSize = Math.round(Math.min(unit * (recipe.wide ? 0.63 : 0.52), height * 0.34));
@@ -103,6 +109,12 @@ const GiftScene = memo(function GiftScene({ gift, onComplete }) {
 
   useEffect(() => {
     progress.setValue(0);
+    // Decoding a cold bundled PNG can take longer than the animation on a slow
+    // emulator. Keep time at zero until the actual hero image has loaded.
+    if (!artworkReady) {
+      const timeout = setTimeout(onComplete, 8000);
+      return () => clearTimeout(timeout);
+    }
     if (reducedMotion) {
       const timer = setTimeout(onComplete, 1400);
       return () => clearTimeout(timer);
@@ -110,9 +122,9 @@ const GiftScene = memo(function GiftScene({ gift, onComplete }) {
     const animation = Animated.timing(progress, { toValue: 1, duration: recipe.duration, easing: Easing.linear, useNativeDriver: true });
     animation.start(({ finished }) => { if (finished) onComplete(); });
     return () => animation.stop();
-  }, [onComplete, progress, recipe.duration, reducedMotion]);
+  }, [artworkReady, onComplete, progress, recipe.duration, reducedMotion]);
 
-  const opacity = reducedMotion ? 1 : interpolate(progress, [0, 1, 1, 1, 1, 0]);
+  const opacity = reducedMotion ? (artworkReady ? 1 : 0) : interpolate(progress, [0, 1, 1, 1, 1, 0]);
   const transform = reducedMotion ? [] : [
     { translateX: interpolate(progress, recipe.hero.x.map((n) => n * unit)) },
     { translateY: interpolate(progress, recipe.hero.y.map((n) => n * unit)) },
@@ -124,7 +136,7 @@ const GiftScene = memo(function GiftScene({ gift, onComplete }) {
   const title = gift.name || gift.giftName || "Hediye";
 
   return (
-    <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.overlay}>
+    <View collapsable={false} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.overlay}>
       <View style={[styles.scene, { width: unit, height: Math.min(height * 0.62, 470), bottom: Math.max(88, height * 0.15) }]}>
         {!reducedMotion ? <>
           <Animated.View style={[styles.aura, { width: artworkSize * 1.5, height: artworkSize * 1.5, borderRadius: artworkSize, opacity: interpolate(progress, [0, 0.5, 0.28, 0.42, 0.2, 0]), transform: [{ scale: interpolate(progress, [0.3, 0.9, 1.2, 1, 1.1, 1.5]) }] }]}>
@@ -169,7 +181,7 @@ const GiftScene = memo(function GiftScene({ gift, onComplete }) {
           </View> : null}
         </> : null}
         <Animated.View style={[styles.hero, { opacity, transform }]}>
-          <SoraGiftArtwork giftId={gift.id || gift.giftId} giftName={title} size={reducedMotion ? Math.min(artworkSize, 126) : artworkSize} />
+          <SoraGiftArtwork giftId={gift.id || gift.giftId} giftName={title} size={reducedMotion ? Math.min(artworkSize, 126) : artworkSize} onLoad={handleArtworkLoad} onError={handleArtworkError} />
         </Animated.View>
         <Animated.View style={[styles.caption, { bottom: reducedMotion ? 42 : 12, borderColor: `${recipe.color}70`, opacity }]}>
           <Text numberOfLines={1} style={styles.title}>{title}{quantity > 1 ? ` ×${quantity}` : ""}</Text>

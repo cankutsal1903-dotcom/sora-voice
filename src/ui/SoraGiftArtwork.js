@@ -110,6 +110,8 @@ export const SoraGiftArtwork = memo(function SoraGiftArtwork({
   fallbackIcon = "gift",
   fallbackColor = "#2F80ED",
   size = 54,
+  onLoad,
+  onError,
 }) {
   const key = resolveGiftRecipeKey(giftId, giftName);
   const source = GIFT_ARTWORK_SOURCES[key];
@@ -121,6 +123,8 @@ export const SoraGiftArtwork = memo(function SoraGiftArtwork({
         resizeMethod="resize"
         accessible={false}
         fadeDuration={0}
+        onLoad={onLoad}
+        onError={onError}
         style={{ width: size, height: size }}
       />
     );
