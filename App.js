@@ -7502,9 +7502,10 @@ function Room({
   };
 
   return (
-    <SafeAreaView style={styles.roomScreen}>
-      <LinearGradient
-        colors={["#142746", "#101A2B", "#0A101B"]}
+    <View collapsable={false} style={styles.roomRootWrap}>
+      <SafeAreaView style={styles.roomScreen}>
+        <LinearGradient
+          colors={["#142746", "#101A2B", "#0A101B"]}
         locations={[0, 0.4, 1]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
@@ -7791,8 +7792,6 @@ function Room({
         </View>
       </KeyboardSafeView>
 
-      <SoraGiftEffect gift={minimized ? null : giftFlight} />
-
       <RoomMenuSheet
         visible={settingsOpen}
         menuRole={room.persisted ? menuRole : isHost ? "owner" : "member"}
@@ -7939,7 +7938,9 @@ function Room({
           setSelectedParticipant(null);
         }}
       />
-    </SafeAreaView>
+      </SafeAreaView>
+      <SoraGiftEffect gift={minimized ? null : giftFlight} />
+    </View>
   );
 }
 
@@ -16498,6 +16499,10 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 13,
     fontWeight: "900",
+  },
+  roomRootWrap: {
+    flex: 1,
+    position: "relative",
   },
   roomMessageAvatarPress: {
     marginTop: 2,

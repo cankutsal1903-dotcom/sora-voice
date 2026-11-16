@@ -1245,7 +1245,7 @@ export function CommunityScreen({
   };
 
   return (
-    <View style={styles.screen}>
+    <View collapsable={false} style={styles.screen}>
       {myFamily ? (
         // ── Üye olunan aile varsa doğrudan Aile Sohbeti açılır ─────────────────
         <KeyboardSafeView style={{ flex: 1 }}>
@@ -2123,7 +2123,7 @@ export function CommunityScreen({
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: COLORS.background },
+  screen: { flex: 1, position: "relative", backgroundColor: COLORS.background },
   pageHeader: {
     paddingHorizontal: 18,
     paddingTop: 14,
@@ -2385,6 +2385,7 @@ const styles = StyleSheet.create({
   msgTime: { color: COLORS.muted, fontSize: 9.5, lineHeight: 14, marginLeft: "auto" },
   msgTimeOwn: { color: "rgba(255,255,255,0.8)" },
   giftMsgCard: {
+    width: 268,
     maxWidth: "100%",
     flexDirection: "row",
     alignItems: "center",

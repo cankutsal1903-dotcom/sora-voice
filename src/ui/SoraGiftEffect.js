@@ -104,6 +104,9 @@ const GiftScene = memo(function GiftScene({ gift, onComplete }) {
   }, [key, onComplete]);
   const recipe = GIFT_EFFECT_RECIPES[key] || FALLBACK_GIFT_EFFECT;
   const unit = Math.min(width, 440);
+  const sceneHeight = Math.round(Math.min(height * 0.62, 470));
+  const sceneTop = Math.max(44, Math.round((height - sceneHeight) * 0.34));
+  const sceneLeft = Math.round((width - unit) / 2);
   const artworkSize = Math.round(Math.min(unit * (recipe.wide ? 0.63 : 0.52), height * 0.34));
   const count = Math.min(recipe.count || 12, 18);
 
@@ -136,8 +139,49 @@ const GiftScene = memo(function GiftScene({ gift, onComplete }) {
   const title = gift.name || gift.giftName || "Hediye";
 
   return (
-    <View collapsable={false} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.overlay}>
-      <View style={[styles.scene, { width: unit, height: Math.min(height * 0.62, 470), bottom: Math.max(88, height * 0.15) }]}>
+    <View
+      collapsable={false}
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={[styles.overlay, { width, height }]}
+    >
+      <View
+        collapsable={false}
+        style={[
+          styles.scene,
+          {
+            width: unit,
+            height: sceneHeight,
+            top: sceneTop,
+            left: sceneLeft,
+          },
+        ]}
+      >
+        <Animated.View
+          style={[
+            styles.stageBackdrop,
+            {
+              width: Math.min(unit * 0.92, artworkSize * 1.72),
+              height: Math.min(sceneHeight * 0.82, artworkSize * 1.62),
+              borderRadius: artworkSize,
+              borderColor: `${recipe.color}55`,
+              opacity: reducedMotion
+                ? (artworkReady ? 0.92 : 0)
+                : interpolate(progress, [0, 0.92, 0.88, 0.86, 0.72, 0]),
+              transform: reducedMotion
+                ? []
+                : [{ scale: interpolate(progress, [0.55, 1, 1.04, 1.02, 0.98, 0.88]) }],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={["rgba(8, 15, 34, 0.78)", "rgba(12, 24, 52, 0.56)", `${recipe.color}28`]}
+            start={{ x: 0.2, y: 0 }}
+            end={{ x: 0.8, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+        </Animated.View>
         {!reducedMotion ? <>
           <Animated.View style={[styles.aura, { width: artworkSize * 1.5, height: artworkSize * 1.5, borderRadius: artworkSize, opacity: interpolate(progress, [0, 0.5, 0.28, 0.42, 0.2, 0]), transform: [{ scale: interpolate(progress, [0.3, 0.9, 1.2, 1, 1.1, 1.5]) }] }]}>
             <LinearGradient colors={[`${recipe.color}42`, `${recipe.color}06`, "transparent"]} style={StyleSheet.absoluteFillObject} />
@@ -241,8 +285,9 @@ export const SoraGiftEffect = memo(function SoraGiftEffect({ gift }) {
 });
 
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, zIndex: 45, elevation: 45, alignItems: "center", overflow: "hidden" },
+  overlay: { position: "absolute", top: 0, left: 0, zIndex: 90, elevation: 90 },
   scene: { position: "absolute", alignItems: "center", justifyContent: "center" },
+  stageBackdrop: { position: "absolute", borderWidth: 1, overflow: "hidden" },
   hero: { position: "absolute", alignItems: "center", justifyContent: "center" },
   aura: { position: "absolute", overflow: "hidden" },
   particle: { position: "absolute", alignItems: "center", justifyContent: "center" },
