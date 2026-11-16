@@ -544,6 +544,21 @@ export const listMySafetyReports = async () => {
   }));
 };
 
+export const getMyActiveSanction = async () => {
+  const client = requireClient();
+  const { data, error } = await client.rpc("get_my_active_sanction");
+  if (error) return null;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row?.sanction_id) return null;
+  return {
+    id: row.sanction_id,
+    action: row.action,
+    reason: row.reason || "Kural ihlali",
+    expiresAt: row.expires_at || null,
+    createdAt: row.created_at || null,
+  };
+};
+
 export const getCurrentAdminRole = async (userId) => {
   const client = requireClient();
   const { data, error } = await client

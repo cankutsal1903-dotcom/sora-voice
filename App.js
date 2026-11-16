@@ -61,6 +61,7 @@ import {
   deleteRoom as deleteRemoteRoom,
   evenLevelCoinReward,
   getHostedRoom,
+  getMyActiveSanction,
   getMyFamily,
   getPublicProfile,
   getRoom,
@@ -8429,6 +8430,7 @@ function AppContent() {
   const openRoomIdRef = useRef(null);
   openRoomIdRef.current = room?.id || null;
   const [myFamily, setMyFamily] = useState(null);
+  const [activeSanction, setActiveSanction] = useState(null);
   const [inspectedUserId, setInspectedUserId] = useState(null);
   const [roomMinimized, setRoomMinimized] = useState(false);
   const [passwordPromptRoom, setPasswordPromptRoom] = useState(null);
@@ -9966,6 +9968,53 @@ function AppContent() {
     [refreshWalletData],
   );
 
+  const refreshMySanction = useCallback(async () => {
+    if (!supabase || !authSession?.user?.id) {
+      setActiveSanction(null);
+      return null;
+    }
+    const sanction = await getMyActiveSanction().catch(() => null);
+    setActiveSanction(sanction);
+    if (sanction) {
+      setRoom(null);
+      setRoomMinimized(false);
+    }
+    return sanction;
+  }, [authSession?.user?.id]);
+
+  useEffect(() => {
+    const uid = authSession?.user?.id;
+    if (!supabase || !uid) {
+      setActiveSanction(null);
+      return undefined;
+    }
+    refreshMySanction();
+    const channel = supabase
+      .channel(`self-admin-sync-${uid}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "user_sanctions", filter: `user_id=eq.${uid}` },
+        () => {
+          refreshMySanction();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "wallets", filter: `user_id=eq.${uid}` },
+        (payload) => {
+          const next = payload?.new;
+          if (!next) return;
+          if (typeof next.balance === "number") setWalletBalance(next.balance);
+          if (typeof next.promo_balance === "number") setPromoWalletBalance(next.promo_balance);
+          if (typeof next.paid_balance === "number") setPaidWalletBalance(next.paid_balance);
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [authSession?.user?.id, refreshMySanction]);
+
   // --- Kosullu ekranlar (tum hook'lar yukarida cagrildi) ---
   if (brandLaunchVisible || (isSupabaseConfigured && authSession === undefined))
     return (
@@ -9986,6 +10035,103 @@ function AppContent() {
         />
       </View>
     );
+
+  if (activeSanction) {
+    const expiryLabel = activeSanction.expiresAt
+      ? new Intl.DateTimeFormat("tr-TR", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        }).format(new Date(activeSanction.expiresAt))
+      : null;
+    return (
+      <SafeAreaView style={[styles.app, { justifyContent: "center", paddingHorizontal: 24 }]}>
+        <StatusBar barStyle="dark-content" />
+        <View
+          style={{
+            padding: 24,
+            borderRadius: 24,
+            backgroundColor: COLORS.surface,
+            borderWidth: 1,
+            borderColor: COLORS.line,
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: 32,
+              backgroundColor: "rgba(217,79,92,0.12)",
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: 14,
+            }}
+          >
+            <Ionicons name="ban-outline" size={32} color={COLORS.danger} />
+          </View>
+          <Text style={{ color: COLORS.text, fontSize: 21, fontWeight: "900", textAlign: "center" }}>
+            {expiryLabel ? "Hesabın Geçici Olarak Kısıtlandı" : "Hesabın Süresiz Yasaklandı"}
+          </Text>
+          <Text
+            style={{
+              color: COLORS.danger,
+              fontSize: 13,
+              fontWeight: "800",
+              marginTop: 8,
+              textAlign: "center",
+            }}
+          >
+            {expiryLabel ? `Bitiş tarihi: ${expiryLabel}` : "Süre: Süresiz"}
+          </Text>
+          <Text
+            style={{
+              color: COLORS.textSecondary,
+              fontSize: 13,
+              lineHeight: 20,
+              marginTop: 12,
+              textAlign: "center",
+            }}
+          >
+            Sebep: {activeSanction.reason}
+          </Text>
+          <View style={{ flexDirection: "row", gap: 10, marginTop: 22, width: "100%" }}>
+            <Pressable
+              onPress={() => refreshMySanction()}
+              style={{
+                flex: 1,
+                minHeight: 46,
+                borderRadius: 14,
+                backgroundColor: COLORS.primary,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ color: "#FFFFFF", fontSize: 13, fontWeight: "900" }}>
+                Durumu Kontrol Et
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => supabase?.auth.signOut().catch(() => undefined)}
+              style={{
+                flex: 1,
+                minHeight: 46,
+                borderRadius: 14,
+                backgroundColor: COLORS.surfaceRaised,
+                borderWidth: 1,
+                borderColor: COLORS.line,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ color: COLORS.text, fontSize: 13, fontWeight: "800" }}>
+                Çıkış Yap
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const screens = {
     discover: (
