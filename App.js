@@ -3615,67 +3615,76 @@ const GiftSheet = memo(function GiftSheet({
     >
       <View style={styles.modalOverlay}>
         <Pressable style={styles.modalDismiss} onPress={onDismiss} />
-        <View style={[styles.sheet, { maxHeight: "86%" }]}>
+        <View style={[styles.sheet, styles.roomGiftSheet]}>
           <View style={styles.sheetHandle} />
-          <Pressable onPress={onDismiss} style={styles.sheetClose}>
-            <Ionicons name="close" size={20} color={COLORS.text} />
-          </Pressable>
-          <Text style={styles.kicker}>ODA HEDİYELERİ</Text>
-          <View style={styles.giftSheetHeading}>
-            <Text style={styles.sheetTitle}>Hediye gönder</Text>
-            <View style={styles.coinPill}>
-              <Ionicons name="diamond" size={14} color="#6AA8F5" />
-              <Text style={styles.coinPillText}>{formatCredits(coins)}</Text>
+          <View style={styles.roomGiftHeader}>
+            <View style={{ flex: 1, marginRight: 8 }}>
+              <Text style={styles.kicker}>ODA HEDİYELERİ</Text>
+              <Text numberOfLines={1} style={styles.roomGiftSheetTitle}>
+                Hediye gönder
+              </Text>
+            </View>
+            <View style={styles.roomGiftHeaderRight}>
+              <View style={styles.coinPill}>
+                <Ionicons name="diamond" size={13} color={COLORS.primary} />
+                <Text style={styles.coinPillText}>{formatCredits(coins)}</Text>
+              </View>
+              <Pressable onPress={onDismiss} style={styles.roomGiftCloseBtn}>
+                <Ionicons name="close" size={20} color={COLORS.text} />
+              </Pressable>
             </View>
           </View>
+
           <Text style={styles.fieldLabel}>ALICI SEÇ</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.roomGiftRecipientRow}
-            style={{ flexGrow: 0, marginBottom: 12 }}
-          >
-            {recipients.map((recipient) => {
-              const active = selectedRecipient?.userId === recipient.userId;
-              return (
-                <Pressable
-                  key={recipient.userId}
-                  onPress={() => setRecipientId(recipient.userId)}
-                  style={[
-                    styles.roomGiftRecipientCard,
-                    active && styles.roomGiftRecipientCardActive,
-                  ]}
-                >
-                  <View style={[styles.roomGiftAvatarRing, active && styles.roomGiftAvatarRingActive]}>
-                    <Avatar
-                      circle
-                      size={42}
-                      uri={recipient.avatarUrl || null}
-                      color={recipient.color || COLORS.primary}
-                      label={(recipient.name || "S").charAt(0).toUpperCase()}
-                    />
-                    {active ? (
-                      <View style={styles.roomGiftRecipientCheck}>
-                        <Ionicons name="checkmark" size={10} color="#FFFFFF" />
-                      </View>
-                    ) : null}
-                  </View>
-                  <Text
-                    numberOfLines={1}
+          <View style={styles.roomGiftRecipientWrap}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.roomGiftRecipientRow}
+              style={{ flexGrow: 0, flexShrink: 0 }}
+            >
+              {recipients.map((recipient) => {
+                const active = selectedRecipient?.userId === recipient.userId;
+                return (
+                  <Pressable
+                    key={recipient.userId}
+                    onPress={() => setRecipientId(recipient.userId)}
                     style={[
-                      styles.roomGiftRecipientName,
-                      active && styles.roomGiftRecipientNameActive,
+                      styles.roomGiftRecipientCard,
+                      active && styles.roomGiftRecipientCardActive,
                     ]}
                   >
-                    {recipient.isSelf ? "Kendim" : recipient.name}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+                    <View style={[styles.roomGiftAvatarRing, active && styles.roomGiftAvatarRingActive]}>
+                      <Avatar
+                        circle
+                        size={42}
+                        uri={recipient.avatarUrl || null}
+                        color={recipient.color || COLORS.primary}
+                        label={(recipient.name || "S").charAt(0).toUpperCase()}
+                      />
+                      {active ? (
+                        <View style={styles.roomGiftRecipientCheck}>
+                          <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+                        </View>
+                      ) : null}
+                    </View>
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.roomGiftRecipientName,
+                        active && styles.roomGiftRecipientNameActive,
+                      ]}
+                    >
+                      {recipient.isSelf ? "Kendim" : recipient.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
 
           <View style={styles.roomGiftQtyHeader}>
-            <Text style={styles.fieldLabel}>ADET</Text>
+            <Text style={[styles.fieldLabel, { marginBottom: 0 }]}>ADET</Text>
             <View style={styles.roomGiftQtyRow}>
               {ROOM_GIFT_QUANTITIES.map((qty) => {
                 const active = quantity === qty;
@@ -3699,7 +3708,11 @@ const GiftSheet = memo(function GiftSheet({
             </View>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
+          <ScrollView
+            style={{ flexShrink: 1 }}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 10 }}
+          >
             <View style={styles.roomGiftGrid3}>
               {gifts.map((gift) => {
                 const active = selectedGift?.id === gift.id;
@@ -16333,16 +16346,56 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
   },
+  roomGiftSheet: {
+    maxHeight: "86%",
+    paddingHorizontal: 18,
+    paddingTop: 22,
+  },
+  roomGiftHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+    flexShrink: 0,
+  },
+  roomGiftSheetTitle: {
+    color: COLORS.text,
+    fontSize: 22,
+    fontWeight: "900",
+    letterSpacing: -0.5,
+    marginTop: 2,
+  },
+  roomGiftHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexShrink: 0,
+  },
+  roomGiftCloseBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: COLORS.surfaceRaised,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  roomGiftRecipientWrap: {
+    flexShrink: 0,
+    minHeight: 84,
+    marginBottom: 12,
+  },
   roomGiftRecipientRow: {
     gap: 10,
-    paddingVertical: 4,
-    paddingBottom: 10,
+    paddingVertical: 2,
+    paddingRight: 6,
   },
   roomGiftRecipientCard: {
-    width: 68,
+    width: 78,
+    minHeight: 80,
     alignItems: "center",
-    paddingVertical: 6,
-    paddingHorizontal: 4,
+    justifyContent: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 6,
     borderRadius: 16,
     backgroundColor: COLORS.surfaceRaised,
     borderWidth: 1,
@@ -16353,9 +16406,9 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
   },
   roomGiftAvatarRing: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
@@ -16437,13 +16490,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 10,
+    flexShrink: 0,
   },
   roomGiftQtyRow: {
     flexDirection: "row",
-    gap: 6,
+    gap: 5,
   },
   roomGiftQtyPill: {
-    paddingHorizontal: 11,
+    paddingHorizontal: 9,
     height: 30,
     borderRadius: 9,
     backgroundColor: COLORS.surfaceRaised,
@@ -16473,6 +16527,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     borderTopWidth: 1,
     borderTopColor: COLORS.line,
+    flexShrink: 0,
   },
   roomGiftSendTitle: {
     color: COLORS.text,

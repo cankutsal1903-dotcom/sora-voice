@@ -1472,7 +1472,7 @@ export function CommunityScreen({
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.recipientPickerRow}
-              style={{ flexGrow: 0, marginBottom: 14 }}
+              style={{ flexGrow: 0, flexShrink: 0, marginBottom: 14 }}
             >
               {giftRecipients.map((recipient) => {
                 const active = selectedGiftRecipient?.userId === recipient.userId;
@@ -1516,7 +1516,7 @@ export function CommunityScreen({
             </ScrollView>
 
             <View style={styles.qtyHeaderRow}>
-              <Text style={styles.fieldLabel}>ADET</Text>
+              <Text style={[styles.fieldLabel, { marginBottom: 0 }]}>ADET</Text>
               <View style={styles.qtyPillsRow}>
                 {GIFT_QUANTITIES.map((qty) => {
                   const active = giftQuantity === qty;
@@ -2538,10 +2538,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 10,
+    flexShrink: 0,
   },
-  qtyPillsRow: { flexDirection: "row", gap: 6 },
+  qtyPillsRow: { flexDirection: "row", gap: 5 },
   qtyPill: {
-    paddingHorizontal: 11,
+    paddingHorizontal: 9,
     height: 30,
     borderRadius: 9,
     backgroundColor: COLORS.background,
