@@ -19,6 +19,21 @@ const BRAND = COLORS.primary;
 
 const cleanHandle = (value) => value.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
 
+const describeAuthError = (error, fallback) => {
+  const message = String(error?.message || "");
+  const normalizedMessage = message.toLocaleLowerCase("en-US");
+  if (
+    normalizedMessage.includes("fetch failed") ||
+    normalizedMessage.includes("failed to fetch") ||
+    normalizedMessage.includes("network request failed") ||
+    normalizedMessage.includes("unknownhostexception") ||
+    normalizedMessage.includes("unable to resolve host")
+  ) {
+    return "Sunucuya ulaşılamadı. İnternet bağlantını kontrol edip tekrar dene.";
+  }
+  return message || fallback;
+};
+
 function ProviderButton({ icon, label, onPress, disabled }) {
   return <Pressable disabled={disabled} onPress={onPress} style={[styles.providerButton, disabled && styles.disabled]}><Ionicons name={icon} size={18} color="#F5F8FC" /><Text style={styles.providerButtonText}>{label}</Text></Pressable>;
 }
@@ -81,7 +96,7 @@ export function AuthScreen() {
         Alert.alert("E-postanı doğrula", "Hesabını açmak için e-postandaki doğrulama bağlantısına dokun.");
       }
     } catch (error) {
-      Alert.alert("Giriş yapılamadı", error?.message || "Bağlantını kontrol edip tekrar dene.");
+      Alert.alert("Giriş yapılamadı", describeAuthError(error, "Bağlantını kontrol edip tekrar dene."));
     } finally {
       setSubmitting(false);
     }
@@ -102,7 +117,7 @@ export function AuthScreen() {
       setScreen("otp");
       Alert.alert("Kod gönderildi", "SMS ile gelen 6 haneli kodu gir.");
     } catch (error) {
-      Alert.alert("Kod gönderilemedi", error?.message || "Telefon giriş ayarlarını kontrol et.");
+      Alert.alert("Kod gönderilemedi", describeAuthError(error, "Telefon giriş ayarlarını kontrol et."));
     } finally {
       setSubmitting(false);
     }
@@ -117,7 +132,7 @@ export function AuthScreen() {
     try {
       await verifyPhoneSignIn({ phone, token: otp.trim() });
     } catch (error) {
-      Alert.alert("Kod doğrulanamadı", error?.message || "Kodu kontrol edip tekrar dene.");
+      Alert.alert("Kod doğrulanamadı", describeAuthError(error, "Kodu kontrol edip tekrar dene."));
     } finally {
       setSubmitting(false);
     }
@@ -128,7 +143,7 @@ export function AuthScreen() {
     try {
       await startOAuthSignIn(provider);
     } catch (error) {
-      Alert.alert("Giriş başlatılamadı", error?.message || "Sağlayıcı ayarlarını kontrol et.");
+      Alert.alert("Giriş başlatılamadı", describeAuthError(error, "Sağlayıcı ayarlarını kontrol et."));
     } finally {
       setSubmitting(false);
     }
@@ -145,7 +160,7 @@ export function AuthScreen() {
       await requestPasswordReset(cleanEmail);
       Alert.alert("Bağlantı gönderildi", "Bu hesap varsa parola sıfırlama bağlantısı e-postana gönderildi.");
     } catch (error) {
-      Alert.alert("İstek gönderilemedi", error?.message || "Daha sonra tekrar dene.");
+      Alert.alert("İstek gönderilemedi", describeAuthError(error, "Daha sonra tekrar dene."));
     } finally {
       setSubmitting(false);
     }
