@@ -156,6 +156,7 @@ import {
   DEFAULT_GIFT_CATALOG,
   GIFT_CATEGORIES,
   LEVEL_BADGE_TIERS,
+  SoraAchievementBadge,
   SoraGiftArtwork,
   SoraLevelCrest,
   getBadgeTierConfigForLevel,
@@ -2753,25 +2754,18 @@ function Profile({
               key={badge.id}
               style={[styles.pfBadge, badge.unlocked && { borderColor: `${badge.tint}55` }]}
             >
-              <LinearGradient
-                colors={badge.unlocked ? badge.gradient : ["#EEF2F7", "#E2E8F0"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.pfBadgeMedal}
-              >
-                <View style={styles.pfBadgeMedalInner}>
-                  <Ionicons
-                    name={badge.icon}
-                    size={22}
-                    color={badge.unlocked ? "#FFFFFF" : "#A3AFBF"}
-                  />
-                </View>
+              <View style={styles.pfBadgeMedal}>
+                <SoraAchievementBadge
+                  badgeId={badge.id}
+                  size={54}
+                  locked={!badge.unlocked}
+                />
                 {!badge.unlocked ? (
                   <View style={styles.pfBadgeLock}>
                     <Ionicons name="lock-closed" size={10} color="#FFFFFF" />
                   </View>
                 ) : null}
-              </LinearGradient>
+              </View>
               <Text
                 style={[styles.pfBadgeText, !badge.unlocked && { color: COLORS.muted }]}
                 numberOfLines={1}

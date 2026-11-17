@@ -252,7 +252,28 @@ export const LEVEL_BADGE_TIERS = [
     octagramBack: true,
     gems: 8,
   },
-];
+].map((tier) => ({
+  ...tier,
+  key: tier.code,
+  title: tier.name,
+  borderColor: tier.border,
+}));
+
+const LEVEL_BADGE_ARTWORK = {
+  sora_crest_t0: require("../../assets/badges/v1/sora_crest_t0.png"),
+  sora_crest_t1: require("../../assets/badges/v1/sora_crest_t1.png"),
+  sora_crest_t2: require("../../assets/badges/v1/sora_crest_t2.png"),
+  sora_crest_t3: require("../../assets/badges/v1/sora_crest_t3.png"),
+  sora_crest_t4: require("../../assets/badges/v1/sora_crest_t4.png"),
+  sora_crest_t5: require("../../assets/badges/v1/sora_crest_t5.png"),
+};
+
+const ACHIEVEMENT_BADGE_ARTWORK = {
+  "first-listen": require("../../assets/badges/v1/achievement_first_listen.png"),
+  host: require("../../assets/badges/v1/achievement_host.png"),
+  curator: require("../../assets/badges/v1/achievement_explorer.png"),
+  family: require("../../assets/badges/v1/achievement_family.png"),
+};
 
 export const getBadgeTierConfigForLevel = (rawLevel = 1) => {
   const lvl = Math.max(1, Math.floor(Number(rawLevel) || 1));
@@ -266,10 +287,31 @@ export const getBadgeTierConfigForLevel = (rawLevel = 1) => {
 export const SoraLevelCrest = memo(function SoraLevelCrest({
   level = 1,
   size = 44,
+  showLevel = false,
   showLevelTag = false,
   locked = false,
 }) {
   const tier = getBadgeTierConfigForLevel(level);
+  const artwork = LEVEL_BADGE_ARTWORK[tier.code];
+  if (artwork) {
+    return (
+      <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center", position: "relative" }}>
+        <Image
+          source={artwork}
+          resizeMode="contain"
+          resizeMethod="resize"
+          accessible={false}
+          fadeDuration={0}
+          style={{ width: size, height: size, opacity: locked ? 0.34 : 1 }}
+        />
+        {showLevel || showLevelTag ? (
+          <View style={[artStyles.crestLevelPill, { borderColor: tier.border }]}>
+            <Text style={artStyles.crestLevelText}>Sv.{level}</Text>
+          </View>
+        ) : null}
+      </View>
+    );
+  }
   const wingSize = Math.max(11, Math.round(size * 0.34));
   const crownSize = Math.max(10, Math.round(size * 0.3));
   const coreSize = Math.round(size * 0.78);
@@ -452,6 +494,25 @@ export const SoraLevelCrest = memo(function SoraLevelCrest({
         </View>
       ) : null}
     </View>
+  );
+});
+
+export const SoraAchievementBadge = memo(function SoraAchievementBadge({
+  badgeId,
+  size = 54,
+  locked = false,
+}) {
+  const artwork = ACHIEVEMENT_BADGE_ARTWORK[badgeId];
+  if (!artwork) return null;
+  return (
+    <Image
+      source={artwork}
+      resizeMode="contain"
+      resizeMethod="resize"
+      accessible={false}
+      fadeDuration={0}
+      style={{ width: size, height: size, opacity: locked ? 0.34 : 1 }}
+    />
   );
 });
 
