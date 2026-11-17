@@ -55,6 +55,7 @@ import {
 import {
   DAILY_REWARD_COINS,
   claimDailyReward as claimRemoteDailyReward,
+  claimSelfGiftBlast,
   computeUserLevelProgress,
   createRoom as createRemoteRoom,
   deactivateStaleHostedRooms,
@@ -382,15 +383,50 @@ const createRequestUuid = () => {
   });
 };
 const PROFILE_ITEM_APPEARANCE = {
-  frame_sky: { color: "#58A0F0", width: 3 },
-  frame_amber: { color: "#2F80ED", width: 3 },
-  frame_lilac: { color: "#7C9ED4", width: 3 },
-  frame_family_silver: { color: "#4C9AFF", width: 3.5 },
-  frame_family_royal: { color: "#1D5FBF", width: 4 },
+  frame_sky: { color: "#58A0F0", accent: "#DFF4FF", width: 3, style: "halo" },
+  frame_amber: { color: "#2F80ED", accent: "#F5C76B", width: 3, style: "gem" },
+  frame_lilac: { color: "#7C9ED4", accent: "#E7D9FF", width: 3, style: "orbit" },
+  frame_family_silver: { color: "#4C9AFF", accent: "#E7F5FF", width: 3.5, style: "crown" },
+  frame_family_royal: { color: "#1D5FBF", accent: "#FFD978", width: 4, style: "royal" },
+  frame_flame: { color: "#F04B24", accent: "#FFD166", width: 4, style: "flame", animated: true },
   theme_ocean: { background: "#E7F2FF", accent: "#258FB8" },
   theme_midnight: { background: "#E8EEF8", accent: "#315FAD" },
   theme_sunrise: { background: "#F2F7FD", accent: "#5388CB" },
 };
+
+const ProfileFrame = memo(function ProfileFrame({ appearance, size, children, style }) {
+  const flamePulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!appearance?.animated) return undefined;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(flamePulse, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      Animated.timing(flamePulse, { toValue: 0, duration: 700, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [appearance?.animated, flamePulse]);
+  if (!appearance) return <View style={style}>{children}</View>;
+  const ring = { width: size + 14, height: size + 14, borderRadius: (size + 14) / 2 };
+  return (
+    <View style={[{ alignItems: "center", justifyContent: "center" }, style]}>
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, ring, { borderWidth: appearance.width || 3, borderColor: appearance.color }]} />
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, ring, { borderWidth: 1.5, borderColor: appearance.accent, transform: [{ rotate: "22deg" }] }]} />
+      {(appearance.style === "gem" || appearance.style === "royal") ? (
+        <>
+          <View pointerEvents="none" style={{ position: "absolute", top: -2, width: 7, height: 7, borderRadius: 4, backgroundColor: appearance.accent }} />
+          <View pointerEvents="none" style={{ position: "absolute", bottom: 1, width: 5, height: 5, borderRadius: 3, backgroundColor: appearance.accent }} />
+        </>
+      ) : null}
+      {appearance.style === "crown" ? <Ionicons pointerEvents="none" name="sparkles" size={size * 0.22} color={appearance.accent} style={{ position: "absolute", top: -size * 0.08 }} /> : null}
+      {appearance.style === "flame" ? (
+        <Animated.View pointerEvents="none" style={{ position: "absolute", top: -size * 0.13, transform: [{ scale: flamePulse.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.12] }) }], opacity: flamePulse.interpolate({ inputRange: [0, 1], outputRange: [0.78, 1] }) }}>
+          <Ionicons name="flame" size={size * 0.28} color={appearance.accent} />
+        </Animated.View>
+      ) : null}
+      {children}
+    </View>
+  );
+});
 const DEFAULT_CHATS = [
   {
     id: "ece",
@@ -2480,19 +2516,7 @@ function Profile({
                 pressed && styles.profileHomePressed,
               ]}
             >
-              <View
-                style={[
-                  styles.profileHomeAvatarWrap,
-                  homeFrameAppearance
-                    ? {
-                        padding: 3,
-                        borderRadius: 999,
-                        borderWidth: homeFrameAppearance.width || 3,
-                        borderColor: homeFrameAppearance.color || COLORS.primary,
-                      }
-                    : null,
-                ]}
-              >
+              <ProfileFrame appearance={homeFrameAppearance} size={68} style={styles.profileHomeAvatarWrap}>
                 <Avatar
                   label={profile.name.charAt(0).toUpperCase()}
                   color={profile.color}
@@ -2501,7 +2525,7 @@ function Profile({
                   bordered
                   circle
                 />
-              </View>
+              </ProfileFrame>
               <View style={styles.profileHomeCopy}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                   <Text style={[styles.profileHomeName, { flexShrink: 1 }]} numberOfLines={1}>
@@ -3012,17 +3036,7 @@ function ProfileDetailSheet({
               </View>
             </View>
             <View style={styles.profileDetailCoverBottom}>
-              <View
-                style={[
-                  styles.profileDetailAvatarRing,
-                  frameAppearance
-                    ? {
-                        borderColor: frameAppearance.color || COLORS.primary,
-                        borderWidth: frameAppearance.width || 3,
-                      }
-                    : null,
-                ]}
-              >
+              <ProfileFrame appearance={frameAppearance} size={88} style={styles.profileDetailAvatarRing}>
                 <Avatar
                   label={name.charAt(0).toUpperCase()}
                   color={color}
@@ -3031,7 +3045,7 @@ function ProfileDetailSheet({
                   bordered
                   circle
                 />
-              </View>
+              </ProfileFrame>
               <View style={styles.profileDetailStatus}>
                 <View style={styles.profileDetailStatusDot} />
                 <Text style={styles.profileDetailStatusText}>
@@ -9350,6 +9364,19 @@ function AppContent() {
         text: `${recipient.name} kişisine ${qtyPrefix}${gift.name}`, amount: -result.gift_cost,
         time: "Şimdi",
       }, ...items]);
+      if (recipient.userId === authSession.user.id) {
+        const blast = await claimSelfGiftBlast(requestKey).catch(() => null);
+        const reward = Number(blast?.reward_amount || 0);
+        if (blast?.balance !== null && blast?.balance !== undefined) setWalletBalance(Number(blast.balance));
+        if (reward > 0) {
+          const multiplier = Number(blast.multiplier_basis || 0) / 100;
+          setWalletActivities((items) => [{
+            id: `blast-${requestKey}`, icon: "flame", color: "#F04B24",
+            text: `Hediye patlaması · ${multiplier}x geri dönüş`, amount: reward, time: "Şimdi",
+          }, ...items]);
+          Alert.alert("Hediye patlaması!", `${formatCredits(reward)} kredi geri kazandın.`);
+        }
+      }
       pushNotification({
         id: `gift-${requestKey}`,
         icon: gift.icon,

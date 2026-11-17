@@ -1239,6 +1239,13 @@ export const sendRoomGift = async ({ roomId, giftId, recipientId, quantity = 1, 
   return data?.[0] || null;
 };
 
+export const claimSelfGiftBlast = async (requestId) => {
+  const client = requireClient();
+  const { data, error } = await client.rpc("claim_self_gift_blast", { p_request_id: requestId });
+  throwIfError(error);
+  return data?.[0] || { reward_amount: 0, multiplier_basis: 0, balance: null };
+};
+
 export const listRoomGiftCatalog = async () => {
   const client = requireClient();
   let { data, error } = await client

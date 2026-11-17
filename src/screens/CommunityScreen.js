@@ -18,6 +18,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   claimFamilyLevelRewards,
+  claimSelfGiftBlast,
   computeFamilyLevelProgress,
   createFamily,
   DEFAULT_FAMILY_LEVEL_CONFIGS,
@@ -528,6 +529,13 @@ export function CommunityScreen({
       requestAnimationFrame(() => {
         chatScrollRef.current?.scrollToEnd?.({ animated: true });
       });
+      if (recipient.userId === currentUserId) {
+        const blast = await claimSelfGiftBlast(requestId).catch(() => null);
+        const reward = Number(blast?.reward_amount || 0);
+        if (reward > 0) {
+          Alert.alert("Hediye patlaması!", `${formatCredits(reward)} kredi geri kazandın.`);
+        }
+      }
       onBalanceRefresh?.().catch?.(() => undefined);
       return true;
     } catch (err) {
