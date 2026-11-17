@@ -36,8 +36,20 @@ const formatMessageTime = (value) => {
   return new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short" }).format(date);
 };
 
+const isNetworkError = (error) => {
+  const message = String(error?.message || error || "");
+  const normalizedMessage = message.toLocaleLowerCase("en-US");
+  return (
+    normalizedMessage.includes("fetch failed") ||
+    normalizedMessage.includes("network request failed") ||
+    normalizedMessage.includes("unknownhostexception") ||
+    normalizedMessage.includes("unable to resolve host")
+  );
+};
+
 const friendlyError = (error) => {
-  const message = error?.message || "İşlem tamamlanamadı.";
+  const message = String(error?.message || "İşlem tamamlanamadı.");
+  if (isNetworkError(error)) return "Sunucuya ulaşılamadı. İnternet bağlantını kontrol et.";
   if (message.includes("User not found")) return "Bu kullanıcı adına sahip bir hesap bulunamadı.";
   if (message.includes("yourself")) return "Kendinle sohbet başlatamazsın.";
   if (message.includes("unavailable")) return "Bu kullanıcıyla sohbet başlatılamıyor.";
@@ -95,7 +107,14 @@ export function InboxScreen({ currentUserId, profile }) {
     if (!silent) setLoading(true);
     setError("");
     try {
-      const nextConversations = await listDirectConversations();
+      let nextConversations;
+      try {
+        nextConversations = await listDirectConversations();
+      } catch (firstError) {
+        if (!isNetworkError(firstError)) throw firstError;
+        await new Promise((resolve) => setTimeout(resolve, 750));
+        nextConversations = await listDirectConversations();
+      }
       setConversations(nextConversations);
       setSelectedConversation((current) => current ? nextConversations.find((item) => item.id === current.id) || current : current);
     } catch (loadError) {
