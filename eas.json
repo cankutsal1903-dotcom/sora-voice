@@ -7,7 +7,14 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "environment": "development"
+      "environment": "development",
+      "env": {
+        "EXPO_PUBLIC_TOKEN_SERVER_URL": "https://jamvnkspjaatffdgvsxi.supabase.co/functions/v1/livekit-token",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://jamvnkspjaatffdgvsxi.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_YHGHZ1X6cLhNXSnk1Zy2yg_0R9AYIeg",
+        "EXPO_PUBLIC_EAS_PROJECT_ID": "eaa65edd-9980-4db9-950a-9ecb047f0ad7",
+        "EXPO_PUBLIC_ERROR_REPORTING_ENABLED": "true"
+      }
     },
     "preview": {
       "distribution": "internal",
@@ -16,9 +23,9 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_TOKEN_SERVER_URL": "http://192.168.1.33:3001",
-        "EXPO_PUBLIC_SUPABASE_URL": "https://eziwbekavrhbqrovbgwa.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_-G4IyIqCxn_vCsXvJb2n3g_HI6kPDG-",
+        "EXPO_PUBLIC_TOKEN_SERVER_URL": "https://jamvnkspjaatffdgvsxi.supabase.co/functions/v1/livekit-token",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://jamvnkspjaatffdgvsxi.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_YHGHZ1X6cLhNXSnk1Zy2yg_0R9AYIeg",
         "EXPO_PUBLIC_EAS_PROJECT_ID": "eaa65edd-9980-4db9-950a-9ecb047f0ad7",
         "EXPO_PUBLIC_ERROR_REPORTING_ENABLED": "true"
       }
@@ -31,9 +38,9 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_TOKEN_SERVER_URL": "http://192.168.1.33:3001",
-        "EXPO_PUBLIC_SUPABASE_URL": "https://eziwbekavrhbqrovbgwa.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_-G4IyIqCxn_vCsXvJb2n3g_HI6kPDG-",
+        "EXPO_PUBLIC_TOKEN_SERVER_URL": "https://jamvnkspjaatffdgvsxi.supabase.co/functions/v1/livekit-token",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://jamvnkspjaatffdgvsxi.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_YHGHZ1X6cLhNXSnk1Zy2yg_0R9AYIeg",
         "EXPO_PUBLIC_EAS_PROJECT_ID": "eaa65edd-9980-4db9-950a-9ecb047f0ad7",
         "EXPO_PUBLIC_ERROR_REPORTING_ENABLED": "true"
       }
@@ -45,9 +52,9 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_TOKEN_SERVER_URL": "http://192.168.1.33:3001",
-        "EXPO_PUBLIC_SUPABASE_URL": "https://eziwbekavrhbqrovbgwa.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_-G4IyIqCxn_vCsXvJb2n3g_HI6kPDG-",
+        "EXPO_PUBLIC_TOKEN_SERVER_URL": "https://jamvnkspjaatffdgvsxi.supabase.co/functions/v1/livekit-token",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://jamvnkspjaatffdgvsxi.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_YHGHZ1X6cLhNXSnk1Zy2yg_0R9AYIeg",
         "EXPO_PUBLIC_EAS_PROJECT_ID": "eaa65edd-9980-4db9-950a-9ecb047f0ad7",
         "EXPO_PUBLIC_ERROR_REPORTING_ENABLED": "true"
       }

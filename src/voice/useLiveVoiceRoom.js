@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AudioSession, registerGlobals } from "@livekit/react-native";
 import { DisconnectReason, Room, RoomEvent } from "livekit-client";
 import { supabase } from "../auth/supabase";
+import { loadAgoraModule } from "./loadAgoraModule";
 
 registerGlobals();
 
@@ -37,18 +38,6 @@ const parseSeat = (participant) => {
 
 const roomRoleCanPublish = (role, muted, seat) =>
   role === "host" || (Number.isInteger(seat) && !muted);
-
-let cachedAgoraModule = undefined;
-const loadAgoraModule = () => {
-  if (cachedAgoraModule !== undefined) return cachedAgoraModule;
-  try {
-    // eslint-disable-next-line global-require
-    cachedAgoraModule = require("react-native-agora");
-  } catch {
-    cachedAgoraModule = null;
-  }
-  return cachedAgoraModule;
-};
 
 export function useLiveVoiceRoom({
   roomName,

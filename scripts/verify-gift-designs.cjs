@@ -7,7 +7,57 @@ const Module = require("node:module");
 const parser = require("@babel/parser");
 const babel = require("@babel/core");
 const generate = require("@babel/generator").default;
-const { PNG } = require("pngjs");
+const zlib = require("node:zlib");
+
+function readRgbaPng(buf) {
+  assert.equal(buf.subarray(0, 8).toString("hex"), "89504e470d0a1a0a", "Invalid PNG signature");
+  let offset = 8, width = 0, height = 0, bitDepth = 0, colorType = 0;
+  const idat = [];
+  while (offset < buf.length) {
+    const len = buf.readUInt32BE(offset);
+    const type = buf.subarray(offset + 4, offset + 8).toString("ascii");
+    const chunk = buf.subarray(offset + 8, offset + 8 + len);
+    if (type === "IHDR") {
+      width = chunk.readUInt32BE(0);
+      height = chunk.readUInt32BE(4);
+      bitDepth = chunk[8];
+      colorType = chunk[9];
+    } else if (type === "IDAT") {
+      idat.push(chunk);
+    } else if (type === "IEND") {
+      break;
+    }
+    offset += 12 + len;
+  }
+  assert.equal(bitDepth, 8, "Expected 8-bit PNG");
+  assert.equal(colorType, 6, "Expected RGBA PNG");
+  const raw = zlib.inflateSync(Buffer.concat(idat));
+  const bpp = 4, stride = width * bpp;
+  const data = Buffer.alloc(height * stride);
+  const paeth = (a, b, c) => {
+    const p = a + b - c;
+    const pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+    return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+  };
+  for (let y = 0; y < height; y++) {
+    const filter = raw[y * (stride + 1)];
+    const srcOff = y * (stride + 1) + 1;
+    const dstOff = y * stride;
+    for (let i = 0; i < stride; i++) {
+      const xByte = raw[srcOff + i];
+      const a = i >= bpp ? data[dstOff + i - bpp] : 0;
+      const b = y > 0 ? data[dstOff - stride + i] : 0;
+      const c = y > 0 && i >= bpp ? data[dstOff - stride + i - bpp] : 0;
+      const recon = filter === 0 ? xByte
+        : filter === 1 ? xByte + a
+        : filter === 2 ? xByte + b
+        : filter === 3 ? xByte + ((a + b) >> 1)
+        : xByte + paeth(a, b, c);
+      data[dstOff + i] = recon & 0xff;
+    }
+  }
+  return { width, height, data };
+}
 
 const root = path.resolve(__dirname, "..");
 const artworkPath = path.join(root, "src/ui/SoraGiftArtwork.js");
@@ -100,7 +150,7 @@ for (const id of ids) {
   const filename = imageById.get(id);
   if (!filename || !fs.existsSync(filename)) { errors.push(`${id}: artwork PNG missing`); continue; }
   try {
-    const png = PNG.sync.read(fs.readFileSync(filename));
+    const png = readRgbaPng(fs.readFileSync(filename));
     assert.ok(png.width >= 256 && png.height >= 256, "artwork below 256px");
     assert.ok(png.width <= 2048 && png.height <= 2048, "artwork unnecessarily large");
     // Sample a grid: real transparent backdrop and visible art must both exist.

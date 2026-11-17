@@ -383,47 +383,120 @@ const createRequestUuid = () => {
   });
 };
 const PROFILE_ITEM_APPEARANCE = {
-  frame_sky: { color: "#58A0F0", accent: "#DFF4FF", width: 3, style: "halo" },
-  frame_amber: { color: "#2F80ED", accent: "#F5C76B", width: 3, style: "gem" },
-  frame_lilac: { color: "#7C9ED4", accent: "#E7D9FF", width: 3, style: "orbit" },
-  frame_family_silver: { color: "#4C9AFF", accent: "#E7F5FF", width: 3.5, style: "crown" },
-  frame_family_royal: { color: "#1D5FBF", accent: "#FFD978", width: 4, style: "royal" },
-  frame_flame: { color: "#F04B24", accent: "#FFD166", width: 4, style: "flame", animated: true },
+  frame_sky: { color: "#58A0F0", accent: "#DFF4FF", width: 3, style: "halo", frameScale: 1.46, asset: require("./assets/frames/frame_sky.png") },
+  frame_amber: { color: "#2F80ED", accent: "#F5C76B", width: 3, style: "gem", frameScale: 1.53, asset: require("./assets/frames/frame_amber.png") },
+  frame_lilac: { color: "#7C9ED4", accent: "#E7D9FF", width: 3, style: "orbit", frameScale: 1.49, asset: require("./assets/frames/frame_lilac.png") },
+  frame_family_silver: { color: "#4C9AFF", accent: "#E7F5FF", width: 3.5, style: "crown", frameScale: 1.45, asset: require("./assets/frames/frame_family_silver.png") },
+  frame_family_royal: { color: "#1D5FBF", accent: "#FFD978", width: 4, style: "royal", frameScale: 1.52, asset: require("./assets/frames/frame_family_royal.png") },
+  frame_flame: { color: "#F04B24", accent: "#FFD166", width: 4, style: "flame", frameScale: 1.66, animated: true, asset: require("./assets/frames/frame_flame.png") },
   theme_ocean: { background: "#E7F2FF", accent: "#258FB8" },
   theme_midnight: { background: "#E8EEF8", accent: "#315FAD" },
   theme_sunrise: { background: "#F2F7FD", accent: "#5388CB" },
 };
 
 const ProfileFrame = memo(function ProfileFrame({ appearance, size, children, style }) {
-  const flamePulse = useRef(new Animated.Value(0)).current;
+  const reducedMotion = useReducedMotion();
+  const phase = useRef(new Animated.Value(0)).current;
+  const styleKey = appearance?.style || null;
   useEffect(() => {
-    if (!appearance?.animated) return undefined;
-    const loop = Animated.loop(Animated.sequence([
-      Animated.timing(flamePulse, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-      Animated.timing(flamePulse, { toValue: 0, duration: 700, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-    ]));
+    phase.setValue(0);
+    if (!appearance || reducedMotion) return undefined;
+    const duration =
+      styleKey === "flame"
+        ? 720
+        : styleKey === "gem"
+          ? 1950
+          : styleKey === "royal"
+            ? 2000
+            : styleKey === "crown"
+              ? 2200
+              : styleKey === "orbit"
+                ? 2600
+                : 2300;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(phase, {
+          toValue: 1,
+          duration,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(phase, {
+          toValue: 0,
+          duration,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
     loop.start();
     return () => loop.stop();
-  }, [appearance?.animated, flamePulse]);
+  }, [appearance, phase, reducedMotion, styleKey]);
+
   if (!appearance) return <View style={style}>{children}</View>;
-  const ring = { width: size + 14, height: size + 14, borderRadius: (size + 14) / 2 };
+  const frameSize = Math.round(size * (appearance.frameScale || 1.48));
+  const offset = (size - frameSize) / 2;
+  const animatedTransform = reducedMotion
+    ? []
+    : styleKey === "flame"
+      ? [{ scale: phase.interpolate({ inputRange: [0, 1], outputRange: [0.968, 1.048] }) }]
+      : styleKey === "orbit"
+        ? [
+            { scale: phase.interpolate({ inputRange: [0, 1], outputRange: [0.985, 1.028] }) },
+            { rotate: phase.interpolate({ inputRange: [0, 1], outputRange: ["-4.5deg", "4.5deg"] }) },
+          ]
+        : styleKey === "gem"
+          ? [
+              { scale: phase.interpolate({ inputRange: [0, 1], outputRange: [0.988, 1.032] }) },
+              { rotate: phase.interpolate({ inputRange: [0, 1], outputRange: ["-1.5deg", "1.5deg"] }) },
+            ]
+          : styleKey === "crown" || styleKey === "royal"
+            ? [
+                { scale: phase.interpolate({ inputRange: [0, 1], outputRange: [0.988, 1.034] }) },
+                { translateY: phase.interpolate({ inputRange: [0, 1], outputRange: [0.8, -1.4] }) },
+              ]
+            : [{ scale: phase.interpolate({ inputRange: [0, 1], outputRange: [0.985, 1.028] }) }];
+  const animatedOpacity = reducedMotion
+    ? 1
+    : styleKey === "flame"
+      ? phase.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] })
+      : phase.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] });
+
   return (
-    <View style={[{ alignItems: "center", justifyContent: "center" }, style]}>
-      <View pointerEvents="none" style={[StyleSheet.absoluteFill, ring, { borderWidth: appearance.width || 3, borderColor: appearance.color }]} />
-      <View pointerEvents="none" style={[StyleSheet.absoluteFill, ring, { borderWidth: 1.5, borderColor: appearance.accent, transform: [{ rotate: "22deg" }] }]} />
-      {(appearance.style === "gem" || appearance.style === "royal") ? (
-        <>
-          <View pointerEvents="none" style={{ position: "absolute", top: -2, width: 7, height: 7, borderRadius: 4, backgroundColor: appearance.accent }} />
-          <View pointerEvents="none" style={{ position: "absolute", bottom: 1, width: 5, height: 5, borderRadius: 3, backgroundColor: appearance.accent }} />
-        </>
-      ) : null}
-      {appearance.style === "crown" ? <Ionicons pointerEvents="none" name="sparkles" size={size * 0.22} color={appearance.accent} style={{ position: "absolute", top: -size * 0.08 }} /> : null}
-      {appearance.style === "flame" ? (
-        <Animated.View pointerEvents="none" style={{ position: "absolute", top: -size * 0.13, transform: [{ scale: flamePulse.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.12] }) }], opacity: flamePulse.interpolate({ inputRange: [0, 1], outputRange: [0.78, 1] }) }}>
-          <Ionicons name="flame" size={size * 0.28} color={appearance.accent} />
-        </Animated.View>
-      ) : null}
-      {children}
+    <View style={[{ alignItems: "center", justifyContent: "center", overflow: "visible" }, style]}>
+      <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center", overflow: "visible" }}>
+        {children}
+        {appearance.asset ? (
+          <Animated.Image
+            pointerEvents="none"
+            source={appearance.asset}
+            resizeMode="contain"
+            style={{
+              position: "absolute",
+              width: frameSize,
+              height: frameSize,
+              left: offset,
+              top: offset,
+              opacity: animatedOpacity,
+              transform: animatedTransform,
+            }}
+          />
+        ) : (
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              width: size + 10,
+              height: size + 10,
+              left: -5,
+              top: -5,
+              borderRadius: (size + 10) / 2,
+              borderWidth: appearance.width || 3,
+              borderColor: appearance.color,
+            }}
+          />
+        )}
+      </View>
     </View>
   );
 });
@@ -3036,7 +3109,14 @@ function ProfileDetailSheet({
               </View>
             </View>
             <View style={styles.profileDetailCoverBottom}>
-              <ProfileFrame appearance={frameAppearance} size={88} style={styles.profileDetailAvatarRing}>
+              <ProfileFrame
+                appearance={frameAppearance}
+                size={88}
+                style={[
+                  styles.profileDetailAvatarRing,
+                  frameAppearance?.asset && { backgroundColor: "transparent", borderWidth: 0 },
+                ]}
+              >
                 <Avatar
                   label={name.charAt(0).toUpperCase()}
                   color={color}
@@ -7315,6 +7395,7 @@ function Room({
           color: member.color || COLORS.primary,
           role: member.role,
           seat: member.seat,
+          activeFrameId: member.activeFrameId || null,
         });
       }
     }
@@ -7326,6 +7407,7 @@ function Room({
           ...participant,
           avatarUrl: participant.avatarUrl || prev?.avatarUrl || null,
           color: participant.color || prev?.color || COLORS.primary,
+          activeFrameId: participant.activeFrameId || prev?.activeFrameId || null,
         });
       }
     }
@@ -7337,10 +7419,11 @@ function Room({
         name: profile?.name || prev?.name || "Sen",
         avatarUrl: profile?.avatarUrl || prev?.avatarUrl || null,
         color: profile?.color || prev?.color || COLORS.primary,
+        activeFrameId: profile?.activeFrameId || prev?.activeFrameId || null,
       });
     }
     return map;
-  }, [activeRoomParticipants, profile?.avatarUrl, profile?.color, profile?.name, roomMembers, userId]);
+  }, [activeRoomParticipants, profile?.activeFrameId, profile?.avatarUrl, profile?.color, profile?.name, roomMembers, userId]);
 
   const roomGiftRecipients = useMemo(() => {
     const others = activeRoomParticipants.filter((participant) => participant.userId !== userId);
@@ -7449,6 +7532,12 @@ function Room({
       );
     }
     const isSelfSeat = participant.userId === userId || (isHostSeat && isHost);
+    const seatFrameAppearance =
+      PROFILE_ITEM_APPEARANCE[
+        isSelfSeat
+          ? profile?.activeFrameId || participant.activeFrameId
+          : participant.activeFrameId || participantById.get(participant.userId)?.activeFrameId
+      ];
     return (
       <Pressable
         style={slotStyle}
@@ -7463,43 +7552,45 @@ function Room({
           {participant.isSpeaking ? (
             <SpeakingRing size={avatarSize + 14} color={COLORS.primary} />
           ) : null}
-          <View
-            style={[
-              styles.roomSpeakerAvatar,
-              { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 },
-              isHostSeat && styles.roomHostStageAvatar,
-              participant.role === "host" && styles.roomSpeakerAvatarHost,
-              participant.microphoneEnabled && styles.roomSpeakerAvatarActive,
-            ]}
-          >
-            <LinearGradient
-              colors={
-                isHostSeat
-                  ? ["#8CC8FF", "#347CE0"]
-                  : ["#527DB8", "#203D66"]
-              }
-              style={[StyleSheet.absoluteFill, { borderRadius: avatarSize / 2 }]}
-            />
-            {participant.avatarUrl ? (
-              <Image
-                source={{ uri: participant.avatarUrl }}
-                style={[StyleSheet.absoluteFill, { borderRadius: (avatarSize - 4) / 2 }]}
+          <ProfileFrame appearance={seatFrameAppearance} size={avatarSize}>
+            <View
+              style={[
+                styles.roomSpeakerAvatar,
+                { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 },
+                isHostSeat && styles.roomHostStageAvatar,
+                participant.role === "host" && styles.roomSpeakerAvatarHost,
+                participant.microphoneEnabled && styles.roomSpeakerAvatarActive,
+              ]}
+            >
+              <LinearGradient
+                colors={
+                  isHostSeat
+                    ? ["#8CC8FF", "#347CE0"]
+                    : ["#527DB8", "#203D66"]
+                }
+                style={[StyleSheet.absoluteFill, { borderRadius: avatarSize / 2 }]}
               />
-            ) : (
-              <Text style={[styles.roomSpeakerInitial, isHostSeat && styles.roomHostStageInitial]}>
-                {participant.name?.charAt(0)?.toUpperCase() || "?"}
-              </Text>
-            )}
-            {participant.microphoneEnabled ? (
-              <View style={styles.roomMicOnBadge}>
-                <Ionicons name="mic" size={9} color="#11131A" />
-              </View>
-            ) : (
-              <View style={styles.roomMicOffBadge}>
-                <Ionicons name="mic-off" size={9} color="rgba(255,255,255,0.7)" />
-              </View>
-            )}
-          </View>
+              {participant.avatarUrl ? (
+                <Image
+                  source={{ uri: participant.avatarUrl }}
+                  style={[StyleSheet.absoluteFill, { borderRadius: (avatarSize - 4) / 2 }]}
+                />
+              ) : (
+                <Text style={[styles.roomSpeakerInitial, isHostSeat && styles.roomHostStageInitial]}>
+                  {participant.name?.charAt(0)?.toUpperCase() || "?"}
+                </Text>
+              )}
+              {participant.microphoneEnabled ? (
+                <View style={styles.roomMicOnBadge}>
+                  <Ionicons name="mic" size={9} color="#11131A" />
+                </View>
+              ) : (
+                <View style={styles.roomMicOffBadge}>
+                  <Ionicons name="mic-off" size={9} color="rgba(255,255,255,0.7)" />
+                </View>
+              )}
+            </View>
+          </ProfileFrame>
           {participant.role === "host" ? (
             <View style={styles.roomSpeakerCrown}>
               <Ionicons name="sparkles" size={9} color="#11131A" />
@@ -8051,13 +8142,31 @@ function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh, 
   }, [visible]);
 
   const activePreview = profileItems.find((item) => item.id === previewItemId);
+  const editorFrameId =
+    activePreview?.item_type === "frame" ? activePreview.id : profile.activeFrameId;
+  const editorFrameAppearance = PROFILE_ITEM_APPEARANCE[editorFrameId];
+  const isEquippedItem = (item) =>
+    item?.item_type === "frame"
+      ? profile.activeFrameId === item.id
+      : profile.activeProfileThemeId === item?.id;
   const handleProfileItem = (item) => {
     if (ownedItemIds.includes(item.id)) {
+      const unequipping = isEquippedItem(item);
       setItemBusy(item.id);
-      activateProfileItem(item.id).then(() => {
-        onSave({ ...profile, ...(item.item_type === "frame" ? { activeFrameId: item.id } : { activeProfileThemeId: item.id }) });
-        onDismiss();
-      }).catch(() => Alert.alert("Ürün etkinleştirilemedi", "Biraz sonra yeniden dene.")).finally(() => setItemBusy(null));
+      activateProfileItem(
+        unequipping ? (item.item_type === "frame" ? "none_frame" : "none_theme") : item.id,
+      )
+        .then(() => {
+          onSave({
+            ...profile,
+            ...(item.item_type === "frame"
+              ? { activeFrameId: unequipping ? null : item.id }
+              : { activeProfileThemeId: unequipping ? null : item.id }),
+          });
+          onDismiss();
+        })
+        .catch(() => Alert.alert("Ürün güncellenemedi", "Biraz sonra yeniden dene."))
+        .finally(() => setItemBusy(null));
       return;
     }
     if (item.purchasable === false) {
@@ -8132,13 +8241,15 @@ function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh, 
               style={styles.avatarEditPress}
               accessibilityLabel="Profil resmini değiştir"
             >
-              <Avatar
-                label={(name || profile.name || "S").charAt(0).toUpperCase()}
-                color={profile.color}
-                uri={avatarUrl}
-                size={84}
-                circle
-              />
+              <ProfileFrame appearance={editorFrameAppearance} size={84}>
+                <Avatar
+                  label={(name || profile.name || "S").charAt(0).toUpperCase()}
+                  color={profile.color}
+                  uri={avatarUrl}
+                  size={84}
+                  circle
+                />
+              </ProfileFrame>
               <View style={styles.avatarEditBadge}>
                 {avatarBusy ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
@@ -8195,32 +8306,133 @@ function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh, 
             <>
               <Text style={styles.fieldLabel}>ÇERÇEVE VE PROFİL TEMASI</Text>
               {activePreview ? (
-                <View style={{ padding: 12, marginBottom: 10, borderRadius: 14, backgroundColor: activePreview.appearance?.background || "#F1F7FB", borderWidth: activePreview.item_type === "frame" ? 3 : 0, borderColor: activePreview.appearance?.color || "transparent" }}>
-                  <Text style={{ color: activePreview.appearance?.accent || COLORS.text, fontWeight: "800" }}>Önizleme · {activePreview.name}</Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 14,
+                    padding: 12,
+                    marginBottom: 10,
+                    borderRadius: 14,
+                    backgroundColor:
+                      PROFILE_ITEM_APPEARANCE[activePreview.id]?.background ||
+                      activePreview.appearance?.background ||
+                      "#F1F7FB",
+                    borderWidth: 1.5,
+                    borderColor:
+                      PROFILE_ITEM_APPEARANCE[activePreview.id]?.color ||
+                      activePreview.appearance?.color ||
+                      COLORS.line,
+                  }}
+                >
+                  {activePreview.item_type === "frame" ? (
+                    <ProfileFrame
+                      appearance={PROFILE_ITEM_APPEARANCE[activePreview.id]}
+                      size={44}
+                      style={{ marginHorizontal: 6, marginVertical: 4 }}
+                    >
+                      <Avatar
+                        label={(name || profile.name || "S").charAt(0).toUpperCase()}
+                        color={profile.color}
+                        uri={avatarUrl}
+                        size={44}
+                        circle
+                      />
+                    </ProfileFrame>
+                  ) : null}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: COLORS.text, fontWeight: "800" }}>
+                      Önizleme · {activePreview.name}
+                    </Text>
+                    <Text style={styles.walletActivityTime}>
+                      {isEquippedItem(activePreview)
+                        ? "Şu anda profilinde aktif"
+                        : ownedItemIds.includes(activePreview.id)
+                          ? "Sahipsin · etkinleştirebilirsin"
+                          : activePreview.purchasable === false
+                            ? "Aile seviye ödülü ile açılır"
+                            : `${activePreview.cost.toLocaleString("tr-TR")} kredi`}
+                    </Text>
+                  </View>
                 </View>
               ) : null}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
                 {profileItems.map((item) => {
                   const owned = ownedItemIds.includes(item.id);
-                  const subtitle = owned
-                    ? "Sahipsin · dokun etkinleştir"
-                    : item.purchasable === false
-                      ? "Aile seviye ödülü"
-                      : `${item.cost} kredi · basılı tut satın al`;
-                  return <Pressable key={item.id} onPress={() => setPreviewItemId(item.id)} onLongPress={() => handleProfileItem(item)} style={[styles.transferOption, previewItemId === item.id && styles.transferOptionActive, { marginRight: 8 }]}>
-                    <Text style={[styles.transferOptionText, previewItemId === item.id && styles.transferOptionTextActive]}>{item.name}</Text>
-                    <Text style={[styles.walletActivityTime, { textAlign: "center" }]}>{subtitle}</Text>
-                  </Pressable>;
+                  const equipped = isEquippedItem(item);
+                  const itemAppearance = PROFILE_ITEM_APPEARANCE[item.id];
+                  const subtitle = equipped
+                    ? "Aktif · dokun kaldır"
+                    : owned
+                      ? "Sahipsin · etkinleştir"
+                      : item.purchasable === false
+                        ? "Aile seviye ödülü"
+                        : `${item.cost.toLocaleString("tr-TR")} kredi`;
+                  return (
+                    <Pressable
+                      key={item.id}
+                      onPress={() => setPreviewItemId(item.id)}
+                      onLongPress={() => handleProfileItem(item)}
+                      style={[
+                        styles.transferOption,
+                        previewItemId === item.id && styles.transferOptionActive,
+                        { marginRight: 8, alignItems: "center", minWidth: 118, paddingVertical: 12 },
+                      ]}
+                    >
+                      {item.item_type === "frame" && itemAppearance ? (
+                        <View style={{ marginVertical: 6 }}>
+                          <ProfileFrame appearance={itemAppearance} size={36}>
+                            <Avatar
+                              label={(name || profile.name || "S").charAt(0).toUpperCase()}
+                              color={profile.color}
+                              uri={avatarUrl}
+                              size={36}
+                              circle
+                            />
+                          </ProfileFrame>
+                        </View>
+                      ) : (
+                        <View
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 18,
+                            marginVertical: 6,
+                            backgroundColor: itemAppearance?.background || "#E7F2FF",
+                            borderWidth: 2,
+                            borderColor: itemAppearance?.accent || COLORS.primary,
+                          }}
+                        />
+                      )}
+                      <Text
+                        style={[
+                          styles.transferOptionText,
+                          previewItemId === item.id && styles.transferOptionTextActive,
+                        ]}
+                      >
+                        {item.name}
+                      </Text>
+                      <Text style={[styles.walletActivityTime, { textAlign: "center" }]}>{subtitle}</Text>
+                    </Pressable>
+                  );
                 })}
               </ScrollView>
               {activePreview ? (
-                <Pressable disabled={Boolean(itemBusy)} onPress={() => handleProfileItem(activePreview)} style={styles.transferCreateButton}>
+                <Pressable
+                  disabled={Boolean(itemBusy)}
+                  onPress={() => handleProfileItem(activePreview)}
+                  style={styles.transferCreateButton}
+                >
                   <Text style={styles.transferCreateButtonText}>
-                    {ownedItemIds.includes(activePreview.id)
-                      ? "Profili etkinleştir"
-                      : activePreview.purchasable === false
-                        ? "Aile seviye ödülü"
-                        : `Önizle · ${activePreview.cost} kredi`}
+                    {isEquippedItem(activePreview)
+                      ? activePreview.item_type === "frame"
+                        ? "Çerçeveyi kaldır"
+                        : "Temayı kaldır"
+                      : ownedItemIds.includes(activePreview.id)
+                        ? "Profili etkinleştir"
+                        : activePreview.purchasable === false
+                          ? "Aile seviye ödülü"
+                          : `Satın al · ${activePreview.cost.toLocaleString("tr-TR")} kredi`}
                   </Text>
                 </Pressable>
               ) : null}
@@ -9817,7 +10029,10 @@ function AppContent() {
         );
         return;
       }
-      if (nextProfile.activeFrameId || nextProfile.activeProfileThemeId) {
+      if (
+        nextProfile.activeFrameId !== profile.activeFrameId ||
+        nextProfile.activeProfileThemeId !== profile.activeProfileThemeId
+      ) {
         await supabase
           .from("profiles")
           .update({

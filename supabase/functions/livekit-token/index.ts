@@ -16,16 +16,51 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
 };
 
+const clientErrorWindows = new Map<string, { createdAt: number; count: number }>();
+const CLIENT_ERROR_WINDOW_MS = 60_000;
+const MAX_CLIENT_ERROR_REPORTS = 20;
+const MAX_CLIENT_ERROR_BODY_BYTES = 12_000;
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+const redactClientErrorText = (value: unknown) => String(value || "")
+  .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [REDACTED]")
+  .replace(/\beyJ[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+){2}\b/g, "[REDACTED_JWT]")
+  .replace(/\b(?:sb_(?:publishable|secret)_[A-Za-z0-9_-]+|sk_[A-Za-z0-9_-]+)\b/g, "[REDACTED_KEY]")
+  .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[REDACTED_EMAIL]")
+  .slice(0, 1200);
+
+const canAcceptClientError = (request: Request) => {
+  const forwarded = request.headers.get("cf-connecting-ip") ||
+    request.headers.get("x-forwarded-for") || "unknown";
+  const key = forwarded.split(",")[0].trim() || "unknown";
+  const now = Date.now();
+  if (clientErrorWindows.size > 1024) {
+    for (const [windowKey, window] of clientErrorWindows) {
+      if (now - window.createdAt >= CLIENT_ERROR_WINDOW_MS) {
+        clientErrorWindows.delete(windowKey);
+      }
+    }
+  }
+  const current = clientErrorWindows.get(key);
+  if (!current || now - current.createdAt >= CLIENT_ERROR_WINDOW_MS) {
+    clientErrorWindows.set(key, { createdAt: now, count: 1 });
+    return true;
+  }
+  if (current.count >= MAX_CLIENT_ERROR_REPORTS) return false;
+  current.count += 1;
+  return true;
+};
+
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") ||
   Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ||
   "";
+const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
 // 1) Birincil sağlayıcı: LiveKit Cloud
 const liveKitUrl = Deno.env.get("LIVEKIT_URL") || "";
@@ -191,7 +226,12 @@ const participantSeat = (
 };
 
 const requireBaseConfig = () => {
-  if (!supabaseUrl || !supabaseKey || getConfiguredProviders().length === 0) {
+  if (
+    !supabaseUrl ||
+    !supabaseKey ||
+    !supabaseServiceRoleKey ||
+    getConfiguredProviders().length === 0
+  ) {
     throw new Error("Voice session function is not configured");
   }
 };
@@ -324,10 +364,14 @@ const issueToken = async (request: Request) => {
   }
 
   const configuredProviders = getConfiguredProviders();
-  const { data: allocRows, error: allocError } = await userClient.rpc(
-    "allocate_voice_session",
+  // Provider configuration is server-only input.  Calling the allocator with
+  // the user's JWT would let a client force a provider or pin a room to it.
+  const serverClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+  const { data: allocRows, error: allocError } = await serverClient.rpc(
+    "allocate_voice_session_server",
     {
       p_room_id: cleanRoomName,
+      p_user_id: user.id,
       p_configured_providers: configuredProviders,
       p_exclude_providers: rawExclude,
     },
@@ -427,6 +471,51 @@ const issueToken = async (request: Request) => {
     canPublish,
     quota,
   });
+};
+
+const handleClientError = async (request: Request) => {
+  const contentLength = Number(request.headers.get("content-length") || 0);
+  if (contentLength > MAX_CLIENT_ERROR_BODY_BYTES) {
+    return json({ error: "Error report too large" }, 413);
+  }
+  if (!canAcceptClientError(request)) {
+    return json({ error: "Too many error reports" }, 429);
+  }
+
+  const rawBody = await request.text();
+  if (new TextEncoder().encode(rawBody).byteLength > MAX_CLIENT_ERROR_BODY_BYTES) {
+    return json({ error: "Error report too large" }, 413);
+  }
+  const body = (() => {
+    try {
+      return JSON.parse(rawBody || "{}");
+    } catch {
+      return null;
+    }
+  })();
+  if (!body || typeof body !== "object") return json({ error: "Invalid JSON" }, 400);
+  const message = redactClientErrorText(body?.message);
+  if (!message) return json({ error: "message is required" }, 400);
+
+  const rawContext = body?.context && typeof body.context === "object"
+    ? body.context
+    : {};
+  const context = Object.fromEntries(
+    Object.entries(rawContext)
+      .slice(0, 8)
+      .map(([key, value]) => [String(key).slice(0, 60), redactClientErrorText(value)]),
+  );
+
+  console.error("[client-error]", JSON.stringify({
+    message,
+    stack: redactClientErrorText(body?.stack),
+    context,
+    platform: redactClientErrorText(body?.platform),
+    appVersion: redactClientErrorText(body?.appVersion),
+    buildNumber: redactClientErrorText(body?.buildNumber),
+    occurredAt: redactClientErrorText(body?.occurredAt),
+  }));
+  return json({ accepted: true }, 202);
 };
 
 const handleVoiceHeartbeat = async (request: Request) => {
@@ -870,6 +959,9 @@ Deno.serve(async (request) => {
   try {
     if (request.method !== "POST") {
       return json({ error: "Method not allowed" }, 405);
+    }
+    if (pathname.endsWith("/errors")) {
+      return await handleClientError(request);
     }
     if (pathname.endsWith("/token") || pathname.endsWith("/voice/session")) {
       return await issueToken(request);

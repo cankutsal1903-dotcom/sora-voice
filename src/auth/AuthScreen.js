@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Alert, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { KeyboardSafeView } from "../ui/useKeyboardInset";
 import {
+  AUTH_CALLBACK_URL,
   isHandleAvailable,
   normalizePhoneNumber,
   requestPasswordReset,
@@ -89,7 +90,14 @@ export function AuthScreen() {
       const profile = isRegistering ? await validateProfile() : null;
       if (isRegistering && !profile) return;
       const result = isRegistering
-        ? await supabase.auth.signUp({ email: cleanEmail, password, options: { data: { display_name: profile.displayName, handle: profile.handle } } })
+        ? await supabase.auth.signUp({
+            email: cleanEmail,
+            password,
+            options: {
+              ...(Platform.OS === "web" ? {} : { emailRedirectTo: AUTH_CALLBACK_URL }),
+              data: { display_name: profile.displayName, handle: profile.handle },
+            },
+          })
         : await supabase.auth.signInWithPassword({ email: cleanEmail, password });
       if (result.error) throw result.error;
       if (isRegistering && !result.data.session) {

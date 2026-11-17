@@ -8,7 +8,7 @@ Proje kökünde aşağıdaki komutları çalıştır:
 
 ```powershell
 npx supabase login
-npx supabase link --project-ref PROJE_REFERANSIN
+npx supabase link PROJE_REFERANSIN
 npx supabase db push
 npx supabase secrets set WEBHOOK_SECRET=UZUN_RASTGELE_BIR_DEGER
 npx supabase functions deploy notify-room-live --no-verify-jwt
