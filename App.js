@@ -5828,7 +5828,7 @@ function Room({
                 ? "host"
                 : member?.role || "listener",
             isMuted: Boolean(member?.isMuted),
-            seat: participant.id === room.hostId ? 0 : participant.seat ?? null,
+            seat: participant.id === room.hostId ? 0 : participant.seat ?? member?.seat ?? null,
             handRaisedAt: member?.handRaisedAt || null,
             micBannedUntil: member?.micBannedUntil || null,
           };

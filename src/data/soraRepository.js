@@ -320,7 +320,7 @@ export const listRoomMembers = async (roomId) => {
   const client = requireClient();
   const { data, error } = await client
     .from("room_members")
-    .select("user_id, role, is_muted, removed_at, hand_raised_at, mic_banned_until, profiles!room_members_user_id_fkey(display_name, avatar_color, avatar_url)")
+    .select("user_id, role, is_muted, seat_index, removed_at, hand_raised_at, mic_banned_until, profiles!room_members_user_id_fkey(display_name, avatar_color, avatar_url)")
     .eq("room_id", roomId)
     .is("removed_at", null);
   throwIfError(error);
@@ -328,6 +328,7 @@ export const listRoomMembers = async (roomId) => {
     userId: member.user_id,
     role: member.role,
     isMuted: member.is_muted,
+    seat: typeof member.seat_index === "number" ? member.seat_index : null,
     handRaisedAt: member.hand_raised_at || null,
     micBannedUntil: member.mic_banned_until || null,
     name: profileFromJoin(member.profiles)?.display_name || "Sora kullanıcısı",
