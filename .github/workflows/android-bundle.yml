@@ -4,8 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches: [main, fix/gift-send-effects-20261116]
-    paths:
-      - ".github/workflows/android-bundle.yml"
 
 permissions:
   contents: read
@@ -85,8 +83,16 @@ jobs:
           chmod +x gradlew
           ./gradlew :app:bundleRelease --no-daemon --stacktrace
 
-      - name: AAB imzasını doğrula
-        run: jarsigner -verify android/app/build/outputs/bundle/release/app-release.aab
+      - name: AAB imzasını ve izinleri doğrula
+        run: |
+          jarsigner -verify android/app/build/outputs/bundle/release/app-release.aab
+          python3 -c '
+          import zipfile
+          with zipfile.ZipFile("android/app/build/outputs/bundle/release/app-release.aab") as z:
+              raw = z.read("base/manifest/AndroidManifest.xml")
+          assert b"FOREGROUND_SERVICE" not in raw, "Unexpected FOREGROUND_SERVICE permission remained in manifest"
+          print("MANIFEST_CLEAN_NO_FGS_OK")
+          '
 
       - name: AAB paketini indirilebilir yap
         uses: actions/upload-artifact@v4

@@ -42,15 +42,12 @@
     ],
     "android": {
       "package": "com.arescan.soravoice",
-      "versionCode": 18,
+      "versionCode": 19,
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.MODIFY_AUDIO_SETTINGS",
-        "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
-        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.INTERNET",
         "android.permission.WAKE_LOCK",
@@ -60,7 +57,11 @@
       "blockedPermissions": [
         "android.permission.CAMERA",
         "android.permission.READ_PHONE_STATE",
-        "android.permission.RECORD_VIDEO"
+        "android.permission.RECORD_VIDEO",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/sora-logo-blue.png",
@@ -69,7 +70,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.arescan.soravoice",
-      "buildNumber": "18",
+      "buildNumber": "19",
       "supportsTablet": true,
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Sora, sesli odalarda konuşabilmen için mikrofonuna erişir.",
