@@ -149,34 +149,11 @@ const requireSupabase = () => {
   return supabase;
 };
 
-export const normalizePhoneNumber = (value) => {
-  const digits = String(value || "").replace(/\D/g, "");
-  if (digits.startsWith("0") && digits.length === 11) return `+90${digits.slice(1)}`;
-  if (digits.startsWith("5") && digits.length === 10) return `+90${digits}`;
-  return digits ? `+${digits}` : "";
-};
-
 export const isHandleAvailable = async (handle) => {
   const client = requireSupabase();
   const { data, error } = await client.rpc("is_handle_available", { p_handle: handle });
   if (error) throw error;
   return Boolean(data);
-};
-
-export const startPhoneSignIn = async ({ phone, profile }) => {
-  const client = requireSupabase();
-  const options = profile
-    ? { shouldCreateUser: true, data: { display_name: profile.displayName, handle: profile.handle } }
-    : { shouldCreateUser: false };
-  const { error } = await client.auth.signInWithOtp({ phone, options });
-  if (error) throw error;
-};
-
-export const verifyPhoneSignIn = async ({ phone, token }) => {
-  const client = requireSupabase();
-  const { data, error } = await client.auth.verifyOtp({ phone, token, type: "sms" });
-  if (error) throw error;
-  return data.session;
 };
 
 export const startOAuthSignIn = async (provider) => {
@@ -186,6 +163,7 @@ export const startOAuthSignIn = async (provider) => {
     provider,
     options: {
       ...(isWeb ? {} : { redirectTo: AUTH_CALLBACK_URL, skipBrowserRedirect: true }),
+      ...(provider === "google" ? { queryParams: { prompt: "select_account" } } : {}),
     },
   });
   if (error) throw error;

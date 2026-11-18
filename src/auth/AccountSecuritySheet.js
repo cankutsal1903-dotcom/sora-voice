@@ -4,6 +4,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../theme/colors";
 import { KeyboardSafeView } from "../ui/useKeyboardInset";
+import {
+  ACCOUNT_DELETION_URL,
+  CHILD_SAFETY_URL,
+  PRIVACY_POLICY_URL,
+  TERMS_OF_USE_URL,
+  openLegalUrl,
+} from "../security/legalLinks";
 
 export function AccountSecuritySheet({ visible, email, onDismiss, onResetPassword, onSignOut, onDeleteAccount }) {
   const insets = useSafeAreaInsets();
@@ -78,6 +85,46 @@ export function AccountSecuritySheet({ visible, email, onDismiss, onResetPasswor
                 <Text style={styles.description}>Bu cihazdaki güvenli oturumunu kapat.</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
+            </Pressable>
+            <Pressable disabled={submitting} onPress={() => openLegalUrl(PRIVACY_POLICY_URL)} style={styles.action}>
+              <View style={styles.icon}>
+                <Ionicons name="document-text-outline" size={19} color={COLORS.primary} />
+              </View>
+              <View style={styles.content}>
+                <Text style={styles.actionTitle}>Gizlilik Politikası</Text>
+                <Text style={styles.description}>Kişisel veriler, ses izinleri ve veri koruma kuralları.</Text>
+              </View>
+              <Ionicons name="open-outline" size={17} color={COLORS.muted} />
+            </Pressable>
+            <Pressable disabled={submitting} onPress={() => openLegalUrl(TERMS_OF_USE_URL)} style={styles.action}>
+              <View style={styles.icon}>
+                <Ionicons name="reader-outline" size={19} color={COLORS.primary} />
+              </View>
+              <View style={styles.content}>
+                <Text style={styles.actionTitle}>Kullanım Koşulları ve Çocuk Güvenliği</Text>
+                <Text style={styles.description}>UGC topluluk kuralları, 18+ sınırı ve CSAE standartları.</Text>
+              </View>
+              <Ionicons name="open-outline" size={17} color={COLORS.muted} />
+            </Pressable>
+            <Pressable disabled={submitting} onPress={() => openLegalUrl(CHILD_SAFETY_URL)} style={styles.action}>
+              <View style={styles.icon}>
+                <Ionicons name="shield-outline" size={19} color={COLORS.primary} />
+              </View>
+              <View style={styles.content}>
+                <Text style={styles.actionTitle}>Çocuk Güvenliği Beyanı (CSAE)</Text>
+                <Text style={styles.description}>Sıfır tolerans politikası ve yetkili bildirim kanalı.</Text>
+              </View>
+              <Ionicons name="open-outline" size={17} color={COLORS.muted} />
+            </Pressable>
+            <Pressable disabled={submitting} onPress={() => openLegalUrl(ACCOUNT_DELETION_URL)} style={styles.action}>
+              <View style={styles.icon}>
+                <Ionicons name="globe-outline" size={19} color={COLORS.primary} />
+              </View>
+              <View style={styles.content}>
+                <Text style={styles.actionTitle}>Web Hesap ve Veri Silme Sayfası</Text>
+                <Text style={styles.description}>Uygulama dışından hesap ve veri silme yönergeleri.</Text>
+              </View>
+              <Ionicons name="open-outline" size={17} color={COLORS.muted} />
             </Pressable>
             <View style={styles.dangerSection}>
               <Text style={styles.dangerCaption}>TEHLİKELİ İŞLEMLER</Text>

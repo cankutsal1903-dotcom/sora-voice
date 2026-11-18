@@ -4248,6 +4248,25 @@ const GiftSheet = memo(function GiftSheet({
             </View>
           </ScrollView>
 
+          {selectedRecipient?.isSelf ? (
+            <View
+              style={{
+                marginTop: 6,
+                marginBottom: 2,
+                paddingHorizontal: 10,
+                paddingVertical: 7,
+                borderRadius: 10,
+                backgroundColor: "rgba(47,128,237,0.08)",
+                borderWidth: 1,
+                borderColor: "rgba(47,128,237,0.20)",
+              }}
+            >
+              <Text style={{ color: COLORS.textSecondary, fontSize: 10.5, lineHeight: 14.5 }}>
+                Kendime hediye sürpriz promosyon oranları: %70 ek iade yok · %25 +%5 · %4 +%20 · %0,99 +%100 · %0,01 +%500. Krediler sanaldır, nakde çevrilemez.
+              </Text>
+            </View>
+          ) : null}
+
           {selectedGift ? (
             <View style={styles.roomGiftSendBar}>
               <View style={{ flex: 1 }}>

@@ -1,37 +1,49 @@
-# Sora Gizlilik Politikası
+# Sora (Sora Club: Sesli Sohbet) — Gizlilik Politikası
 
-**Yürürlük tarihi:** 6 Kasım 2026
-**Uygulama:** Sora
+**Yürürlük ve son güncelleme tarihi:** 18 Kasım 2026  
+**Uygulama:** Sora (`Sora Club: Sesli Sohbet` — Paket adı: `com.arescan.soravoice`)  
+**Resmi web adresi:** https://cankutsal1903-dotcom.github.io/sora-voice/privacy.html  
+**İletişim ve veri sorumlusu destek adresi:** cankutsal1903@gmail.com
 
-Bu politika, Sora'nın sesli oda ve topluluk özelliklerini kullanırken hangi verileri işlediğini açıklar. Uygulama mağazalarına göndermeden önce aşağıdaki `DESTEK_E_POSTA_ADRESI` alanını gerçek destek adresinizle değiştirin ve bu metni herkesin erişebileceği HTTPS adresinde yayımlayın.
+Bu Gizlilik Politikası, Sora sesli sohbet ve topluluk uygulamasını kullanırken hangi kişisel verilerin işlendiğini, hangi amaçlarla kullanıldığını, hangi altyapı sağlayıcılarıyla paylaşıldığını ve verileriniz üzerindeki haklarınızı açıklar.
 
-## İşlediğimiz bilgiler
+## 1. İşlediğimiz bilgiler
 
-- **Hesap ve profil:** Kimlik doğrulama sağlayıcısının verdiği kullanıcı kimliği, e-posta adresi, kullanıcı adı, görünen ad ve seçtiğiniz profil görünümü.
-- **Topluluk etkinliği:** Açtığınız veya katıldığınız odalar, oda üyeliğiniz, oda içi mesajlar, takipler, engellemeler, şikâyetler ve moderasyon kararları.
-- **Cüzdan ve krediler:** Kredi bakiyesi, promosyon ve satın alınmış kredi toplamları ile kredi işlem geçmişi. Mağaza satın alımları etkinleştirildiğinde ödemeyi Google Play işler; Sora banka kartı veya hesap giriş bilgilerini toplamaz.
-- **Ses bağlantısı:** Mikrofona yalnızca izin verdiğinizde, güvenli ses bağlantısı kurulduğunda ve sesli odaya katıldığınızda erişilir. Sora ses kaydı oluşturma ya da oynatma özelliği sunmaz; ses, odayı sağlamak için canlı iletişim altyapısından geçer.
-- **Bildirim bilgileri:** Bildirim izni, cihaz bildirim belirteci ve seçtiğiniz oda hatırlatıcıları.
-- **Teknik hata bilgileri:** Uygulama sürümü, işletim sistemi, hata zamanı ve hassas verileri ayıklanmış hata metni. Hata kayıtlarına erişim belirteçleri, parolalar ve e-posta adresleri gönderilmemelidir.
+- **Hesap ve kimlik doğrulama bilgileri:** E-posta ve parola ile kayıt olduğunuzda e-posta adresiniz; **Google ile devam et / kaydol** seçeneğini kullandığınızda Google hesabınızın sağladığı temel profil bilgileri (e-posta adresi, görünen ad ve varsa profil fotoğrafı bağlantısı), benzersiz kullanıcı kimliği (UUID), kullanıcı adı (`@kullaniciadi`), görünen ad, biyografi ve seçtiğiniz profil çerçevesi/görseli işlenir. Sora telefon numarası ile kayıt veya SMS doğrulaması talep etmez.
+- **Topluluk ve oda etkinliği:** Oluşturduğunuz veya katıldığınız sesli odalar, oda içi yazılı mesajlar, sanal hediye etkileşimleri, topluluk/aile üyelikleri, takip ve engelleme tercihleri, güvenlik bildirimleri (şikâyetler) ve moderasyon işlemleri.
+- **Canlı ses ve mikrofon erişimi (`RECORD_AUDIO`):** Mikrofonunuza yalnızca açıkça izin verdiğinizde, bir sesli odaya katıldığınızda ve mikrofonunuzu etkinleştirdiğinizde erişilir. Sora konuşmaları kaydetmez, arşivlemez veya sonradan dinlenebilir ses dosyası oluşturmaz; ses akışı yalnızca canlı iletişimi sağlamak için şifreli gerçek zamanlı medya kanallarından iletilir.
+- **Görsel seçimi:** Yalnızca kendi isteğinizle profil, topluluk/aile veya oda kapağı görseli yüklemek istediğinizde sistem fotoğraf seçicisi aracılığıyla seçtiğiniz görsel işlenir.
+- **Cüzdan ve sanal krediler:** Uygulama içi sanal/promosyon kredi bakiyesi ve kredi işlem geçmişi. Gerçek parayla kredi satışı ve ödeme işlemleri şu anda geçici olarak kapalıdır; Sora banka kartı, kredi kartı veya IBAN/hesap giriş bilgilerini toplamaz. İleride uygulama içi satın alımlar etkinleştirildiğinde tüm ödemeler yalnızca Google Play Faturalandırma (Google Play Billing) üzerinden işlenir.
+- **Bildirim ve teknik tanılama bilgileri:** Bildirim izni verdiğinizde anlık bildirim belirteci (push token), oda hatırlatıcı tercihleri ile uygulama kararlılığını korumak için kullanılan uygulama sürümü, işletim sistemi ve kimlik belirteçlerinden arındırılmış hata kayıtları.
 
-## Bilgileri neden kullanıyoruz
+## 2. Bilgileri kullanma amaçlarımız
 
-Bilgileri hesabınızı çalıştırmak, sesli odaları ve mesajlaşmayı sağlamak, güvenliği ve moderasyonu yürütmek, kredi bakiyesini ve işlem geçmişini yönetmek, bildirim göndermek ve uygulama hatalarını çözmek için kullanırız.
+Kişisel verilerinizi; hesabınızı oluşturmak ve güvenli oturum sağlamak, canlı sesli odaları ve yazılı sohbeti çalıştırmak, kullanıcı güvenliğini ve topluluk moderasyonunu yürütmek (bildirim, engelleme ve küfür/taciz filtreleri dahil), sanal kredi bakiyesini yönetmek, isteğe bağlı bildirimleri iletmek ve teknik hataları gidermek amacıyla işleriz.
 
-## Paylaşım ve altyapı sağlayıcıları
+## 3. Üçüncü taraf altyapı sağlayıcıları ve veri güvenliği
 
-Sora; kimlik doğrulama ve veritabanı için Supabase, canlı ses iletimi için LiveKit ve push bildirimleri için Expo'nun altyapısından yararlanabilir. Bu sağlayıcılar yalnızca ilgili hizmeti vermek için gerekli teknik verileri işler. Yasal bir zorunluluk, güvenlik ihtiyacı veya hizmetin korunması olmadıkça kişisel verileri satmayız.
+Sora, hizmeti sunmak için yalnızca gerekli teknik kapsamda aşağıdaki güvenilir altyapı sağlayıcılarından yararlanır:
 
-## Saklama, güvenlik ve seçimleriniz
+- **Supabase:** Kimlik doğrulama, veritabanı ve görsel depolama altyapısı.
+- **Google (Google Sign-In / OAuth 2.0):** İsteğe bağlı Google hesabıyla kayıt ve giriş doğrulaması (`email` ve `profile` kapsamları).
+- **Agora ve LiveKit:** Gerçek zamanlı, düşük gecikmeli ve şifreli canlı sesli oda iletimi.
+- **Expo / Google Firebase Cloud Messaging (FCM):** Anlık bildirim iletimi.
 
-Verileri hizmeti sağlamak, yasal yükümlülükleri yerine getirmek ve güvenlik olaylarını araştırmak için gerekli süre boyunca tutarız. Uygulama ayarlarından bildirim iznini cihazınızın ayarları üzerinden kapatabilirsiniz. Hesap, veri silme, düzeltme veya gizlilik talebi için bizimle iletişime geçebilirsiniz.
+Tüm veri iletişimi aktarım sırasında şifrelenir (`HTTPS / TLS` ve ses kanallarında `DTLS-SRTP`). Kişisel verilerinizi hiçbir koşulda üçüncü taraflara satmayız veya reklam hedeflemesi amacıyla paylaşmayız.
 
-## Çocukların gizliliği
+## 4. Veri saklama, hesap ve veri silme haklarınız
 
-Sora, yerel mevzuatın izin vermediği yaş grubundaki çocuklara yönelik değildir. Böyle bir hesabın tespit edilmesi halinde kaldırılması için işlem yaparız.
+Verilerinizi hesabınız aktif olduğu sürece ve güvenlik/yasal yükümlülüklerin gerektirdiği asgari süre boyunca saklarız. Hesabınızı ve tüm bulut verilerinizi dilediğiniz an kalıcı olarak silebilirsiniz:
 
-## İletişim
+1. **Uygulama içinden anında silme:** **Profil -> Ayarlar -> Hesap ve güvenlik -> Hesabımı sil** adımlarını izleyip onay alanına `SİL` yazarak hesabınızı, profilinizi, mesajlarınızı, odalarınızı ve cüzdan kayıtlarınızı anında ve geri alınamaz biçimde silebilirsiniz.
+2. **Web / e-posta üzerinden silme talebi:** Uygulamaya erişemiyorsanız https://cankutsal1903-dotcom.github.io/sora-voice/delete-account.html sayfasındaki yönergeleri izleyebilir veya kayıtlı e-posta adresinizden **cankutsal1903@gmail.com** adresine silme talebi gönderebilirsiniz; talebiniz en geç 7 gün içinde sonuçlandırılır.
 
-Gizlilik talepleri için: **DESTEK_E_POSTA_ADRESI**
+Cihaz ayarlarınızdan mikrofon ve bildirim izinlerini istediğiniz zaman kapatabilirsiniz.
 
-Bu politika değiştiğinde yürürlük tarihini günceller ve gerekli olduğu durumlarda uygulama içinden bildirim yaparız.
+## 5. Yaş sınırı ve çocuk güvenliği (CSAE sıfır tolerans)
+
+Sora **18 yaş ve üzeri** kullanıcılara yöneliktir; 18 yaşın altındaki bireylerin hesap oluşturmasına izin verilmez. Böyle bir hesabın tespiti halinde hesap derhal kapatılır ve verileri silinir. Çocuk cinsel istismarı ve sömürüsüne (CSAE / CSAM) karşı sıfır tolerans politikamız https://cankutsal1903-dotcom.github.io/sora-voice/child-safety.html adresinde yayımlanmaktadır.
+
+## 6. İletişim ve değişiklikler
+
+Gizlilik, veri erişimi, düzeltme veya silme talepleriniz için bizimle **cankutsal1903@gmail.com** adresinden iletişime geçebilirsiniz. Bu politikada önemli bir değişiklik yapıldığında yürürlük tarihi güncellenir ve uygulama içinden bilgilendirme yapılır.

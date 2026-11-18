@@ -6,13 +6,16 @@ import { KeyboardSafeView } from "../ui/useKeyboardInset";
 import {
   AUTH_CALLBACK_URL,
   isHandleAvailable,
-  normalizePhoneNumber,
   requestPasswordReset,
   startOAuthSignIn,
-  startPhoneSignIn,
   supabase,
-  verifyPhoneSignIn,
 } from "./supabase";
+import {
+  CHILD_SAFETY_URL,
+  PRIVACY_POLICY_URL,
+  TERMS_OF_USE_URL,
+  openLegalUrl,
+} from "../security/legalLinks";
 import { COLORS } from "../theme/colors";
 
 const SORA_LOGO = require("../../assets/images/sora-logo-blue.png");
@@ -35,10 +38,6 @@ const describeAuthError = (error, fallback) => {
   return message || fallback;
 };
 
-function ProviderButton({ icon, label, onPress, disabled }) {
-  return <Pressable disabled={disabled} onPress={onPress} style={[styles.providerButton, disabled && styles.disabled]}><Ionicons name={icon} size={18} color={BRAND} /><Text style={styles.providerButtonText}>{label}</Text></Pressable>;
-}
-
 /** Odaklandiginda kenarligi marka rengine donen metin alani. */
 function Field({ focused, style, ...props }) {
   return (
@@ -55,16 +54,22 @@ export function AuthScreen() {
   const [focusedField, setFocusedField] = useState(null);
   const focus = (name) => () => setFocusedField(name);
   const blur = () => setFocusedField(null);
-  const [screen, setScreen] = useState("email");
   const [isRegistering, setIsRegistering] = useState(false);
+  const [acceptedPolicies, setAcceptedPolicies] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [handle, setHandle] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [phoneRegistration, setPhoneRegistration] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const ensureAcceptedPolicies = () => {
+    if (acceptedPolicies) return true;
+    Alert.alert(
+      "Koşulları onayla",
+      "Kayıt olmadan önce 18 yaş ve üzeri olduğunu ve Kullanım Koşulları, Gizlilik Politikası ile Çocuk Güvenliği kurallarını kabul ettiğini onayla.",
+    );
+    return false;
+  };
 
   const validateProfile = async () => {
     const normalizedHandle = cleanHandle(handle);
@@ -80,6 +85,7 @@ export function AuthScreen() {
   };
 
   const submitEmail = async () => {
+    if (isRegistering && !ensureAcceptedPolicies()) return;
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail || password.length < 6) {
       Alert.alert("Bilgilerini kontrol et", "Geçerli e-posta ve en az 6 karakterlik parola gerekli.");
@@ -111,55 +117,13 @@ export function AuthScreen() {
     }
   };
 
-  const submitPhone = async (isResend = false) => {
-    const normalizedPhone = normalizePhoneNumber(phone);
-    if (!/^\+[1-9]\d{7,14}$/.test(normalizedPhone)) {
-      Alert.alert("Telefon numarası geçersiz", "Numaranı ülke koduyla birlikte yaz. Örnek: 532 123 45 67");
-      return;
-    }
+  const startGoogleAuth = async () => {
+    if (isRegistering && !ensureAcceptedPolicies()) return;
     setSubmitting(true);
     try {
-      let profile = null;
-      if (phoneRegistration) {
-        if (isResend) {
-          profile = { displayName: displayName.trim(), handle: cleanHandle(handle) };
-        } else {
-          profile = await validateProfile();
-          if (!profile) return;
-        }
-      }
-      await startPhoneSignIn({ phone: normalizedPhone, profile });
-      setPhone(normalizedPhone);
-      setScreen("otp");
-      Alert.alert("Kod gönderildi", "SMS ile gelen 6 haneli kodu gir.");
+      await startOAuthSignIn("google");
     } catch (error) {
-      Alert.alert("Kod gönderilemedi", describeAuthError(error, "Telefon giriş ayarlarını kontrol et."));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const submitOtp = async () => {
-    if (!/^\d{6}$/.test(otp.trim())) {
-      Alert.alert("Kodu kontrol et", "SMS ile gelen 6 haneli kodu yaz.");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await verifyPhoneSignIn({ phone, token: otp.trim() });
-    } catch (error) {
-      Alert.alert("Kod doğrulanamadı", describeAuthError(error, "Kodu kontrol edip tekrar dene."));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const startProvider = async (provider) => {
-    setSubmitting(true);
-    try {
-      await startOAuthSignIn(provider);
-    } catch (error) {
-      Alert.alert("Giriş başlatılamadı", describeAuthError(error, "Sağlayıcı ayarlarını kontrol et."));
+      Alert.alert("Google girişi başlatılamadı", describeAuthError(error, "Bağlantını kontrol edip tekrar dene."));
     } finally {
       setSubmitting(false);
     }
@@ -182,15 +146,73 @@ export function AuthScreen() {
     }
   };
 
-  const profileFields = <><Text style={styles.label}>GÖRÜNEN AD</Text><Field value={displayName} onChangeText={setDisplayName} autoCapitalize="words" placeholder="Adın" style={styles.input} maxLength={36} focused={focusedField === "name"} onFocus={focus("name")} onBlur={blur} /><Text style={styles.label}>KULLANICI ADI</Text><View style={[styles.handleInput, focusedField === "handle" && styles.handleInputFocused]}><Text style={styles.handlePrefix}>@</Text><TextInput value={handle} onChangeText={setHandle} autoCapitalize="none" autoCorrect={false} placeholder="kullaniciadi" placeholderTextColor="#8190A2" selectionColor={BRAND} onFocus={focus("handle")} onBlur={blur} style={styles.handleText} maxLength={24} /></View></>;
+  const profileFields = (
+    <>
+      <Text style={styles.label}>GÖRÜNEN AD</Text>
+      <Field
+        value={displayName}
+        onChangeText={setDisplayName}
+        autoCapitalize="words"
+        placeholder="Adın"
+        style={styles.input}
+        maxLength={36}
+        focused={focusedField === "name"}
+        onFocus={focus("name")}
+        onBlur={blur}
+      />
+      <Text style={styles.label}>KULLANICI ADI</Text>
+      <View style={[styles.handleInput, focusedField === "handle" && styles.handleInputFocused]}>
+        <Text style={styles.handlePrefix}>@</Text>
+        <TextInput
+          value={handle}
+          onChangeText={setHandle}
+          autoCapitalize="none"
+          autoCorrect={false}
+          placeholder="kullaniciadi"
+          placeholderTextColor="#8190A2"
+          selectionColor={BRAND}
+          onFocus={focus("handle")}
+          onBlur={blur}
+          style={styles.handleText}
+          maxLength={24}
+        />
+      </View>
+    </>
+  );
 
-  const emailCard = <><View style={styles.card}>{isRegistering ? profileFields : null}<Text style={styles.label}>E-POSTA</Text><Field value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" placeholder="ornek@mail.com" style={styles.input} focused={focusedField === "email"} onFocus={focus("email")} onBlur={blur} /><Text style={styles.label}>PAROLA</Text><Field value={password} onChangeText={setPassword} secureTextEntry placeholder="En az 6 karakter" style={styles.input} focused={focusedField === "password"} onFocus={focus("password")} onBlur={blur} /><Pressable disabled={submitting} onPress={submitEmail}><LinearGradient colors={[BRAND, "#1D5FBF"]} style={[styles.submit, submitting && styles.disabled]}><Text style={styles.submitText}>{submitting ? "İşleniyor" : isRegistering ? "Hesabımı oluştur" : "Giriş yap"}</Text><Ionicons name="arrow-forward" size={19} color="#FFFFFF" /></LinearGradient></Pressable>{!isRegistering ? <Pressable disabled={submitting} onPress={sendResetEmail} style={styles.textButton}><Text style={styles.textButtonLabel}>Parolamı unuttum</Text></Pressable> : null}<Pressable onPress={() => setIsRegistering((current) => !current)} style={styles.toggle} hitSlop={{ top: 14, bottom: 14, left: 24, right: 24 }}><Text style={styles.toggleMuted}>{isRegistering ? "Zaten hesabın var mı?" : "Sora'da yeni misin?"}</Text><Text style={styles.toggleLink}>{isRegistering ? " Giriş yap" : " Hesap oluştur"}</Text></Pressable></View><Text style={styles.or}>veya</Text><View style={styles.providerGrid}><ProviderButton disabled={submitting} icon="logo-google" label="Google" onPress={() => startProvider("google")} /><ProviderButton disabled={submitting} icon="phone-portrait-outline" label="Telefon" onPress={() => setScreen("phone")} /></View></>;
+  const consentBox = (
+    <View style={[styles.consentBox, acceptedPolicies && styles.consentBoxActive]}>
+      <Pressable
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: acceptedPolicies }}
+        accessibilityLabel="Kullanım koşullarını ve gizlilik politikasını onayla"
+        onPress={() => setAcceptedPolicies((current) => !current)}
+        hitSlop={10}
+        style={[styles.checkbox, acceptedPolicies && styles.checkboxActive]}
+      >
+        {acceptedPolicies ? <Ionicons name="checkmark" size={14} color="#FFFFFF" /> : null}
+      </Pressable>
+      <Text style={styles.consentText}>
+        <Text onPress={() => setAcceptedPolicies((current) => !current)}>18 yaşından büyüğüm; </Text>
+        <Text style={styles.legalLink} onPress={() => openLegalUrl(TERMS_OF_USE_URL)}>
+          Kullanım Koşulları (UGC)
+        </Text>
+        <Text onPress={() => setAcceptedPolicies((current) => !current)}>, </Text>
+        <Text style={styles.legalLink} onPress={() => openLegalUrl(PRIVACY_POLICY_URL)}>
+          Gizlilik Politikası
+        </Text>
+        <Text onPress={() => setAcceptedPolicies((current) => !current)}> ve </Text>
+        <Text style={styles.legalLink} onPress={() => openLegalUrl(CHILD_SAFETY_URL)}>
+          Çocuk Güvenliği Standartları
+        </Text>
+        <Text onPress={() => setAcceptedPolicies((current) => !current)}> kurallarını kabul ediyorum.</Text>
+      </Text>
+    </View>
+  );
 
-  const phoneCard = <View style={styles.card}>{phoneRegistration ? profileFields : null}<Text style={styles.label}>TELEFON NUMARASI</Text><Field value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="532 123 45 67" style={styles.input} maxLength={18} focused={focusedField === "phone"} onFocus={focus("phone")} onBlur={blur} /><Pressable disabled={submitting} onPress={() => submitPhone(false)}><LinearGradient colors={[BRAND, "#1D5FBF"]} style={[styles.submit, submitting && styles.disabled]}><Text style={styles.submitText}>{submitting ? "Gönderiliyor" : "SMS kodu gönder"}</Text><Ionicons name="chatbubble-ellipses-outline" size={19} color="#FFFFFF" /></LinearGradient></Pressable><Pressable onPress={() => setPhoneRegistration((current) => !current)} style={styles.toggle} hitSlop={{ top: 14, bottom: 14, left: 24, right: 24 }}><Text style={styles.toggleMuted}>{phoneRegistration ? "Zaten telefon hesabın var mı?" : "Telefonla yeni misin?"}</Text><Text style={styles.toggleLink}>{phoneRegistration ? " Giriş yap" : " Hesap oluştur"}</Text></Pressable><Pressable onPress={() => setScreen("email")} style={styles.textButton}><Text style={styles.textButtonLabel}>E-posta girişine dön</Text></Pressable></View>;
-
-  const otpCard = <View style={styles.card}><Text style={styles.otpDescription}>{phone} numarasına gönderilen 6 haneli kodu gir.</Text><Text style={styles.label}>DOĞRULAMA KODU</Text><Field value={otp} onChangeText={(value) => setOtp(value.replace(/\D/g, "").slice(0, 6))} keyboardType="number-pad" placeholder="000000" style={[styles.input, styles.otpInput]} maxLength={6} focused={focusedField === "otp"} onFocus={focus("otp")} onBlur={blur} /><Pressable disabled={submitting} onPress={submitOtp}><LinearGradient colors={[BRAND, "#1D5FBF"]} style={[styles.submit, submitting && styles.disabled]}><Text style={styles.submitText}>{submitting ? "Doğrulanıyor" : "Kodu doğrula"}</Text><Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" /></LinearGradient></Pressable><Pressable disabled={submitting} onPress={() => submitPhone(true)} style={styles.textButton}><Text style={styles.textButtonLabel}>Kodu yeniden gönder</Text></Pressable><Pressable onPress={() => setScreen("phone")} style={styles.textButton}><Text style={styles.textButtonLabel}>Telefon numarasını değiştir</Text></Pressable></View>;
-
-  const subtitle = screen === "otp" ? "Telefon numaranı güvenle doğrula." : screen === "phone" ? "Telefon numaranla hızlı ve güvenli giriş yap." : isRegistering ? "Profilini oluştur, topluluğunu bul ve odalara katıl." : "Odaların, takiplerin ve profilin seni bekliyor.";
+  const subtitle = isRegistering
+    ? "Google veya e-posta adresinle kaydol, topluluğunu bul ve odalara katıl."
+    : "Odaların, takiplerin ve profilin seni bekliyor.";
 
   return (
     <LinearGradient colors={["#F3F7FC", "#F3F7FC", "#EAF3FD"]} style={styles.screen}>
@@ -204,10 +226,127 @@ export function AuthScreen() {
             <View style={styles.hero}>
               <Image source={SORA_LOGO} style={styles.logo} accessibilityLabel="Sora logosu" />
               <Text style={styles.kicker}>SORA HESABI</Text>
-              <Text style={styles.title}>{screen === "otp" ? "Kodunu doğrula." : screen === "phone" ? "Telefonla devam et." : isRegistering ? "Sesinle yerini al." : "Sohbete geri dön."}</Text>
+              <Text style={styles.title}>{isRegistering ? "Sesinle yerini al." : "Sohbete geri dön."}</Text>
               <Text style={styles.subtitle}>{subtitle}</Text>
             </View>
-            {screen === "email" ? emailCard : screen === "phone" ? phoneCard : otpCard}
+
+            <View style={styles.card}>
+              <View style={styles.modeTabs}>
+                <Pressable
+                  disabled={submitting}
+                  onPress={() => setIsRegistering(false)}
+                  style={[styles.modeTab, !isRegistering && styles.modeTabActive]}
+                >
+                  <Text style={[styles.modeTabText, !isRegistering && styles.modeTabTextActive]}>Giriş yap</Text>
+                </Pressable>
+                <Pressable
+                  disabled={submitting}
+                  onPress={() => setIsRegistering(true)}
+                  style={[styles.modeTab, isRegistering && styles.modeTabActive]}
+                >
+                  <Text style={[styles.modeTabText, isRegistering && styles.modeTabTextActive]}>Kayıt ol</Text>
+                </Pressable>
+              </View>
+
+              {isRegistering ? consentBox : null}
+
+              <Pressable
+                disabled={submitting}
+                onPress={startGoogleAuth}
+                style={({ pressed }) => [
+                  styles.googleButton,
+                  submitting && styles.disabled,
+                  pressed && { opacity: 0.9 },
+                ]}
+              >
+                <View style={styles.googleBadge}>
+                  <Ionicons name="logo-google" size={17} color={BRAND} />
+                </View>
+                <Text style={styles.googleButtonText}>
+                  {isRegistering ? "Google ile kaydol" : "Google ile giriş yap"}
+                </Text>
+                <Ionicons name="chevron-forward" size={17} color="#46596F" />
+              </Pressable>
+
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.or}>
+                  {isRegistering ? "veya e-posta ile kaydol" : "veya e-posta ile giriş yap"}
+                </Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              {isRegistering ? profileFields : null}
+
+              <Text style={styles.label}>E-POSTA</Text>
+              <Field
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                placeholder="ornek@mail.com"
+                style={styles.input}
+                focused={focusedField === "email"}
+                onFocus={focus("email")}
+                onBlur={blur}
+              />
+
+              <Text style={styles.label}>PAROLA</Text>
+              <Field
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                placeholder="En az 6 karakter"
+                style={styles.input}
+                focused={focusedField === "password"}
+                onFocus={focus("password")}
+                onBlur={blur}
+              />
+
+              <Pressable disabled={submitting} onPress={submitEmail}>
+                <LinearGradient colors={[BRAND, "#1D5FBF"]} style={[styles.submit, submitting && styles.disabled]}>
+                  <Text style={styles.submitText}>
+                    {submitting ? "İşleniyor" : isRegistering ? "E-posta ile kaydol" : "Giriş yap"}
+                  </Text>
+                  <Ionicons name="arrow-forward" size={19} color="#FFFFFF" />
+                </LinearGradient>
+              </Pressable>
+
+              {!isRegistering ? (
+                <Pressable disabled={submitting} onPress={sendResetEmail} style={styles.textButton}>
+                  <Text style={styles.textButtonLabel}>Parolamı unuttum</Text>
+                </Pressable>
+              ) : null}
+
+              <Pressable
+                onPress={() => setIsRegistering((current) => !current)}
+                style={styles.toggle}
+                hitSlop={{ top: 14, bottom: 14, left: 24, right: 24 }}
+              >
+                <Text style={styles.toggleMuted}>{isRegistering ? "Zaten hesabın var mı?" : "Sora'da yeni misin?"}</Text>
+                <Text style={styles.toggleLink}>{isRegistering ? " Giriş yap" : " Kayıt ol"}</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.legalFooter}>
+              <Text style={styles.legalFooterText}>
+                Devam ederek{" "}
+                <Text style={styles.legalLink} onPress={() => openLegalUrl(TERMS_OF_USE_URL)}>
+                  Kullanım Koşulları
+                </Text>
+                {", "}
+                <Text style={styles.legalLink} onPress={() => openLegalUrl(PRIVACY_POLICY_URL)}>
+                  Gizlilik Politikası
+                </Text>
+                {" ve "}
+                <Text style={styles.legalLink} onPress={() => openLegalUrl(CHILD_SAFETY_URL)}>
+                  Çocuk Güvenliği
+                </Text>
+                {" kurallarını kabul etmiş olursun."}
+              </Text>
+            </View>
+
             <View style={styles.providerHint}>
               <Ionicons name="shield-checkmark-outline" size={16} color={BRAND} />
               <Text style={styles.providerHintText}>Hesabın güvenli oturumla cihazında saklanır.</Text>
@@ -236,12 +375,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 20,
   },
-  hero: { alignItems: "center", marginBottom: 26 },
+  hero: { alignItems: "center", marginBottom: 22 },
   logo: {
-    width: 104,
-    height: 104,
-    borderRadius: 32,
-    marginBottom: 16,
+    width: 96,
+    height: 96,
+    borderRadius: 30,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: "rgba(47,128,237,0.22)",
   },
@@ -256,7 +395,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "900",
     letterSpacing: -1.1,
-    marginTop: 9,
+    marginTop: 8,
     textAlign: "center",
   },
   subtitle: {
@@ -264,8 +403,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     textAlign: "center",
-    marginTop: 9,
-    maxWidth: 300,
+    marginTop: 8,
+    maxWidth: 310,
   },
   card: {
     borderRadius: 26,
@@ -274,6 +413,124 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#D9E3EF",
     ...CARD_SHADOW,
+  },
+  modeTabs: {
+    flexDirection: "row",
+    backgroundColor: "#EDF3FA",
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: "#D9E3EF",
+  },
+  modeTab: {
+    flex: 1,
+    height: 40,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modeTabActive: {
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#102033",
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  modeTabText: {
+    color: "#46596F",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  modeTabTextActive: {
+    color: BRAND,
+    fontWeight: "900",
+  },
+  consentBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: "#F3F7FC",
+    borderWidth: 1,
+    borderColor: "#D9E3EF",
+    marginBottom: 14,
+  },
+  consentBoxActive: {
+    borderColor: "rgba(47,128,237,0.45)",
+    backgroundColor: "#EAF3FD",
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 7,
+    borderWidth: 1.5,
+    borderColor: "#8190A2",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+  checkboxActive: {
+    backgroundColor: BRAND,
+    borderColor: BRAND,
+  },
+  consentText: {
+    flex: 1,
+    color: "#46596F",
+    fontSize: 11.5,
+    lineHeight: 17,
+  },
+  legalLink: {
+    color: BRAND,
+    fontWeight: "800",
+    textDecorationLine: "underline",
+  },
+  googleButton: {
+    minHeight: 52,
+    paddingHorizontal: 14,
+    borderRadius: 15,
+    backgroundColor: "#F4F8FD",
+    borderWidth: 1,
+    borderColor: "rgba(47,128,237,0.32)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+  },
+  googleBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#D9E3EF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  googleButtonText: {
+    flex: 1,
+    color: "#111820",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginVertical: 15,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#E1E9F3",
+  },
+  or: {
+    color: "#8190A2",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.2,
   },
   label: {
     color: "#46596F",
@@ -285,7 +542,7 @@ const styles = StyleSheet.create({
   },
   input: {
     height: 52,
-    marginBottom: 16,
+    marginBottom: 14,
     paddingHorizontal: 14,
     borderRadius: 15,
     color: "#111820",
@@ -300,7 +557,7 @@ const styles = StyleSheet.create({
   },
   handleInput: {
     height: 52,
-    marginBottom: 16,
+    marginBottom: 14,
     paddingHorizontal: 14,
     borderRadius: 15,
     flexDirection: "row",
@@ -319,7 +576,7 @@ const styles = StyleSheet.create({
   handleText: { flex: 1, color: "#111820", fontSize: 15 },
   submit: {
     height: 54,
-    marginTop: 5,
+    marginTop: 4,
     borderRadius: 16,
     paddingHorizontal: 18,
     flexDirection: "row",
@@ -333,38 +590,23 @@ const styles = StyleSheet.create({
   },
   disabled: { opacity: 0.55, shadowOpacity: 0 },
   submitText: { color: "#FFFFFF", fontSize: 15, fontWeight: "900" },
-  toggle: { flexDirection: "row", justifyContent: "center", marginTop: 18 },
+  toggle: { flexDirection: "row", justifyContent: "center", marginTop: 16 },
   toggleMuted: { color: "#46596F", fontSize: 12.5 },
   toggleLink: { color: BRAND, fontSize: 12.5, fontWeight: "900" },
   textButton: { alignSelf: "center", paddingVertical: 11 },
   textButtonLabel: { color: BRAND, fontSize: 12.5, fontWeight: "800" },
-  or: {
-    color: "#8190A2",
-    fontSize: 11,
-    textAlign: "center",
-    marginVertical: 15,
-    letterSpacing: 0.4,
-  },
-  providerGrid: { flexDirection: "row", gap: 9, justifyContent: "center" },
-  providerButton: {
-    flex: 1,
-    minHeight: 50,
+  legalFooter: {
+    marginTop: 15,
     paddingHorizontal: 8,
-    borderRadius: 15,
-    backgroundColor: "#EDF3FA",
-    borderWidth: 1,
-    borderColor: "#D9E3EF",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 5,
   },
-  providerButtonText: {
-    color: "#111820",
-    fontSize: 10.5,
-    fontWeight: "800",
+  legalFooterText: {
+    color: "#5D6F84",
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: "center",
   },
   providerHint: {
-    marginTop: 20,
+    marginTop: 12,
     paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
@@ -376,17 +618,5 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     textAlign: "center",
     flexShrink: 1,
-  },
-  otpDescription: {
-    color: "#46596F",
-    fontSize: 13,
-    lineHeight: 19,
-    marginBottom: 20,
-  },
-  otpInput: {
-    fontSize: 23,
-    fontWeight: "900",
-    letterSpacing: 8,
-    textAlign: "center",
   },
 });

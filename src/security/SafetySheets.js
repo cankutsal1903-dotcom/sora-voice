@@ -15,6 +15,13 @@ import {
 } from "../data/soraRepository";
 import { COLORS } from "../theme/colors";
 import { KeyboardSafeView } from "../ui/useKeyboardInset";
+import {
+  ACCOUNT_DELETION_URL,
+  CHILD_SAFETY_URL,
+  PRIVACY_POLICY_URL,
+  TERMS_OF_USE_URL,
+  openLegalUrl,
+} from "./legalLinks";
 
 const REPORT_REASONS = [
   ["spam", "Spam", "mail-unread-outline"],
@@ -163,6 +170,24 @@ export function SafetyCenterSheet({ visible, onDismiss }) {
         <Text style={styles.rowMeta}>{report.targetName || report.roomTitle || "İçerik"} · {new Date(report.createdAt).toLocaleDateString("tr-TR")}</Text>
         {report.details ? <Text style={styles.reportDetails} numberOfLines={2}>{report.details}</Text> : null}
       </View>) : <View style={styles.empty}><Ionicons name="flag-outline" size={23} color={COLORS.muted} /><Text style={styles.emptyText}>{loading ? "Yükleniyor..." : "Henüz gönderilmiş bildirim yok."}</Text></View>}
+      <Text style={styles.sectionLabel}>YASAL VE GÜVENLİK BELGELERİ</Text>
+      {[
+        ["Gizlilik Politikası", "İşlenen veriler, izinler ve altyapı sağlayıcıları", PRIVACY_POLICY_URL, "document-text-outline"],
+        ["Kullanım Koşulları (UGC)", "Topluluk kuralları ve içerik standartları", TERMS_OF_USE_URL, "reader-outline"],
+        ["Çocuk Güvenliği Standartları (CSAE)", "Sıfır tolerans politikası ve resmi bildirim", CHILD_SAFETY_URL, "shield-outline"],
+        ["Web Hesap ve Veri Silme Rehberi", "Harici hesap ve veri silme adımları", ACCOUNT_DELETION_URL, "trash-outline"],
+      ].map(([label, meta, url, icon]) => (
+        <Pressable key={label} onPress={() => openLegalUrl(url)} style={styles.userRow}>
+          <View style={[styles.avatar, { backgroundColor: "rgba(47,128,237,0.14)" }]}>
+            <Ionicons name={icon} size={18} color={COLORS.primary} />
+          </View>
+          <View style={styles.rowCopy}>
+            <Text style={styles.rowTitle}>{label}</Text>
+            <Text style={styles.rowMeta}>{meta}</Text>
+          </View>
+          <Ionicons name="open-outline" size={17} color={COLORS.primary} />
+        </Pressable>
+      ))}
     </ScrollView>
   </SheetFrame>;
 }
