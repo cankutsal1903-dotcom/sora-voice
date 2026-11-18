@@ -180,7 +180,6 @@ export const getLatestBackgroundRequest = async (roomId) => {
 };
 
 export const clearRoomBackground = async (roomId) => {
-export const clearRoomBackground = async (roomId) => {
   const client = requireClient();
   const { data, error } = await client.rpc("clear_room_background", { p_room_id: roomId });
   throwIfError(error);
