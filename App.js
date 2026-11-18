@@ -4809,7 +4809,9 @@ const WalletSheet = memo(function WalletSheet({
                   {formatCredits(coins)} <Text style={styles.walletBalanceUnit}>kredi</Text>
                 </Text>
                 <Text style={styles.walletActivityTime}>
-                  Promosyon {formatCredits(promoCoins)} · Satın alınan {formatCredits(paidCoins)}
+                  {paidCoins > 0
+                    ? `Promosyon ${formatCredits(promoCoins)} · Satın alınan ${formatCredits(paidCoins)}`
+                    : `Toplam kredi: ${formatCredits(coins)}`}
                 </Text>
               </View>
               <View style={styles.walletBalanceIcon}>
@@ -4863,19 +4865,14 @@ const WalletSheet = memo(function WalletSheet({
                 </Text>
               </Pressable>
             </View>
-            <Text style={styles.settingsCaption}>MAĞAZA İLE KREDİ YÜKLE</Text>
+            <Text style={styles.settingsCaption}>KREDİ YÜKLEME</Text>
             <View style={styles.transferCard}>
-              <Text style={styles.transferTitle}>
-                {Platform.OS === "android"
-                  ? "Google Play üzerinden kredi yükleme"
-                  : Platform.OS === "ios"
-                    ? "App Store üzerinden kredi yükleme"
-                    : "Mağaza satın alımları"}
-              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <Ionicons name="lock-closed-outline" size={16} color={COLORS.muted} />
+                <Text style={styles.transferTitle}>Geçici olarak kapalıdır</Text>
+              </View>
               <Text style={styles.transferHint}>
-                {Platform.OS === "web"
-                  ? "Kredi paketleri web sürümünde satılmaz. Android'de Google Play, iOS'ta App Store kullanılacaktır."
-                  : "Mağaza ürünleri ve sunucu doğrulaması yapılandırılana kadar satın alma kapalıdır. Ürün adı ve yerel fiyat mağazadan alınacaktır."}
+                Kredi yükleme ve ödeme işlemleri şu anda geçici olarak kapalıdır. Günlük giriş ve seviye ödülleriyle kredi kazanmaya devam edebilirsin.
               </Text>
             </View>
             {visibleActivities.length > 0 && (
@@ -4911,8 +4908,8 @@ const WalletSheet = memo(function WalletSheet({
                         ]}
                       >
                         {activity.amount > 0
-                          ? `+${activity.amount}`
-                          : activity.amount}
+                          ? `+${formatCredits(activity.amount)}`
+                          : `-${formatCredits(Math.abs(activity.amount))}`}
                       </Text>
                     </View>
                   ))}

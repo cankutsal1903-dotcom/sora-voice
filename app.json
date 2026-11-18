@@ -42,7 +42,7 @@
     ],
     "android": {
       "package": "com.arescan.soravoice",
-      "versionCode": 16,
+      "versionCode": 17,
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.RECORD_AUDIO",
@@ -69,7 +69,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.arescan.soravoice",
-      "buildNumber": "16",
+      "buildNumber": "17",
       "supportsTablet": true,
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Sora, sesli odalarda konuşabilmen için mikrofonuna erişir.",
