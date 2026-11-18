@@ -392,89 +392,298 @@ const createRequestUuid = () => {
   });
 };
 const PROFILE_ITEM_APPEARANCE = {
-  frame_sky: { color: "#58A0F0", accent: "#DFF4FF", width: 3, style: "halo", frameScale: 1.46, asset: require("./assets/frames/frame_sky.png") },
-  frame_amber: { color: "#2F80ED", accent: "#F5C76B", width: 3, style: "gem", frameScale: 1.53, asset: require("./assets/frames/frame_amber.png") },
-  frame_lilac: { color: "#7C9ED4", accent: "#E7D9FF", width: 3, style: "orbit", frameScale: 1.49, asset: require("./assets/frames/frame_lilac.png") },
-  frame_family_silver: { color: "#4C9AFF", accent: "#E7F5FF", width: 3.5, style: "crown", frameScale: 1.45, asset: require("./assets/frames/frame_family_silver.png") },
-  frame_family_royal: { color: "#1D5FBF", accent: "#FFD978", width: 4, style: "royal", frameScale: 1.52, asset: require("./assets/frames/frame_family_royal.png") },
-  frame_flame: { color: "#F04B24", accent: "#FFD166", width: 4, style: "flame", frameScale: 1.66, animated: true, asset: require("./assets/frames/frame_flame.png") },
+  frame_sky: {
+    color: "#58A0F0",
+    accent: "#DFF4FF",
+    glowColor: "rgba(88,160,240,0.34)",
+    sparkColor: "#E0F7FF",
+    width: 3,
+    style: "halo",
+    tier: 1,
+    frameScale: 1.38,
+    overhang: { top: 0.18, bottom: 0.18, side: 0.18 },
+    asset: require("./assets/frames/frame_sky.png"),
+  },
+  frame_family_silver: {
+    color: "#4C9AFF",
+    accent: "#E7F5FF",
+    glowColor: "rgba(96,165,250,0.36)",
+    sparkColor: "#E8F6FF",
+    width: 3.5,
+    style: "crown",
+    tier: 1,
+    frameScale: 1.39,
+    overhang: { top: 0.18, bottom: 0.18, side: 0.18 },
+    asset: require("./assets/frames/frame_family_silver.png"),
+  },
+  frame_amber: {
+    color: "#E89B1E",
+    accent: "#FFE082",
+    glowColor: "rgba(255,168,24,0.48)",
+    sparkColor: "#FFF5BA",
+    width: 3,
+    style: "gem",
+    tier: 2,
+    animated: true,
+    frameScale: 1.45,
+    overhang: { top: 0.21, bottom: 0.21, side: 0.21 },
+    asset: require("./assets/frames/frame_amber.png"),
+  },
+  frame_lilac: {
+    color: "#9B6BFF",
+    accent: "#F3E5FF",
+    glowColor: "rgba(168,85,247,0.52)",
+    sparkColor: "#FAE8FF",
+    width: 3,
+    style: "orbit",
+    tier: 3,
+    animated: true,
+    frameScale: 1.41,
+    overhang: { top: 0.2, bottom: 0.2, side: 0.2 },
+    asset: require("./assets/frames/frame_lilac.png"),
+  },
+  frame_family_royal: {
+    color: "#1D5FBF",
+    accent: "#FFD978",
+    glowColor: "rgba(245,180,32,0.50)",
+    sparkColor: "#FFF4B8",
+    width: 4,
+    style: "royal",
+    tier: 3,
+    animated: true,
+    frameScale: 1.59,
+    overhang: { top: 0.28, bottom: 0.17, side: 0.22 },
+    asset: require("./assets/frames/frame_family_royal.png"),
+  },
+  frame_flame: {
+    color: "#F04B24",
+    accent: "#FFD166",
+    glowColor: "rgba(255,72,16,0.62)",
+    sparkColor: "#FFE885",
+    width: 4,
+    style: "flame",
+    tier: 4,
+    animated: true,
+    frameScale: 1.8,
+    overhang: { top: 0.38, bottom: 0.18, side: 0.24 },
+    asset: require("./assets/frames/frame_flame.png"),
+  },
   theme_ocean: { background: "#E7F2FF", accent: "#258FB8" },
   theme_midnight: { background: "#E8EEF8", accent: "#315FAD" },
   theme_sunrise: { background: "#F2F7FD", accent: "#5388CB" },
 };
 
-const ProfileFrame = memo(function ProfileFrame({ appearance, size, children, style }) {
-  const reducedMotion = useReducedMotion();
-  const phase = useRef(new Animated.Value(0)).current;
-  const styleKey = appearance?.style || null;
-  useEffect(() => {
-    phase.setValue(0);
-    if (!appearance || reducedMotion) return undefined;
-    const duration =
-      styleKey === "flame"
-        ? 720
-        : styleKey === "gem"
-          ? 1950
-          : styleKey === "royal"
-            ? 2000
-            : styleKey === "crown"
-              ? 2200
-              : styleKey === "orbit"
-                ? 2600
-                : 2300;
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(phase, {
-          toValue: 1,
-          duration,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(phase, {
-          toValue: 0,
-          duration,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [appearance, phase, reducedMotion, styleKey]);
+const sharedFrameOrbitAnim = new Animated.Value(0);
+const sharedFramePulseAnim = new Animated.Value(0);
+const sharedFrameRiseAnim = new Animated.Value(0);
+let activeAnimatedFrameWatchers = 0;
+let sharedFrameRafId = null;
+let sharedFrameLastTick = 0;
 
-  if (!appearance) return <View style={style}>{children}</View>;
-  const frameSize = Math.round(size * (appearance.frameScale || 1.48));
+const tickSharedFrameClock = () => {
+  if (activeAnimatedFrameWatchers <= 0) {
+    sharedFrameRafId = null;
+    return;
+  }
+  const now = Date.now();
+  if (now - sharedFrameLastTick >= 28) {
+    sharedFrameLastTick = now;
+    sharedFrameOrbitAnim.setValue((now % 4400) / 4400);
+    sharedFramePulseAnim.setValue(0.5 - 0.5 * Math.cos(((now % 920) / 920) * Math.PI * 2));
+    sharedFrameRiseAnim.setValue((now % 1250) / 1250);
+  }
+  sharedFrameRafId = requestAnimationFrame(tickSharedFrameClock);
+};
+
+const retainSharedFrameClock = () => {
+  activeAnimatedFrameWatchers += 1;
+  if (sharedFrameRafId === null) {
+    sharedFrameLastTick = 0;
+    sharedFrameRafId = requestAnimationFrame(tickSharedFrameClock);
+  }
+  return () => {
+    activeAnimatedFrameWatchers = Math.max(0, activeAnimatedFrameWatchers - 1);
+    if (activeAnimatedFrameWatchers === 0 && sharedFrameRafId !== null) {
+      cancelAnimationFrame(sharedFrameRafId);
+      sharedFrameRafId = null;
+    }
+  };
+};
+
+const FRAME_ORBIT_ANGLES_4 = [25, 115, 205, 295];
+const FRAME_ORBIT_ANGLES_6 = [15, 75, 135, 195, 255, 315];
+const FRAME_ORBIT_ANGLES_8 = [0, 45, 90, 135, 180, 225, 270, 315];
+
+const ProfileFrame = memo(function ProfileFrame({
+  appearance,
+  size,
+  children,
+  overlay = null,
+  compactHorizontal = false,
+  style,
+}) {
+  const styleKey = appearance?.style || null;
+  const tier = appearance?.tier || 0;
+  const shouldAnimate = Boolean(appearance && tier >= 1);
+
+  useEffect(() => {
+    if (!shouldAnimate) return undefined;
+    return retainSharedFrameClock();
+  }, [shouldAnimate]);
+
+  if (!appearance) {
+    return (
+      <View style={[{ alignItems: "center", justifyContent: "center" }, style]}>
+        <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
+          {children}
+          {overlay}
+        </View>
+      </View>
+    );
+  }
+
+  const overhang = appearance.overhang || { top: 0.18, bottom: 0.18, side: 0.18 };
+  const padTop = Math.ceil(size * overhang.top);
+  const padBottom = Math.ceil(size * overhang.bottom);
+  const padSide = compactHorizontal ? 2 : Math.ceil(size * overhang.side);
+  const frameSize = Math.round(size * (appearance.frameScale || 1.42));
   const offset = (size - frameSize) / 2;
-  const animatedTransform = reducedMotion
-    ? []
-    : styleKey === "flame"
-      ? [{ scale: phase.interpolate({ inputRange: [0, 1], outputRange: [0.968, 1.048] }) }]
-      : styleKey === "orbit"
-        ? [
-            { scale: phase.interpolate({ inputRange: [0, 1], outputRange: [0.985, 1.028] }) },
-            { rotate: phase.interpolate({ inputRange: [0, 1], outputRange: ["-4.5deg", "4.5deg"] }) },
-          ]
-        : styleKey === "gem"
-          ? [
-              { scale: phase.interpolate({ inputRange: [0, 1], outputRange: [0.988, 1.032] }) },
-              { rotate: phase.interpolate({ inputRange: [0, 1], outputRange: ["-1.5deg", "1.5deg"] }) },
-            ]
-          : styleKey === "crown" || styleKey === "royal"
-            ? [
-                { scale: phase.interpolate({ inputRange: [0, 1], outputRange: [0.988, 1.034] }) },
-                { translateY: phase.interpolate({ inputRange: [0, 1], outputRange: [0.8, -1.4] }) },
-              ]
-            : [{ scale: phase.interpolate({ inputRange: [0, 1], outputRange: [0.985, 1.028] }) }];
-  const animatedOpacity = reducedMotion
-    ? 1
-    : styleKey === "flame"
-      ? phase.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] })
-      : phase.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] });
+
+  const isFlame = styleKey === "flame";
+  const isOrbit = styleKey === "orbit";
+  const isRoyal = styleKey === "royal";
+  const isGem = styleKey === "gem";
+  const isExpensive = tier >= 2;
+
+  const mainScale = isFlame
+    ? sharedFramePulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.985, 1.045] })
+    : isOrbit || isRoyal
+      ? sharedFramePulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.99, 1.032] })
+      : isGem
+        ? sharedFramePulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.992, 1.026] })
+        : sharedFramePulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.996, 1.012] });
+
+  const mainRotate = isFlame
+    ? sharedFramePulseAnim.interpolate({ inputRange: [0, 1], outputRange: ["-2.2deg", "2.2deg"] })
+    : isOrbit
+      ? sharedFramePulseAnim.interpolate({ inputRange: [0, 1], outputRange: ["-3.6deg", "3.6deg"] })
+      : "0deg";
+
+  const secondaryScale = sharedFramePulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1.06, 0.97],
+  });
+  const secondaryRotate = sharedFramePulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["4.8deg", "-4.8deg"],
+  });
+  const secondaryOpacity = sharedFramePulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.68],
+  });
+
+  const auraScale = sharedFramePulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: isFlame ? [0.96, 1.14] : [0.98, 1.09],
+  });
+  const auraOpacity = sharedFramePulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: isFlame ? [0.34, 0.82] : [0.22, 0.58],
+  });
+
+  const orbitRotateCw = sharedFrameOrbitAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
+  const orbitRotateCcw = sharedFrameOrbitAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["360deg", "0deg"],
+  });
+  const sparkTwinkle = sharedFramePulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.45, 1],
+  });
+
+  const riseTranslateY = sharedFrameRiseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [2, -Math.max(8, Math.round(size * 0.18))],
+  });
+  const riseOpacity = sharedFrameRiseAnim.interpolate({
+    inputRange: [0, 0.25, 0.85, 1],
+    outputRange: [0, 1, 0.75, 0],
+  });
+
+  const orbitRadius = Math.round(size * (isFlame ? 0.57 : isRoyal ? 0.56 : 0.55));
+  const orbitBoxSize = orbitRadius * 2;
+  const orbitBoxOffset = (size - orbitBoxSize) / 2;
+  const orbitAngles = isFlame
+    ? FRAME_ORBIT_ANGLES_8
+    : isOrbit || isRoyal
+      ? FRAME_ORBIT_ANGLES_6
+      : FRAME_ORBIT_ANGLES_4;
+  const sparkDotSize = Math.max(5, Math.round(size * (isFlame ? 0.095 : 0.08)));
+  const auraSize = Math.round(size * (isFlame ? 1.18 : 1.12));
+  const auraOffset = (size - auraSize) / 2;
 
   return (
-    <View style={[{ alignItems: "center", justifyContent: "center", overflow: "visible" }, style]}>
-      <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center", overflow: "visible" }}>
+    <View
+      style={[
+        {
+          paddingTop: padTop,
+          paddingBottom: padBottom,
+          paddingHorizontal: padSide,
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "visible",
+        },
+        style,
+      ]}
+    >
+      <View
+        style={{
+          width: size,
+          height: size,
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "visible",
+        }}
+      >
+        {isExpensive ? (
+          <Animated.View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              width: auraSize,
+              height: auraSize,
+              left: auraOffset,
+              top: auraOffset,
+              borderRadius: auraSize / 2,
+              backgroundColor: appearance.glowColor || "rgba(255,140,0,0.4)",
+              opacity: auraOpacity,
+              transform: [{ scale: auraScale }],
+            }}
+          />
+        ) : null}
+
         {children}
+
+        {isFlame && appearance.asset ? (
+          <Animated.Image
+            pointerEvents="none"
+            source={appearance.asset}
+            resizeMode="contain"
+            style={{
+              position: "absolute",
+              width: frameSize,
+              height: frameSize,
+              left: offset,
+              top: offset,
+              opacity: secondaryOpacity,
+              transform: [{ scale: secondaryScale }, { rotate: secondaryRotate }],
+            }}
+          />
+        ) : null}
+
         {appearance.asset ? (
           <Animated.Image
             pointerEvents="none"
@@ -486,8 +695,7 @@ const ProfileFrame = memo(function ProfileFrame({ appearance, size, children, st
               height: frameSize,
               left: offset,
               top: offset,
-              opacity: animatedOpacity,
-              transform: animatedTransform,
+              transform: [{ scale: mainScale }, { rotate: mainRotate }],
             }}
           />
         ) : (
@@ -505,6 +713,135 @@ const ProfileFrame = memo(function ProfileFrame({ appearance, size, children, st
             }}
           />
         )}
+
+        {isExpensive && size >= 34 ? (
+          <Animated.View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              width: orbitBoxSize,
+              height: orbitBoxSize,
+              left: orbitBoxOffset,
+              top: orbitBoxOffset,
+              opacity: sparkTwinkle,
+              transform: [{ rotate: orbitRotateCw }],
+            }}
+          >
+            {orbitAngles.map((deg, idx) => {
+              const rad = (deg * Math.PI) / 180;
+              const cx = orbitRadius + Math.cos(rad) * orbitRadius - sparkDotSize / 2;
+              const cy = orbitRadius + Math.sin(rad) * orbitRadius - sparkDotSize / 2;
+              const isPrimarySpark = idx % 2 === 0;
+              return (
+                <View
+                  key={deg}
+                  style={{
+                    position: "absolute",
+                    left: cx,
+                    top: cy,
+                    width: sparkDotSize,
+                    height: sparkDotSize,
+                    borderRadius: sparkDotSize / 2,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: isFlame
+                      ? isPrimarySpark
+                        ? "#FFF3B0"
+                        : "#FF6B00"
+                      : appearance.sparkColor || "#FFFFFF",
+                    shadowColor: appearance.accent || "#FFFFFF",
+                    shadowOpacity: 0.95,
+                    shadowRadius: 4,
+                    elevation: 3,
+                  }}
+                >
+                  {isPrimarySpark && size >= 52 ? (
+                    <Ionicons
+                      name={isFlame ? "flame" : "sparkles"}
+                      size={Math.max(8, Math.round(sparkDotSize * 1.15))}
+                      color={isFlame ? "#FFE066" : "#FFFFFF"}
+                    />
+                  ) : null}
+                </View>
+              );
+            })}
+          </Animated.View>
+        ) : null}
+
+        {(isOrbit || isFlame) && size >= 44 ? (
+          <Animated.View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              width: orbitBoxSize + 8,
+              height: orbitBoxSize + 8,
+              left: orbitBoxOffset - 4,
+              top: orbitBoxOffset - 4,
+              transform: [{ rotate: orbitRotateCcw }],
+            }}
+          >
+            {FRAME_ORBIT_ANGLES_4.map((deg) => {
+              const r2 = orbitRadius + 4;
+              const rad = ((deg + 45) * Math.PI) / 180;
+              const d2 = Math.max(4, Math.round(sparkDotSize * 0.72));
+              return (
+                <View
+                  key={deg}
+                  style={{
+                    position: "absolute",
+                    left: r2 + Math.cos(rad) * r2 - d2 / 2,
+                    top: r2 + Math.sin(rad) * r2 - d2 / 2,
+                    width: d2,
+                    height: d2,
+                    borderRadius: d2 / 2,
+                    backgroundColor: isFlame ? "#FFD166" : "#F5D0FE",
+                  }}
+                />
+              );
+            })}
+          </Animated.View>
+        ) : null}
+
+        {isFlame && size >= 42 ? (
+          <Animated.View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              top: -Math.round(size * 0.22),
+              left: 0,
+              right: 0,
+              flexDirection: "row",
+              justifyContent: "center",
+              gap: Math.max(6, Math.round(size * 0.14)),
+              opacity: riseOpacity,
+              transform: [{ translateY: riseTranslateY }],
+            }}
+          >
+            <View
+              style={{
+                width: Math.max(4, Math.round(size * 0.06)),
+                height: Math.max(4, Math.round(size * 0.06)),
+                borderRadius: 99,
+                backgroundColor: "#FF9F1C",
+              }}
+            />
+            <Ionicons
+              name="flame"
+              size={Math.max(10, Math.round(size * 0.16))}
+              color="#FFF3B0"
+            />
+            <View
+              style={{
+                width: Math.max(4, Math.round(size * 0.06)),
+                height: Math.max(4, Math.round(size * 0.06)),
+                borderRadius: 99,
+                backgroundColor: "#FF5400",
+              }}
+            />
+          </Animated.View>
+        ) : null}
+
+        {overlay}
       </View>
     </View>
   );
@@ -2629,13 +2966,17 @@ function Profile({
                 pressed && styles.profileHomePressed,
               ]}
             >
-              <ProfileFrame appearance={homeFrameAppearance} size={68} style={styles.profileHomeAvatarWrap}>
+              <ProfileFrame
+                appearance={homeFrameAppearance}
+                size={homeFrameAppearance ? 60 : 68}
+                style={styles.profileHomeAvatarWrap}
+              >
                 <Avatar
                   label={(profile.name || "S").charAt(0).toUpperCase()}
                   color={profile.color}
                   uri={profile.avatarUrl}
-                  size={68}
-                  bordered
+                  size={homeFrameAppearance ? 60 : 68}
+                  bordered={!homeFrameAppearance}
                   circle
                 />
               </ProfileFrame>
@@ -3156,21 +3497,27 @@ function ProfileDetailSheet({
                 <Text style={styles.profileDetailBrandCaption}>SESİNİ PAYLAŞ</Text>
               </View>
             </View>
-            <View style={styles.profileDetailCoverBottom}>
+            <View
+              style={[
+                styles.profileDetailCoverBottom,
+                frameAppearance && { left: 16, bottom: -22 },
+              ]}
+            >
               <ProfileFrame
                 appearance={frameAppearance}
-                size={88}
-                style={[
-                  styles.profileDetailAvatarRing,
-                  frameAppearance?.asset && { backgroundColor: "transparent", borderWidth: 0 },
-                ]}
+                size={frameAppearance ? 80 : 88}
+                style={
+                  frameAppearance
+                    ? { padding: 0, backgroundColor: "transparent", borderWidth: 0 }
+                    : styles.profileDetailAvatarRing
+                }
               >
                 <Avatar
                   label={name.charAt(0).toUpperCase()}
                   color={color}
                   uri={person.avatarUrl || person.avatar_url || null}
-                  size={88}
-                  bordered
+                  size={frameAppearance ? 80 : 88}
+                  bordered={!frameAppearance}
                   circle
                 />
               </ProfileFrame>
@@ -3186,6 +3533,7 @@ function ProfileDetailSheet({
           <View
             style={[
               styles.profileDetailIdentity,
+              frameAppearance && { paddingTop: 38 },
               themeAppearance?.background
                 ? { backgroundColor: themeAppearance.background }
                 : null,
@@ -5738,7 +6086,7 @@ const RoomMessageRow = memo(function RoomMessageRow({
           ]}
         >
           {item.system ? (
-            item.text
+            item.text === "Hoşgeldin" ? "Hoş geldin" : item.text
           ) : (
             <>
               <Text style={styles.messageUser}>{item.user}</Text> {item.text}
@@ -7648,6 +7996,35 @@ function Room({
           ? profile?.activeFrameId || participant.activeFrameId
           : participant.activeFrameId || participantById.get(participant.userId)?.activeFrameId
       ];
+    const seatedAvatarSize = seatFrameAppearance
+      ? isHostSeat
+        ? 76
+        : compactStage
+          ? 54
+          : 62
+      : avatarSize;
+    const seatBadges = (
+      <>
+        {participant.microphoneEnabled ? (
+          <View style={[styles.roomMicOnBadge, { zIndex: 12, elevation: 6 }]}>
+            <Ionicons name="mic" size={9} color="#11131A" />
+          </View>
+        ) : (
+          <View style={[styles.roomMicOffBadge, { zIndex: 12, elevation: 6 }]}>
+            <Ionicons name="mic-off" size={9} color="rgba(255,255,255,0.85)" />
+          </View>
+        )}
+        {participant.role === "host" ? (
+          <View style={[styles.roomSpeakerCrown, { zIndex: 12, elevation: 6 }]}>
+            <Ionicons name="sparkles" size={9} color="#11131A" />
+          </View>
+        ) : participant.role === "moderator" ? (
+          <View style={[styles.roomSpeakerCrown, styles.roomAdminBadge, { zIndex: 12, elevation: 6 }]}>
+            <Ionicons name="shield-checkmark" size={9} color="#11131A" />
+          </View>
+        ) : null}
+      </>
+    );
     return (
       <Pressable
         style={slotStyle}
@@ -7660,16 +8037,23 @@ function Room({
       >
         <View style={styles.roomAvatarWrap}>
           {participant.isSpeaking ? (
-            <SpeakingRing size={avatarSize + 14} color={COLORS.primary} />
+            <SpeakingRing size={seatedAvatarSize + 14} color={COLORS.primary} />
           ) : null}
-          <ProfileFrame appearance={seatFrameAppearance} size={avatarSize}>
+          <ProfileFrame
+            appearance={seatFrameAppearance}
+            size={seatedAvatarSize}
+            compactHorizontal={!isHostSeat}
+            overlay={seatBadges}
+          >
             <View
               style={[
                 styles.roomSpeakerAvatar,
-                { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 },
+                { width: seatedAvatarSize, height: seatedAvatarSize, borderRadius: seatedAvatarSize / 2 },
                 isHostSeat && styles.roomHostStageAvatar,
+                isHostSeat && { width: seatedAvatarSize, height: seatedAvatarSize, borderRadius: seatedAvatarSize / 2 },
                 participant.role === "host" && styles.roomSpeakerAvatarHost,
                 participant.microphoneEnabled && styles.roomSpeakerAvatarActive,
+                seatFrameAppearance?.asset && { borderWidth: 0 },
               ]}
             >
               <LinearGradient
@@ -7678,40 +8062,22 @@ function Room({
                     ? ["#8CC8FF", "#347CE0"]
                     : ["#527DB8", "#203D66"]
                 }
-                style={[StyleSheet.absoluteFill, { borderRadius: avatarSize / 2 }]}
+                style={[StyleSheet.absoluteFill, { borderRadius: seatedAvatarSize / 2 }]}
               />
               {participant.avatarUrl ? (
                 <Image
                   source={{ uri: participant.avatarUrl }}
-                  style={[StyleSheet.absoluteFill, { borderRadius: (avatarSize - 4) / 2 }]}
+                  style={[StyleSheet.absoluteFill, { borderRadius: seatedAvatarSize / 2 }]}
                 />
               ) : (
                 <Text style={[styles.roomSpeakerInitial, isHostSeat && styles.roomHostStageInitial]}>
                   {participant.name?.charAt(0)?.toUpperCase() || "?"}
                 </Text>
               )}
-              {participant.microphoneEnabled ? (
-                <View style={styles.roomMicOnBadge}>
-                  <Ionicons name="mic" size={9} color="#11131A" />
-                </View>
-              ) : (
-                <View style={styles.roomMicOffBadge}>
-                  <Ionicons name="mic-off" size={9} color="rgba(255,255,255,0.7)" />
-                </View>
-              )}
             </View>
           </ProfileFrame>
-          {participant.role === "host" ? (
-            <View style={styles.roomSpeakerCrown}>
-              <Ionicons name="sparkles" size={9} color="#11131A" />
-            </View>
-          ) : participant.role === "moderator" ? (
-            <View style={[styles.roomSpeakerCrown, styles.roomAdminBadge]}>
-              <Ionicons name="shield-checkmark" size={9} color="#11131A" />
-            </View>
-          ) : null}
         </View>
-        <Text style={styles.roomSpeakerName} numberOfLines={1}>
+        <Text style={[styles.roomSpeakerName, seatFrameAppearance && { marginTop: 2 }]} numberOfLines={1}>
           {isHostSeat ? `1 · ${participant.name}` : participant.name}
         </Text>
         {!isHostSeat ? (
@@ -8364,22 +8730,27 @@ function ProfileEditor({
               style={styles.avatarEditPress}
               accessibilityLabel="Profil resmini değiştir"
             >
-              <ProfileFrame appearance={editorFrameAppearance} size={84}>
+              <ProfileFrame
+                appearance={editorFrameAppearance}
+                size={editorFrameAppearance ? 74 : 84}
+                overlay={
+                  <View style={[styles.avatarEditBadge, { zIndex: 20, elevation: 8 }]}>
+                    {avatarBusy ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Ionicons name="camera" size={16} color="#FFFFFF" />
+                    )}
+                  </View>
+                }
+              >
                 <Avatar
                   label={(name || profile.name || "S").charAt(0).toUpperCase()}
                   color={profile.color}
                   uri={avatarUrl}
-                  size={84}
+                  size={editorFrameAppearance ? 74 : 84}
                   circle
                 />
               </ProfileFrame>
-              <View style={styles.avatarEditBadge}>
-                {avatarBusy ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Ionicons name="camera" size={16} color="#FFFFFF" />
-                )}
-              </View>
             </Pressable>
             <View style={{ flex: 1, gap: 6 }}>
               <Pressable onPress={pickAvatar} disabled={avatarBusy} style={styles.avatarEditButton}>
@@ -8452,7 +8823,6 @@ function ProfileEditor({
                     <ProfileFrame
                       appearance={PROFILE_ITEM_APPEARANCE[activePreview.id]}
                       size={44}
-                      style={{ marginHorizontal: 6, marginVertical: 4 }}
                     >
                       <Avatar
                         label={(name || profile.name || "S").charAt(0).toUpperCase()}
@@ -8502,31 +8872,37 @@ function ProfileEditor({
                         { marginRight: 8, alignItems: "center", minWidth: 118, paddingVertical: 12 },
                       ]}
                     >
-                      {item.item_type === "frame" && itemAppearance ? (
-                        <View style={{ marginVertical: 6 }}>
-                          <ProfileFrame appearance={itemAppearance} size={36}>
+                      <View
+                        style={{
+                          height: 76,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          marginBottom: 4,
+                        }}
+                      >
+                        {item.item_type === "frame" && itemAppearance ? (
+                          <ProfileFrame appearance={itemAppearance} size={40}>
                             <Avatar
                               label={(name || profile.name || "S").charAt(0).toUpperCase()}
                               color={profile.color}
                               uri={avatarUrl}
-                              size={36}
+                              size={40}
                               circle
                             />
                           </ProfileFrame>
-                        </View>
-                      ) : (
-                        <View
-                          style={{
-                            width: 36,
-                            height: 36,
-                            borderRadius: 18,
-                            marginVertical: 6,
-                            backgroundColor: itemAppearance?.background || "#E7F2FF",
-                            borderWidth: 2,
-                            borderColor: itemAppearance?.accent || COLORS.primary,
-                          }}
-                        />
-                      )}
+                        ) : (
+                          <View
+                            style={{
+                              width: 42,
+                              height: 42,
+                              borderRadius: 21,
+                              backgroundColor: itemAppearance?.background || "#E7F2FF",
+                              borderWidth: 2.5,
+                              borderColor: itemAppearance?.accent || COLORS.primary,
+                            }}
+                          />
+                        )}
+                      </View>
                       <Text
                         style={[
                           styles.transferOptionText,
@@ -8535,7 +8911,15 @@ function ProfileEditor({
                       >
                         {item.name}
                       </Text>
-                      <Text style={[styles.walletActivityTime, { textAlign: "center" }]}>{subtitle}</Text>
+                      <Text
+                        style={[
+                          styles.walletActivityTime,
+                          { textAlign: "center" },
+                          previewItemId === item.id && { color: "rgba(255,255,255,0.88)" },
+                        ]}
+                      >
+                        {subtitle}
+                      </Text>
                     </Pressable>
                   );
                 })}
@@ -8544,7 +8928,7 @@ function ProfileEditor({
                 <Pressable
                   disabled={Boolean(itemBusy)}
                   onPress={() => handleProfileItem(activePreview)}
-                  style={styles.transferCreateButton}
+                  style={[styles.transferCreateButton, { marginBottom: 10 }]}
                 >
                   <Text style={styles.transferCreateButtonText}>
                     {isEquippedItem(activePreview)
@@ -10968,7 +11352,13 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  avatarEditRow: { flexDirection: "row", alignItems: "center", gap: 16, marginTop: 6, marginBottom: 8 },
+  avatarEditRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    marginTop: 8,
+    marginBottom: 14,
+  },
   avatarEditPress: { position: "relative" },
   avatarEditBadge: {
     position: "absolute",
@@ -11967,7 +12357,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.text,
   },
   createSubmitText: {
-    color: COLORS.primary,
+    color: COLORS.primaryInk,
     fontSize: 15,
     fontWeight: "900",
   },
