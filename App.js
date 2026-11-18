@@ -468,9 +468,6 @@ const PROFILE_ITEM_APPEARANCE = {
     overhang: { top: 0.38, bottom: 0.18, side: 0.24 },
     asset: require("./assets/frames/frame_flame.png"),
   },
-  theme_ocean: { background: "#E7F2FF", accent: "#258FB8" },
-  theme_midnight: { background: "#E8EEF8", accent: "#315FAD" },
-  theme_sunrise: { background: "#F2F7FD", accent: "#5388CB" },
 };
 
 const sharedFrameOrbitAnim = new Animated.Value(0);
@@ -2668,7 +2665,7 @@ const UserLevelSheet = memo(function UserLevelSheet({
                       <Text numberOfLines={1} style={styles.userTierRange}>
                         {tier.rangeLabel}
                       </Text>
-                      <Text numberOfLines={1} style={styles.userTierTitle}>
+                      <Text numberOfLines={2} style={styles.userTierTitle}>
                         {tier.title}
                       </Text>
                       <Text style={[styles.userTierState, unlocked && { color: COLORS.primary }]}>
@@ -3193,74 +3190,82 @@ function Profile({
         )}
 
         <Text style={styles.pfSection}>SEVİYE ROZETLERİ</Text>
-        <View style={styles.pfBadgeRow}>
-          {LEVEL_BADGE_TIERS.map((tier) => {
-            const unlocked = level >= tier.minLevel;
-            return (
-              <Pressable
-                key={tier.key}
-                onPress={() => setLevelSheetOpen(true)}
-                style={[
-                  styles.pfBadge,
-                  styles.pfBadgeGridLevel,
-                  unlocked && { borderColor: `${tier.borderColor}66` },
-                  !unlocked && { opacity: 0.62 },
-                ]}
-              >
-                <View style={{ marginBottom: 6 }}>
-                  <SoraLevelCrest level={tier.minLevel} size={46} locked={!unlocked} />
-                  {!unlocked ? (
-                    <View style={styles.pfBadgeLock}>
-                      <Ionicons name="lock-closed" size={10} color="#FFFFFF" />
-                    </View>
-                  ) : null}
-                </View>
-                <Text
-                  style={[styles.pfBadgeText, !unlocked && { color: COLORS.muted }]}
-                  numberOfLines={1}
-                >
-                  {tier.title}
-                </Text>
-                <Text style={styles.pfBadgeHint} numberOfLines={1}>
-                  {unlocked ? tier.rangeLabel : `Sv. ${tier.minLevel}`}
-                </Text>
-              </Pressable>
-            );
-          })}
+        <View style={styles.pfBadgeGridStack}>
+          {[LEVEL_BADGE_TIERS.slice(0, 3), LEVEL_BADGE_TIERS.slice(3, 6)].map(
+            (row, rowIdx) => (
+              <View key={`lvl-row-${rowIdx}`} style={styles.pfBadgeRow}>
+                {row.map((tier) => {
+                  const unlocked = level >= tier.minLevel;
+                  return (
+                    <Pressable
+                      key={tier.key}
+                      onPress={() => setLevelSheetOpen(true)}
+                      style={[
+                        styles.pfBadge,
+                        unlocked && { borderColor: `${tier.borderColor}66` },
+                        !unlocked && { opacity: 0.62 },
+                      ]}
+                    >
+                      <View style={{ marginBottom: 4, position: "relative" }}>
+                        <SoraLevelCrest level={tier.minLevel} size={50} locked={!unlocked} />
+                        {!unlocked ? (
+                          <View style={styles.pfBadgeLock}>
+                            <Ionicons name="lock-closed" size={10} color="#FFFFFF" />
+                          </View>
+                        ) : null}
+                      </View>
+                      <Text
+                        style={[styles.pfBadgeText, !unlocked && { color: COLORS.muted }]}
+                        numberOfLines={2}
+                      >
+                        {tier.title}
+                      </Text>
+                      <Text style={styles.pfBadgeHint} numberOfLines={1}>
+                        {unlocked ? tier.rangeLabel : `Sv. ${tier.minLevel}`}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ),
+          )}
         </View>
 
         <Text style={styles.pfSection}>ETKİNLİK ROZETLERİ</Text>
-        <View style={styles.pfBadgeRow}>
-          {badges.map((badge) => (
-            <View
-              key={badge.id}
-              style={[
-                styles.pfBadge,
-                styles.pfBadgeGridAchievement,
-                badge.unlocked && { borderColor: `${badge.tint}55` },
-              ]}
-            >
-              <View style={styles.pfBadgeMedal}>
-                <SoraAchievementBadge
-                  badgeId={badge.id}
-                  size={54}
-                  locked={!badge.unlocked}
-                />
-                {!badge.unlocked ? (
-                  <View style={styles.pfBadgeLock}>
-                    <Ionicons name="lock-closed" size={10} color="#FFFFFF" />
+        <View style={styles.pfBadgeGridStack}>
+          {[badges.slice(0, 2), badges.slice(2, 4)].map((row, rowIdx) => (
+            <View key={`ach-row-${rowIdx}`} style={styles.pfBadgeRow}>
+              {row.map((badge) => (
+                <View
+                  key={badge.id}
+                  style={[
+                    styles.pfBadge,
+                    badge.unlocked && { borderColor: `${badge.tint}55` },
+                  ]}
+                >
+                  <View style={styles.pfBadgeMedal}>
+                    <SoraAchievementBadge
+                      badgeId={badge.id}
+                      size={54}
+                      locked={!badge.unlocked}
+                    />
+                    {!badge.unlocked ? (
+                      <View style={styles.pfBadgeLock}>
+                        <Ionicons name="lock-closed" size={10} color="#FFFFFF" />
+                      </View>
+                    ) : null}
                   </View>
-                ) : null}
-              </View>
-              <Text
-                style={[styles.pfBadgeText, !badge.unlocked && { color: COLORS.muted }]}
-                numberOfLines={1}
-              >
-                {badge.title}
-              </Text>
-              <Text style={styles.pfBadgeHint} numberOfLines={1}>
-                {badge.unlocked ? "Kazanıldı" : badge.hint}
-              </Text>
+                  <Text
+                    style={[styles.pfBadgeText, !badge.unlocked && { color: COLORS.muted }]}
+                    numberOfLines={2}
+                  >
+                    {badge.title}
+                  </Text>
+                  <Text style={styles.pfBadgeHint} numberOfLines={1}>
+                    {badge.unlocked ? "Kazanıldı" : badge.hint}
+                  </Text>
+                </View>
+              ))}
             </View>
           ))}
         </View>
@@ -8619,7 +8624,7 @@ function ProfileEditor({
     if (!visible || !supabase) return;
     listProfileItems()
       .then(({ items, ownedIds }) => {
-        setProfileItems(items || []);
+        setProfileItems((items || []).filter((item) => item.item_type === "frame"));
         setOwnedItemIds(ownedIds || []);
       })
       .catch(() => {
@@ -8798,7 +8803,7 @@ function ProfileEditor({
           />
           {profileItems.length > 0 ? (
             <>
-              <Text style={styles.fieldLabel}>ÇERÇEVE VE PROFİL TEMASI</Text>
+              <Text style={styles.fieldLabel}>PROFİL ÇERÇEVELERİ</Text>
               {activePreview ? (
                 <View
                   style={{
@@ -8936,7 +8941,7 @@ function ProfileEditor({
                         ? "Çerçeveyi kaldır"
                         : "Temayı kaldır"
                       : ownedItemIds.includes(activePreview.id)
-                        ? "Profili etkinleştir"
+                        ? "Çerçeveyi etkinleştir"
                         : activePreview.purchasable === false
                           ? "Aile seviye ödülü"
                           : `Satın al · ${activePreview.cost.toLocaleString("tr-TR")} kredi`}
@@ -16706,29 +16711,21 @@ const styles = StyleSheet.create({
     marginTop: 26,
     marginBottom: 10,
   },
+  pfBadgeGridStack: {
+    gap: 10,
+  },
   pfBadgeRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    rowGap: 10,
-    gap: 8,
-  },
-  pfBadgeGridLevel: {
-    flexGrow: 0,
-    flexShrink: 0,
-    width: "31.5%",
-  },
-  pfBadgeGridAchievement: {
-    flexGrow: 0,
-    flexShrink: 0,
-    width: "48.2%",
+    gap: 10,
   },
   pfBadge: {
     flex: 1,
+    minWidth: 0,
     alignItems: "center",
-    gap: 8,
+    justifyContent: "space-between",
+    gap: 6,
     paddingVertical: 14,
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     borderRadius: 18,
     backgroundColor: COLORS.surface,
     borderWidth: 1,
@@ -16773,8 +16770,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  pfBadgeHint: { color: COLORS.muted, fontSize: 10, fontWeight: "600", marginTop: -4 },
-  pfBadgeText: { color: COLORS.text, fontSize: 12, fontWeight: "800" },
+  pfBadgeHint: { color: COLORS.muted, fontSize: 10, fontWeight: "700", textAlign: "center" },
+  pfBadgeText: {
+    color: COLORS.text,
+    fontSize: 11,
+    lineHeight: 14,
+    minHeight: 28,
+    fontWeight: "800",
+    textAlign: "center",
+  },
   pfActivityRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -17158,7 +17162,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   userTierCard: {
-    width: 112,
+    width: 126,
     alignItems: "center",
     paddingVertical: 12,
     paddingHorizontal: 8,
@@ -17179,9 +17183,11 @@ const styles = StyleSheet.create({
   },
   userTierTitle: {
     color: COLORS.text,
-    fontSize: 12,
+    fontSize: 11,
+    lineHeight: 14,
+    minHeight: 28,
     fontWeight: "900",
-    marginTop: 2,
+    marginTop: 3,
     textAlign: "center",
   },
   userTierState: {
