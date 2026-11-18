@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { KeyboardSafeView } from "../ui/useKeyboardInset";
 
 export function PasswordResetSheet({ visible, onDismiss, onUpdatePassword }) {
+  const insets = useSafeAreaInsets();
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -17,6 +19,10 @@ export function PasswordResetSheet({ visible, onDismiss, onUpdatePassword }) {
       setSubmitting(false);
     }
   }, [visible]);
+
+  const safeDismiss = () => {
+    if (!submitting) onDismiss?.();
+  };
 
   const submit = async () => {
     if (password.length < 6) {
@@ -33,18 +39,19 @@ export function PasswordResetSheet({ visible, onDismiss, onUpdatePassword }) {
       await onUpdatePassword(password);
     } catch (nextError) {
       setError(nextError?.message || "Parola güncellenemedi.");
+    } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <Modal transparent visible={visible} animationType="slide" onRequestClose={onDismiss}>
+    <Modal transparent visible={visible} animationType="slide" onRequestClose={safeDismiss}>
       <KeyboardSafeView style={styles.overlay}>
-        <Pressable style={styles.dismiss} onPress={onDismiss} />
-        <View style={styles.sheet}>
+        <Pressable style={styles.dismiss} onPress={safeDismiss} />
+        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
           <View style={styles.handle} />
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <View style={styles.icon}><Ionicons name="key-outline" size={24} color="#111820" /></View>
+            <View style={styles.icon}><Ionicons name="key-outline" size={24} color="#FFFFFF" /></View>
             <Text style={styles.kicker}>GÜVENLİK DOĞRULAMASI</Text>
             <Text style={styles.title}>Yeni parolanı belirle.</Text>
             <Text style={styles.subtitle}>Bu bağlantı ile hesabının parolasını güvenle yenileyebilirsin.</Text>

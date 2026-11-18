@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AudioSession, registerGlobals } from "@livekit/react-native";
 import { DisconnectReason, Room, RoomEvent } from "livekit-client";
 import { supabase } from "../auth/supabase";
 import { loadAgoraModule } from "./loadAgoraModule";
-
-registerGlobals();
+import { AudioSession } from "./loadLiveKitNative";
 
 const initialState = {
   status: "idle",
@@ -51,10 +49,18 @@ export function useLiveVoiceRoom({
   const autoRetryCountRef = useRef(0);
   const excludeProvidersRef = useRef([]);
   const intentionalDisconnectRef = useRef(false);
+  const accessTokenRef = useRef(accessToken);
+  const profileNameRef = useRef(profile?.name || "Sora kullanıcısı");
+  const startWithMicrophoneRef = useRef(Boolean(startWithMicrophone));
+  accessTokenRef.current = accessToken;
+  profileNameRef.current = profile?.name || "Sora kullanıcısı";
+  startWithMicrophoneRef.current = Boolean(startWithMicrophone);
+
   const [state, setState] = useState(initialState);
   const [connectionAttempt, setConnectionAttempt] = useState(0);
   const tokenServerUrl = process.env.EXPO_PUBLIC_TOKEN_SERVER_URL?.replace(/\/$/, "");
   const enabled = Boolean(tokenServerUrl);
+  const hasAuthToken = Boolean(accessToken);
 
   useEffect(() => {
     autoRetryCountRef.current = 0;
@@ -64,13 +70,14 @@ export function useLiveVoiceRoom({
 
   const sendHeartbeat = useCallback(
     async ({ ended = false, failedProvider = null, errorText = null } = {}) => {
-      if (!tokenServerUrl || !accessToken || !roomName) return;
+      const token = accessTokenRef.current;
+      if (!tokenServerUrl || !token || !roomName) return;
       try {
         await fetch(`${tokenServerUrl}/voice/heartbeat`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             roomId: roomName,
@@ -83,7 +90,7 @@ export function useLiveVoiceRoom({
         // Kalp atışı ağ hatası ses akışını kesmez.
       }
     },
-    [accessToken, roomName, tokenServerUrl],
+    [roomName, tokenServerUrl],
   );
 
   useEffect(() => {
@@ -91,7 +98,18 @@ export function useLiveVoiceRoom({
     let tokenFetchController;
     let retryTimer;
     let heartbeatTimer;
+    let stableResetTimer;
     let cleanupAdapter = () => Promise.resolve();
+
+    const scheduleStableReset = () => {
+      clearTimeout(stableResetTimer);
+      stableResetTimer = setTimeout(() => {
+        if (active && !intentionalDisconnectRef.current) {
+          autoRetryCountRef.current = 0;
+          excludeProvidersRef.current = [];
+        }
+      }, 20_000);
+    };
 
     const startHeartbeatLoop = () => {
       clearInterval(heartbeatTimer);
@@ -148,10 +166,10 @@ export function useLiveVoiceRoom({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `Bearer ${accessTokenRef.current || ""}`,
         },
         body: JSON.stringify({
-          name: profile.name,
+          name: profileNameRef.current,
           roomName,
           excludeProviders: excludeProvidersRef.current,
         }),
@@ -202,13 +220,15 @@ export function useLiveVoiceRoom({
           };
         });
         const canPublish = Boolean(local.permissions?.canPublish);
+        const seatNow = parseSeat(local);
         setState((current) => ({
           ...current,
           participantCount: participants.length,
           participants,
           canPublish,
-          localSeat: parseSeat(local),
-          microphoneEnabled: canPublish ? current.microphoneEnabled : false,
+          localSeat: seatNow,
+          mutedByModerator: seatNow !== null && current.role !== "host" ? !canPublish : false,
+          microphoneEnabled: canPublish ? Boolean(local.isMicrophoneEnabled) : false,
         }));
       };
 
@@ -262,7 +282,13 @@ export function useLiveVoiceRoom({
       });
       connectedRoom.on(RoomEvent.Disconnected, (reason) => {
         if (!active) return;
+        clearTimeout(stableResetTimer);
         if (intentionalDisconnectRef.current || NON_RETRYABLE_REASONS.has(reason)) {
+          clearInterval(heartbeatTimer);
+          AudioSession.stopAudioSession().catch(() => undefined);
+          if (reason === DisconnectReason.PARTICIPANT_REMOVED) {
+            sendHeartbeat({ ended: true });
+          }
           setState((current) => ({
             ...current,
             status: "disconnected",
@@ -296,9 +322,8 @@ export function useLiveVoiceRoom({
       };
 
       cleanupAdapter = async () => {
-        participantEvents.forEach((event) => connectedRoom.off(event, updateParticipants));
-        connectedRoom.off(RoomEvent.ParticipantPermissionsChanged, handlePermissionsChanged);
-        connectedRoom.off(RoomEvent.TrackSubscribed, handleTrackSubscribed);
+        clearTimeout(stableResetTimer);
+        connectedRoom.removeAllListeners();
         await connectedRoom.disconnect().catch(() => undefined);
         AudioSession.stopAudioSession().catch(() => undefined);
       };
@@ -317,13 +342,18 @@ export function useLiveVoiceRoom({
         return;
       }
 
-      autoRetryCountRef.current = 0;
-      excludeProvidersRef.current = [];
+      scheduleStableReset();
       const canPublishNow = Boolean(
         connectedRoom.localParticipant.permissions?.canPublish ?? payload.canPublish,
       );
-      if (startWithMicrophone && canPublishNow) {
-        await connectedRoom.localParticipant.setMicrophoneEnabled(true);
+      let micStarted = false;
+      if (startWithMicrophoneRef.current && canPublishNow) {
+        try {
+          await connectedRoom.localParticipant.setMicrophoneEnabled(true);
+          micStarted = true;
+        } catch {
+          micStarted = false;
+        }
       }
       setState({
         ...initialState,
@@ -333,7 +363,7 @@ export function useLiveVoiceRoom({
         mutedByModerator: Boolean(payload.muted),
         canPublish: canPublishNow,
         localSeat: typeof payload.seat === "number" ? payload.seat : parseSeat(connectedRoom.localParticipant),
-        microphoneEnabled: Boolean(startWithMicrophone && canPublishNow),
+        microphoneEnabled: micStarted,
         error: null,
       });
       applySpeakerState();
@@ -461,7 +491,7 @@ export function useLiveVoiceRoom({
 
       const channel = supabase
         ? supabase
-            .channel(`voice-roster-${roomName}-${userId}`)
+            .channel(`voice-roster-${roomName}-${userId}-${Date.now().toString(36)}`)
             .on(
               "postgres_changes",
               { event: "*", schema: "public", table: "room_members", filter: `room_id=eq.${roomName}` },
@@ -528,6 +558,10 @@ export function useLiveVoiceRoom({
         },
         onRemoved: () => {
           intentionalDisconnectRef.current = true;
+          clearTimeout(stableResetTimer);
+          clearInterval(heartbeatTimer);
+          rosterSync.dispose();
+          sendHeartbeat({ ended: true });
           try {
             engine.leaveChannel();
           } catch {
@@ -549,8 +583,7 @@ export function useLiveVoiceRoom({
         onJoinChannelSuccess: () => {
           joinedResolve?.();
         },
-        onUserJoined: (_conn, remoteUid) => {
-          remoteSpeakingUids.add(Number(remoteUid));
+        onUserJoined: () => {
           rosterSync.refresh();
         },
         onUserOffline: (_conn, remoteUid) => {
@@ -561,6 +594,13 @@ export function useLiveVoiceRoom({
           if (muted) remoteSpeakingUids.delete(Number(remoteUid));
           else remoteSpeakingUids.add(Number(remoteUid));
           rosterSync.refresh();
+        },
+        onConnectionStateChanged: (_conn, stateCode) => {
+          // 5 = CONNECTION_STATE_FAILED
+          if (stateCode === 5 && active && !intentionalDisconnectRef.current) {
+            clearTimeout(stableResetTimer);
+            scheduleAutoRetry("Ses bağlantısı kesildi. Yeniden deneyebilirsin.", "agora");
+          }
         },
         onAudioVolumeIndication: (_conn, speakers) => {
           if (!active || !Array.isArray(speakers)) return;
@@ -590,6 +630,7 @@ export function useLiveVoiceRoom({
       };
 
       cleanupAdapter = async () => {
+        clearTimeout(stableResetTimer);
         rosterSync.dispose();
         try {
           engine.unregisterEventHandler(eventHandler);
@@ -611,7 +652,7 @@ export function useLiveVoiceRoom({
       engine.enableAudioVolumeIndication(250, 3, true);
 
       const canPublishNow = Boolean(payload.canPublish);
-      const wantMic = Boolean(startWithMicrophone && canPublishNow);
+      const wantMic = Boolean(startWithMicrophoneRef.current && canPublishNow);
       engine.setClientRole(canPublishNow ? 1 : 2);
       engine.enableLocalAudio(wantMic);
       engine.muteLocalAudioStream(!wantMic);
@@ -630,12 +671,17 @@ export function useLiveVoiceRoom({
         throw new Error(`Agora kanalına katılınamadı (${joinCode}).`);
       }
 
-      await Promise.race([
-        joinedPromise,
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Agora bağlantı zaman aşımı.")), 10_000),
-        ),
-      ]);
+      let joinTimer;
+      try {
+        await Promise.race([
+          joinedPromise,
+          new Promise((_, reject) => {
+            joinTimer = setTimeout(() => reject(new Error("Agora bağlantı zaman aşımı.")), 10_000);
+          }),
+        ]);
+      } finally {
+        clearTimeout(joinTimer);
+      }
 
       if (!active) return;
 
@@ -659,8 +705,7 @@ export function useLiveVoiceRoom({
         },
       };
 
-      autoRetryCountRef.current = 0;
-      excludeProvidersRef.current = [];
+      scheduleStableReset();
       rosterSync.setLocalMicFlag(wantMic);
       setState((current) => ({
         ...current,
@@ -684,6 +729,23 @@ export function useLiveVoiceRoom({
         throw new Error("Cloudflare WebRTC oturumu başlatılamadı.");
       }
 
+      let pc = null;
+      let localStream = null;
+      let rosterSync = null;
+      const remoteTracks = new Set();
+
+      cleanupAdapter = async () => {
+        clearTimeout(stableResetTimer);
+        rosterSync?.dispose?.();
+        localStream?.getTracks?.()?.forEach((t) => t.stop());
+        try {
+          pc?.close?.();
+        } catch {
+          // yoksay
+        }
+        AudioSession.stopAudioSession().catch(() => undefined);
+      };
+
       await AudioSession.configureAudio({
         android: {
           preferredOutputList: ["speaker", "headset", "bluetooth", "earpiece"],
@@ -692,12 +754,10 @@ export function useLiveVoiceRoom({
       }).catch(() => undefined);
       await AudioSession.startAudioSession();
 
-      const pc = new PeerConn({
+      pc = new PeerConn({
         iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }],
         bundlePolicy: "max-bundle",
       });
-      let localStream = null;
-      const remoteTracks = new Set();
 
       pc.ontrack = (event) => {
         const track = event?.track;
@@ -708,9 +768,9 @@ export function useLiveVoiceRoom({
       };
 
       const canPublishNow = Boolean(payload.canPublish);
-      const wantMic = Boolean(startWithMicrophone && canPublishNow);
+      const wantMic = Boolean(startWithMicrophoneRef.current && canPublishNow);
 
-      if (getUserMedia) {
+      if (wantMic && getUserMedia) {
         localStream = await getUserMedia({ audio: true, video: false }).catch(() => null);
       }
       const audioTrack = localStream?.getAudioTracks?.()?.[0] || null;
@@ -728,7 +788,7 @@ export function useLiveVoiceRoom({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `Bearer ${accessTokenRef.current || ""}`,
         },
         body: JSON.stringify({
           roomId: roomName,
@@ -751,18 +811,24 @@ export function useLiveVoiceRoom({
       }
       await pc.setRemoteDescription(negJson.sessionDescription);
 
-      const rosterSync = attachRealtimeRosterSync({
+      rosterSync = attachRealtimeRosterSync({
         initialRole: payload.role || "listener",
         initialMuted: Boolean(payload.muted),
         initialSeat: typeof payload.seat === "number" ? payload.seat : null,
         onPermissionUpdate: ({ canPublish: nextPub }) => {
-          if (!nextPub && audioTrack) {
-            audioTrack.enabled = false;
+          const track = localStream?.getAudioTracks?.()?.[0];
+          if (!nextPub && track) {
+            track.enabled = false;
           }
         },
         onRemoved: () => {
           intentionalDisconnectRef.current = true;
-          pc.close();
+          clearTimeout(stableResetTimer);
+          clearInterval(heartbeatTimer);
+          rosterSync?.dispose?.();
+          sendHeartbeat({ ended: true });
+          AudioSession.stopAudioSession().catch(() => undefined);
+          pc?.close?.();
           setState((current) => ({
             ...current,
             status: "disconnected",
@@ -775,24 +841,10 @@ export function useLiveVoiceRoom({
         },
       });
 
-      cleanupAdapter = async () => {
-        rosterSync.dispose();
-        localStream?.getTracks?.()?.forEach((t) => t.stop());
-        try {
-          pc.close();
-        } catch {
-          // yoksay
-        }
-        AudioSession.stopAudioSession().catch(() => undefined);
-      };
-
       adapterRef.current = {
         provider: "cloudflare",
         setMicrophoneEnabled: async (nextEnabled) => {
           if (nextEnabled && !rosterSync.getCanPublish()) return false;
-          if (!audioTrack && nextEnabled && getUserMedia) {
-            localStream = await getUserMedia({ audio: true, video: false });
-          }
           const track = localStream?.getAudioTracks?.()?.[0];
           if (!track) return false;
           track.enabled = Boolean(nextEnabled);
@@ -806,13 +858,12 @@ export function useLiveVoiceRoom({
           });
         },
         disconnect: async () => {
-          pc.close();
+          pc?.close?.();
         },
       };
 
-      autoRetryCountRef.current = 0;
-      excludeProvidersRef.current = [];
-      rosterSync.setLocalMicFlag(wantMic);
+      scheduleStableReset();
+      rosterSync.setLocalMicFlag(Boolean(audioTrack && wantMic));
       setState((current) => ({
         ...current,
         provider: "cloudflare",
@@ -833,7 +884,7 @@ export function useLiveVoiceRoom({
         setState({ ...initialState, status: "local" });
         return;
       }
-      if (!userId || !accessToken) {
+      if (!userId || !hasAuthToken) {
         console.warn("[room-entry] voice connection missing session");
         setState({
           ...initialState,
@@ -869,6 +920,8 @@ export function useLiveVoiceRoom({
           await connectLiveKitProvider(payload);
         }
       } catch (error) {
+        await cleanupAdapter().catch(() => undefined);
+        adapterRef.current = null;
         console.warn(
           "[room-entry] voice connection failed",
           attemptedProvider || "none",
@@ -904,6 +957,7 @@ export function useLiveVoiceRoom({
     return () => {
       active = false;
       clearTimeout(retryTimer);
+      clearTimeout(stableResetTimer);
       clearInterval(heartbeatTimer);
       tokenFetchController?.abort();
       sendHeartbeat({ ended: true });
@@ -911,12 +965,10 @@ export function useLiveVoiceRoom({
       adapterRef.current = null;
     };
   }, [
-    accessToken,
     connectionAttempt,
-    profile.name,
+    hasAuthToken,
     roomName,
     sendHeartbeat,
-    startWithMicrophone,
     tokenServerUrl,
     userId,
   ]);

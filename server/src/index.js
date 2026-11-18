@@ -7,15 +7,19 @@ import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 dotenv.config({ path: fileURLToPath(new URL("../.env", import.meta.url)) });
 dotenv.config({ path: fileURLToPath(new URL("../../.env", import.meta.url)) });
 
-const requiredEnvironment = ["LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET", "EXPO_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY"];
+const requiredEnvironment = [
+  "LIVEKIT_URL",
+  "LIVEKIT_API_KEY",
+  "LIVEKIT_API_SECRET",
+  "EXPO_PUBLIC_SUPABASE_URL",
+  "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+];
 const missingEnvironment = requiredEnvironment.filter((key) => !process.env[key]);
 
 if (missingEnvironment.length) {
   throw new Error(`Missing required environment variables: ${missingEnvironment.join(", ")}`);
 }
 
-// .env.example / .env dosyalarindaki ornek degerlerin sessizce kullanilmasini engeller.
-// Aksi halde sunucu ayakta gorunur ama her /token istegi LiveKit hatasi verir.
 const PLACEHOLDER_PATTERN = /(your[-_]|example\.com|\bYOUR_)/i;
 const placeholderEnvironment = requiredEnvironment.filter((key) => PLACEHOLDER_PATTERN.test(String(process.env[key])));
 if (placeholderEnvironment.length) {
@@ -31,11 +35,15 @@ if (!liveKitUrlIsValid) {
 }
 
 const app = express();
+app.set("trust proxy", 1);
+
 const port = Number(process.env.PORT || 3001);
 const liveKitServiceUrl = process.env.LIVEKIT_URL.replace(/^wss:/, "https:").replace(/^ws:/, "http:");
 const liveKitService = new RoomServiceClient(liveKitServiceUrl, process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET);
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL.replace(/\/$/, "");
 const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const isProduction = process.env.NODE_ENV === "production";
 const allowedOrigins = (process.env.ALLOWED_ORIGIN || "")
   .split(",")
   .map((origin) => origin.trim())
@@ -43,37 +51,54 @@ const allowedOrigins = (process.env.ALLOWED_ORIGIN || "")
 
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || !allowedOrigins.length || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+    if (!origin) {
       callback(null, true);
       return;
     }
-
-    callback(new Error("Origin is not allowed"));
+    if (!allowedOrigins.length && !isProduction) {
+      callback(null, true);
+      return;
+    }
+    if (allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(null, false);
   },
 }));
-app.use(express.json({ limit: "10kb" }));
+app.use(express.json({ limit: "12kb" }));
 
-const errorReportWindows = new Map();
-const ERROR_REPORT_WINDOW_MS = 60_000;
-const MAX_ERROR_REPORTS_PER_WINDOW = 20;
+const makeRateLimiter = (windowMs, maxRequests) => {
+  const buckets = new Map();
+  return (key) => {
+    const now = Date.now();
+    if (buckets.size > 1024) {
+      for (const [k, entry] of buckets) {
+        if (now - entry.createdAt >= windowMs) buckets.delete(k);
+      }
+    }
+    const current = buckets.get(key);
+    if (!current || now - current.createdAt >= windowMs) {
+      buckets.set(key, { createdAt: now, count: 1 });
+      return true;
+    }
+    if (current.count >= maxRequests) return false;
+    current.count += 1;
+    return true;
+  };
+};
+
+const canAcceptErrorReport = makeRateLimiter(60_000, 20);
+const canAcceptApiCall = makeRateLimiter(60_000, 90);
+
 const redactReportText = (value) => String(value || "")
   .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [REDACTED]")
   .replace(/\beyJ[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+){2}\b/g, "[REDACTED_JWT]")
   .replace(/\b(?:sb_(?:publishable|secret)_[A-Za-z0-9_-]+|sk_[A-Za-z0-9_-]+)\b/g, "[REDACTED_KEY]")
+  .replace(/([?&#](?:access_token|refresh_token|token|code)=)[^&#\s]+/gi, "$1[REDACTED]")
   .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[REDACTED_EMAIL]")
+  .replace(/\+[1-9]\d{9,14}\b/g, "[REDACTED_PHONE]")
   .slice(0, 1200);
-
-const canAcceptErrorReport = (ip) => {
-  const now = Date.now();
-  const window = errorReportWindows.get(ip);
-  if (!window || now - window.createdAt >= ERROR_REPORT_WINDOW_MS) {
-    errorReportWindows.set(ip, { createdAt: now, count: 1 });
-    return true;
-  }
-  if (window.count >= MAX_ERROR_REPORTS_PER_WINDOW) return false;
-  window.count += 1;
-  return true;
-};
 
 app.get("/health", (_request, response) => {
   response.json({ status: "ok" });
@@ -109,10 +134,7 @@ app.post("/errors", (request, response) => {
   response.status(202).json({ accepted: true });
 });
 
-// Oda sahibi her zaman 1 numaralı koltuktadır; diğer kullanıcılar yalnızca
-// bir koltuğa oturtulduklarında (LiveKit "seat" özniteliği) yayın yapabilir.
 const roomRoleCanPublish = (role, muted, seated = false) => role === "host" || (seated && !muted);
-const roomRoleIsStaff = (role) => ["host", "moderator"].includes(role);
 const UUID_PATTERN = /^[a-f0-9-]{36}$/i;
 const COUPLE_SEAT_INDEX = 1;
 const FIRST_REGULAR_SEAT_INDEX = 2;
@@ -136,12 +158,14 @@ const sendError = (response, error, fallback) => {
   response.status(error?.status || 403).json({ error: message });
 };
 
-const supabaseRequest = async (path, accessToken, options = {}) => {
+const supabaseRequest = async (path, bearerToken, options = {}) => {
+  const apiKey = options.serviceRole && supabaseServiceRoleKey ? supabaseServiceRoleKey : supabaseKey;
+  const authBearer = options.serviceRole && supabaseServiceRoleKey ? supabaseServiceRoleKey : bearerToken;
   const response = await fetch(`${supabaseUrl}${path}`, {
     ...options,
     headers: {
-      apikey: supabaseKey,
-      Authorization: `Bearer ${accessToken}`,
+      apikey: apiKey,
+      Authorization: `Bearer ${authBearer}`,
       "Content-Type": "application/json",
       ...(options.headers || {}),
     },
@@ -161,6 +185,11 @@ const getAccessToken = (request) => {
 };
 
 const getAuthenticatedUser = async (request) => {
+  if (!canAcceptApiCall(request.ip || "unknown")) {
+    const error = new Error("Too many requests");
+    error.status = 429;
+    throw error;
+  }
   const accessToken = getAccessToken(request);
   if (!accessToken) {
     const error = new Error("Authentication required");
@@ -203,19 +232,19 @@ const muteParticipantTracks = async (roomId, identity, muted) => {
   await Promise.all((participant.tracks || []).map((track) => liveKitService.mutePublishedTrack(roomId, identity, track.sid, muted)));
 };
 
-app.post("/token", async (request, response) => {
-  const { name, roomName } = request.body || {};
+const handleIssueToken = async (request, response) => {
+  const { name, roomName, excludeProviders } = request.body || {};
   const cleanName = String(name || "").trim();
   const cleanRoomName = String(roomName || "").trim();
+  const rawExclude = Array.isArray(excludeProviders)
+    ? excludeProviders.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
 
   if (!cleanName || !cleanRoomName) {
     response.status(400).json({ error: "name and roomName are required" });
     return;
   }
-
-  const invalidRoomName = !/^[a-f0-9-]{36}$/i.test(cleanRoomName);
-
-  if (invalidRoomName || cleanName.length > 128) {
+  if (!UUID_PATTERN.test(cleanRoomName) || cleanName.length > 128) {
     response.status(400).json({ error: "roomName must be a valid room id" });
     return;
   }
@@ -224,31 +253,108 @@ app.post("/token", async (request, response) => {
     const { accessToken, user } = await getAuthenticatedUser(request);
     const membership = await joinRoomMembership(accessToken, cleanRoomName);
     if (!membership?.role) throw new Error("Room membership could not be created");
+
+    let role = membership.role;
+    let muted = Boolean(membership.is_muted);
+    let seat = role === "host" ? 0 : null;
+    let agoraUid = 1;
+
+    if (supabaseServiceRoleKey) {
+      const allocRows = await supabaseRequest("/rest/v1/rpc/allocate_voice_session_server", accessToken, {
+        method: "POST",
+        serviceRole: true,
+        body: JSON.stringify({
+          p_room_id: cleanRoomName,
+          p_user_id: user.id,
+          p_configured_providers: ["livekit"],
+          p_exclude_providers: rawExclude,
+        }),
+      });
+      const alloc = allocRows?.[0];
+      if (alloc) {
+        const isHost = Boolean(alloc.is_host);
+        role = isHost ? "host" : String(alloc.role || role);
+        muted = isHost ? false : Boolean(alloc.is_muted);
+        seat = isHost ? 0 : (typeof alloc.seat_index === "number" ? alloc.seat_index : null);
+        agoraUid = Number(alloc.agora_uid) || 1;
+      }
+    } else {
+      const memberRows = await supabaseRequest(
+        `/rest/v1/room_members?room_id=eq.${cleanRoomName}&user_id=eq.${user.id}&select=seat_index`,
+        accessToken,
+        { method: "GET" }
+      ).catch(() => []);
+      if (role !== "host" && typeof memberRows?.[0]?.seat_index === "number") {
+        seat = memberRows[0].seat_index;
+      }
+    }
+
+    const profileRows = await supabaseRequest(
+      `/rest/v1/profiles?id=eq.${user.id}&select=display_name`,
+      accessToken,
+      { method: "GET" }
+    ).catch(() => []);
+    const verifiedName = String(profileRows?.[0]?.display_name || cleanName || "Sora kullanıcısı").trim().slice(0, 64);
+
+    const canPublish = roomRoleCanPublish(role, muted, seat !== null);
     const token = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET, {
       identity: user.id,
-      name: cleanName,
+      name: verifiedName,
       ttl: "10m",
+      attributes: seat !== null ? { seat: String(seat) } : undefined,
     });
     token.addGrant({
       roomJoin: true,
       room: cleanRoomName,
-      canPublish: roomRoleCanPublish(membership.role, membership.is_muted, false),
+      canPublish,
       canSubscribe: true,
       canPublishData: true,
       roomAdmin: false,
     });
     const jwt = await token.toJwt();
-    console.info("Room token issued");
     response.json({
+      provider: "livekit",
       serverUrl: process.env.LIVEKIT_URL,
       token: jwt,
-      role: membership.role,
-      muted: membership.is_muted,
-      canPublish: roomRoleCanPublish(membership.role, membership.is_muted, false),
+      roomId: cleanRoomName,
+      agoraUid,
+      role,
+      muted,
+      seat,
+      canPublish,
     });
   } catch (error) {
     console.error("Room token request failed:", error.message);
     response.status(error.status || 403).json({ error: error.message || "Unable to join this room" });
+  }
+};
+
+app.post("/token", handleIssueToken);
+app.post("/voice/session", handleIssueToken);
+
+app.post("/voice/heartbeat", async (request, response) => {
+  const roomId = String(request.body?.roomId || request.body?.roomName || "").trim();
+  const ended = Boolean(request.body?.ended);
+  const failedProvider = request.body?.failedProvider ? String(request.body.failedProvider).trim() : null;
+  const errorText = request.body?.errorText ? String(request.body.errorText).trim() : null;
+  if (!UUID_PATTERN.test(roomId)) {
+    response.status(400).json({ error: "Invalid room id" });
+    return;
+  }
+  try {
+    const { accessToken } = await getAuthenticatedUser(request);
+    const data = await supabaseRequest("/rest/v1/rpc/heartbeat_voice_session", accessToken, {
+      method: "POST",
+      body: JSON.stringify({
+        p_room_id: roomId,
+        p_ended: ended,
+        p_failed_provider: failedProvider,
+        p_error_text: errorText,
+      }),
+    });
+    response.json(data || { ok: true });
+  } catch (error) {
+    sendError(response, error, "Heartbeat failed");
   }
 });
 
@@ -256,7 +362,7 @@ app.post("/rooms/:roomId/moderate", async (request, response) => {
   const roomId = String(request.params.roomId || "").trim();
   const targetUserId = String(request.body?.targetUserId || "").trim();
   const action = String(request.body?.action || "").trim();
-  if (!/^[a-f0-9-]{36}$/i.test(roomId) || !/^[a-f0-9-]{36}$/i.test(targetUserId)) {
+  if (!UUID_PATTERN.test(roomId) || !UUID_PATTERN.test(targetUserId)) {
     response.status(400).json({ error: "Invalid room or participant" });
     return;
   }
@@ -269,9 +375,15 @@ app.post("/rooms/:roomId/moderate", async (request, response) => {
     const membership = result?.[0];
     if (!membership) throw new Error("Moderation action failed");
     if (action === "remove") {
-      await liveKitService.removeParticipant(roomId, targetUserId, { revokeTokenTs: BigInt(Math.floor(Date.now() / 1000)) }).catch(() => undefined);
+      await liveKitService.removeParticipant(roomId, targetUserId).catch(() => undefined);
     } else {
       const seat = action === "demote_listener" ? null : undefined;
+      if (action === "demote_listener") {
+        await supabaseRequest("/rest/v1/rpc/commit_room_seat", accessToken, {
+          method: "POST",
+          body: JSON.stringify({ p_room_id: roomId, p_target_user_id: targetUserId, p_seat_index: null }),
+        }).catch(() => undefined);
+      }
       await applyLiveKitPermission(roomId, targetUserId, membership.role, membership.is_muted, seat).catch(() => undefined);
       if (["mute", "demote_listener"].includes(action)) await muteParticipantTracks(roomId, targetUserId, true);
     }
@@ -289,9 +401,6 @@ const listSeatedParticipants = async (roomId) => {
   }));
 };
 
-// Koltuk işlemleri: take (yönetici/oda sahibi kendisi oturur), leave,
-// assign (istek onayı / mikrofona davet), kick (10 dk mikrofon yasağı),
-// reject (isteği reddet).
 app.post("/rooms/:roomId/seat", async (request, response) => {
   const roomId = String(request.params.roomId || "").trim();
   const action = String(request.body?.action || "").trim();
@@ -323,6 +432,10 @@ app.post("/rooms/:roomId/seat", async (request, response) => {
     }
 
     if (action === "leave" || action === "kick") {
+      await supabaseRequest("/rest/v1/rpc/commit_room_seat", accessToken, {
+        method: "POST",
+        body: JSON.stringify({ p_room_id: roomId, p_target_user_id: targetId, p_seat_index: null }),
+      }).catch(() => undefined);
       if (targetId !== seatAuth.host_id) {
         await applyLiveKitPermission(roomId, targetId, seatAuth.target_role, seatAuth.target_muted, null).catch(() => undefined);
         await muteParticipantTracks(roomId, targetId, true).catch(() => undefined);
@@ -336,6 +449,10 @@ app.post("/rooms/:roomId/seat", async (request, response) => {
     }
 
     if (targetId === seatAuth.host_id) {
+      await supabaseRequest("/rest/v1/rpc/commit_room_seat", accessToken, {
+        method: "POST",
+        body: JSON.stringify({ p_room_id: roomId, p_target_user_id: targetId, p_seat_index: 0 }),
+      }).catch(() => undefined);
       response.json({ ok: true, seat: 0 });
       return;
     }
@@ -374,14 +491,24 @@ app.post("/rooms/:roomId/seat", async (request, response) => {
         throw error;
       }
     }
-    await applyLiveKitPermission(roomId, targetId, seatAuth.target_role, seatAuth.target_muted, seat);
-    response.json({ ok: true, seat });
+
+    const committed = await supabaseRequest("/rest/v1/rpc/commit_room_seat", accessToken, {
+      method: "POST",
+      body: JSON.stringify({
+        p_room_id: roomId,
+        p_target_user_id: targetId,
+        p_seat_index: seat,
+        p_valid_seats: validSeats,
+      }),
+    });
+    const finalSeat = Number(committed);
+    await applyLiveKitPermission(roomId, targetId, seatAuth.target_role, seatAuth.target_muted, finalSeat);
+    response.json({ ok: true, seat: finalSeat });
   } catch (error) {
     sendError(response, error, "Seat action failed");
   }
 });
 
-// Süreli oda banı. minutes null => kalıcı.
 app.post("/rooms/:roomId/ban", async (request, response) => {
   const roomId = String(request.params.roomId || "").trim();
   const targetUserId = String(request.body?.targetUserId || "").trim();
@@ -400,16 +527,13 @@ app.post("/rooms/:roomId/ban", async (request, response) => {
     });
     const membership = result?.[0];
     if (!membership) throw new Error("Ban failed");
-    await liveKitService
-      .removeParticipant(roomId, targetUserId, { revokeTokenTs: BigInt(Math.floor(Date.now() / 1000)) })
-      .catch(() => undefined);
+    await liveKitService.removeParticipant(roomId, targetUserId).catch(() => undefined);
     response.json({ membership });
   } catch (error) {
     sendError(response, error, "Ban failed");
   }
 });
 
-// Mikrofon sayısı / çift koltuğu. Kapanan koltuklardaki kullanıcılar indirilir.
 app.post("/rooms/:roomId/layout", async (request, response) => {
   const roomId = String(request.params.roomId || "").trim();
   const seatCount = Number.parseInt(request.body?.seatCount, 10);
@@ -425,11 +549,22 @@ app.post("/rooms/:roomId/layout", async (request, response) => {
       body: JSON.stringify({ p_room_id: roomId, p_seat_count: seatCount, p_couple_seat: coupleSeat }),
     });
     const room = Array.isArray(result) ? result[0] : result;
-    const validSeats = new Set(roomSeatIndexes(seatCount, coupleSeat));
+    const validList = roomSeatIndexes(seatCount, coupleSeat);
+    await supabaseRequest("/rest/v1/rpc/prune_invalid_room_seats", accessToken, {
+      method: "POST",
+      body: JSON.stringify({ p_room_id: roomId, p_valid_seats: validList }),
+    }).catch(() => undefined);
+
+    const validSeats = new Set(validList);
     const participants = await listSeatedParticipants(roomId);
     await Promise.all(
       participants
-        .filter((participant) => participant.seat !== null && !validSeats.has(participant.seat))
+        .filter((participant) =>
+          participant.seat !== null &&
+          participant.seat > 0 &&
+          participant.identity !== room?.host_id &&
+          !validSeats.has(participant.seat)
+        )
         .map(async (participant) => {
           await liveKitService.updateParticipant(roomId, participant.identity, {
             attributes: { seat: "" },
@@ -444,8 +579,6 @@ app.post("/rooms/:roomId/layout", async (request, response) => {
   }
 });
 
-// Keşfet: uygulaması arka planda olduğu için kalp atışı gecikmiş odaların
-// sahibinin LiveKit'te hâlâ bağlı olup olmadığını döndürür.
 app.post("/rooms/presence", async (request, response) => {
   const rooms = Array.isArray(request.body?.rooms) ? request.body.rooms.slice(0, 50) : [];
   try {

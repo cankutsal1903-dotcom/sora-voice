@@ -174,9 +174,13 @@ export function PinInput({ value, onChange, masked = false, autoFocus = true }) 
     const timer = setTimeout(() => inputRef.current?.focus(), 250);
     return () => clearTimeout(timer);
   }, [autoFocus]);
+  const focusPinInput = () => {
+    inputRef.current?.blur?.();
+    setTimeout(() => inputRef.current?.focus?.(), 20);
+  };
   const digits = String(value || "").split("");
   return (
-    <Pressable style={sheetStyles.pinRow} onPress={() => inputRef.current?.focus()} accessibilityLabel="4 haneli şifre">
+    <Pressable style={sheetStyles.pinRow} onPress={focusPinInput} accessibilityLabel="4 haneli şifre">
       {Array.from({ length: 4 }).map((_, index) => (
         <View key={index} style={[sheetStyles.pinBox, index === digits.length && sheetStyles.pinBoxActive]}>
           <Text style={sheetStyles.pinDigit}>{digits[index] ? (masked ? "•" : digits[index]) : ""}</Text>
@@ -895,7 +899,10 @@ export function RoomMusicSheet({
 }
 
 // ── Ban süresi ────────────────────────────────────────────────────────────
-export function BanDurationSheet({ participant, busy, onSelect, onDismiss }) {
+export function BanDurationSheet({ participant, busy, canPermanentBan = true, onSelect, onDismiss }) {
+  const options = canPermanentBan
+    ? ROOM_BAN_DURATIONS
+    : ROOM_BAN_DURATIONS.filter((option) => option.minutes !== null);
   return (
     <SheetFrame
       visible={Boolean(participant)}
@@ -903,7 +910,7 @@ export function BanDurationSheet({ participant, busy, onSelect, onDismiss }) {
       subtitle={participant ? `${participant.name} odadan çıkarılacak. Süreyi seç.` : null}
       onDismiss={onDismiss}
     >
-      {ROOM_BAN_DURATIONS.map((option) => (
+      {options.map((option) => (
         <Pressable
           key={option.label}
           disabled={busy}

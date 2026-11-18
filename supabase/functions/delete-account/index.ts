@@ -1,9 +1,28 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.119.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Origin": "*",
+};
+
+const removeFolderObjects = async (
+  adminClient: ReturnType<typeof createClient>,
+  bucket: string,
+  folder: string,
+) => {
+  const cleanFolder = String(folder || "").replace(/^\/+|\/+$/g, "");
+  if (!cleanFolder) return;
+  const { data: items } = await adminClient.storage
+    .from(bucket)
+    .list(cleanFolder, { limit: 200 });
+  if (!items?.length) return;
+  const paths = items
+    .filter((item) => item?.name)
+    .map((item) => `${cleanFolder}/${item.name}`);
+  if (paths.length) {
+    await adminClient.storage.from(bucket).remove(paths).catch(() => undefined);
+  }
 };
 
 Deno.serve(async (request) => {
@@ -50,9 +69,35 @@ Deno.serve(async (request) => {
   }
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey);
-  const { error: deleteError } = await adminClient.auth.admin.deleteUser(user.id, true);
+
+  // Transfer multi-member family ownership and gather hosted room IDs for Storage cleanup.
+  const { data: prepData, error: prepError } = await adminClient.rpc(
+    "prepare_account_deletion_server",
+    { p_user_id: user.id },
+  );
+  if (prepError) {
+    console.error("prepare_account_deletion_server error:", prepError.message);
+  }
+
+  const roomIds: string[] = Array.isArray(prepData?.room_ids)
+    ? prepData.room_ids.map((id: unknown) => String(id || "")).filter(Boolean)
+    : [];
+
+  await Promise.all([
+    removeFolderObjects(adminClient, "avatars", user.id),
+    removeFolderObjects(adminClient, "family-avatars", user.id),
+    ...roomIds.flatMap((roomId) => [
+      removeFolderObjects(adminClient, "room-backgrounds", roomId),
+      removeFolderObjects(adminClient, "room-music", roomId),
+    ]),
+  ]).catch(() => undefined);
+
+  // Hard-delete (shouldSoftDelete = false) so auth.users, profiles, rooms, wallets,
+  // messages, follows, and push tokens cascade-delete completely.
+  const { error: deleteError } = await adminClient.auth.admin.deleteUser(user.id, false);
 
   if (deleteError) {
+    console.error("auth.admin.deleteUser error:", deleteError.message);
     return new Response(JSON.stringify({ error: "Could not delete account" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

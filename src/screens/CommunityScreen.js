@@ -262,7 +262,7 @@ export function CommunityScreen({
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [currentUserId]);
+  }, [currentUserId, discoverModalOpen]);
 
   useEffect(() => {
     loadFamilies();
@@ -286,7 +286,7 @@ export function CommunityScreen({
     return () => {
       active = false;
     };
-  }, [currentUserId]);
+  }, [currentUserId, discoverModalOpen]);
 
   const loadMessages = useCallback(async (communityId, { silent = false } = {}) => {
     if (!communityId || !currentUserId) return;
@@ -321,7 +321,7 @@ export function CommunityScreen({
     } finally {
       if (!silent) setMessagesLoading(false);
     }
-  }, [currentUserId]);
+  }, [currentUserId, discoverModalOpen]);
 
   useEffect(() => {
     if (!myFamily?.id || !currentUserId) {
@@ -354,7 +354,7 @@ export function CommunityScreen({
               id: incoming.id,
               communityId: incoming.communityId,
               userId: incoming.userId,
-              senderName: isOwn ? (profile?.name || "Sen") : "Aile üyesi",
+              senderName: isOwn ? (profile?.name || "Sen") : null,
               senderHandle: isOwn ? (profile?.handle || "sora") : "uye",
               senderColor: isOwn ? (profile?.color || COLORS.primary) : COLORS.primary,
               senderAvatarUrl: isOwn ? (profile?.avatarUrl || null) : null,
@@ -467,8 +467,14 @@ export function CommunityScreen({
     [selectedGiftId, visibleGiftCatalog],
   );
 
+  const pendingGiftSpendRef = useRef(0);
+  const sendingGiftCountRef = useRef(0);
+
   const executeSendFamilyGift = useCallback(async ({ gift, recipient, quantity }) => {
     if (!myFamily?.id || !gift || !recipient?.userId) return false;
+    const totalCost = Math.max(0, Number(gift.cost || 0) * Number(quantity || 1));
+    pendingGiftSpendRef.current += totalCost;
+    sendingGiftCountRef.current += 1;
     setSendingGift(true);
     try {
       const requestId = createUuid();
@@ -536,14 +542,16 @@ export function CommunityScreen({
           Alert.alert("Hediye patlaması!", `${formatCredits(reward)} kredi geri kazandın.`);
         }
       }
-      onBalanceRefresh?.().catch?.(() => undefined);
+      await onBalanceRefresh?.().catch?.(() => undefined);
       return true;
     } catch (err) {
       setComboState(null);
       Alert.alert("Hediye gönderilemedi", describeFamilyError(err));
       return false;
     } finally {
-      setSendingGift(false);
+      pendingGiftSpendRef.current = Math.max(0, pendingGiftSpendRef.current - totalCost);
+      sendingGiftCountRef.current = Math.max(0, sendingGiftCountRef.current - 1);
+      setSendingGift(sendingGiftCountRef.current > 0);
     }
   }, [
     currentUserId,
@@ -573,7 +581,9 @@ export function CommunityScreen({
       return;
     }
     const totalCost = Number(gift.cost || 0) * giftQuantity;
-    if (typeof coins === "number" && coins < totalCost) {
+    const availableCoins =
+      typeof coins === "number" ? Math.max(0, coins - pendingGiftSpendRef.current) : Infinity;
+    if (availableCoins < totalCost) {
       Alert.alert(
         "Bakiye yetersiz",
         `${giftQuantity}x ${gift.name} için ${formatCredits(totalCost)} kredi gerekiyor.`,
@@ -605,7 +615,9 @@ export function CommunityScreen({
     if (!comboState?.gift || !comboState?.recipient?.userId) return;
     const { gift, recipient, quantity } = comboState;
     const totalCost = Number(gift.cost || 0) * quantity;
-    if (typeof coins === "number" && coins < totalCost) {
+    const availableCoins =
+      typeof coins === "number" ? Math.max(0, coins - pendingGiftSpendRef.current) : Infinity;
+    if (availableCoins < totalCost) {
       setComboState(null);
       Alert.alert(
         "Bakiye yetersiz",
@@ -631,6 +643,10 @@ export function CommunityScreen({
 
   const openFamilyDetail = useCallback(async (familyId, initialTab = "levels") => {
     if (!familyId) return;
+    if (discoverModalOpen) {
+      setDiscoverModalOpen(false);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
     setSelectedFamilyId(familyId);
     setDetailTab(initialTab);
     setDetailLoading(true);
@@ -1256,7 +1272,7 @@ export function CommunityScreen({
     <View collapsable={false} style={styles.screen}>
       {myFamily ? (
         // ── Üye olunan aile varsa doğrudan Aile Sohbeti açılır ─────────────────
-        <KeyboardSafeView style={{ flex: 1 }}>
+        <KeyboardSafeView style={{ flex: 1 }} iosOffset={insets.top}>
           <View style={styles.chatHeader}>
             <Pressable
               onPress={() => openFamilyDetail(myFamily.id, "levels")}
@@ -1453,7 +1469,7 @@ export function CommunityScreen({
             style={StyleSheet.absoluteFill}
             onPress={() => !sendingGift && setGiftSheetOpen(false)}
           />
-          <View style={[styles.sheet, { maxHeight: "86%" }]}>
+          <View style={[styles.sheet, { maxHeight: "86%", paddingBottom: Math.max(insets.bottom, 16) + 14 }]}>
             <View style={styles.sheetHandle} />
             <View style={styles.sheetHeader}>
               <View>
@@ -1638,7 +1654,7 @@ export function CommunityScreen({
       >
         <KeyboardSafeView style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setDiscoverModalOpen(false)} />
-          <View style={[styles.sheet, { height: "84%" }]}>
+          <View style={[styles.sheet, { height: "84%", paddingBottom: Math.max(insets.bottom, 16) + 14 }]}>
             <View style={styles.sheetHandle} />
             <View style={styles.sheetHeader}>
               <View>
@@ -1666,7 +1682,7 @@ export function CommunityScreen({
             style={StyleSheet.absoluteFill}
             onPress={() => !creating && setCreateOpen(false)}
           />
-          <View style={[styles.sheet, { maxHeight: "88%" }]}>
+          <View style={[styles.sheet, { maxHeight: "88%", paddingBottom: Math.max(insets.bottom, 16) + 14 }]}>
             <View style={styles.sheetHandle} />
             <View style={styles.sheetHeader}>
               <View>
@@ -1786,7 +1802,7 @@ export function CommunityScreen({
       >
         <KeyboardSafeView style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeFamilyDetail} />
-          <View style={[styles.sheet, { maxHeight: "88%" }]}>
+          <View style={[styles.sheet, { maxHeight: "88%", paddingBottom: Math.max(insets.bottom, 16) + 14 }]}>
             <View style={styles.sheetHandle} />
             {detailLoading ? (
               <View style={[styles.center, { minHeight: 240 }]}>
@@ -1954,7 +1970,7 @@ export function CommunityScreen({
                             disabled={!onOpenUserProfile}
                             onPress={() => {
                               closeFamilyDetail();
-                              onOpenUserProfile?.(member.userId);
+                              setTimeout(() => onOpenUserProfile?.(member.userId), 300);
                             }}
                             style={styles.memberIdentityPress}
                           >
@@ -1978,7 +1994,7 @@ export function CommunityScreen({
                             <Pressable
                               onPress={() => {
                                 closeFamilyDetail();
-                                openGiftSheet(member.userId);
+                                setTimeout(() => openGiftSheet(member.userId), 300);
                               }}
                               accessibilityLabel={`${member.name} kişisine hediye gönder`}
                               style={styles.memberGiftBtn}
@@ -2322,7 +2338,7 @@ const styles = StyleSheet.create({
   xpStrip: {
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: COLORS.surfaceElevated,
+    backgroundColor: COLORS.surfaceRaised,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.lineSoft,
     flexDirection: "row",
@@ -2582,9 +2598,9 @@ const styles = StyleSheet.create({
   },
   categoryPillText: { color: COLORS.textSecondary, fontSize: 11, fontWeight: "800" },
   categoryPillTextActive: { color: COLORS.primary, fontWeight: "900" },
-  giftGrid: { flexDirection: "row", flexWrap: "wrap", gap: 9 },
+  giftGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: 9 },
   giftItemCard: {
-    width: "31.2%",
+    width: "31.5%",
     paddingVertical: 11,
     paddingHorizontal: 8,
     borderRadius: 16,

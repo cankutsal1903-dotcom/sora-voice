@@ -10,7 +10,7 @@ export const ROOM_BAN_DURATIONS = [
   { label: "Kalıcı", minutes: null },
 ];
 
-export const DEFAULT_ROOM_ANNOUNCEMENT = "Hoşgeldin";
+export const DEFAULT_ROOM_ANNOUNCEMENT = "Hoş geldin";
 export const COUPLE_SEAT_INDEX = 1;
 export const FIRST_REGULAR_SEAT_INDEX = 2;
 
@@ -67,8 +67,11 @@ export const describeRoomError = (error, fallback = "Bağlantını kontrol edip 
   if (message.includes("Title too long")) return "Oda adı en fazla 36 karakter olabilir.";
   if (message.includes("Description too long")) return "Açıklama en fazla 180 karakter olabilir.";
   if (message.includes("Announcement too long")) return "Duyuru en fazla 200 karakter olabilir.";
-  if (message.includes("Room is locked")) return "Oda sahibi mikrofon sırasını kapattı.";
+  if (message.includes("Room is locked")) return "Oda sahibi odayı yeni girişlere kilitledi.";
+  if (message.includes("Room access is restricted")) return "Hesabındaki kısıtlama nedeniyle bu odaya katılamazsın.";
   if (message.includes("Room is unavailable")) return "Bu oda şu an kullanılamıyor.";
+  if (message.includes("Invalid music file")) return "Geçerli bir müzik dosyası seçilemedi.";
+  if (message.includes("Invalid image path")) return "Geçerli bir görsel seçilemedi.";
   if (message.includes("Payload too large") || message.includes("exceeded the maximum")) return "Dosya çok büyük.";
   if (message.includes("mime type") || message.includes("invalid_mime_type")) return "Bu dosya türü desteklenmiyor.";
   return fallback;
@@ -177,17 +180,28 @@ export const getLatestBackgroundRequest = async (roomId) => {
 };
 
 export const clearRoomBackground = async (roomId) => {
+export const clearRoomBackground = async (roomId) => {
   const client = requireClient();
   const { data, error } = await client.rpc("clear_room_background", { p_room_id: roomId });
   throwIfError(error);
+  for (const key of signedUrlCache.keys()) {
+    if (key.startsWith(`room-backgrounds/${roomId}/`)) signedUrlCache.delete(key);
+  }
   return firstRow(data);
 };
 
+const TR_CHAR_MAP = {
+  ç: "c", Ç: "C", ğ: "g", Ğ: "G", ı: "i", İ: "I", ö: "o", Ö: "O", ş: "s", Ş: "S", ü: "u", Ü: "U",
+};
+
 const safeFileName = (name, fallbackExtension) => {
-  const base = String(name || "")
+  const transliterated = String(name || "").replace(/[çÇğĞıİöÖşŞüÜ]/g, (ch) => TR_CHAR_MAP[ch] || ch);
+  const base = transliterated
     .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^\w.-]+/g, "_")
     .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")
     .slice(-60);
   const hasExtension = /\.[A-Za-z0-9]{2,5}$/.test(base);
   const random = Math.random().toString(36).slice(2, 10);
@@ -212,10 +226,10 @@ const readFileBytes = (uri) =>
 
 export const uploadProfileAvatar = async ({ userId, asset }) => {
   const client = requireClient();
-  const mimeType = asset.mimeType || "image/jpeg";
-  const extension = mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : "jpg";
-  const path = `${userId}/${safeFileName(null, extension)}`;
+  const initialCheck = validateFamilyAvatarAsset(asset);
   const bytes = await readFileBytes(asset.uri);
+  const { mimeType, extension } = validateFamilyAvatarAsset(asset, bytes.byteLength);
+  const path = `${userId}/${safeFileName(null, initialCheck.extension || extension)}`;
   const { error: uploadError } = await client.storage
     .from("avatars")
     .upload(path, bytes, { contentType: mimeType, upsert: true });
@@ -277,12 +291,30 @@ export const removeProfileAvatar = async ({ userId }) => {
   throwIfError(error);
 };
 
+const ROOM_BG_MAX_BYTES = 6 * 1024 * 1024;
+const ROOM_MUSIC_MAX_BYTES = 25 * 1024 * 1024;
+const AUDIO_EXT_MIME = {
+  mp3: "audio/mpeg",
+  m4a: "audio/mp4",
+  mp4: "audio/mp4",
+  aac: "audio/aac",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+};
+
 export const uploadRoomBackground = async ({ roomId, asset }) => {
   const client = requireClient();
-  const mimeType = asset.mimeType || "image/jpeg";
-  const extension = mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : "jpg";
+  const rawMime = String(asset?.mimeType || "image/jpeg").toLowerCase().trim();
+  const mimeType = rawMime === "image/jpg" ? "image/jpeg" : rawMime;
+  if (!ALLOWED_FAMILY_AVATAR_MIMES.has(mimeType)) {
+    throw new Error("Yalnızca JPEG, PNG veya WebP görselleri yüklenebilir.");
+  }
+  const extension = mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpg";
   const path = `${roomId}/${safeFileName(null, extension)}`;
   const bytes = await readFileBytes(asset.uri);
+  if (bytes.byteLength <= 0 || bytes.byteLength > ROOM_BG_MAX_BYTES) {
+    throw new Error("Oda arka plan görseli en fazla 6 MB olabilir.");
+  }
   const { error: uploadError } = await client.storage
     .from("room-backgrounds")
     .upload(path, bytes, { contentType: mimeType, upsert: false });
@@ -297,9 +329,17 @@ export const uploadRoomBackground = async ({ roomId, asset }) => {
 
 export const uploadRoomMusic = async ({ roomId, asset }) => {
   const client = requireClient();
-  const mimeType = asset.mimeType || "audio/mpeg";
-  const path = `${roomId}/${safeFileName(asset.name, "mp3")}`;
+  const extMatch = String(asset?.name || "").toLowerCase().match(/\.([a-z0-9]{2,5})$/)?.[1] || "mp3";
+  const rawMime = String(asset?.mimeType || "").toLowerCase().trim();
+  const mimeType =
+    !rawMime || rawMime === "application/octet-stream" || rawMime === "audio/mp4a-latm"
+      ? AUDIO_EXT_MIME[extMatch] || "audio/mpeg"
+      : rawMime;
+  const path = `${roomId}/${safeFileName(asset?.name, AUDIO_EXT_MIME[extMatch] ? extMatch : "mp3")}`;
   const bytes = await readFileBytes(asset.uri);
+  if (bytes.byteLength <= 0 || bytes.byteLength > ROOM_MUSIC_MAX_BYTES) {
+    throw new Error("Müzik dosyası en fazla 25 MB olabilir.");
+  }
   const { error } = await client.storage
     .from("room-music")
     .upload(path, bytes, { contentType: mimeType, upsert: false });
@@ -335,13 +375,16 @@ export const deleteRoomMusic = async (path) => {
   const client = requireClient();
   const { error } = await client.storage.from("room-music").remove([path]);
   throwIfError(error);
+  signedUrlCache.delete(`room-music/${path}`);
 };
 
-export const getSignedRoomFileUrl = async (bucket, path, expiresIn = 3600) => {
+export const getSignedRoomFileUrl = async (bucket, path, expiresIn = 3600, { forceRefresh = false } = {}) => {
   if (!path) return null;
   const key = `${bucket}/${path}`;
-  const cached = signedUrlCache.get(key);
-  if (cached && cached.expiresAt > Date.now() + 60_000) return cached.url;
+  if (!forceRefresh) {
+    const cached = signedUrlCache.get(key);
+    if (cached && cached.expiresAt > Date.now() + 60_000) return cached.url;
+  }
   const client = requireClient();
   const { data, error } = await client.storage.from(bucket).createSignedUrl(path, expiresIn);
   throwIfError(error);

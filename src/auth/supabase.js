@@ -93,9 +93,9 @@ const authStorage = {
   async getItem(key) {
     try {
       const fromSecureStore = await readChunksFromSecureStore(key);
-      if (fromSecureStore) return fromSecureStore;
+      if (fromSecureStore !== null && fromSecureStore !== undefined) return fromSecureStore;
     } catch {
-      // Keystore okunamadi; yedege dus
+      // Keystore okunamadı; yedeğe düş
     }
     try {
       return await AsyncStorage.getItem(FALLBACK_PREFIX + key);
@@ -105,22 +105,21 @@ const authStorage = {
   },
 
   async setItem(key, value) {
-    let stored = false;
+    let storedInSecure = false;
     try {
       await writeChunksToSecureStore(key, value);
-      stored = true;
+      storedInSecure = true;
+      await AsyncStorage.removeItem(FALLBACK_PREFIX + key).catch(() => undefined);
     } catch {
-      // Cihaz SecureStore'a yazamiyor; yedege dus
+      // Cihaz SecureStore'a yazamıyor; yedeğe düş
     }
-    try {
-      // Yedegi her zaman yaz: SecureStore'un sonradan okunamaz hale gelmesi
-      // (Keystore sifirlanmasi, yedekten geri yukleme) oturumu bozmasin.
-      await AsyncStorage.setItem(FALLBACK_PREFIX + key, value);
-      stored = true;
-    } catch {
-      // yoksay
+    if (!storedInSecure) {
+      try {
+        await AsyncStorage.setItem(FALLBACK_PREFIX + key, value);
+      } catch {
+        throw new Error("Oturum cihaza kaydedilemedi");
+      }
     }
-    if (!stored) throw new Error("Oturum cihaza kaydedilemedi");
   },
 
   async removeItem(key) {
@@ -227,7 +226,10 @@ export const completeAuthRedirect = async (url) => {
     if (error) throw error;
   }
 
-  return { isPasswordRecovery: valueFor("type") === "recovery" };
+  return {
+    isPasswordRecovery:
+      valueFor("type") === "recovery" || /^sora:\/\/auth\/reset-password/i.test(String(url || "")),
+  };
 };
 
 export const deleteCurrentAccount = async () => {

@@ -12,7 +12,7 @@ const BLOCKED_TERMS = [
   "ibne",
 ];
 
-export const normalizeModerationText = (value = "") => value
+export const normalizeModerationText = (value = "") => String(value || "")
   .toLocaleLowerCase("tr-TR")
   .replace(/[çÇ]/g, "c")
   .replace(/[ğĞ]/g, "g")
@@ -34,11 +34,12 @@ export const createMessageGuard = () => {
 
   return {
     check(value, now = Date.now()) {
-      const normalized = normalizeModerationText(value);
-      if (!normalized) return { allowed: false, reason: "empty" };
-      if (containsBlockedLanguage(value)) return { allowed: false, reason: "blocked_language" };
+      const trimmed = String(value || "").trim();
+      if (!trimmed) return { allowed: false, reason: "empty" };
+      if (containsBlockedLanguage(trimmed)) return { allowed: false, reason: "blocked_language" };
+      const key = normalizeModerationText(trimmed) || trimmed;
       sentAt = sentAt.filter((timestamp) => timestamp > now - 5 * 60 * 1000);
-      if (lastMessage.text === normalized && lastMessage.sentAt > now - 30 * 1000) {
+      if (lastMessage.text === key && lastMessage.sentAt > now - 30 * 1000) {
         return { allowed: false, reason: "duplicate" };
       }
       if (sentAt.filter((timestamp) => timestamp > now - 10 * 1000).length >= 5 || sentAt.length >= 20) {
@@ -47,8 +48,9 @@ export const createMessageGuard = () => {
       return { allowed: true };
     },
     record(value, now = Date.now()) {
+      const trimmed = String(value || "").trim();
       sentAt = [...sentAt.filter((timestamp) => timestamp > now - 5 * 60 * 1000), now];
-      lastMessage = { text: normalizeModerationText(value), sentAt: now };
+      lastMessage = { text: normalizeModerationText(trimmed) || trimmed, sentAt: now };
     },
   };
 };

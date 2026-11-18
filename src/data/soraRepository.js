@@ -31,7 +31,7 @@ export const mapRoom = (room) => {
     accent: room.accent_color,
     roomLocked: room.room_locked,
     chatLocked: room.chat_locked,
-    announcement: room.announcement || "Hoşgeldin",
+    announcement: room.announcement || "Hoş geldin",
     passwordProtected: Boolean(room.password_protected),
     seatCount: room.seat_count === 13 ? 13 : 9,
     coupleSeat: Boolean(room.couple_seat),
@@ -71,6 +71,7 @@ export const listRooms = async (state = "live") => {
     const backgroundGraceSince = Date.now() - 45_000;
     const staleRows = visibleRows.filter((room) => new Date(room.last_active_at).getTime() < backgroundGraceSince);
     let presentIds = new Set();
+    let presenceFailed = false;
     if (staleRows.length) {
       try {
         const { data: sessionData } = await client.auth.getSession();
@@ -80,11 +81,14 @@ export const listRooms = async (state = "live") => {
         });
         presentIds = new Set(liveIds);
       } catch {
-        presentIds = new Set();
+        presenceFailed = true;
       }
     }
+    const fallbackGraceSince = Date.now() - 3 * 60_000;
     visibleRows = visibleRows.filter(
-      (room) => new Date(room.last_active_at).getTime() >= backgroundGraceSince || presentIds.has(room.id),
+      (room) =>
+        new Date(room.last_active_at).getTime() >= (presenceFailed ? fallbackGraceSince : backgroundGraceSince) ||
+        presentIds.has(room.id),
     );
   }
   return visibleRows.map(mapRoom);
@@ -215,7 +219,11 @@ export const startScheduledRoom = async (roomId) => {
   const client = requireClient();
   const { data, error } = await client
     .from("rooms")
-    .update({ state: "live" })
+    .update({
+      state: "live",
+      last_active_at: new Date().toISOString(),
+      listener_count: 1,
+    })
     .eq("id", roomId)
     .eq("state", "scheduled")
     .select(ROOM_SELECT)
@@ -341,46 +349,25 @@ export const listRoomMembers = async (roomId) => {
 export const getPublicProfile = async (userId) => {
   if (!userId) return null;
   const client = requireClient();
-  const [profileResult, appearanceResult, publicIdResult, levelResult] = await Promise.all([
-    client
-      .from("profiles")
-      .select("id, handle, display_name, avatar_color, avatar_url, bio")
-      .eq("id", userId)
-      .maybeSingle(),
-    client
-      .from("profiles")
-      .select("active_frame_id, active_profile_theme_id")
-      .eq("id", userId)
-      .maybeSingle(),
-    client
-      .from("profiles")
-      .select("public_id")
-      .eq("id", userId)
-      .maybeSingle(),
-    client
-      .from("profiles")
-      .select("user_level, user_xp")
-      .eq("id", userId)
-      .maybeSingle(),
-  ]);
-  const { data, error } = profileResult;
+  const { data, error } = await client
+    .from("profiles")
+    .select("id, public_id, handle, display_name, avatar_color, avatar_url, bio, active_frame_id, active_profile_theme_id, user_level, user_xp")
+    .eq("id", userId)
+    .maybeSingle();
   throwIfError(error);
   if (!data) return null;
-  const appearance = appearanceResult.error ? null : appearanceResult.data;
-  const publicIdRow = publicIdResult.error ? null : publicIdResult.data;
-  const levelRow = levelResult.error ? null : levelResult.data;
   return {
     userId: data.id,
-    publicId: publicIdRow?.public_id || null,
+    publicId: data.public_id || null,
     handle: data.handle,
-    name: data.display_name,
-    color: data.avatar_color,
+    name: data.display_name || "Sora kullanıcısı",
+    color: data.avatar_color || "#2F80ED",
     avatarUrl: data.avatar_url || null,
-    bio: data.bio,
-    activeFrameId: appearance?.active_frame_id || null,
-    activeProfileThemeId: appearance?.active_profile_theme_id || null,
-    userLevel: Math.max(1, Number(levelRow?.user_level) || 1),
-    userXp: Math.max(0, Number(levelRow?.user_xp) || 0),
+    bio: data.bio || "",
+    activeFrameId: data.active_frame_id || null,
+    activeProfileThemeId: data.active_profile_theme_id || null,
+    userLevel: Math.max(1, Number(data.user_level) || 1),
+    userXp: Math.max(0, Number(data.user_xp) || 0),
   };
 };
 
@@ -400,6 +387,30 @@ export const listFollowedUserIds = async (userId) => {
   const { data, error } = await client.from("follows").select("following_id").eq("follower_id", userId);
   throwIfError(error);
   return (data || []).map((follow) => follow.following_id);
+};
+
+export const listFollowedProfiles = async (userId) => {
+  if (!userId) return [];
+  const client = requireClient();
+  const { data, error } = await client
+    .from("follows")
+    .select("following_id, profiles!follows_following_id_fkey(id, display_name, handle, avatar_color, avatar_url)")
+    .eq("follower_id", userId)
+    .limit(100);
+  throwIfError(error);
+  return (data || [])
+    .map((row) => {
+      const p = profileFromJoin(row.profiles);
+      if (!p?.id) return null;
+      return {
+        userId: p.id,
+        name: p.display_name || "Sora kullanıcısı",
+        handle: p.handle || "sora",
+        color: p.avatar_color || "#2F80ED",
+        avatarUrl: p.avatar_url || null,
+      };
+    })
+    .filter(Boolean);
 };
 
 export const setFollowing = async ({ userId, targetUserId, following }) => {
@@ -692,7 +703,7 @@ export const sendDirectMessage = async ({ conversationId, userId, text }) => {
 export const subscribeToDirectMessages = ({ conversationId, onMessage }) => {
   const client = requireClient();
   const channel = client
-    .channel(`direct-messages:${conversationId}`)
+    .channel(`direct-messages:${conversationId}:${Date.now().toString(36)}`)
     .on(
       "postgres_changes",
       { event: "INSERT", schema: "public", table: "direct_messages", filter: `conversation_id=eq.${conversationId}` },
@@ -967,20 +978,7 @@ export const getFamilyDetails = async (communityId, currentUserId) => {
     });
   }
 
-  let checkedInToday = false;
-  if (currentUserId && memberIds.includes(currentUserId)) {
-    const todayUtc = new Date().toISOString().slice(0, 10);
-    const { data: checkinRow } = await client
-      .from("family_xp_events")
-      .select("id")
-      .eq("community_id", communityId)
-      .eq("actor_id", currentUserId)
-      .eq("event_type", "daily_checkin")
-      .eq("event_date", todayUtc)
-      .limit(1)
-      .maybeSingle();
-    checkedInToday = Boolean(checkinRow?.id);
-  }
+  const checkedInToday = false;
 
   const members = memberRows.map((row) => {
     const p = profileFromJoin(row.profiles);
@@ -1172,7 +1170,7 @@ export const sendFamilyGift = async ({
 export const subscribeToFamilyMessages = ({ communityId, onMessage }) => {
   const client = requireClient();
   const channel = client
-    .channel(`family-messages:${communityId}`)
+    .channel(`family-messages:${communityId}:${Date.now().toString(36)}`)
     .on(
       "postgres_changes",
       { event: "INSERT", schema: "public", table: "family_messages", filter: `community_id=eq.${communityId}` },
@@ -1213,7 +1211,7 @@ export const claimFamilyLevelRewards = async (communityId) => {
 export const subscribeToCommunities = (onChange) => {
   const client = requireClient();
   const channel = client
-    .channel("communities:changes")
+    .channel(`communities:changes:${Date.now().toString(36)}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "communities" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "community_members" }, onChange)
     .subscribe();
@@ -1386,6 +1384,8 @@ export const listProfileItems = async () => {
   const client = requireClient();
   const { data: userData, error: userError } = await client.auth.getUser();
   throwIfError(userError);
+  const uid = userData?.user?.id;
+  if (!uid) return { items: [], ownedIds: [], active: {} };
   let catalog = await client
     .from("profile_item_catalog")
     .select("id,name,item_type,appearance,cost,purchasable")
@@ -1400,7 +1400,7 @@ export const listProfileItems = async () => {
   }
   const [owned, profile] = await Promise.all([
     client.from("user_profile_items").select("item_id"),
-    client.from("profiles").select("active_frame_id,active_profile_theme_id").eq("id", userData.user.id).maybeSingle(),
+    client.from("profiles").select("active_frame_id,active_profile_theme_id").eq("id", uid).maybeSingle(),
   ]);
   throwIfError(catalog.error);
   throwIfError(owned.error);

@@ -120,7 +120,7 @@ export function KeyboardSafeView({
   if (Platform.OS === "ios") {
     return (
       <KeyboardAvoidingView
-        style={style}
+        style={[{ flex: 1 }, style]}
         behavior="padding"
         keyboardVerticalOffset={iosOffset}
         pointerEvents={pointerEvents}

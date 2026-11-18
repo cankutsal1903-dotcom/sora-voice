@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import {
   createSafetyReport,
@@ -28,11 +29,14 @@ const REPORT_REASONS = [
 const CATEGORY_LABELS = Object.fromEntries(REPORT_REASONS.map(([key, label]) => [key, label]));
 const STATUS_LABELS = { open: "Bekliyor", reviewing: "İnceleniyor", actioned: "İşlem yapıldı", dismissed: "Kapatıldı" };
 
+const ROLE_LABELS = { owner: "KURUCU", admin: "YÖNETİCİ", moderator: "MODERATÖR" };
+
 function SheetFrame({ visible, onDismiss, children, tall = false }) {
+  const insets = useSafeAreaInsets();
   return <Modal transparent visible={visible} animationType="slide" onRequestClose={onDismiss}>
     <KeyboardSafeView style={styles.overlay}>
       <Pressable style={styles.dismissArea} onPress={onDismiss} />
-      <View style={[styles.sheet, tall && styles.tallSheet]}>
+      <View style={[styles.sheet, tall && styles.tallSheet, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
         <View style={styles.handle} />
         <Pressable onPress={onDismiss} style={styles.closeButton}><Ionicons name="close" size={20} color={COLORS.text} /></Pressable>
         {children}
@@ -72,11 +76,14 @@ export function ReportSheet({ target, onDismiss }) {
     } catch (error) {
       const duplicate = error?.message?.includes("already submitted");
       const limited = error?.message?.includes("Report limit exceeded");
-      Alert.alert("Bildirim gönderilemedi", duplicate
-        ? "Bu konu için yakın zamanda zaten bildirim yaptın."
-        : limited
-          ? "Çok sayıda bildirim gönderdin. Bir saat sonra tekrar dene."
-          : "Bağlantını kontrol edip tekrar dene.");
+      const selfReport = error?.message?.includes("cannot report yourself");
+      Alert.alert("Bildirim gönderilemedi", selfReport
+        ? "Kendi profilini bildiremezsin."
+        : duplicate
+          ? "Bu konu için yakın zamanda zaten bildirim yaptın."
+          : limited
+            ? "Çok sayıda bildirim gönderdin. Bir saat sonra tekrar dene."
+            : "Bağlantını kontrol edip tekrar dene.");
     } finally {
       setSubmitting(false);
     }
@@ -232,19 +239,20 @@ export function AdminPanelSheet({ visible, role, onDismiss }) {
     ["Filtre terimi", overview.blocked_terms, "text-outline"],
   ] : [];
 
+  const roleLabel = ROLE_LABELS[String(role || "moderator").toLowerCase()] || "MODERATÖR";
   return <SheetFrame visible={visible} onDismiss={onDismiss} tall>
-    <Text style={styles.kicker}>YÖNETİM PANELİ · {String(role || "moderator").toUpperCase()}</Text>
+    <Text style={styles.kicker}>YÖNETİM PANELİ · {roleLabel}</Text>
     <Text style={styles.title}>Güvenlik kuyruğu</Text>
     <View style={styles.statGrid}>{cards.map(([label, value, icon]) => <View key={label} style={styles.statCard}><Ionicons name={icon} size={17} color={COLORS.primary} /><Text style={styles.statValue}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>)}</View>
     <View style={styles.adminHeading}><Text style={styles.sectionLabel}>SON BİLDİRİMLER</Text><Pressable onPress={load}><Ionicons name="refresh-outline" size={18} color={COLORS.primary} /></Pressable></View>
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.adminList}>
-      {role !== "moderator" && <><Text style={styles.sectionLabel}>BEKLEYEN IBAN TRANSFERLERİ</Text>{transferRequests.filter((request) => request.status === "awaiting_transfer").map((request) => <View key={request.id} style={styles.transferRequest}>
+      {role !== "moderator" && transferRequests.some((request) => request.status === "awaiting_transfer") && <><Text style={styles.sectionLabel}>BEKLEYEN IBAN TRANSFERLERİ</Text>{transferRequests.filter((request) => request.status === "awaiting_transfer").map((request) => <View key={request.id} style={styles.transferRequest}>
         <View style={styles.reportHeader}><Text style={styles.rowTitle}>{request.referenceCode}</Text><Text style={styles.transferAmount}>{Number(request.amountTry).toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}</Text></View>
         <Text style={styles.rowMeta}>{request.requesterName || "Bilinmeyen kullanıcı"} · @{request.requesterHandle || "sora"}</Text>
         <Text style={styles.transferMeta}>Talep: {request.requestedCredits} kredi · {new Date(request.createdAt).toLocaleString("tr-TR")}</Text>
         <TextInput value={creditAmounts[request.id] || ""} onChangeText={(value) => setCreditAmounts((current) => ({ ...current, [request.id]: value.replace(/[^0-9]/g, "") }))} keyboardType="number-pad" placeholder="Yüklenecek kredi" placeholderTextColor={COLORS.muted} style={styles.transferCreditInput} maxLength={7} />
         <View style={styles.adminActions}><Pressable disabled={workingId === request.id} onPress={() => reviewTransfer(request, true)} style={styles.transferApprove}><Text style={styles.transferApproveText}>Onayla ve yükle</Text></Pressable><Pressable disabled={workingId === request.id} onPress={() => reviewTransfer(request, false)} style={[styles.adminAction, styles.adminActionDanger]}><Text style={styles.adminActionDangerText}>Reddet</Text></Pressable></View>
-      </View>)}{!transferRequests.some((request) => request.status === "awaiting_transfer") ? <View style={styles.empty}><Ionicons name="receipt-outline" size={24} color={COLORS.muted} /><Text style={styles.emptyText}>{loading ? "Yükleniyor..." : "Bekleyen IBAN transfer talebi yok."}</Text></View> : null}</>}
+      </View>)}</>}
       <Text style={styles.sectionLabel}>GÜVENLİK BİLDİRİMLERİ</Text>
       {reports.map((report) => <View key={report.id} style={styles.adminReport}>
         <View style={styles.reportHeader}><Text style={styles.rowTitle}>{CATEGORY_LABELS[report.category] || report.category}</Text><Text style={styles.statusText}>{STATUS_LABELS[report.status] || report.status}</Text></View>

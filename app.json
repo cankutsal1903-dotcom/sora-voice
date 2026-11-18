@@ -14,8 +14,13 @@
       "expo-audio",
       "expo-asset",
       "@livekit/react-native-expo-plugin",
-      "@config-plugins/react-native-webrtc",
       "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Sora, profil, aile ve oda görseli seçebilmen için fotoğraf arşivine erişir."
+        }
+      ],
       [
         "expo-notifications",
         {
@@ -37,6 +42,7 @@
     ],
     "android": {
       "package": "com.arescan.soravoice",
+      "versionCode": 14,
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.RECORD_AUDIO",
@@ -44,11 +50,17 @@
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
         "android.permission.ACCESS_NETWORK_STATE",
-        "android.permission.CAMERA",
         "android.permission.INTERNET",
         "android.permission.WAKE_LOCK",
-        "android.permission.BLUETOOTH"
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_CONNECT"
+      ],
+      "blockedPermissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_PHONE_STATE",
+        "android.permission.RECORD_VIDEO"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/sora-logo-blue.png",
@@ -57,14 +69,16 @@
     },
     "ios": {
       "bundleIdentifier": "com.arescan.soravoice",
+      "buildNumber": "14",
       "supportsTablet": true,
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Sora, sesli odalarda konuşabilmen için mikrofonuna erişir.",
+        "NSPhotoLibraryUsageDescription": "Sora, profil, aile ve oda görseli seçebilmen için fotoğraf arşivine erişir.",
+        "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": [
           "audio"
         ]
-      },
-      "bitcode": false
+      }
     },
     "extra": {
       "eas": {

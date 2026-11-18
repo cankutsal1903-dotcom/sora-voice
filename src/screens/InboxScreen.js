@@ -91,6 +91,8 @@ export function InboxScreen({ currentUserId, profile }) {
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [newHandle, setNewHandle] = useState("");
   const [startingChat, setStartingChat] = useState(false);
+  const selectedConversationIdRef = useRef(null);
+  selectedConversationIdRef.current = selectedConversation?.id || null;
 
   useEffect(() => {
     if (keyboard.visible && selectedConversation) {
@@ -145,13 +147,13 @@ export function InboxScreen({ currentUserId, profile }) {
         setMessages((current) => current.some((item) => item.id === message.id) ? current : [...current, {
           ...message,
           own: message.userId === currentUserId,
-          sender: message.userId === currentUserId ? profile.name : selectedConversation.name,
+          sender: message.userId === currentUserId ? (profile?.name || "Sen") : (selectedConversation?.name || "Sora kullanıcısı"),
         }]);
         loadConversations({ silent: true });
       },
     });
     return () => { active = false; unsubscribe(); };
-  }, [currentUserId, loadConversations, profile.name, selectedConversation?.id]);
+  }, [currentUserId, loadConversations, profile?.name, selectedConversation?.id, selectedConversation?.name]);
 
   const visibleConversations = useMemo(() => {
     const cleanQuery = query.trim().toLocaleLowerCase("tr-TR");
@@ -190,15 +192,20 @@ export function InboxScreen({ currentUserId, profile }) {
 
   const submitMessage = async () => {
     const text = draft.trim();
-    if (!text || !selectedConversation || sending) return;
+    const targetConvId = selectedConversation?.id;
+    if (!text || !targetConvId || sending) return;
     setSending(true);
     setDraft("");
     try {
-      const sentMessage = await sendDirectMessage({ conversationId: selectedConversation.id, userId: currentUserId, text });
-      setMessages((current) => current.some((item) => item.id === sentMessage.id) ? current : [...current, { ...sentMessage, sender: profile.name }]);
+      const sentMessage = await sendDirectMessage({ conversationId: targetConvId, userId: currentUserId, text });
+      if (selectedConversationIdRef.current === targetConvId) {
+        setMessages((current) => current.some((item) => item.id === sentMessage.id) ? current : [...current, { ...sentMessage, sender: profile?.name || "Sen" }]);
+      }
       loadConversations({ silent: true });
     } catch (sendError) {
-      setDraft(text);
+      if (selectedConversationIdRef.current === targetConvId) {
+        setDraft(text);
+      }
       Alert.alert("Mesaj gönderilemedi", friendlyError(sendError));
     } finally {
       setSending(false);
@@ -206,7 +213,7 @@ export function InboxScreen({ currentUserId, profile }) {
   };
 
   if (selectedConversation) {
-    return <KeyboardSafeView style={styles.screen}>
+    return <KeyboardSafeView style={styles.screen} iosOffset={insets.top}>
       <View style={styles.chatHeader}>
         <Pressable onPress={() => setSelectedConversation(null)} accessibilityLabel="Sohbet listesine dön" style={styles.headerButton}><Ionicons name="arrow-back" size={21} color={COLORS.text} /></Pressable>
         <Avatar name={selectedConversation.name} color={selectedConversation.color} uri={selectedConversation.avatarUrl} size={42} />
@@ -225,7 +232,7 @@ export function InboxScreen({ currentUserId, profile }) {
     <View style={styles.search}><Ionicons name="search-outline" size={18} color={COLORS.muted} /><TextInput value={query} onChangeText={setQuery} placeholder="Kişi ara" placeholderTextColor={COLORS.muted} style={styles.searchInput} autoCapitalize="none" /></View>
     {error ? <Pressable onPress={() => loadConversations()} style={styles.errorBanner}><Ionicons name="refresh-outline" size={17} color={COLORS.danger} /><Text style={styles.errorText}>{error} Tekrar dene.</Text></Pressable> : null}
     {loading ? <View style={styles.center}><ActivityIndicator color={COLORS.primary} /><Text style={styles.loadingText}>Sohbetler yükleniyor...</Text></View> : !visibleConversations.length ? <EmptyState icon="chatbubbles-outline" title={query ? "Sonuç bulunamadı" : "Henüz sohbet yok"} description={query ? "Farklı bir isim veya kullanıcı adı ara." : "Gerçek bir kullanıcı adıyla yeni sohbet başlat."} action={query ? null : "Sohbet başlat"} onAction={() => setNewChatOpen(true)} /> : <ScrollView contentContainerStyle={styles.conversationList} showsVerticalScrollIndicator={false}>{visibleConversations.map((conversation) => <Pressable key={conversation.id} onPress={() => openConversation(conversation)} style={styles.conversationCard}><Avatar name={conversation.name} color={conversation.color} uri={conversation.avatarUrl} /><View style={styles.conversationCopy}><View style={styles.conversationTop}><Text numberOfLines={1} style={styles.conversationName}>{conversation.name}</Text><Text style={styles.conversationTime}>{formatMessageTime(conversation.lastMessageAt)}</Text></View><Text numberOfLines={1} style={styles.conversationMessage}>{conversation.lastMessage || ("@" + conversation.handle)}</Text></View></Pressable>)}</ScrollView>}
-    <Modal transparent visible={newChatOpen} animationType="slide" onRequestClose={() => setNewChatOpen(false)}><KeyboardSafeView style={styles.modalOverlay}><Pressable style={StyleSheet.absoluteFill} onPress={() => setNewChatOpen(false)} /><View style={styles.sheet}><View style={styles.sheetHandle} /><ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}><View style={styles.sheetHeader}><View><Text style={styles.eyebrow}>YENİ SOHBET</Text><Text style={styles.sheetTitle}>Birini bul.</Text></View><Pressable onPress={() => setNewChatOpen(false)} style={styles.headerButton}><Ionicons name="close" size={21} color={COLORS.text} /></Pressable></View><Text style={styles.fieldLabel}>KULLANICI ADI</Text><View style={styles.handleInput}><Text style={styles.handlePrefix}>@</Text><TextInput value={newHandle} onChangeText={setNewHandle} placeholder="kullaniciadi" placeholderTextColor={COLORS.muted} autoCapitalize="none" autoCorrect={false} maxLength={24} style={styles.handleTextInput} /></View><Text style={styles.sheetHint}>Yalnızca kayıtlı Sora kullanıcılarıyla sohbet başlatabilirsin.</Text><Pressable disabled={startingChat} onPress={createConversation}><LinearGradient colors={[COLORS.primary, "#6AA8F5"]} style={styles.primaryAction}>{startingChat ? <ActivityIndicator color={COLORS.primaryInk} /> : <><Text style={styles.primaryActionText}>Sohbeti aç</Text><Ionicons name="arrow-forward" size={19} color={COLORS.primaryInk} /></>}</LinearGradient></Pressable></ScrollView></View></KeyboardSafeView></Modal>
+    <Modal transparent visible={newChatOpen} animationType="slide" onRequestClose={() => setNewChatOpen(false)}><KeyboardSafeView style={styles.modalOverlay}><Pressable style={StyleSheet.absoluteFill} onPress={() => setNewChatOpen(false)} /><View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}><View style={styles.sheetHandle} /><ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}><View style={styles.sheetHeader}><View><Text style={styles.eyebrow}>YENİ SOHBET</Text><Text style={styles.sheetTitle}>Birini bul.</Text></View><Pressable onPress={() => setNewChatOpen(false)} style={styles.headerButton}><Ionicons name="close" size={21} color={COLORS.text} /></Pressable></View><Text style={styles.fieldLabel}>KULLANICI ADI</Text><View style={styles.handleInput}><Text style={styles.handlePrefix}>@</Text><TextInput value={newHandle} onChangeText={setNewHandle} placeholder="kullaniciadi" placeholderTextColor={COLORS.muted} autoCapitalize="none" autoCorrect={false} maxLength={24} style={styles.handleTextInput} /></View><Text style={styles.sheetHint}>Yalnızca kayıtlı Sora kullanıcılarıyla sohbet başlatabilirsin.</Text><Pressable disabled={startingChat} onPress={createConversation}><LinearGradient colors={[COLORS.primary, "#6AA8F5"]} style={styles.primaryAction}>{startingChat ? <ActivityIndicator color={COLORS.primaryInk} /> : <><Text style={styles.primaryActionText}>Sohbeti aç</Text><Ionicons name="arrow-forward" size={19} color={COLORS.primaryInk} /></>}</LinearGradient></Pressable></ScrollView></View></KeyboardSafeView></Modal>
   </View>;
 }
 
@@ -272,7 +279,7 @@ const styles = StyleSheet.create({
   messageBody: { color: COLORS.text, fontSize: 14, lineHeight: 20 },
   messageBodyOwn: { color: COLORS.primaryInk },
   messageTime: { color: COLORS.muted, fontSize: 9, marginTop: 5, alignSelf: "flex-end" },
-  messageTimeOwn: { color: "#1D5FBF" },
+  messageTimeOwn: { color: "rgba(255,255,255,0.82)" },
   composer: { paddingHorizontal: 13, paddingTop: 10, paddingBottom: Platform.OS === "ios" ? 12 : 9, borderTopWidth: 1, borderTopColor: COLORS.line, backgroundColor: COLORS.background, flexDirection: "row", alignItems: "flex-end", gap: 8 },
   composerInput: { flex: 1, minHeight: 43, maxHeight: 112, borderRadius: 15, paddingHorizontal: 14, paddingVertical: 11, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.line, color: COLORS.text, fontSize: 14 },
   sendButton: { width: 43, height: 43, borderRadius: 15, backgroundColor: COLORS.primary, alignItems: "center", justifyContent: "center" },

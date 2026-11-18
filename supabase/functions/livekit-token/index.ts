@@ -31,13 +31,17 @@ const redactClientErrorText = (value: unknown) => String(value || "")
   .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [REDACTED]")
   .replace(/\beyJ[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+){2}\b/g, "[REDACTED_JWT]")
   .replace(/\b(?:sb_(?:publishable|secret)_[A-Za-z0-9_-]+|sk_[A-Za-z0-9_-]+)\b/g, "[REDACTED_KEY]")
+  .replace(/([?&#](?:access_token|refresh_token|token|code)=)[^&#\s]+/gi, "$1[REDACTED]")
   .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[REDACTED_EMAIL]")
+  .replace(/\+[1-9]\d{9,14}\b/g, "[REDACTED_PHONE]")
   .slice(0, 1200);
 
 const canAcceptClientError = (request: Request) => {
-  const forwarded = request.headers.get("cf-connecting-ip") ||
-    request.headers.get("x-forwarded-for") || "unknown";
-  const key = forwarded.split(",")[0].trim() || "unknown";
+  const key = (
+    request.headers.get("cf-connecting-ip") ||
+    request.headers.get("x-real-ip") ||
+    "unknown"
+  ).trim() || "unknown";
   const now = Date.now();
   if (clientErrorWindows.size > 1024) {
     for (const [windowKey, window] of clientErrorWindows) {
@@ -105,7 +109,9 @@ const getConfiguredProviders = (): string[] => {
   const list: string[] = [];
   if (primaryLiveKitService) list.push("livekit");
   if (agoraAppId && agoraAppCertificate) list.push("agora");
-  if (cfCallsAppId && cfCallsAppSecret) list.push("cloudflare");
+  if (cfCallsAppId && cfCallsAppSecret && Deno.env.get("CF_CALLS_ENABLED") === "true") {
+    list.push("cloudflare");
+  }
   if (backupLiveKitService) list.push("livekit_backup");
   return list;
 };
@@ -359,9 +365,18 @@ const issueToken = async (request: Request) => {
     "join_room",
     { p_room_id: cleanRoomName },
   );
-  if (membershipError) {
-    return json({ error: membershipError.message }, 403);
+  if (membershipError || !membership?.[0]) {
+    return json({ error: membershipError?.message || "Room access denied" }, 403);
   }
+
+  const { data: profileRow } = await userClient
+    .from("profiles")
+    .select("display_name")
+    .eq("id", user.id)
+    .maybeSingle();
+  const verifiedName = String(profileRow?.display_name || cleanName || "Sora kullanıcısı")
+    .trim()
+    .slice(0, 64);
 
   const configuredProviders = getConfiguredProviders();
   // Provider configuration is server-only input.  Calling the allocator with
@@ -446,7 +461,7 @@ const issueToken = async (request: Request) => {
 
   const token = new AccessToken(targetKey, targetSecret, {
     identity: user.id,
-    name: cleanName,
+    name: verifiedName,
     ttl: "10m",
     attributes: seat !== null ? { seat: String(seat) } : undefined,
   });
@@ -545,6 +560,8 @@ const handleVoiceHeartbeat = async (request: Request) => {
   return json(data || { ok: true });
 };
 
+const CF_SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+
 const handleCloudflareNegotiate = async (request: Request) => {
   requireBaseConfig();
   if (!cfCallsAppId || !cfCallsAppSecret) {
@@ -554,27 +571,47 @@ const handleCloudflareNegotiate = async (request: Request) => {
   const roomId = String(body.roomId || "").trim();
   const sessionId = String(body.sessionId || "").trim();
   const op = String(body.op || "tracks_new").trim();
-  const payload = body.payload || {};
+  const payload = body.payload && typeof body.payload === "object" ? body.payload : {};
 
-  if (!UUID_PATTERN.test(roomId) || !sessionId) {
+  if (
+    !UUID_PATTERN.test(roomId) ||
+    !CF_SESSION_ID_PATTERN.test(sessionId) ||
+    !["tracks_new", "renegotiate"].includes(op)
+  ) {
     return json({ error: "Invalid Cloudflare request" }, 400);
   }
 
   const { client, user } = await getAuthenticatedClient(request);
-  const { data: member } = await client
-    .from("room_members")
-    .select("role, is_muted, removed_at")
-    .eq("room_id", roomId)
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const [{ data: room }, { data: member }] = await Promise.all([
+    client.from("rooms").select("id, host_id, state").eq("id", roomId).maybeSingle(),
+    client
+      .from("room_members")
+      .select("role, is_muted, seat_index, removed_at")
+      .eq("room_id", roomId)
+      .eq("user_id", user.id)
+      .maybeSingle(),
+  ]);
 
-  if (!member || member.removed_at) {
+  if (!room || room.state !== "live" || !member || member.removed_at) {
     return json({ error: "Room membership required" }, 403);
   }
 
+  const isHost = room.host_id === user.id;
+  const role = isHost ? "host" : String(member.role || "listener");
+  const muted = isHost ? false : Boolean(member.is_muted);
+  const seated = isHost || typeof member.seat_index === "number";
+  const canPublish = roomRoleCanPublish(role, muted, seated);
+
+  const tracks = Array.isArray((payload as { tracks?: unknown[] }).tracks)
+    ? ((payload as { tracks: Array<{ location?: string }> }).tracks)
+    : [];
+  if (!canPublish && tracks.some((track) => track?.location === "local")) {
+    return json({ error: "Publish permission required" }, 403);
+  }
+
   const endpoint = op === "renegotiate"
-    ? `https://rtc.live.cloudflare.com/v1/apps/${cfCallsAppId}/sessions/${sessionId}/renegotiate`
-    : `https://rtc.live.cloudflare.com/v1/apps/${cfCallsAppId}/sessions/${sessionId}/tracks/new`;
+    ? `https://rtc.live.cloudflare.com/v1/apps/${encodeURIComponent(cfCallsAppId)}/sessions/${encodeURIComponent(sessionId)}/renegotiate`
+    : `https://rtc.live.cloudflare.com/v1/apps/${encodeURIComponent(cfCallsAppId)}/sessions/${encodeURIComponent(sessionId)}/tracks/new`;
 
   const upstream = await fetch(endpoint, {
     method: op === "renegotiate" ? "PUT" : "POST",
@@ -780,12 +817,19 @@ const authorizeSeat = async (request: Request, roomId: string) => {
     if (seat === null) return json({ error: "No free seat" }, 409);
   }
 
-  await client.rpc("commit_room_seat", {
-    p_room_id: roomId,
-    p_target_user_id: targetId,
-    p_seat_index: seat,
-    p_valid_seats: validSeats,
-  }).catch(() => undefined);
+  const { data: committedSeat, error: commitError } = await client.rpc(
+    "commit_room_seat",
+    {
+      p_room_id: roomId,
+      p_target_user_id: targetId,
+      p_seat_index: seat,
+      p_valid_seats: validSeats,
+    },
+  );
+  if (commitError || committedSeat === null || committedSeat === undefined) {
+    return json({ error: commitError?.message || "Seat is taken" }, 409);
+  }
+  seat = Number(committedSeat);
 
   await applyLiveKitPermission(
     lkService,
@@ -863,7 +907,10 @@ const updateLayout = async (request: Request, roomId: string) => {
     await Promise.all(
       participants
         .filter((participant) =>
-          participant.seat !== null && !validSeats.has(participant.seat)
+          participant.seat !== null &&
+          participant.seat > 0 &&
+          participant.identity !== room.host_id &&
+          !validSeats.has(participant.seat)
         )
         .map(async (participant) => {
           await lkService.updateParticipant(roomId, participant.identity, {
@@ -895,11 +942,23 @@ const listHostPresence = async (request: Request) => {
   if (!wanted.length) return json({ liveRoomIds: [] });
 
   const liveSet = new Set<string>();
-  const roomIds = wanted.map((r) => String(r.roomId));
+  const requestedIds = wanted.map((r) => String(r.roomId));
 
-  // 1) Aktif veritabanı ses oturumları (tüm sağlayıcıları kapsar: LiveKit, Agora, Cloudflare, Yedek)
+  // Filter requested rooms through caller RLS first so block rules apply, then
+  // inspect voice_active_sessions via service_role (so lobby users see Agora/backup rooms online).
+  const { data: visibleRooms } = await client
+    .from("rooms")
+    .select("id")
+    .in("id", requestedIds)
+    .eq("state", "live");
+  const visibleIds = new Set((visibleRooms || []).map((r: { id: string }) => String(r.id)));
+  const visibleWanted = wanted.filter((r) => visibleIds.has(String(r.roomId)));
+  if (!visibleWanted.length) return json({ liveRoomIds: [] });
+  const roomIds = visibleWanted.map((r) => String(r.roomId));
+
   const twoMinAgo = new Date(Date.now() - 130_000).toISOString();
-  const { data: activeSessions } = await client
+  const serverClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+  const { data: activeSessions } = await serverClient
     .from("voice_active_sessions")
     .select("room_id, user_id")
     .in("room_id", roomIds)
@@ -909,7 +968,7 @@ const listHostPresence = async (request: Request) => {
     const sessionPairs = new Set(
       activeSessions.map((s) => `${s.room_id}:${s.user_id}`),
     );
-    for (const r of wanted) {
+    for (const r of visibleWanted) {
       if (sessionPairs.has(`${r.roomId}:${r.hostId}`)) {
         liveSet.add(String(r.roomId));
       }
@@ -919,7 +978,7 @@ const listHostPresence = async (request: Request) => {
   // 2) LiveKit doğrudan varlık kontrolü (birincil + yedek)
   for (const lkService of [primaryLiveKitService, backupLiveKitService]) {
     if (!lkService) continue;
-    const remaining = wanted.filter((r) => !liveSet.has(String(r.roomId)));
+    const remaining = visibleWanted.filter((r) => !liveSet.has(String(r.roomId)));
     if (!remaining.length) break;
     const activeRooms = await lkService
       .listRooms(remaining.map((r) => String(r.roomId)))

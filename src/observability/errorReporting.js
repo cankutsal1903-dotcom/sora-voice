@@ -10,7 +10,9 @@ const redactText = (value) => String(value || "")
   .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [REDACTED]")
   .replace(/\beyJ[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+){2}\b/g, "[REDACTED_JWT]")
   .replace(/\b(?:sb_(?:publishable|secret)_[A-Za-z0-9_-]+|sk_[A-Za-z0-9_-]+)\b/g, "[REDACTED_KEY]")
+  .replace(/([?&#](?:access_token|refresh_token|token|code)=)[^&#\s]+/gi, "$1[REDACTED]")
   .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[REDACTED_EMAIL]")
+  .replace(/\+[1-9]\d{9,14}\b/g, "[REDACTED_PHONE]")
   .slice(0, MAX_TEXT_LENGTH);
 
 const toErrorPayload = (error, context = {}) => {
@@ -22,13 +24,13 @@ const toErrorPayload = (error, context = {}) => {
     message: message || "Unknown client error",
     stack: stack || undefined,
     context: Object.fromEntries(
-      Object.entries(context)
+      Object.entries(context || {})
         .slice(0, 8)
         .map(([key, value]) => [String(key).slice(0, 60), redactText(value)])
     ),
     platform: Platform.OS,
     appVersion: expoConfig.version || "unknown",
-    buildNumber: Platform.select({ ios: expoConfig.ios?.buildNumber, android: expoConfig.android?.versionCode }) || "unknown",
+    buildNumber: String(Platform.select({ ios: expoConfig.ios?.buildNumber, android: expoConfig.android?.versionCode }) || "1"),
     occurredAt: new Date().toISOString(),
   };
 };
@@ -42,7 +44,7 @@ export const reportError = (error, context) => {
   const payload = toErrorPayload(error, context);
   const fingerprint = `${payload.message}:${payload.platform}`;
   const now = Date.now();
-  if (lastReport.fingerprint === fingerprint && now - lastReport.createdAt < REPORT_COOLDOWN_MS) return;
+  if (!context?.fatal && lastReport.fingerprint === fingerprint && now - lastReport.createdAt < REPORT_COOLDOWN_MS) return;
 
   lastReport = { fingerprint, createdAt: now };
   fetch(`${tokenServerUrl}/errors`, {

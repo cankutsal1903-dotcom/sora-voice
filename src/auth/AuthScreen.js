@@ -36,7 +36,7 @@ const describeAuthError = (error, fallback) => {
 };
 
 function ProviderButton({ icon, label, onPress, disabled }) {
-  return <Pressable disabled={disabled} onPress={onPress} style={[styles.providerButton, disabled && styles.disabled]}><Ionicons name={icon} size={18} color="#F5F8FC" /><Text style={styles.providerButtonText}>{label}</Text></Pressable>;
+  return <Pressable disabled={disabled} onPress={onPress} style={[styles.providerButton, disabled && styles.disabled]}><Ionicons name={icon} size={18} color={BRAND} /><Text style={styles.providerButtonText}>{label}</Text></Pressable>;
 }
 
 /** Odaklandiginda kenarligi marka rengine donen metin alani. */
@@ -87,6 +87,7 @@ export function AuthScreen() {
     }
     setSubmitting(true);
     try {
+      if (!supabase) throw new Error("Supabase yapılandırılmadı.");
       const profile = isRegistering ? await validateProfile() : null;
       if (isRegistering && !profile) return;
       const result = isRegistering
@@ -110,7 +111,7 @@ export function AuthScreen() {
     }
   };
 
-  const submitPhone = async () => {
+  const submitPhone = async (isResend = false) => {
     const normalizedPhone = normalizePhoneNumber(phone);
     if (!/^\+[1-9]\d{7,14}$/.test(normalizedPhone)) {
       Alert.alert("Telefon numarası geçersiz", "Numaranı ülke koduyla birlikte yaz. Örnek: 532 123 45 67");
@@ -118,8 +119,15 @@ export function AuthScreen() {
     }
     setSubmitting(true);
     try {
-      const profile = phoneRegistration ? await validateProfile() : null;
-      if (phoneRegistration && !profile) return;
+      let profile = null;
+      if (phoneRegistration) {
+        if (isResend) {
+          profile = { displayName: displayName.trim(), handle: cleanHandle(handle) };
+        } else {
+          profile = await validateProfile();
+          if (!profile) return;
+        }
+      }
       await startPhoneSignIn({ phone: normalizedPhone, profile });
       setPhone(normalizedPhone);
       setScreen("otp");
@@ -178,9 +186,9 @@ export function AuthScreen() {
 
   const emailCard = <><View style={styles.card}>{isRegistering ? profileFields : null}<Text style={styles.label}>E-POSTA</Text><Field value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" placeholder="ornek@mail.com" style={styles.input} focused={focusedField === "email"} onFocus={focus("email")} onBlur={blur} /><Text style={styles.label}>PAROLA</Text><Field value={password} onChangeText={setPassword} secureTextEntry placeholder="En az 6 karakter" style={styles.input} focused={focusedField === "password"} onFocus={focus("password")} onBlur={blur} /><Pressable disabled={submitting} onPress={submitEmail}><LinearGradient colors={[BRAND, "#1D5FBF"]} style={[styles.submit, submitting && styles.disabled]}><Text style={styles.submitText}>{submitting ? "İşleniyor" : isRegistering ? "Hesabımı oluştur" : "Giriş yap"}</Text><Ionicons name="arrow-forward" size={19} color="#FFFFFF" /></LinearGradient></Pressable>{!isRegistering ? <Pressable disabled={submitting} onPress={sendResetEmail} style={styles.textButton}><Text style={styles.textButtonLabel}>Parolamı unuttum</Text></Pressable> : null}<Pressable onPress={() => setIsRegistering((current) => !current)} style={styles.toggle} hitSlop={{ top: 14, bottom: 14, left: 24, right: 24 }}><Text style={styles.toggleMuted}>{isRegistering ? "Zaten hesabın var mı?" : "Sora'da yeni misin?"}</Text><Text style={styles.toggleLink}>{isRegistering ? " Giriş yap" : " Hesap oluştur"}</Text></Pressable></View><Text style={styles.or}>veya</Text><View style={styles.providerGrid}><ProviderButton disabled={submitting} icon="logo-google" label="Google" onPress={() => startProvider("google")} /><ProviderButton disabled={submitting} icon="phone-portrait-outline" label="Telefon" onPress={() => setScreen("phone")} /></View></>;
 
-  const phoneCard = <View style={styles.card}>{phoneRegistration ? profileFields : null}<Text style={styles.label}>TELEFON NUMARASI</Text><Field value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="532 123 45 67" style={styles.input} maxLength={18} focused={focusedField === "phone"} onFocus={focus("phone")} onBlur={blur} /><Pressable disabled={submitting} onPress={submitPhone}><LinearGradient colors={[BRAND, "#1D5FBF"]} style={[styles.submit, submitting && styles.disabled]}><Text style={styles.submitText}>{submitting ? "Gönderiliyor" : "SMS kodu gönder"}</Text><Ionicons name="chatbubble-ellipses-outline" size={19} color="#FFFFFF" /></LinearGradient></Pressable><Pressable onPress={() => setPhoneRegistration((current) => !current)} style={styles.toggle} hitSlop={{ top: 14, bottom: 14, left: 24, right: 24 }}><Text style={styles.toggleMuted}>{phoneRegistration ? "Zaten telefon hesabın var mı?" : "Telefonla yeni misin?"}</Text><Text style={styles.toggleLink}>{phoneRegistration ? " Giriş yap" : " Hesap oluştur"}</Text></Pressable><Pressable onPress={() => setScreen("email")} style={styles.textButton}><Text style={styles.textButtonLabel}>E-posta girişine dön</Text></Pressable></View>;
+  const phoneCard = <View style={styles.card}>{phoneRegistration ? profileFields : null}<Text style={styles.label}>TELEFON NUMARASI</Text><Field value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="532 123 45 67" style={styles.input} maxLength={18} focused={focusedField === "phone"} onFocus={focus("phone")} onBlur={blur} /><Pressable disabled={submitting} onPress={() => submitPhone(false)}><LinearGradient colors={[BRAND, "#1D5FBF"]} style={[styles.submit, submitting && styles.disabled]}><Text style={styles.submitText}>{submitting ? "Gönderiliyor" : "SMS kodu gönder"}</Text><Ionicons name="chatbubble-ellipses-outline" size={19} color="#FFFFFF" /></LinearGradient></Pressable><Pressable onPress={() => setPhoneRegistration((current) => !current)} style={styles.toggle} hitSlop={{ top: 14, bottom: 14, left: 24, right: 24 }}><Text style={styles.toggleMuted}>{phoneRegistration ? "Zaten telefon hesabın var mı?" : "Telefonla yeni misin?"}</Text><Text style={styles.toggleLink}>{phoneRegistration ? " Giriş yap" : " Hesap oluştur"}</Text></Pressable><Pressable onPress={() => setScreen("email")} style={styles.textButton}><Text style={styles.textButtonLabel}>E-posta girişine dön</Text></Pressable></View>;
 
-  const otpCard = <View style={styles.card}><Text style={styles.otpDescription}>{phone} numarasına gönderilen 6 haneli kodu gir.</Text><Text style={styles.label}>DOĞRULAMA KODU</Text><Field value={otp} onChangeText={(value) => setOtp(value.replace(/\D/g, "").slice(0, 6))} keyboardType="number-pad" placeholder="000000" style={[styles.input, styles.otpInput]} maxLength={6} focused={focusedField === "otp"} onFocus={focus("otp")} onBlur={blur} /><Pressable disabled={submitting} onPress={submitOtp}><LinearGradient colors={[BRAND, "#1D5FBF"]} style={[styles.submit, submitting && styles.disabled]}><Text style={styles.submitText}>{submitting ? "Doğrulanıyor" : "Kodu doğrula"}</Text><Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" /></LinearGradient></Pressable><Pressable disabled={submitting} onPress={submitPhone} style={styles.textButton}><Text style={styles.textButtonLabel}>Kodu yeniden gönder</Text></Pressable><Pressable onPress={() => setScreen("phone")} style={styles.textButton}><Text style={styles.textButtonLabel}>Telefon numarasını değiştir</Text></Pressable></View>;
+  const otpCard = <View style={styles.card}><Text style={styles.otpDescription}>{phone} numarasına gönderilen 6 haneli kodu gir.</Text><Text style={styles.label}>DOĞRULAMA KODU</Text><Field value={otp} onChangeText={(value) => setOtp(value.replace(/\D/g, "").slice(0, 6))} keyboardType="number-pad" placeholder="000000" style={[styles.input, styles.otpInput]} maxLength={6} focused={focusedField === "otp"} onFocus={focus("otp")} onBlur={blur} /><Pressable disabled={submitting} onPress={submitOtp}><LinearGradient colors={[BRAND, "#1D5FBF"]} style={[styles.submit, submitting && styles.disabled]}><Text style={styles.submitText}>{submitting ? "Doğrulanıyor" : "Kodu doğrula"}</Text><Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" /></LinearGradient></Pressable><Pressable disabled={submitting} onPress={() => submitPhone(true)} style={styles.textButton}><Text style={styles.textButtonLabel}>Kodu yeniden gönder</Text></Pressable><Pressable onPress={() => setScreen("phone")} style={styles.textButton}><Text style={styles.textButtonLabel}>Telefon numarasını değiştir</Text></Pressable></View>;
 
   const subtitle = screen === "otp" ? "Telefon numaranı güvenle doğrula." : screen === "phone" ? "Telefon numaranla hızlı ve güvenli giriş yap." : isRegistering ? "Profilini oluştur, topluluğunu bul ve odalara katıl." : "Odaların, takiplerin ve profilin seni bekliyor.";
 
@@ -370,7 +378,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   otpDescription: {
-    color: "#C2CEDD",
+    color: "#46596F",
     fontSize: 13,
     lineHeight: 19,
     marginBottom: 20,

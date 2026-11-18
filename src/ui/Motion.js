@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   Animated,
@@ -148,9 +148,10 @@ export const Reveal = memo(function Reveal({
   style,
 }) {
   const progress = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(
-    progress.interpolate({ inputRange: [0, 1], outputRange: [distance, 0] }),
-  ).current;
+  const translateY = useMemo(
+    () => progress.interpolate({ inputRange: [0, 1], outputRange: [distance, 0] }),
+    [distance, progress],
+  );
   const reducedMotion = useReducedMotion();
 
   useEffect(() => {
@@ -195,13 +196,19 @@ export const LivePulse = memo(function LivePulse({
   const scale = useRef(
     pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 2.2] }),
   ).current;
-  const shellStyle = useRef({ width: size * 2.3, height: size * 2.3 }).current;
-  const dotStyle = useRef({
-    width: size,
-    height: size,
-    borderRadius: size / 2,
-    backgroundColor: color,
-  }).current;
+  const shellStyle = useMemo(
+    () => ({ width: size * 2.3, height: size * 2.3 }),
+    [size],
+  );
+  const dotStyle = useMemo(
+    () => ({
+      width: size,
+      height: size,
+      borderRadius: size / 2,
+      backgroundColor: color,
+    }),
+    [color, size],
+  );
 
   return (
     <View
@@ -235,14 +242,16 @@ export const AudioBars = memo(function AudioBars({
 }) {
   const progress = useSharedDriver(barsDriver, useReducedMotion());
   const heights = compact ? AUDIO_HEIGHTS_COMPACT : AUDIO_HEIGHTS;
-  const scales = useRef(
-    heights.map((_, index) =>
-      progress.interpolate({
-        inputRange: [0, 1],
-        outputRange: index % 2 ? [0.48, 1] : [1, 0.55],
-      }),
-    ),
-  ).current;
+  const scales = useMemo(
+    () =>
+      heights.map((_, index) =>
+        progress.interpolate({
+          inputRange: [0, 1],
+          outputRange: index % 2 ? [0.48, 1] : [1, 0.55],
+        }),
+      ),
+    [heights, progress],
+  );
 
   return (
     <View

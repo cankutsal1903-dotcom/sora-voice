@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   AppState,
   BackHandler,
+  Dimensions,
   Easing,
   Image,
   Linking,
@@ -70,6 +71,7 @@ import {
   getWallet,
   joinRoomMembership,
   listBlockedUsers,
+  listFollowedProfiles,
   listFollowedUserIds,
   getFollowCounts,
   listRoomMembers,
@@ -142,6 +144,7 @@ import { useRoomMusic } from "./src/room/useRoomMusic";
 import {
   configureNotificationChannel,
   registerPushToken,
+  unregisterPushToken,
 } from "./src/notifications/pushTokenManager";
 import {
   cancelReminder,
@@ -320,12 +323,18 @@ const INITIAL_ROOMS = [
 ];
 
 const CATEGORIES = [
-  { name: "Tumu", label: "Tumu", icon: "apps-outline" },
+  { name: "Tumu", label: "Tümü", icon: "apps-outline" },
   { name: "Sohbet", label: "Sohbet", icon: "chatbubbles-outline" },
-  { name: "Muzik", label: "Muzik", icon: "musical-notes-outline" },
+  { name: "Muzik", label: "Müzik", icon: "musical-notes-outline" },
   { name: "Oyun", label: "Oyun", icon: "game-controller-outline" },
   { name: "Gece", label: "Gece", icon: "moon-outline" },
 ];
+
+const formatCategoryLabel = (value) => {
+  if (value === "Muzik") return "Müzik";
+  if (value === "Tumu") return "Tümü";
+  return value || "Sohbet";
+};
 
 const DEFAULT_COMMUNITIES = [
   {
@@ -602,8 +611,8 @@ const NotificationCenter = memo(function NotificationCenter({
               <Text style={styles.notificationTitle}>Bildirimler</Text>
               <Text style={styles.notificationSubtitle}>
                 {notifications.length
-                  ? `${notifications.length} yeni gelisme var`
-                  : "Her sey yakalandi"}
+                  ? `${notifications.length} yeni gelişme var`
+                  : "Her şey yakalandı"}
               </Text>
             </View>
             <Pressable onPress={notifications.length ? onClear : onDismiss}>
@@ -1016,12 +1025,12 @@ function Discover({
               <View style={styles.featureTop}>
                 <View style={styles.featureLivePill}>
                   <LivePulse size={6} />
-                  <Text style={styles.featureLiveLabel}>SIMDI CANLI</Text>
+                  <Text style={styles.featureLiveLabel}>ŞİMDİ CANLI</Text>
                 </View>
                 <View style={styles.featureCategoryPill}>
                   <Ionicons name="headset-outline" size={14} color="#FFFFFF" />
                   <Text style={styles.featureCategoryText}>
-                    {featuredRoom.category}
+                    {formatCategoryLabel(featuredRoom.category)}
                   </Text>
                 </View>
               </View>
@@ -1177,21 +1186,21 @@ function ScheduleAgenda({
 }) {
   const confirmCancel = (room) =>
     Alert.alert(
-      "Planli odayi iptal et?",
-      `${room.title} ajandandan kaldirilacak.`,
+      "Planlı odayı iptal et?",
+      `${room.title} ajandandan kaldırılacak.`,
       [
-        { text: "Vazgec", style: "cancel" },
+        { text: "Vazgeç", style: "cancel" },
         {
-          text: "Iptal et",
+          text: "İptal et",
           style: "destructive",
           onPress: () => onCancel(room),
         },
       ],
     );
   const confirmStart = (room) =>
-    Alert.alert("Odayi simdi baslat?", `${room.title} canli odaya donusecek.`, [
-      { text: "Vazgec", style: "cancel" },
-      { text: "Baslat", onPress: () => onStart(room) },
+    Alert.alert("Odayı şimdi başlat?", `${room.title} canlı odaya dönüşecek.`, [
+      { text: "Vazgeç", style: "cancel" },
+      { text: "Başlat", onPress: () => onStart(room) },
     ]);
   return (
     <Modal
@@ -1207,12 +1216,12 @@ function ScheduleAgenda({
           <Pressable onPress={onDismiss} style={styles.sheetClose}>
             <Ionicons name="close" size={20} color={COLORS.text} />
           </Pressable>
-          <Text style={styles.kicker}>SENIN AJANDAN</Text>
-          <Text style={styles.sheetTitle}>Yaklasan odalar</Text>
+          <Text style={styles.kicker}>SENİN AJANDAN</Text>
+          <Text style={styles.sheetTitle}>Yaklaşan odalar</Text>
           <Text style={styles.agendaSummary}>
             {reminderRoomIds.length
-              ? `${reminderRoomIds.length} oda icin hatirlatici acik.`
-              : "Hatirlatmak istediklerini sec."}
+              ? `${reminderRoomIds.length} oda için hatırlatıcı açık.`
+              : "Hatırlatmak istediklerini seç."}
           </Text>
           <ScrollView
             showsVerticalScrollIndicator={false}
@@ -1275,7 +1284,7 @@ function ScheduleAgenda({
                           color={COLORS.primaryInk}
                         />
                       </Pressable>
-                    )}{" "}
+                    )}
                     {canManageRoom && (
                       <Pressable
                         onPress={() => confirmCancel(room)}
@@ -1295,7 +1304,7 @@ function ScheduleAgenda({
           </ScrollView>
           <Pressable onPress={onPlan}>
             <LinearGradient colors={BRAND_GRADIENT} style={styles.createSubmit}>
-              <Text style={styles.createSubmitText}>Yeni bulusma planla</Text>
+              <Text style={styles.createSubmitText}>Yeni buluşma planla</Text>
               <Ionicons name="add" size={21} color={COLORS.primaryInk} />
             </LinearGradient>
           </Pressable>
@@ -1378,7 +1387,7 @@ const RoomCard = memo(function RoomCard({
               </Text>
               <Ionicons name="arrow-forward" size={15} color={COLORS.primary} />
             </View>
-            <Text style={styles.roomCategory}>{room.category}</Text>
+            <Text style={styles.roomCategory}>{formatCategoryLabel(room.category)}</Text>
           </View>
         </Pressable>
         <Pressable
@@ -2308,7 +2317,7 @@ const UserLevelSheet = memo(function UserLevelSheet({
               >
                 {LEVEL_BADGE_TIERS.map((tier) => {
                   const unlocked = safeLevel >= tier.minLevel;
-                  const active = currentTier.tierIndex === tier.tierIndex;
+                  const active = currentTier.key === tier.key;
                   return (
                     <View
                       key={tier.key}
@@ -2318,7 +2327,7 @@ const UserLevelSheet = memo(function UserLevelSheet({
                         !unlocked && { opacity: 0.62 },
                       ]}
                     >
-                      <SoraLevelCrest level={tier.minLevel} size={52} />
+                      <SoraLevelCrest level={tier.minLevel} size={52} locked={!unlocked} />
                       <Text numberOfLines={1} style={styles.userTierRange}>
                         {tier.rangeLabel}
                       </Text>
@@ -2395,6 +2404,8 @@ const UserLevelSheet = memo(function UserLevelSheet({
 
 function Profile({
   profile,
+  userId = null,
+  followedUserIds = [],
   family = null,
   coins,
   favoriteCount,
@@ -2406,6 +2417,7 @@ function Profile({
   onOpenWallet,
   onClaimDailyReward,
   onSyncUserLevel,
+  onOpenUserProfile,
 }) {
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [levelSheetOpen, setLevelSheetOpen] = useState(false);
@@ -2413,7 +2425,7 @@ function Profile({
   const [recentActivity, setRecentActivity] = useState([]);
   const [activityStreak, setActivityStreak] = useState(1);
   const [followedCount, setFollowedCount] = useState(0);
-  const [followedNames, setFollowedNames] = useState([]);
+  const [followedProfiles, setFollowedProfiles] = useState([]);
   const [profileTab, setProfileTab] = useState("rooms");
   const [profileDetailsOpen, setProfileDetailsOpen] = useState(false);
   const openSafetyCenter = useCallback(() => setSafetyOpen(true), []);
@@ -2471,16 +2483,44 @@ function Profile({
       .catch(() => undefined);
   }, []);
   useEffect(() => {
-    AsyncStorage.getItem(FOLLOWED_USERS_KEY)
-      .then((savedNames) => {
-        const parsedNames = JSON.parse(savedNames || "[]");
-        if (Array.isArray(parsedNames)) {
-          setFollowedCount(parsedNames.length);
-          setFollowedNames(parsedNames);
-        }
-      })
-      .catch(() => undefined);
-  }, []);
+    let active = true;
+    if (supabase && userId) {
+      setFollowedCount(followedUserIds.length);
+      listFollowedProfiles(userId)
+        .then((profiles) => {
+          if (!active) return;
+          setFollowedProfiles(profiles);
+          setFollowedCount(profiles.length);
+        })
+        .catch(() => undefined);
+      return () => {
+        active = false;
+      };
+    }
+    if (!isSupabaseConfigured) {
+      AsyncStorage.getItem(FOLLOWED_USERS_KEY)
+        .then((savedNames) => {
+          if (!active) return;
+          const parsedNames = JSON.parse(savedNames || "[]");
+          if (Array.isArray(parsedNames)) {
+            setFollowedCount(parsedNames.length);
+            setFollowedProfiles(
+              parsedNames.map((name) => ({
+                id: name,
+                name,
+                handle: "",
+                color: COLORS.primaryLight,
+                avatarUrl: null,
+              })),
+            );
+          }
+        })
+        .catch(() => undefined);
+    }
+    return () => {
+      active = false;
+    };
+  }, [followedUserIds.length, userId]);
   useEffect(() => {
     const updateStreak = async () => {
       try {
@@ -2591,7 +2631,7 @@ function Profile({
             >
               <ProfileFrame appearance={homeFrameAppearance} size={68} style={styles.profileHomeAvatarWrap}>
                 <Avatar
-                  label={profile.name.charAt(0).toUpperCase()}
+                  label={(profile.name || "S").charAt(0).toUpperCase()}
                   color={profile.color}
                   uri={profile.avatarUrl}
                   size={68}
@@ -2744,7 +2784,7 @@ function Profile({
               Takip ettiklerim
             </Text>
             <View style={styles.pfTabBadge}>
-              <Text style={styles.pfTabBadgeText}>{followedNames.length}</Text>
+              <Text style={styles.pfTabBadgeText}>{followedCount}</Text>
             </View>
           </Pressable>
         </View>
@@ -2759,7 +2799,7 @@ function Profile({
                   ]}
                 >
                   <Text style={styles.pfActivityAvatarText}>
-                    {item.initials || item.title.charAt(0)}
+                    {item.initials || (item.title || "S").charAt(0)}
                   </Text>
                 </View>
                 <View style={styles.pfActivityInfo}>
@@ -2767,7 +2807,7 @@ function Profile({
                     {item.title}
                   </Text>
                   <Text style={styles.pfActivityMeta}>
-                    {item.category} · {item.listeners ?? 0} dinleyici
+                    {formatCategoryLabel(item.category)} · {item.listeners ?? 0} dinleyici
                   </Text>
                 </View>
                 <Ionicons name="mic-outline" size={18} color={COLORS.muted} />
@@ -2779,27 +2819,30 @@ function Profile({
               <Text style={styles.pfEmptyText}>Henüz bir oda açmadın.</Text>
             </View>
           )
-        ) : followedNames.length ? (
-          followedNames.map((name) => (
-            <View key={name} style={styles.pfActivityRow}>
-              <View
-                style={[
-                  styles.pfActivityAvatar,
-                  { backgroundColor: COLORS.primaryLight },
-                ]}
-              >
-                <Text style={styles.pfActivityAvatarText}>
-                  {name.charAt(0).toUpperCase()}
-                </Text>
-              </View>
+        ) : followedProfiles.length ? (
+          followedProfiles.map((person) => (
+            <Pressable
+              key={person.id}
+              onPress={() => person.id && supabase && onOpenUserProfile?.(person.id)}
+              style={styles.pfActivityRow}
+            >
+              <Avatar
+                label={(person.name || "S").charAt(0).toUpperCase()}
+                color={person.color || COLORS.primaryLight}
+                uri={person.avatarUrl || null}
+                size={42}
+                circle
+              />
               <View style={styles.pfActivityInfo}>
                 <Text style={styles.pfActivityTitle} numberOfLines={1}>
-                  {name}
+                  {person.name || "Sora kullanıcısı"}
                 </Text>
-                <Text style={styles.pfActivityMeta}>Takip ediliyor</Text>
+                <Text style={styles.pfActivityMeta} numberOfLines={1}>
+                  {person.handle ? `@${person.handle} · Takip ediliyor` : "Takip ediliyor"}
+                </Text>
               </View>
               <Ionicons name="heart" size={16} color={COLORS.primary} />
-            </View>
+            </Pressable>
           ))
         ) : (
           <View style={styles.pfEmpty}>
@@ -2818,12 +2861,13 @@ function Profile({
                 onPress={() => setLevelSheetOpen(true)}
                 style={[
                   styles.pfBadge,
+                  styles.pfBadgeGridLevel,
                   unlocked && { borderColor: `${tier.borderColor}66` },
                   !unlocked && { opacity: 0.62 },
                 ]}
               >
                 <View style={{ marginBottom: 6 }}>
-                  <SoraLevelCrest level={tier.minLevel} size={46} />
+                  <SoraLevelCrest level={tier.minLevel} size={46} locked={!unlocked} />
                   {!unlocked ? (
                     <View style={styles.pfBadgeLock}>
                       <Ionicons name="lock-closed" size={10} color="#FFFFFF" />
@@ -2849,7 +2893,11 @@ function Profile({
           {badges.map((badge) => (
             <View
               key={badge.id}
-              style={[styles.pfBadge, badge.unlocked && { borderColor: `${badge.tint}55` }]}
+              style={[
+                styles.pfBadge,
+                styles.pfBadgeGridAchievement,
+                badge.unlocked && { borderColor: `${badge.tint}55` },
+              ]}
             >
               <View style={styles.pfBadgeMedal}>
                 <SoraAchievementBadge
@@ -2887,7 +2935,7 @@ function Profile({
                   ]}
                 >
                   <Text style={styles.pfActivityAvatarText}>
-                    {item.initials || item.title.charAt(0)}
+                    {item.initials || (item.title || "S").charAt(0)}
                   </Text>
                 </View>
                 <View style={styles.pfActivityInfo}>
@@ -2895,7 +2943,7 @@ function Profile({
                     {item.title}
                   </Text>
                   <Text style={styles.pfActivityMeta}>
-                    {item.category} · {formatHistoryTime(item)}
+                    {formatCategoryLabel(item.category)} · {formatHistoryTime(item)}
                   </Text>
                 </View>
                 <Ionicons name="headset-outline" size={18} color={COLORS.muted} />
@@ -2912,7 +2960,7 @@ function Profile({
         onShare={shareProfile}
         onOpenLevel={() => {
           setProfileDetailsOpen(false);
-          setLevelSheetOpen(true);
+          setTimeout(() => setLevelSheetOpen(true), 300);
         }}
         onDismiss={() => setProfileDetailsOpen(false)}
       />
@@ -3087,7 +3135,7 @@ function ProfileDetailSheet({
                   <Pressable
                     onPress={() => {
                       onDismiss();
-                      onEdit();
+                      setTimeout(() => onEdit(), 300);
                     }}
                     style={styles.profileDetailIconButton}
                     accessibilityLabel="Profili düzenle"
@@ -4113,6 +4161,20 @@ const RoomMiniBubble = memo(function RoomMiniBubble({
   const insets = useSafeAreaInsets();
   const drag = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const lastPosition = useRef({ x: 0, y: 0 });
+  const clampBubbleOffset = useCallback(
+    (rawX, rawY) => {
+      const { width, height } = Dimensions.get("window");
+      const minX = -Math.max(0, width - 88);
+      const maxX = 4;
+      const minY = -Math.max(0, height - (insets.bottom + 96) - (insets.top + 72));
+      const maxY = 24;
+      return {
+        x: Math.min(maxX, Math.max(minX, rawX)),
+        y: Math.min(maxY, Math.max(minY, rawY)),
+      };
+    },
+    [insets.bottom, insets.top],
+  );
   const panResponder = useMemo(
     () =>
       PanResponder.create({
@@ -4120,19 +4182,21 @@ const RoomMiniBubble = memo(function RoomMiniBubble({
         onMoveShouldSetPanResponder: (_, gesture) =>
           Math.abs(gesture.dx) > 6 || Math.abs(gesture.dy) > 6,
         onPanResponderMove: (_, gesture) => {
-          const next = {
-            x: lastPosition.current.x + gesture.dx,
-            y: lastPosition.current.y + gesture.dy,
-          };
+          const next = clampBubbleOffset(
+            lastPosition.current.x + gesture.dx,
+            lastPosition.current.y + gesture.dy,
+          );
           drag.setValue(next);
         },
         onPanResponderRelease: () => {
           drag.stopAnimation((value) => {
-            lastPosition.current = value;
+            const clamped = clampBubbleOffset(value.x, value.y);
+            lastPosition.current = clamped;
+            drag.setValue(clamped);
           });
         },
       }),
-    [drag],
+    [clampBubbleOffset, drag],
   );
   return (
     <Animated.View
@@ -4344,7 +4408,7 @@ const WalletSheet = memo(function WalletSheet({
 }) {
   const [storedActivities, setStoredActivities] = useState([]);
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || isSupabaseConfigured) return;
     AsyncStorage.getItem(WALLET_ACTIVITY_KEY)
       .then((savedActivities) => {
         const parsedActivities = JSON.parse(savedActivities || "[]");
@@ -4356,7 +4420,11 @@ const WalletSheet = memo(function WalletSheet({
   useEffect(() => {
     if (visible) onRefresh?.();
   }, [visible]);
-  const visibleActivities = activities.length ? activities : storedActivities;
+  const visibleActivities = isSupabaseConfigured
+    ? activities
+    : activities.length
+      ? activities
+      : storedActivities;
   return (
     <Modal
       transparent
@@ -4397,7 +4465,15 @@ const WalletSheet = memo(function WalletSheet({
             </LinearGradient>
             <Text style={styles.settingsCaption}>GÜNLÜK ÖDÜL</Text>
             <View style={styles.walletRewardRow}>
-              <View style={styles.walletRewardIcon}>
+              <View
+                style={[
+                  styles.walletRewardIcon,
+                  dailyRewardClaimed && {
+                    backgroundColor: COLORS.primary,
+                    borderColor: COLORS.primary,
+                  },
+                ]}
+              >
                 <Ionicons
                   name={dailyRewardClaimed ? "checkmark" : "gift-outline"}
                   size={19}
@@ -5452,6 +5528,7 @@ const DEFAULT_SCHEDULED_ROOMS = [
 ];
 const DEFAULT_APP_SETTINGS = {
   chatNotifications: true,
+  roomReminders: true,
   profilePublic: true,
   autoJoinMuted: true,
 };
@@ -5767,13 +5844,16 @@ function Room({
   initialSpeakerOn = true,
   initialMicrophoneOn = false,
   isFollowingHost = false,
+  followedUserIds = [],
   onToggleFollowHost,
+  onToggleFollowUser,
   onHostPresenceChange,
   onMinimize,
   onEditProfile,
   userFamilyLevel = 0,
   minimized = false,
 }) {
+  const insets = useSafeAreaInsets();
   useEffect(() => {
     console.warn("[room-entry] Room component mounted");
     return () => console.warn("[room-entry] Room component unmounted");
@@ -5819,6 +5899,18 @@ function Room({
   const [roomDetails, setRoomDetails] = useState(() => roomDetailsFrom(room));
   const [menuSheet, setMenuSheet] = useState(null);
   const [banTarget, setBanTarget] = useState(null);
+  useEffect(() => {
+    if (!minimized) return;
+    setGiftOpen(false);
+    setSettingsOpen(false);
+    setMenuSheet(null);
+    setSelfSheetOpen(false);
+    setSelfProfileOpen(false);
+    setProfileParticipant(null);
+    setSelectedParticipant(null);
+    setBanTarget(null);
+    setReportTarget(null);
+  }, [minimized]);
   const [staffBusy, setStaffBusy] = useState(null);
   const [backgroundUrl, setBackgroundUrl] = useState(null);
   const [backgroundRequest, setBackgroundRequest] = useState(null);
@@ -6239,55 +6331,63 @@ function Room({
   const handleCloseSettings = useCallback(() => setSettingsOpen(false), []);
   const handleCloseReport = useCallback(() => setReportTarget(null), []);
 
+  const pendingRoomGiftSpendRef = useRef(0);
   const executeRoomGiftSend = useCallback(
     async ({ gift, recipient, quantity = 1 }) => {
-      const requestId = createRequestUuid();
-      const sent = await onSendGift({
-        gift,
-        recipient,
-        quantity,
-        roomId: room.id,
-        requestId,
-      });
-      if (!sent) {
-        setRoomCombo(null);
-        return false;
-      }
-      playGiftEffect({
-        ...gift,
-        name: sent.gift_name || gift.name,
-        recipientName: recipient.name,
-        quantity,
-        eventId: sent.message_id || requestId,
-      });
-      if (sent.message_id) {
-        setMessages((current) =>
-          mergeRoomMessages(current, [
-            {
-              id: sent.message_id,
-              userId,
-              user: profile?.name || "Sen",
-              avatarUrl: profile?.avatarUrl || null,
-              avatarColor: profile?.color || COLORS.primary,
-              kind: "gift",
-              metadata: {
-                gift_id: gift.id,
-                gift_name: sent.gift_name || gift.name,
-                gift_icon: gift.icon,
-                gift_color: gift.color,
-                quantity,
-                gift_cost: sent.gift_cost,
-                recipient_id: recipient.userId,
-                recipient_name: recipient.name,
+      const cleanQty = Math.max(1, Math.floor(Number(quantity) || 1));
+      const reservedCost = Number(gift.cost || 0) * cleanQty;
+      pendingRoomGiftSpendRef.current += reservedCost;
+      try {
+        const requestId = createRequestUuid();
+        const sent = await onSendGift({
+          gift,
+          recipient,
+          quantity: cleanQty,
+          roomId: room.id,
+          requestId,
+        });
+        if (!sent) {
+          setRoomCombo(null);
+          return false;
+        }
+        playGiftEffect({
+          ...gift,
+          name: sent.gift_name || gift.name,
+          recipientName: recipient.name,
+          quantity: cleanQty,
+          eventId: sent.message_id || requestId,
+        });
+        if (sent.message_id) {
+          setMessages((current) =>
+            mergeRoomMessages(current, [
+              {
+                id: sent.message_id,
+                userId,
+                user: profile?.name || "Sen",
+                avatarUrl: profile?.avatarUrl || null,
+                avatarColor: profile?.color || COLORS.primary,
+                kind: "gift",
+                metadata: {
+                  gift_id: gift.id,
+                  gift_name: sent.gift_name || gift.name,
+                  gift_icon: gift.icon,
+                  gift_color: gift.color,
+                  quantity: cleanQty,
+                  gift_cost: sent.gift_cost,
+                  recipient_id: recipient.userId,
+                  recipient_name: recipient.name,
+                },
+                text: sent.message_body,
+                system: false,
+                createdAt: new Date().toISOString(),
               },
-              text: sent.message_body,
-              system: false,
-              createdAt: new Date().toISOString(),
-            },
-          ]),
-        );
+            ]),
+          );
+        }
+        return true;
+      } finally {
+        pendingRoomGiftSpendRef.current = Math.max(0, pendingRoomGiftSpendRef.current - reservedCost);
       }
-      return true;
     },
     [onSendGift, playGiftEffect, profile?.avatarUrl, profile?.color, profile?.name, room.id, userId],
   );
@@ -6311,7 +6411,8 @@ function Room({
     if (!roomCombo?.gift || !roomCombo?.recipient?.userId) return;
     const { gift, recipient, quantity } = roomCombo;
     const totalCost = Number(gift.cost || 0) * quantity;
-    if (typeof coins === "number" && coins < totalCost) {
+    const availableCoins = typeof coins === "number" ? coins - pendingRoomGiftSpendRef.current : Infinity;
+    if (availableCoins < totalCost) {
       setRoomCombo(null);
       Alert.alert(
         "Bakiye yetersiz",
@@ -6528,7 +6629,7 @@ function Room({
         category: room.category,
         initials: room.initials,
         color: roomBrand.accent,
-        visitedAt: "Simdi",
+        visitedAt: "Şimdi",
         visitedTs: Date.now(),
       };
       const nextHistory = [
@@ -6548,13 +6649,14 @@ function Room({
       if (!cleanMessage || messageSending) return false;
       if (chatLocked && !canModerate) {
         Alert.alert(
-          "Sohbet kapali",
-          "Ev sahibi oda sohbetini gecici olarak kapatti.",
+          "Sohbet kapalı",
+          "Ev sahibi oda sohbetini geçici olarak kapattı.",
         );
         return false;
       }
       const messageCheck = messageGuard.check(cleanMessage);
       if (!messageCheck.allowed) {
+        if (messageCheck.reason === "empty") return false;
         const warning =
           messageCheck.reason === "blocked_language"
             ? "Mesajın topluluk kurallarına aykırı bir ifade içeriyor."
@@ -6868,22 +6970,30 @@ function Room({
     setProfileParticipant(selectedParticipant);
     setSelectedParticipant(null);
   }, [selectedParticipant]);
+  const activeTargetParticipant = profileParticipant || selectedParticipant;
   const selectedIsHostParticipant = Boolean(
-    selectedParticipant && selectedParticipant.userId === room.hostId,
+    activeTargetParticipant && activeTargetParticipant.userId === room.hostId,
   );
   const selectedIsFollowing = selectedIsHostParticipant
     ? isFollowingHost
-    : selectedParticipant
-      ? followedParticipantNames.includes(selectedParticipant.name)
-      : false;
+    : activeTargetParticipant?.userId && supabase
+      ? followedUserIds.includes(activeTargetParticipant.userId)
+      : activeTargetParticipant
+        ? followedParticipantNames.includes(activeTargetParticipant.name)
+        : false;
   const handleSelectedFollow = useCallback(() => {
-    if (!selectedParticipant) return;
-    if (selectedParticipant.userId === room.hostId) {
+    const target = profileParticipant || selectedParticipant;
+    if (!target) return;
+    if (target.userId === room.hostId) {
       onToggleFollowHost?.();
       return;
     }
+    if (target.userId && supabase && onToggleFollowUser) {
+      onToggleFollowUser(target.userId);
+      return;
+    }
     setFollowedParticipantNames((current) => {
-      const name = selectedParticipant.name;
+      const name = target.name;
       const nextNames = current.includes(name)
         ? current.filter((item) => item !== name)
         : [...current, name];
@@ -6893,15 +7003,15 @@ function Room({
       ).catch(() => undefined);
       return nextNames;
     });
-  }, [onToggleFollowHost, room.hostId, selectedParticipant]);
+  }, [onToggleFollowHost, onToggleFollowUser, profileParticipant, room.hostId, selectedParticipant]);
   const handleSelectedBlock = useCallback(() => {
-    const participant = selectedParticipant;
+    const participant = profileParticipant || selectedParticipant;
     setSelectedParticipant(null);
     setProfileParticipant(null);
     if (participant) blockParticipant(participant);
-  }, [blockParticipant, selectedParticipant]);
+  }, [blockParticipant, profileParticipant, selectedParticipant]);
   const handleSelectedReport = useCallback(() => {
-    const participant = selectedParticipant;
+    const participant = profileParticipant || selectedParticipant;
     setSelectedParticipant(null);
     setProfileParticipant(null);
     if (participant)
@@ -6910,7 +7020,7 @@ function Room({
         userId: participant.userId,
         roomId: room.id,
       });
-  }, [room.id, selectedParticipant]);
+  }, [profileParticipant, room.id, selectedParticipant]);
 
   const manageParticipant = useCallback(
     async (participant, action) => {
@@ -7357,7 +7467,7 @@ function Room({
     try {
       await Share.share({
         title: `Sora · ${room.title}`,
-        message: `${room.title} odasina katil.\nEv sahibi: ${room.host}\nOda kodu: ${room.id}`,
+        message: `${room.title} odasına katıl.\nEv sahibi: ${room.host}\nOda kodu: ${room.id}`,
       });
     } catch {
       return;
@@ -7640,7 +7750,7 @@ function Room({
       {minimized ? null : (
         <StatusBar barStyle="light-content" backgroundColor="#11131A" />
       )}
-      <KeyboardSafeView style={{ flex: 1 }}>
+      <KeyboardSafeView iosOffset={insets.top} style={{ flex: 1 }}>
         {/* ── Üst bar: küçült · oda bilgisi · menü · çıkış ── */}
         <View style={styles.roomTopBar}>
           <Pressable
@@ -7681,7 +7791,7 @@ function Room({
               ) : null}
             </View>
             <Text style={styles.roomHeaderCaption} numberOfLines={1}>
-              {room.category || "Sohbet"} · {Math.max(liveVoice.participantCount, activeRoomParticipants.length)} kişi
+              {formatCategoryLabel(room.category)} · {Math.max(liveVoice.participantCount, activeRoomParticipants.length)} kişi
               {musicPlaying ? " · müzik" : ""}
             </Text>
           </View>
@@ -7987,6 +8097,7 @@ function Room({
       <BanDurationSheet
         participant={banTarget}
         busy={Boolean(banTarget && staffBusy === banTarget.userId)}
+        canPermanentBan={isHost}
         onSelect={banSelectedTarget}
         onDismiss={() => setBanTarget(null)}
       />
@@ -8056,11 +8167,19 @@ function Room({
   );
 }
 
-function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh, onAvatarChange }) {
-  const [name, setName] = useState(profile.name);
-  const [handle, setHandle] = useState(profile.handle);
+function ProfileEditor({
+  visible,
+  profile,
+  onDismiss,
+  onSave,
+  onEquipItem,
+  onBalanceRefresh,
+  onAvatarChange,
+}) {
+  const [name, setName] = useState(profile.name || "");
+  const [handle, setHandle] = useState(profile.handle || "");
   const [bio, setBio] = useState(profile.bio || "");
-  const [color, setColor] = useState(profile.color);
+  const [color, setColor] = useState(profile.color || DEFAULT_PROFILE.color);
   const [profileItems, setProfileItems] = useState([]);
   const [ownedItemIds, setOwnedItemIds] = useState([]);
   const [previewItemId, setPreviewItemId] = useState(null);
@@ -8121,12 +8240,14 @@ function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh, 
 
   useEffect(() => {
     if (visible) {
-      setName(profile.name);
-      setHandle(profile.handle);
+      setName(profile.name || "");
+      setHandle(profile.handle || "");
       setBio(profile.bio || "");
-      setColor(profile.color);
+      setColor(profile.color || DEFAULT_PROFILE.color);
+      setPreviewItemId(null);
     }
-  }, [profile, visible]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
 
   useEffect(() => {
     if (!visible || !supabase) return;
@@ -8152,18 +8273,20 @@ function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh, 
   const handleProfileItem = (item) => {
     if (ownedItemIds.includes(item.id)) {
       const unequipping = isEquippedItem(item);
+      const patch =
+        item.item_type === "frame"
+          ? { activeFrameId: unequipping ? null : item.id }
+          : { activeProfileThemeId: unequipping ? null : item.id };
       setItemBusy(item.id);
       activateProfileItem(
         unequipping ? (item.item_type === "frame" ? "none_frame" : "none_theme") : item.id,
       )
         .then(() => {
-          onSave({
-            ...profile,
-            ...(item.item_type === "frame"
-              ? { activeFrameId: unequipping ? null : item.id }
-              : { activeProfileThemeId: unequipping ? null : item.id }),
-          });
-          onDismiss();
+          if (onEquipItem) {
+            onEquipItem(patch);
+          } else {
+            onSave({ ...profile, ...patch });
+          }
         })
         .catch(() => Alert.alert("Ürün güncellenemedi", "Biraz sonra yeniden dene."))
         .finally(() => setItemBusy(null));
@@ -8194,8 +8317,8 @@ function ProfileEditor({ visible, profile, onDismiss, onSave, onBalanceRefresh, 
   };
 
   const save = () => {
-    const nextName = name.trim();
-    const nextHandle = handle
+    const nextName = (name || "").trim();
+    const nextHandle = (handle || "")
       .trim()
       .replace(/^@+/, "")
       .replace(/\s+/g, "")
@@ -8464,19 +8587,19 @@ const AppSettingsSheet = memo(function AppSettingsSheet({
       key: "chatNotifications",
       icon: "chatbubble-outline",
       title: "Sohbet bildirimleri",
-      description: "Takip ettigin odalardaki yeni mesajlar",
+      description: "Takip ettiğin odalardaki yeni mesajlar",
     },
     {
       key: "profilePublic",
       icon: "eye-outline",
-      title: "Herkese acik profil",
-      description: "Profilin kesfet bolumunde gorunsun",
+      title: "Herkese açık profil",
+      description: "Profilin keşfet bölümünde görünsün",
     },
     {
       key: "autoJoinMuted",
       icon: "mic-off-outline",
-      title: "Sessiz katil",
-      description: "Odalar acilirken mikrofonunu kapali tut",
+      title: "Sessiz katıl",
+      description: "Odalar açılırken mikrofonunu kapalı tut",
     },
   ];
   return (
@@ -8493,10 +8616,10 @@ const AppSettingsSheet = memo(function AppSettingsSheet({
           <Pressable onPress={onDismiss} style={styles.sheetClose}>
             <Ionicons name="close" size={20} color={COLORS.text} />
           </Pressable>
-          <Text style={styles.kicker}>TERCIHLER</Text>
-          <Text style={styles.sheetTitle}>Ayarlarin.</Text>
+          <Text style={styles.kicker}>TERCİHLER</Text>
+          <Text style={styles.sheetTitle}>Ayarların.</Text>
           <Text style={styles.settingsCaption}>
-            BILDIRIMLER, GIZLILIK VE SES
+            BİLDİRİMLER, GİZLİLİK VE SES
           </Text>
           {options.map((option) => (
             <Pressable
@@ -8536,7 +8659,7 @@ const AppSettingsSheet = memo(function AppSettingsSheet({
             </Pressable>
           ))}
           <Text style={[styles.settingsCaption, styles.settingsDataCaption]}>
-            HESAP VE VERILER
+            HESAP VE VERİLER
           </Text>
           <Pressable onPress={onOpenAccount} style={styles.settingsLink}>
             <View style={styles.settingIcon}>
@@ -8547,9 +8670,9 @@ const AppSettingsSheet = memo(function AppSettingsSheet({
               />
             </View>
             <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Hesap ve guvenlik</Text>
+              <Text style={styles.settingTitle}>Hesap ve güvenlik</Text>
               <Text style={styles.settingDescription}>
-                Parola, oturum ve hesap silme islemleri
+                Parola, oturum ve hesap silme işlemleri
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
@@ -8565,7 +8688,7 @@ const AppSettingsSheet = memo(function AppSettingsSheet({
             <View style={styles.settingContent}>
               <Text style={styles.settingTitle}>Cihaz verilerin</Text>
               <Text style={styles.settingDescription}>
-                Yerel verilerini disa aktar veya sifirla
+                Yerel verilerini dışa aktar veya sıfırla
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
@@ -8695,8 +8818,11 @@ function AppContent() {
   const openRoomIdRef = useRef(null);
   openRoomIdRef.current = room?.id || null;
   const [myFamily, setMyFamily] = useState(null);
+  const [ownHostedRoom, setOwnHostedRoom] = useState(null);
   const [activeSanction, setActiveSanction] = useState(null);
   const [inspectedUserId, setInspectedUserId] = useState(null);
+  const [inspectedReportTarget, setInspectedReportTarget] = useState(null);
+  const pendingGiftSpendRef = useRef(0);
   const [roomMinimized, setRoomMinimized] = useState(false);
   const [passwordPromptRoom, setPasswordPromptRoom] = useState(null);
   const [passwordPromptError, setPasswordPromptError] = useState(null);
@@ -8814,12 +8940,16 @@ function AppContent() {
     Linking.getInitialURL()
       .then(async (url) => {
         if (!url || !/^sora:\/\/auth\//i.test(url)) return;
+        const isResetLink = /^sora:\/\/auth\/reset-password/i.test(url);
         const { data } = await supabase.auth
           .getSession()
           .catch(() => ({ data: {} }));
-        if (data?.session) return;
+        if (data?.session && !isResetLink) return;
         try {
-          await completeAuthRedirect(url);
+          const result = await completeAuthRedirect(url);
+          if (active && (isResetLink || result?.isPasswordRecovery)) {
+            setPasswordRecoveryOpen(true);
+          }
         } catch {
           // Basarisiz/eski callback: yoksay
         }
@@ -8832,11 +8962,33 @@ function AppContent() {
     };
   }, []);
 
+  const previousUserIdRef = useRef(null);
   useEffect(() => {
     const user = authSession?.user;
-    if (!user) return;
+    if (!user) {
+      if (isSupabaseConfigured && previousUserIdRef.current) {
+        previousUserIdRef.current = null;
+        setRoom(null);
+        setRoomMinimized(false);
+        setOwnHostedRoom(null);
+        setProfile(DEFAULT_PROFILE);
+        setWalletBalance(SEEDED_WALLET_BALANCE);
+        setPromoWalletBalance(0);
+        setPaidWalletBalance(0);
+        setWalletActivities([]);
+        setDailyRewardClaimed(false);
+        setMyFamily(null);
+        setFollowedUserIds([]);
+        setActiveSanction(null);
+        setInspectedUserId(null);
+        setInspectedReportTarget(null);
+      }
+      return;
+    }
+    const switchedUser = previousUserIdRef.current !== user.id;
+    previousUserIdRef.current = user.id;
     const metadata = user.user_metadata || {};
-    const fallbackName = user.email?.split("@")[0] || "Sora kullanicisi";
+    const fallbackName = user.email?.split("@")[0] || "Sora kullanıcısı";
     // Google/Apple gibi saglayicilar adi full_name veya name alaninda dondurur.
     const displayName =
       metadata.display_name ||
@@ -8856,7 +9008,7 @@ function AppContent() {
     };
     setProfile((current) => ({
       ...nextProfile,
-      avatarUrl: current?.avatarUrl || null,
+      avatarUrl: switchedUser ? null : current?.avatarUrl || null,
     }));
     AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(nextProfile)).catch(
       () => undefined,
@@ -8919,17 +9071,20 @@ function AppContent() {
         follows,
         wallet,
         transactions,
+        hostedRoom,
       ] = await Promise.all([
         listRooms("live"),
         listRooms("scheduled"),
         listFollowedUserIds(user.id),
         getWallet(),
         listWalletTransactions(),
+        getHostedRoom(user.id).catch(() => null),
       ]);
       if (!active) return;
       const visibleLiveRooms = liveRooms.filter(
         (item) => item.hostId !== user.id || item.id === openRoomIdRef.current,
       );
+      setOwnHostedRoom(hostedRoom || null);
       setRooms([...visibleLiveRooms, ...SEEDED_ROOMS]);
       setScheduledRooms([...plannedRooms, ...SEEDED_SCHEDULED_ROOMS]);
       setFollowedUserIds(follows);
@@ -8960,10 +9115,13 @@ function AppContent() {
         if (!active || !data) return;
         setProfile((current) => ({
           ...current,
-          name: data.display_name,
-          handle: data.handle,
-          bio: data.bio,
-          color: data.avatar_color,
+          name: data.display_name || current.name || "Sora kullanıcısı",
+          handle:
+            data.handle ||
+            current.handle ||
+            `sora${String(user.id || "").slice(0, 6)}`,
+          bio: data.bio ?? "",
+          color: data.avatar_color || current.color || DEFAULT_PROFILE.color,
           avatarUrl: data.avatar_url || null,
           userLevel: Math.max(1, Number(data.user_level) || 1),
           userXp: Math.max(0, Number(data.user_xp) || 0),
@@ -9079,20 +9237,22 @@ function AppContent() {
           setAppSettings({ ...DEFAULT_APP_SETTINGS, ...parsedSettings });
       })
       .catch(() => undefined);
-    AsyncStorage.getItem(WALLET_BALANCE_KEY)
-      .then((savedBalance) => {
-        if (!active || savedBalance === null) return;
-        const parsedBalance = Number(savedBalance);
-        if (Number.isFinite(parsedBalance) && parsedBalance >= 0)
-          setWalletBalance(parsedBalance);
-      })
-      .catch(() => undefined);
-    AsyncStorage.getItem(DAILY_REWARD_KEY)
-      .then((savedDate) => {
-        if (active && savedDate === new Date().toDateString())
-          setDailyRewardClaimed(true);
-      })
-      .catch(() => undefined);
+    if (!isSupabaseConfigured) {
+      AsyncStorage.getItem(WALLET_BALANCE_KEY)
+        .then((savedBalance) => {
+          if (!active || savedBalance === null) return;
+          const parsedBalance = Number(savedBalance);
+          if (Number.isFinite(parsedBalance) && parsedBalance >= 0)
+            setWalletBalance(parsedBalance);
+        })
+        .catch(() => undefined);
+      AsyncStorage.getItem(DAILY_REWARD_KEY)
+        .then((savedDate) => {
+          if (active && savedDate === new Date().toDateString())
+            setDailyRewardClaimed(true);
+        })
+        .catch(() => undefined);
+    }
     AsyncStorage.getItem(ONBOARDING_KEY)
       .then((completed) => {
         if (active && completed !== "true") setOnboardingOpen(true);
@@ -9128,6 +9288,7 @@ function AppContent() {
     try {
       if (supabase && authSession?.user) {
         liveRoom = (await setRemoteRoomPresence(existingRoom.id, true)) || existingRoom;
+        setOwnHostedRoom(liveRoom);
         setRooms((currentRooms) => [
           liveRoom,
           ...currentRooms.filter((item) => item.id !== liveRoom.id),
@@ -9150,16 +9311,18 @@ function AppContent() {
   };
 
   const createRoom = async (newRoom) => {
+    const safeHostName = profile.name || "Sora kullanıcısı";
     const userRoom = {
       ...newRoom,
-      host: profile.name,
-      initials: profile.name.charAt(0).toUpperCase(),
+      host: safeHostName,
+      initials: safeHostName.charAt(0).toUpperCase(),
       userCreated: true,
     };
     if (supabase && authSession?.user) {
       try {
         const existingRoom = await getHostedRoom(authSession.user.id);
         if (existingRoom) {
+          setOwnHostedRoom(existingRoom);
           promptHostedRoom(existingRoom);
           return false;
         }
@@ -9167,6 +9330,7 @@ function AppContent() {
           room: userRoom,
           userId: authSession.user.id,
         });
+        setOwnHostedRoom(savedRoom);
         setRooms((currentRooms) => [
           savedRoom,
           ...currentRooms.filter((item) => !item.persisted),
@@ -9550,13 +9714,14 @@ function AppContent() {
     if (!recipient?.userId || !roomId) return false;
     const cleanQty = Math.max(1, Math.floor(Number(quantity) || 1));
     const totalCost = Number(gift.cost || 0) * cleanQty;
-    if (walletBalance < totalCost) {
+    if (walletBalance - pendingGiftSpendRef.current < totalCost) {
       Alert.alert(
         "Bakiye yetersiz",
         `${cleanQty > 1 ? `${cleanQty}x ` : ""}${gift.name} hediyesi için ${formatCredits(totalCost)} kredi gerekiyor.`,
       );
       return false;
     }
+    pendingGiftSpendRef.current += totalCost;
     try {
       const requestKey = requestId || createRequestUuid();
       const result = await sendRoomGift({
@@ -9610,6 +9775,8 @@ function AppContent() {
         setPaidWalletBalance(wallet.paid_balance || 0);
       }).catch(() => undefined);
       return false;
+    } finally {
+      pendingGiftSpendRef.current = Math.max(0, pendingGiftSpendRef.current - totalCost);
     }
   };
 
@@ -9728,7 +9895,7 @@ function AppContent() {
           icon: "heart",
           color: COLORS.pink,
           text: `${roomToFavorite.title} favorilerine eklendi.`,
-          time: "Simdi",
+          time: "Şimdi",
         });
     }
   };
@@ -9776,7 +9943,10 @@ function AppContent() {
 
     console.warn("[room-entry] open requested", Boolean(nextRoom.id));
     setRoom(nextRoom);
-    setRoomPreferences({ microphoneEnabled: false, speakerEnabled: true });
+    setRoomPreferences({
+      microphoneEnabled: !appSettings.autoJoinMuted,
+      speakerEnabled: true,
+    });
     setRoomMinimized(false);
 
     const currentRecentRooms = Array.isArray(recentRoomIds)
@@ -9797,6 +9967,7 @@ function AppContent() {
     async (roomId, isActive) => {
       if (!supabase || !authSession?.user) return;
       const updatedRoom = await setRemoteRoomPresence(roomId, isActive);
+      if (updatedRoom) setOwnHostedRoom(updatedRoom);
       setRooms((currentRooms) =>
         isActive
           ? [updatedRoom, ...currentRooms.filter((item) => item.id !== roomId)]
@@ -9928,6 +10099,9 @@ function AppContent() {
     if (supabase && authSession?.user && room?.persisted) {
       try {
         const updatedRoom = await updateRemoteRoom(roomId, updates);
+        if (updatedRoom?.hostId === authSession.user.id) {
+          setOwnHostedRoom(updatedRoom);
+        }
         setRooms((currentRooms) =>
           currentRooms.map((item) => (item.id === roomId ? updatedRoom : item)),
         );
@@ -9957,56 +10131,73 @@ function AppContent() {
     );
   };
 
-  const toggleFollowHost = async () => {
-    if (
-      !room?.hostId ||
-      !authSession?.user ||
-      room.hostId === authSession.user.id
-    )
-      return;
-    const targetUserId = room.hostId;
-    const currentlyFollowing = followedUserIds.includes(targetUserId);
-    setFollowedUserIds((currentIds) =>
-      currentlyFollowing
-        ? currentIds.filter((id) => id !== targetUserId)
-        : [...currentIds, targetUserId],
-    );
-    try {
-      await setFollowing({
-        userId: authSession.user.id,
-        targetUserId,
-        following: !currentlyFollowing,
-      });
-    } catch {
+  const toggleFollowUser = useCallback(
+    async (targetUserId) => {
+      if (
+        !targetUserId ||
+        !authSession?.user ||
+        targetUserId === authSession.user.id
+      )
+        return;
+      const currentlyFollowing = followedUserIds.includes(targetUserId);
       setFollowedUserIds((currentIds) =>
         currentlyFollowing
-          ? [...currentIds, targetUserId]
-          : currentIds.filter((id) => id !== targetUserId),
+          ? currentIds.filter((id) => id !== targetUserId)
+          : [...currentIds, targetUserId],
       );
-      Alert.alert(
-        "Takip değiştirilemedi",
-        "Bağlantını kontrol edip tekrar dene.",
-      );
-    }
+      try {
+        await setFollowing({
+          userId: authSession.user.id,
+          targetUserId,
+          following: !currentlyFollowing,
+        });
+      } catch {
+        setFollowedUserIds((currentIds) =>
+          currentlyFollowing
+            ? [...currentIds, targetUserId]
+            : currentIds.filter((id) => id !== targetUserId),
+        );
+        Alert.alert(
+          "Takip değiştirilemedi",
+          "Bağlantını kontrol edip tekrar dene.",
+        );
+      }
+    },
+    [authSession?.user, followedUserIds],
+  );
+
+  const toggleFollowHost = async () => {
+    if (!room?.hostId) return;
+    await toggleFollowUser(room.hostId);
   };
+
+  const equipProfileItem = useCallback((patch) => {
+    setProfile((current) => {
+      const updated = { ...current, ...patch };
+      AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(updated)).catch(
+        () => undefined,
+      );
+      return updated;
+    });
+  }, []);
 
   const saveProfile = async (nextProfile) => {
     if (supabase && authSession?.user) {
-      const normalizedHandle = nextProfile.handle.trim().toLowerCase();
-      if (normalizedHandle !== profile.handle.trim().toLowerCase()) {
+      const normalizedHandle = (nextProfile.handle || "").trim().toLowerCase();
+      if (normalizedHandle !== (profile.handle || "").trim().toLowerCase()) {
         try {
           const available = await isHandleAvailable(normalizedHandle);
           if (!available) {
             Alert.alert(
-              "Kullanici adi alinmis",
-              "Baska bir kullanici adi dene.",
+              "Kullanıcı adı alınmış",
+              "Başka bir kullanıcı adı dene.",
             );
             return;
           }
         } catch {
           Alert.alert(
-            "Kullanici adi denetlenemedi",
-            "Baglantini kontrol edip tekrar dene.",
+            "Kullanıcı adı denetlenemedi",
+            "Bağlantını kontrol edip tekrar dene.",
           );
           return;
         }
@@ -10014,9 +10205,9 @@ function AppContent() {
       const { error } = await supabase
         .from("profiles")
         .update({
-          display_name: nextProfile.name.trim(),
+          display_name: (nextProfile.name || "").trim(),
           handle: normalizedHandle,
-          bio: nextProfile.bio.trim(),
+          bio: (nextProfile.bio || "").trim(),
           avatar_color: nextProfile.color,
         })
         .eq("id", authSession.user.id);
@@ -10090,6 +10281,13 @@ function AppContent() {
 
   const signOutCurrentAccount = async () => {
     try {
+      if (room?.persisted) {
+        leaveRoomMembership(room.id).catch(() => undefined);
+        if (room.hostId === authSession?.user?.id) {
+          setHostRoomPresence(room.id, false).catch(() => undefined);
+        }
+      }
+      await unregisterPushToken(supabase).catch(() => undefined);
       await supabase.auth.signOut();
       setAccountSecurityOpen(false);
     } catch (error) {
@@ -10103,6 +10301,7 @@ function AppContent() {
 
   const permanentlyDeleteCurrentAccount = async () => {
     try {
+      await unregisterPushToken(supabase).catch(() => undefined);
       await deleteCurrentAccount();
       await clearAllReminders();
       await AsyncStorage.multiRemove(APP_STORAGE_KEYS);
@@ -10134,7 +10333,7 @@ function AppContent() {
         return result;
       }, {});
       await Share.share({
-        title: "Sora yerel veri ozeti",
+        title: "Sora yerel veri özeti",
         message: JSON.stringify(
           {
             format: "sora-local-export-v1",
@@ -10147,45 +10346,47 @@ function AppContent() {
       });
     } catch {
       Alert.alert(
-        "Disa aktarma basarisiz",
-        "Veri ozeti su an olusturulamadi. Lutfen tekrar dene.",
+        "Dışa aktarma başarısız",
+        "Veri özeti şu an oluşturulamadı. Lütfen tekrar dene.",
       );
     }
   };
 
   const clearLocalData = () => {
     Alert.alert(
-      "Cihaz verileri silinsin mi?",
-      "Profilin, mesajlarin, odalarin ve tercihlerin bu cihazdan kaldirilacak. Bu islem geri alinamaz.",
+      "Cihaz önbelleği sıfırlansın mı?",
+      "Bu telefondaki favoriler, geçmiş, hatırlatıcılar ve yerel tercihler temizlenecek. Buluttaki hesabın etkilenmez.",
       [
-        { text: "Vazgec", style: "cancel" },
+        { text: "Vazgeç", style: "cancel" },
         {
-          text: "Verileri sil",
+          text: "Sıfırla",
           style: "destructive",
           onPress: async () => {
             try {
               await clearAllReminders();
               await AsyncStorage.multiRemove(APP_STORAGE_KEYS);
-              setRooms(SEEDED_ROOMS);
-              setScheduledRooms(SEEDED_SCHEDULED_ROOMS);
               setReminderRoomIds([]);
               setFavoriteRoomIds([]);
               setRecentRoomIds([]);
               setNotifications(SEEDED_NOTIFICATIONS);
-              setProfile(DEFAULT_PROFILE);
               setAppSettings(DEFAULT_APP_SETTINGS);
-              setWalletBalance(SEEDED_WALLET_BALANCE);
-              setDailyRewardClaimed(false);
-              setRoom(null);
-              setRoomJoined(false);
+              if (!isSupabaseConfigured || !authSession?.user) {
+                setRooms(SEEDED_ROOMS);
+                setScheduledRooms(SEEDED_SCHEDULED_ROOMS);
+                setProfile(DEFAULT_PROFILE);
+                setWalletBalance(SEEDED_WALLET_BALANCE);
+                setDailyRewardClaimed(false);
+                setOnboardingOpen(true);
+              }
+              leaveCurrentRoom();
+              setRoomMinimized(false);
               setActiveTab("discover");
               setSettingsOpen(false);
               setDataControlsOpen(false);
-              setOnboardingOpen(true);
             } catch {
               Alert.alert(
-                "Silme basarisiz",
-                "Yerel veriler su an silinemedi. Lutfen tekrar dene.",
+                "Sıfırlama başarısız",
+                "Yerel veriler şu an silinemedi. Lütfen tekrar dene.",
               );
             }
           },
@@ -10198,10 +10399,17 @@ function AppContent() {
   // Bir donem buradaki ifadeler hook'lardan onceydi; marka ekrani kapanip
   // kosullar degisince hook sayisi degisiyor ve uygulama
   // "Rendered more hooks than during the previous render" ile cokuyordu.
-  const myHostedRooms = useMemo(
-    () => rooms.filter((item) => item.host === profile.name),
-    [rooms, profile.name],
-  );
+  const myHostedRooms = useMemo(() => {
+    if (supabase && authSession?.user?.id) {
+      const uid = authSession.user.id;
+      const fromLive = rooms.filter((item) => item.hostId === uid);
+      if (ownHostedRoom && !fromLive.some((item) => item.id === ownHostedRoom.id)) {
+        return [ownHostedRoom, ...fromLive];
+      }
+      return fromLive;
+    }
+    return rooms.filter((item) => item.host === profile.name);
+  }, [authSession?.user?.id, ownHostedRoom, profile.name, rooms]);
   const hostedRoomCount = myHostedRooms.length;
 
   const handleOpenNotifications = useCallback(
@@ -10262,11 +10470,11 @@ function AppContent() {
   const handleCloseAdminPanel = useCallback(() => setAdminPanelOpen(false), []);
   const handleOpenAccountSecurity = useCallback(() => {
     setSettingsOpen(false);
-    setAccountSecurityOpen(true);
+    setTimeout(() => setAccountSecurityOpen(true), 300);
   }, []);
   const handleOpenDataControls = useCallback(() => {
     setSettingsOpen(false);
-    setDataControlsOpen(true);
+    setTimeout(() => setDataControlsOpen(true), 300);
   }, []);
   const handleRefreshWallet = useCallback(
     () =>
@@ -10419,7 +10627,7 @@ function AppContent() {
               </Text>
             </Pressable>
             <Pressable
-              onPress={() => supabase?.auth.signOut().catch(() => undefined)}
+              onPress={() => signOutCurrentAccount().catch(() => undefined)}
               style={{
                 flex: 1,
                 minHeight: 46,
@@ -10472,6 +10680,8 @@ function AppContent() {
     profile: (
       <Profile
         profile={profile}
+        userId={authSession?.user?.id}
+        followedUserIds={followedUserIds}
         family={myFamily}
         coins={walletBalance}
         favoriteCount={favoriteRoomIds.length}
@@ -10483,6 +10693,7 @@ function AppContent() {
         onOpenWallet={handleOpenWallet}
         onClaimDailyReward={claimDailyReward}
         onSyncUserLevel={syncUserLevelAndNotify}
+        onOpenUserProfile={setInspectedUserId}
       />
     ),
   };
@@ -10514,7 +10725,9 @@ function AppContent() {
               onLeave={leaveCurrentRoom}
               onUpdateRoom={updateRoomSettings}
               isFollowingHost={followedUserIds.includes(room.hostId)}
+              followedUserIds={followedUserIds}
               onToggleFollowHost={toggleFollowHost}
+              onToggleFollowUser={toggleFollowUser}
               initialSpeakerOn={roomPreferences.speakerEnabled}
               initialMicrophoneOn={roomPreferences.microphoneEnabled}
               onHostPresenceChange={setHostRoomPresence}
@@ -10538,11 +10751,60 @@ function AppContent() {
         profile={inspectedUserId === authSession?.user?.id ? profile : null}
         isSelf={Boolean(inspectedUserId && inspectedUserId === authSession?.user?.id)}
         isFollowing={Boolean(inspectedUserId && followedUserIds.includes(inspectedUserId))}
+        canBlock={Boolean(
+          supabase &&
+          inspectedUserId &&
+          authSession?.user?.id &&
+          inspectedUserId !== authSession.user.id,
+        )}
+        onToggleFollow={() => inspectedUserId && toggleFollowUser(inspectedUserId)}
+        onBlock={() => {
+          const targetId = inspectedUserId;
+          if (!targetId) return;
+          Alert.alert(
+            "Kullanıcıyı engelle",
+            "Bu kullanıcıyı engellediğinde mesajlarını göremezsin.",
+            [
+              { text: "Vazgeç", style: "cancel" },
+              {
+                text: "Engelle",
+                style: "destructive",
+                onPress: async () => {
+                  try {
+                    await setUserBlocked({ targetUserId: targetId, blocked: true });
+                    setInspectedUserId(null);
+                    Alert.alert(
+                      "Kullanıcı engellendi",
+                      "Engeli Güvenlik Merkezi'nden kaldırabilirsin.",
+                    );
+                  } catch {
+                    Alert.alert("Engellenemedi", "Bağlantını kontrol edip tekrar dene.");
+                  }
+                },
+              },
+            ],
+          );
+        }}
+        onReport={() => {
+          const targetId = inspectedUserId;
+          if (!targetId) return;
+          setInspectedUserId(null);
+          setTimeout(() => {
+            setInspectedReportTarget({
+              name: "Sora kullanıcısı",
+              userId: targetId,
+            });
+          }, 300);
+        }}
         onEdit={() => {
           setInspectedUserId(null);
-          handleOpenProfileEditor();
+          setTimeout(() => handleOpenProfileEditor(), 300);
         }}
         onDismiss={() => setInspectedUserId(null)}
+      />
+      <ReportSheet
+        target={inspectedReportTarget}
+        onDismiss={() => setInspectedReportTarget(null)}
       />
       <CreateRoomSheet
         visible={createOpen}
@@ -10617,6 +10879,7 @@ function AppContent() {
         profile={profile}
         onDismiss={handleCloseProfileEditor}
         onSave={saveProfile}
+        onEquipItem={equipProfileItem}
         onAvatarChange={(url) => setProfile((current) => ({ ...current, avatarUrl: url }))}
         onBalanceRefresh={refreshWalletData}
       />
@@ -12480,7 +12743,7 @@ const styles = StyleSheet.create({
   },
   communityDetailMembers: { color: "#E8EEF8", fontSize: 11, marginTop: 4 },
   communityDetailDescription: {
-    color: "#C7C9D5",
+    color: COLORS.textSecondary,
     fontSize: 13,
     lineHeight: 19,
     marginBottom: 22,
@@ -15372,7 +15635,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "rgba(255,255,255,0.12)",
   },
-  roomAudienceInitial: { color: "#11131A", fontSize: 16, fontWeight: "900" },
+  roomAudienceInitial: { color: "#FFFFFF", fontSize: 16, fontWeight: "900" },
   roomAudienceCrown: {
     position: "absolute",
     bottom: -2,
@@ -16053,12 +16316,29 @@ const styles = StyleSheet.create({
     marginTop: 26,
     marginBottom: 10,
   },
-  pfBadgeRow: { flexDirection: "row", gap: 10 },
+  pfBadgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    rowGap: 10,
+    gap: 8,
+  },
+  pfBadgeGridLevel: {
+    flexGrow: 0,
+    flexShrink: 0,
+    width: "31.5%",
+  },
+  pfBadgeGridAchievement: {
+    flexGrow: 0,
+    flexShrink: 0,
+    width: "48.2%",
+  },
   pfBadge: {
     flex: 1,
     alignItems: "center",
     gap: 8,
     paddingVertical: 14,
+    paddingHorizontal: 6,
     borderRadius: 18,
     backgroundColor: COLORS.surface,
     borderWidth: 1,
@@ -16159,7 +16439,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: COLORS.primarySoft,
   },
-  pfTabBadgeText: { color: COLORS.primaryInk, fontSize: 11, fontWeight: "900" },
+  pfTabBadgeText: { color: COLORS.primary, fontSize: 11, fontWeight: "900" },
   pfEmpty: {
     flexDirection: "row",
     alignItems: "center",

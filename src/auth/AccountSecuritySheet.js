@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../theme/colors";
 import { KeyboardSafeView } from "../ui/useKeyboardInset";
 
 export function AccountSecuritySheet({ visible, email, onDismiss, onResetPassword, onSignOut, onDeleteAccount }) {
+  const insets = useSafeAreaInsets();
   const [confirmingDeletion, setConfirmingDeletion] = useState(false);
   const [confirmation, setConfirmation] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -17,6 +19,10 @@ export function AccountSecuritySheet({ visible, email, onDismiss, onResetPasswor
     }
   }, [visible]);
 
+  const safeDismiss = () => {
+    if (!submitting) onDismiss?.();
+  };
+
   const run = async (action) => {
     setSubmitting(true);
     try {
@@ -28,13 +34,18 @@ export function AccountSecuritySheet({ visible, email, onDismiss, onResetPasswor
     }
   };
 
+  const normalizedConfirm = confirmation.trim();
+  const isDeleteConfirmed =
+    normalizedConfirm.toLocaleUpperCase("tr-TR") === "SİL" ||
+    normalizedConfirm.toUpperCase() === "SIL";
+
   return (
-    <Modal transparent visible={visible} animationType="slide" onRequestClose={onDismiss}>
-      <KeyboardSafeView style={styles.overlay} offset={0}>
-        <Pressable style={styles.dismiss} onPress={onDismiss} />
-        <View style={styles.sheet}>
+    <Modal transparent visible={visible} animationType="slide" onRequestClose={safeDismiss}>
+      <KeyboardSafeView style={styles.overlay}>
+        <Pressable style={styles.dismiss} onPress={safeDismiss} />
+        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
           <View style={styles.handle} />
-          <Pressable onPress={onDismiss} style={styles.close}>
+          <Pressable disabled={submitting} onPress={safeDismiss} style={styles.close}>
             <Ionicons name="close" size={20} color={COLORS.text} />
           </Pressable>
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -79,15 +90,16 @@ export function AccountSecuritySheet({ visible, email, onDismiss, onResetPasswor
                     value={confirmation}
                     onChangeText={setConfirmation}
                     autoCapitalize="characters"
+                    autoCorrect={false}
                     placeholder="SİL"
                     placeholderTextColor={COLORS.muted}
                     style={styles.input}
-                    maxLength={3}
+                    maxLength={8}
                   />
                   <Pressable
-                    disabled={submitting || confirmation !== "SİL"}
+                    disabled={submitting || !isDeleteConfirmed}
                     onPress={() => run(onDeleteAccount)}
-                    style={[styles.deleteButton, (submitting || confirmation !== "SİL") && styles.disabled]}
+                    style={[styles.deleteButton, (submitting || !isDeleteConfirmed) && styles.disabled]}
                   >
                     <Text style={styles.deleteButtonText}>{submitting ? "Siliniyor" : "Hesabımı kalıcı olarak sil"}</Text>
                   </Pressable>

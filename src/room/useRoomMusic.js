@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createAudioPlayer, setAudioModeAsync } from "expo-audio";
+import { createAudioPlayer } from "expo-audio";
 import { getSignedRoomFileUrl } from "./roomApi";
 
 const LOCAL_VOLUME_KEY = "sora.room.musicLocalVolume";
 
-// Oda müziğinin şu anki konumunu (ms) sunucudaki durumdan hesaplar.
 export const musicPositionMs = (musicState, durationSeconds = 0) => {
   if (!musicState) return 0;
   const base = Number(musicState.position_ms) || 0;
@@ -17,15 +16,28 @@ export const musicPositionMs = (musicState, durationSeconds = 0) => {
   return position;
 };
 
-// Odadaki herkes aynı müziği kendi cihazında senkron çalar. Oda ses seviyesini
-// oda sahibi / yönetici ayarlar; herkes kendi cihazında ayrıca kısabilir.
 export function useRoomMusic({ musicState, enabled = true }) {
   const playerRef = useRef(null);
   const loadedPathRef = useRef(null);
+  const loadedNonceRef = useRef(0);
+  const statusSubRef = useRef(null);
   const [localVolume, setLocalVolumeState] = useState(1);
   const [status, setStatus] = useState("idle");
   const [duration, setDuration] = useState(0);
   const [retryNonce, setRetryNonce] = useState(0);
+
+  const destroyPlayer = useCallback(() => {
+    try {
+      statusSubRef.current?.remove?.();
+    } catch {}
+    statusSubRef.current = null;
+    try {
+      playerRef.current?.pause?.();
+      playerRef.current?.remove?.();
+    } catch {}
+    playerRef.current = null;
+    loadedPathRef.current = null;
+  }, []);
 
   useEffect(() => {
     AsyncStorage.getItem(LOCAL_VOLUME_KEY)
@@ -42,17 +54,7 @@ export function useRoomMusic({ musicState, enabled = true }) {
     AsyncStorage.setItem(LOCAL_VOLUME_KEY, String(next)).catch(() => undefined);
   }, []);
 
-  // Oda kapanınca oynatıcıyı bırak.
-  useEffect(
-    () => () => {
-      try {
-        playerRef.current?.remove();
-      } catch {}
-      playerRef.current = null;
-      loadedPathRef.current = null;
-    },
-    [],
-  );
+  useEffect(() => () => destroyPlayer(), [destroyPlayer]);
 
   const roomVolume = Math.min(1, Math.max(0, Number(musicState?.volume ?? 0.7)));
   const effectiveVolumeRef = useRef(roomVolume * localVolume);
@@ -66,51 +68,50 @@ export function useRoomMusic({ musicState, enabled = true }) {
     let cancelled = false;
     const sync = async () => {
       if (!path) {
-        if (playerRef.current) {
-          try {
-            playerRef.current.pause();
-            playerRef.current.remove();
-          } catch {}
-        }
-        playerRef.current = null;
-        loadedPathRef.current = null;
+        destroyPlayer();
         setStatus("idle");
         setDuration(0);
         return;
       }
       try {
-        if (loadedPathRef.current !== path || !playerRef.current) {
+        const forceReload = loadedNonceRef.current !== retryNonce;
+        if (loadedPathRef.current !== path || !playerRef.current || forceReload) {
           setStatus("loading");
-          const url = await getSignedRoomFileUrl("room-music", path, 6 * 3600);
-          if (cancelled) return;
-          await setAudioModeAsync({
-            playsInSilentMode: true,
-            shouldPlayInBackground: true,
-            allowsRecording: true,
-            interruptionMode: "mixWithOthers",
-            interruptionModeAndroid: "duckOthers",
-          }).catch(() => undefined);
-          try {
-            playerRef.current?.remove();
-          } catch {}
-          const player = createAudioPlayer({ uri: url }, { updateInterval: 1000 });
-          player.loop = true;
-          player.volume = effectiveVolumeRef.current;
-          playerRef.current = player;
+          const url = await getSignedRoomFileUrl("room-music", path, 6 * 3600, { forceRefresh: forceReload });
+          if (cancelled || !url) return;
+
+          destroyPlayer();
+          const created = createAudioPlayer({ uri: url }, { updateInterval: 1000 });
+          if (cancelled) {
+            try {
+              created.pause();
+              created.remove();
+            } catch {}
+            return;
+          }
+          created.loop = true;
+          created.volume = effectiveVolumeRef.current;
+          statusSubRef.current = created.addListener?.("playbackStatusUpdate", (st) => {
+            if (!cancelled && st?.error) {
+              setStatus("error");
+            }
+          }) || null;
+          playerRef.current = created;
           loadedPathRef.current = path;
+          loadedNonceRef.current = retryNonce;
         }
         const player = playerRef.current;
-        if (!player) return;
+        if (!player || cancelled) return;
         player.volume = effectiveVolumeRef.current;
         if (playing) {
           player.play();
           setStatus("playing");
         }
-        // Süre ve yükleme bilgisi hazır olana kadar kısa süre bekle, gerekiyorsa senkron konuma sar.
         for (let attempt = 0; attempt < 15 && !player.isLoaded && !(player.duration > 0); attempt += 1) {
           await new Promise((resolve) => setTimeout(resolve, 200));
-          if (cancelled) return;
+          if (cancelled || playerRef.current !== player) return;
         }
+        if (cancelled || playerRef.current !== player) return;
         if (player.duration > 0) setDuration(player.duration);
         const target = musicPositionMs(
           { position_ms: positionMs, playing, started_at: startedAt },
@@ -120,7 +121,7 @@ export function useRoomMusic({ musicState, enabled = true }) {
         if (Math.abs(target - currentMs) > 1500) {
           await player.seekTo(target / 1000).catch(() => undefined);
         }
-        if (cancelled) return;
+        if (cancelled || playerRef.current !== player) return;
         if (playing) {
           player.play();
           setStatus("playing");
@@ -137,13 +138,12 @@ export function useRoomMusic({ musicState, enabled = true }) {
     return () => {
       cancelled = true;
     };
-  }, [path, playing, positionMs, retryNonce, startedAt]);
+  }, [destroyPlayer, path, playing, positionMs, retryNonce, startedAt]);
 
   useEffect(() => {
     if (playerRef.current) playerRef.current.volume = roomVolume * localVolume;
   }, [localVolume, roomVolume, status]);
 
-  // Sesli sohbet bağlantısı kurulduğunda Android ses yönlendirmesi oynatıcıyı duraklatırsa otomatik sürdür.
   useEffect(() => {
     if (!path || !playing) return undefined;
     const timer = setInterval(() => {
@@ -173,7 +173,6 @@ export function useRoomMusic({ musicState, enabled = true }) {
   return {
     status,
     duration,
-    roomVolume,
     localVolume,
     setLocalVolume,
     retry,
