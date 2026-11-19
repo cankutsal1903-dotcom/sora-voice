@@ -102,7 +102,7 @@ export function AccountSecuritySheet({ visible, email, onDismiss, onResetPasswor
               </View>
               <View style={styles.content}>
                 <Text style={styles.actionTitle}>Kullanım Koşulları ve Çocuk Güvenliği</Text>
-                <Text style={styles.description}>UGC topluluk kuralları, 18+ sınırı ve CSAE standartları.</Text>
+                <Text style={styles.description}>UGC topluluk kuralları, 13+ sınırı ve CSAE standartları.</Text>
               </View>
               <Ionicons name="open-outline" size={17} color={COLORS.muted} />
             </Pressable>

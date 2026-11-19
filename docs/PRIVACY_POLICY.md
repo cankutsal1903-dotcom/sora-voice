@@ -42,7 +42,7 @@ Cihaz ayarlarınızdan mikrofon ve bildirim izinlerini istediğiniz zaman kapata
 
 ## 5. Yaş sınırı ve çocuk güvenliği (CSAE sıfır tolerans)
 
-Sora **18 yaş ve üzeri** kullanıcılara yöneliktir; 18 yaşın altındaki bireylerin hesap oluşturmasına izin verilmez. Böyle bir hesabın tespiti halinde hesap derhal kapatılır ve verileri silinir. Çocuk cinsel istismarı ve sömürüsüne (CSAE / CSAM) karşı sıfır tolerans politikamız https://cankutsal1903-dotcom.github.io/sora-voice/child-safety.html adresinde yayımlanmaktadır.
+Sora **13 yaş ve üzeri** kullanıcılara yöneliktir; 13 yaşın altındaki çocukların hesap oluşturmasına izin verilmez *(13–17 yaş arasındaki kullanıcılar yerel mevzuatın gerektirdiği durumlarda veli/vasi izniyle uygulamayı kullanır)*. 13 yaşından küçük bir kullanıcıya ait hesap tespit edildiğinde hesap derhal kapatılır ve verileri silinir. Çocuk cinsel istismarı ve sömürüsüne (CSAE / CSAM) karşı sıfır tolerans politikamız https://cankutsal1903-dotcom.github.io/sora-voice/child-safety.html adresinde yayımlanmaktadır.
 
 ## 6. İletişim ve değişiklikler
 

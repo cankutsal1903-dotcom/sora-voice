@@ -66,7 +66,7 @@ export function AuthScreen() {
     if (acceptedPolicies) return true;
     Alert.alert(
       "Koşulları onayla",
-      "Kayıt olmadan önce 18 yaş ve üzeri olduğunu ve Kullanım Koşulları, Gizlilik Politikası ile Çocuk Güvenliği kurallarını kabul ettiğini onayla.",
+      "Kayıt olmadan önce 13 yaş ve üzeri olduğunu ve Kullanım Koşulları, Gizlilik Politikası ile Çocuk Güvenliği kurallarını kabul ettiğini onayla.",
     );
     return false;
   };
@@ -193,7 +193,7 @@ export function AuthScreen() {
         {acceptedPolicies ? <Ionicons name="checkmark" size={14} color="#FFFFFF" /> : null}
       </Pressable>
       <Text style={styles.consentText}>
-        <Text onPress={() => setAcceptedPolicies((current) => !current)}>18 yaşından büyüğüm; </Text>
+        <Text onPress={() => setAcceptedPolicies((current) => !current)}>13 yaş ve üzerindeyim; </Text>
         <Text style={styles.legalLink} onPress={() => openLegalUrl(TERMS_OF_USE_URL)}>
           Kullanım Koşulları (UGC)
         </Text>
