@@ -6406,22 +6406,29 @@ function Room({
     const found = activeRoomParticipants.find(
       (participant) => participant.userId === room.hostId,
     );
-    const base = found || {
-      userId: room.hostId || `host-${room.id}`,
-      name: room.host,
-      color: roomBrand.accent,
-      avatarUrl: (isHost ? profile?.avatarUrl : room.hostAvatarUrl) || null,
-      microphoneEnabled: isHost ? micOn : false,
-    };
+    if (!found) {
+      if (!isHost && room.persisted) return null;
+      const fallbackUserId = room.hostId || `host-${room.id}`;
+      return {
+        userId: fallbackUserId,
+        name: isHost ? profile?.name || room.host : room.host,
+        color: isHost ? profile?.color || roomBrand.accent : roomBrand.accent,
+        avatarUrl: (isHost ? profile?.avatarUrl : room.hostAvatarUrl) || null,
+        microphoneEnabled: isHost ? micOn : false,
+        role: "host",
+        seat: 0,
+        isSpeaking: activeSpeakerIds.includes(fallbackUserId),
+      };
+    }
     return {
-      ...base,
+      ...found,
       avatarUrl:
-        base.avatarUrl ||
+        found.avatarUrl ||
         (isHost ? profile?.avatarUrl : room.hostAvatarUrl) ||
         null,
       role: "host",
       seat: 0,
-      isSpeaking: activeSpeakerIds.includes(base.userId),
+      isSpeaking: activeSpeakerIds.includes(found.userId),
     };
   }, [
     activeRoomParticipants,
@@ -6429,10 +6436,13 @@ function Room({
     isHost,
     micOn,
     profile?.avatarUrl,
+    profile?.color,
+    profile?.name,
     room.host,
     room.hostAvatarUrl,
     room.hostId,
     room.id,
+    room.persisted,
     roomBrand.accent,
   ]);
   const seatedByIndex = useMemo(() => {
@@ -6459,7 +6469,10 @@ function Room({
     return rows;
   }, [seatCapacity, seatedByIndex]);
   const stageParticipants = useMemo(
-    () => [hostStageParticipant, ...seatedByIndex.values()],
+    () => [
+      ...(hostStageParticipant ? [hostStageParticipant] : []),
+      ...seatedByIndex.values(),
+    ],
     [hostStageParticipant, seatedByIndex],
   );
   const mySeat = isHost ? 0 : liveVoice.localSeat ?? null;
@@ -6985,8 +6998,10 @@ function Room({
   }, [liveVoice.setMicrophoneEnabled, runSeatAction]);
 
   const leaveRoom = async () => {
-    if (room.persisted) leaveRoomMembership(room.id).catch(() => undefined);
-    await liveVoice.disconnect().catch(() => undefined);
+    await Promise.allSettled([
+      liveVoice.disconnect(),
+      room.persisted ? leaveRoomMembership(room.id) : Promise.resolve(),
+    ]);
     try {
       const savedHistory = await AsyncStorage.getItem(ROOM_HISTORY_KEY);
       const currentHistory = JSON.parse(savedHistory || "[]");
@@ -7154,6 +7169,7 @@ function Room({
   toggleHandRef.current = toggleHand;
 
   const handleEmptySeatPress = (seatIndex) => {
+    if (seatIndex === 0 && !isHost) return;
     if (!room.persisted) {
       toggleHand();
       return;
@@ -7990,7 +8006,13 @@ function Room({
           style={slotStyle}
           onPress={() => handleEmptySeatPress(seatIndex)}
           accessibilityRole="button"
-          accessibilityLabel={isCoupleSeat ? "Boş konuk koltuğu" : `Boş ${seatIndex}. koltuk`}
+          accessibilityLabel={
+            isCoupleSeat
+              ? "Boş konuk koltuğu"
+              : isHostSeat
+                ? "Boş ev sahibi koltuğu"
+                : `Boş ${seatIndex}. koltuk`
+          }
         >
           <View
             style={[
@@ -8005,7 +8027,7 @@ function Room({
             />
           </View>
           <Text style={styles.roomEmptySeatLabel}>
-            {isCoupleSeat ? "Konuk" : seatIndex}
+            {isCoupleSeat ? "Konuk" : isHostSeat ? "1" : seatIndex}
           </Text>
         </Pressable>
       );
@@ -9486,11 +9508,8 @@ function AppContent() {
         getHostedRoom(user.id).catch(() => null),
       ]);
       if (!active) return;
-      const visibleLiveRooms = liveRooms.filter(
-        (item) => item.hostId !== user.id || item.id === openRoomIdRef.current,
-      );
       setOwnHostedRoom(hostedRoom || null);
-      setRooms([...visibleLiveRooms, ...SEEDED_ROOMS]);
+      setRooms([...liveRooms, ...SEEDED_ROOMS]);
       setScheduledRooms([...plannedRooms, ...SEEDED_SCHEDULED_ROOMS]);
       setFollowedUserIds(follows);
       setWalletBalance(wallet.balance);
@@ -10323,8 +10342,10 @@ function AppContent() {
     if (!skipPasswordCheck && nextRoom.persisted && room?.id !== nextRoom.id) {
       try {
         if (authSession?.user?.id && nextRoom.hostId === authSession.user.id) {
-          // Kendi odası listede "canlı" görünse de pasif kalmış olabilir.
-          await setRemoteRoomPresence(nextRoom.id, true, { resetListeners: true }).catch(() => undefined);
+          // Kendi odası pasif durumdaysa yeniden canlı yap; içeride zaten birileri varsa sayacı sıfırlama.
+          await setRemoteRoomPresence(nextRoom.id, true, {
+            resetListeners: nextRoom.state !== "live",
+          }).catch(() => undefined);
         }
         await joinRoomWithPassword(nextRoom.id, null);
       } catch (error) {
@@ -10341,9 +10362,6 @@ function AppContent() {
 
     if (room?.persisted && room.id !== nextRoom.id) {
       leaveRoomMembership(room.id).catch(() => undefined);
-      if (room.hostId === authSession?.user?.id) {
-        setHostRoomPresence(room.id, false).catch(() => undefined);
-      }
     }
 
     console.warn("[room-entry] open requested", Boolean(nextRoom.id));
@@ -10398,17 +10416,7 @@ function AppContent() {
       listRooms("live")
         .then((liveRooms) => {
           if (!active) return;
-          const selfId = authSession?.user?.id;
-          const staleOwnRoom = selfId
-            ? liveRooms.find((item) => item.hostId === selfId && item.id !== openRoomIdRef.current)
-            : null;
-          if (staleOwnRoom && selfId) {
-            deactivateStaleHostedRooms(selfId, openRoomIdRef.current).catch(() => undefined);
-          }
-          const filtered = selfId
-            ? liveRooms.filter((item) => item.hostId !== selfId || item.id === openRoomIdRef.current)
-            : liveRooms;
-          setRooms(filtered);
+          setRooms([...liveRooms, ...SEEDED_ROOMS]);
         })
         .catch(() => undefined);
     const channel = supabase
@@ -10477,10 +10485,13 @@ function AppContent() {
         .catch(() => undefined);
     }
     if (leavingRoom?.persisted) {
-      leaveRoomMembership(leavingRoom.id).catch(() => undefined);
-      if (leavingRoom.hostId === authSession?.user?.id) {
-        setHostRoomPresence(leavingRoom.id, false).catch(() => undefined);
-      }
+      leaveRoomMembership(leavingRoom.id)
+        .catch(() => undefined)
+        .finally(() => {
+          listRooms("live")
+            .then((liveRooms) => setRooms([...liveRooms, ...SEEDED_ROOMS]))
+            .catch(() => undefined);
+        });
     }
   };
 
@@ -10687,10 +10698,7 @@ function AppContent() {
   const signOutCurrentAccount = async () => {
     try {
       if (room?.persisted) {
-        leaveRoomMembership(room.id).catch(() => undefined);
-        if (room.hostId === authSession?.user?.id) {
-          setHostRoomPresence(room.id, false).catch(() => undefined);
-        }
+        await leaveRoomMembership(room.id).catch(() => undefined);
       }
       await unregisterPushToken(supabase).catch(() => undefined);
       await supabase.auth.signOut();

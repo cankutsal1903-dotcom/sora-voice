@@ -945,18 +945,25 @@ const listHostPresence = async (request: Request) => {
   const requestedIds = wanted.map((r) => String(r.roomId));
 
   // Filter requested rooms through caller RLS first so block rules apply, then
-  // inspect voice_active_sessions via service_role (so lobby users see Agora/backup rooms online).
+  // inspect voice_active_sessions via service_role (so lobby users see Agora/backup
+  // and host-departed occupied rooms online as long as ANY participant remains).
   const { data: visibleRooms } = await client
     .from("rooms")
-    .select("id")
+    .select("id, last_active_at")
     .in("id", requestedIds)
     .eq("state", "live");
-  const visibleIds = new Set((visibleRooms || []).map((r: { id: string }) => String(r.id)));
-  const visibleWanted = wanted.filter((r) => visibleIds.has(String(r.roomId)));
+  const visibleMap = new Map(
+    (visibleRooms || []).map((r: { id: string; last_active_at?: string }) => [
+      String(r.id),
+      r.last_active_at ? new Date(r.last_active_at).getTime() : 0,
+    ]),
+  );
+  const visibleWanted = wanted.filter((r) => visibleMap.has(String(r.roomId)));
   if (!visibleWanted.length) return json({ liveRoomIds: [] });
   const roomIds = visibleWanted.map((r) => String(r.roomId));
 
-  const twoMinAgo = new Date(Date.now() - 130_000).toISOString();
+  const twoMinAgoMs = Date.now() - 130_000;
+  const twoMinAgo = new Date(twoMinAgoMs).toISOString();
   const serverClient = createClient(supabaseUrl, supabaseServiceRoleKey);
   const { data: activeSessions } = await serverClient
     .from("voice_active_sessions")
@@ -965,17 +972,12 @@ const listHostPresence = async (request: Request) => {
     .gte("last_heartbeat_at", twoMinAgo);
 
   if (Array.isArray(activeSessions)) {
-    const sessionPairs = new Set(
-      activeSessions.map((s) => `${s.room_id}:${s.user_id}`),
-    );
-    for (const r of visibleWanted) {
-      if (sessionPairs.has(`${r.roomId}:${r.hostId}`)) {
-        liveSet.add(String(r.roomId));
-      }
+    for (const s of activeSessions) {
+      if (s?.room_id) liveSet.add(String(s.room_id));
     }
   }
 
-  // 2) LiveKit doğrudan varlık kontrolü (birincil + yedek)
+  // 2) LiveKit doğrudan varlık kontrolü (birincil + yedek): odada herhangi bir katılımcı varsa canlıdır
   for (const lkService of [primaryLiveKitService, backupLiveKitService]) {
     if (!lkService) continue;
     const remaining = visibleWanted.filter((r) => !liveSet.has(String(r.roomId)));
@@ -983,22 +985,34 @@ const listHostPresence = async (request: Request) => {
     const activeRooms = await lkService
       .listRooms(remaining.map((r) => String(r.roomId)))
       .catch(() => []);
-    const activeNames = new Set(
-      activeRooms.filter((r) => r.numParticipants > 0).map((r) => r.name),
-    );
-    const checks = await Promise.all(
-      remaining
-        .filter((r) => activeNames.has(String(r.roomId)))
-        .map(async (r) => {
-          const participant = await lkService
-            .getParticipant(String(r.roomId), String(r.hostId))
-            .catch(() => null);
-          return participant ? String(r.roomId) : null;
-        }),
-    );
-    for (const id of checks) {
-      if (id) liveSet.add(id);
+    for (const activeRoom of activeRooms) {
+      if (activeRoom.numParticipants > 0 && activeRoom.name) {
+        liveSet.add(String(activeRoom.name));
+      }
     }
+  }
+
+  // 3) Hiçbir aktif katılımcısı kalmayan ve 2 dakikadan eski hayalet odaları kapat
+  const emptyStaleIds = roomIds.filter((id) => {
+    if (liveSet.has(id)) return false;
+    const lastActiveMs = visibleMap.get(id) || 0;
+    return lastActiveMs > 0 && lastActiveMs < twoMinAgoMs;
+  });
+  if (emptyStaleIds.length) {
+    await serverClient
+      .from("rooms")
+      .update({
+        state: "inactive",
+        listener_count: 0,
+        voice_provider: null,
+        voice_provider_pinned_at: null,
+        last_active_at: new Date().toISOString(),
+      })
+      .in("id", emptyStaleIds)
+      .eq("state", "live")
+      .lt("last_active_at", twoMinAgo)
+      .then(() => undefined)
+      .catch(() => undefined);
   }
 
   return json({ liveRoomIds: [...liveSet] });

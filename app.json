@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sora",
     "slug": "sora-voice",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "description": "Canlı sesli odalar, topluluk sohbeti ve güvenli etkileşim için Sora.",
     "primaryColor": "#2F80ED",
     "icon": "./assets/images/sora-logo-blue.png",
@@ -42,7 +42,7 @@
     ],
     "android": {
       "package": "com.arescan.soravoice",
-      "versionCode": 19,
+      "versionCode": 20,
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.RECORD_AUDIO",
@@ -70,7 +70,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.arescan.soravoice",
-      "buildNumber": "19",
+      "buildNumber": "20",
       "supportsTablet": true,
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Sora, sesli odalarda konuşabilmen için mikrofonuna erişir.",

@@ -20,7 +20,7 @@ const initialState = {
 };
 
 const AUTO_RETRY_DELAYS_MS = [1200, 2500, 5000, 8000];
-const HEARTBEAT_INTERVAL_MS = 60_000;
+const HEARTBEAT_INTERVAL_MS = 25_000;
 
 const NON_RETRYABLE_REASONS = new Set([
   DisconnectReason.CLIENT_INITIATED,

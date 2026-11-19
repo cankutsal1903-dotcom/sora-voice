@@ -176,19 +176,9 @@ export const getHostedRoom = async (userId) => {
 export const deactivateStaleHostedRooms = async (userId, activeRoomId = null) => {
   if (!userId) return;
   const client = requireClient();
-  let query = client
-    .from("rooms")
-    .update({
-      state: "inactive",
-      listener_count: 0,
-      last_active_at: new Date().toISOString(),
-    })
-    .eq("host_id", userId)
-    .eq("state", "live");
-  if (activeRoomId) {
-    query = query.neq("id", activeRoomId);
-  }
-  const { error } = await query;
+  const { error } = await client.rpc("deactivate_stale_hosted_rooms", {
+    p_active_room_id: activeRoomId || null,
+  });
   throwIfError(error);
 };
 

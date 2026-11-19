@@ -590,15 +590,9 @@ app.post("/rooms/presence", async (request, response) => {
     }
     const activeRooms = await liveKitService.listRooms(wanted.map((room) => room.roomId)).catch(() => []);
     const activeNames = new Set(activeRooms.filter((room) => room.numParticipants > 0).map((room) => room.name));
-    const liveRoomIds = [];
-    await Promise.all(
-      wanted
-        .filter((room) => activeNames.has(room.roomId))
-        .map(async (room) => {
-          const host = await liveKitService.getParticipant(room.roomId, room.hostId).catch(() => null);
-          if (host) liveRoomIds.push(room.roomId);
-        }),
-    );
+    const liveRoomIds = wanted
+      .filter((room) => activeNames.has(room.roomId))
+      .map((room) => room.roomId);
     response.json({ liveRoomIds });
   } catch (error) {
     sendError(response, error, "Presence lookup failed");
