@@ -1,8 +1,81 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DisconnectReason, Room, RoomEvent } from "livekit-client";
+import { AudioPresets, DisconnectReason, Room, RoomEvent } from "livekit-client";
 import { supabase } from "../auth/supabase";
 import { loadAgoraModule } from "./loadAgoraModule";
 import { AudioSession } from "./loadLiveKitNative";
+
+// Android'de medya akışı (STREAM_MUSIC + MODE_NORMAL + USAGE_MEDIA) kullanılır:
+// - Donanım ses tuşları doğrudan oda sesini %0 (tam sessiz) ile %100 arasında kısar/açar.
+// - Samsung / Android telefonlarda ahize/arama kısıtlaması olmadan tam hoparlör gücü sağlar.
+// - Bluetooth A2DP ve kablolu kulaklıklar otomatik olarak 48 kHz yüksek kalitede bağlanır.
+const VOICE_AUDIO_SESSION_CONFIG = {
+  android: {
+    preferredOutputList: ["bluetooth", "headset", "speaker", "earpiece"],
+    audioTypeOptions: {
+      manageAudioFocus: true,
+      audioMode: "normal",
+      audioFocusMode: "gain",
+      audioStreamType: "music",
+      audioAttributesUsageType: "media",
+      audioAttributesContentType: "music",
+      forceHandleAudioRouting: false,
+    },
+  },
+  ios: {
+    defaultOutput: "speaker",
+  },
+};
+
+// +2.6 dB temiz yayın kazancı (kırpma/bozulma olmadan net ve dolgun ses).
+const REMOTE_AUDIO_TRACK_GAIN = 1.35;
+
+const VOICE_AUDIO_CAPTURE_DEFAULTS = {
+  autoGainControl: true,
+  echoCancellation: true,
+  noiseSuppression: true,
+};
+
+const VOICE_AUDIO_PUBLISH_OPTIONS = {
+  audioPreset: AudioPresets.musicHighQuality, // 48 kHz, 96 kbps Opus
+  dtx: false, // Yumuşak seslerin kesilmesini önler
+  red: true, // Paket kaybında takılmayı önleyen yedekli ses kodlaması
+  forceStereo: false,
+};
+
+const enhanceOpusOfferSdp = (sdp) => {
+  if (typeof sdp !== "string" || !sdp) return sdp;
+  const opusMatch = sdp.match(/a=rtpmap:(\d+)\s+opus\/48000\/2/i);
+  if (!opusMatch) return sdp;
+  const pt = opusMatch[1];
+  const fmtpRegex = new RegExp(`(a=fmtp:${pt}\\s+)([^\\r\\n]+)`, "i");
+  const applyParams = (existing) => {
+    const cleaned = existing
+      .split(";")
+      .map((part) => part.trim())
+      .filter(
+        (part) =>
+          part &&
+          !/^(maxaveragebitrate|useinbandfec|usedtx|cbr|maxplaybackrate|sprop-maxcapturerate)=/i.test(
+            part,
+          ),
+      );
+    cleaned.push(
+      "maxaveragebitrate=96000",
+      "maxplaybackrate=48000",
+      "sprop-maxcapturerate=48000",
+      "useinbandfec=1",
+      "usedtx=0",
+    );
+    return cleaned.join(";");
+  };
+  if (fmtpRegex.test(sdp)) {
+    return sdp.replace(fmtpRegex, (_full, prefix, params) => `${prefix}${applyParams(params)}`);
+  }
+  return sdp.replace(
+    new RegExp(`(a=rtpmap:${pt}\\s+opus\\/48000\\/2\\r?\\n)`, "i"),
+    `$1a=fmtp:${pt} ${applyParams("")}\r\n`,
+  );
+};
 
 const initialState = {
   status: "idle",
@@ -190,14 +263,27 @@ export function useLiveVoiceRoom({
       if (!payload.serverUrl) {
         throw new Error("LiveKit sunucu adresi eksik.");
       }
-      const connectedRoom = new Room({ adaptiveStream: false, dynacast: true });
+      const connectedRoom = new Room({
+        adaptiveStream: false,
+        dynacast: true,
+        audioCaptureDefaults: VOICE_AUDIO_CAPTURE_DEFAULTS,
+        publishDefaults: {
+          ...VOICE_AUDIO_PUBLISH_OPTIONS,
+          stopMicTrackOnMute: false,
+        },
+      });
 
       const applySpeakerState = () => {
+        const targetGain = speakerEnabledRef.current ? REMOTE_AUDIO_TRACK_GAIN : 0;
+        AudioSession.setDefaultRemoteAudioTrackVolume?.(targetGain).catch(() => undefined);
         connectedRoom.remoteParticipants.forEach((participant) => {
           participant.trackPublications.forEach((publication) => {
             const mediaTrack = publication.track?.mediaStreamTrack;
             if (publication.kind === "audio" && mediaTrack) {
               mediaTrack.enabled = speakerEnabledRef.current;
+              if (typeof mediaTrack._setVolume === "function") {
+                mediaTrack._setVolume(targetGain);
+              }
             }
           });
         });
@@ -278,6 +364,7 @@ export function useLiveVoiceRoom({
       });
       connectedRoom.on(RoomEvent.Reconnected, () => {
         autoRetryCountRef.current = 0;
+        applySpeakerState();
         if (active) setState((current) => ({ ...current, status: "connected", error: null }));
       });
       connectedRoom.on(RoomEvent.Disconnected, (reason) => {
@@ -309,7 +396,11 @@ export function useLiveVoiceRoom({
           if (!connectedRoom.localParticipant.permissions?.canPublish && nextEnabled) {
             return false;
           }
-          await connectedRoom.localParticipant.setMicrophoneEnabled(nextEnabled);
+          await connectedRoom.localParticipant.setMicrophoneEnabled(
+            nextEnabled,
+            VOICE_AUDIO_CAPTURE_DEFAULTS,
+            VOICE_AUDIO_PUBLISH_OPTIONS,
+          );
           return true;
         },
         setSpeakerEnabled: (nextSpeaker) => {
@@ -328,12 +419,10 @@ export function useLiveVoiceRoom({
         AudioSession.stopAudioSession().catch(() => undefined);
       };
 
-      await AudioSession.configureAudio({
-        android: {
-          preferredOutputList: ["speaker", "headset", "bluetooth", "earpiece"],
-          audioTypeOptions: { manageAudioFocus: false },
-        },
-      }).catch(() => undefined);
+      await AudioSession.setDefaultRemoteAudioTrackVolume?.(
+        speakerEnabledRef.current ? REMOTE_AUDIO_TRACK_GAIN : 0,
+      ).catch(() => undefined);
+      await AudioSession.configureAudio(VOICE_AUDIO_SESSION_CONFIG).catch(() => undefined);
       await AudioSession.startAudioSession();
       await connectedRoom.connect(payload.serverUrl, payload.token);
       console.warn(`[room-entry] ${payload.provider || "livekit"} connected`);
@@ -349,7 +438,11 @@ export function useLiveVoiceRoom({
       let micStarted = false;
       if (startWithMicrophoneRef.current && canPublishNow) {
         try {
-          await connectedRoom.localParticipant.setMicrophoneEnabled(true);
+          await connectedRoom.localParticipant.setMicrophoneEnabled(
+            true,
+            VOICE_AUDIO_CAPTURE_DEFAULTS,
+            VOICE_AUDIO_PUBLISH_OPTIONS,
+          );
           micStarted = true;
         } catch {
           micStarted = false;
@@ -644,11 +737,17 @@ export function useLiveVoiceRoom({
       engine.initialize({
         appId: payload.appId,
         channelProfile: 1, // ChannelProfileLiveBroadcasting
+        audioScenario: 3, // AudioScenarioGameStreaming (Android STREAM_MUSIC %0-%100 medya sesi)
       });
       engine.registerEventHandler(eventHandler);
       engine.enableAudio();
+      engine.setAudioProfile?.(4, 3); // AudioProfileMusicHighQuality (48 kHz, 96 kbps) + GameStreaming
+      engine.setAudioScenario?.(3);
+      engine.setAINSMode?.(true, 0); // Yapay zeka destekli dengeli gürültü azaltma
       engine.setDefaultAudioRouteToSpeakerphone(true);
-      engine.setEnableSpeakerphone(speakerEnabledRef.current);
+      engine.adjustPlaybackSignalVolume?.(120);
+      engine.adjustRecordingSignalVolume?.(110);
+      engine.muteAllRemoteAudioStreams(!speakerEnabledRef.current);
       engine.enableAudioVolumeIndication(250, 3, true);
 
       const canPublishNow = Boolean(payload.canPublish);
@@ -697,7 +796,6 @@ export function useLiveVoiceRoom({
         },
         setSpeakerEnabled: (nextSpeaker) => {
           speakerEnabledRef.current = Boolean(nextSpeaker);
-          engine.setEnableSpeakerphone(speakerEnabledRef.current);
           engine.muteAllRemoteAudioStreams(!speakerEnabledRef.current);
         },
         disconnect: async () => {
@@ -746,12 +844,10 @@ export function useLiveVoiceRoom({
         AudioSession.stopAudioSession().catch(() => undefined);
       };
 
-      await AudioSession.configureAudio({
-        android: {
-          preferredOutputList: ["speaker", "headset", "bluetooth", "earpiece"],
-          audioTypeOptions: { manageAudioFocus: false },
-        },
-      }).catch(() => undefined);
+      await AudioSession.setDefaultRemoteAudioTrackVolume?.(
+        speakerEnabledRef.current ? REMOTE_AUDIO_TRACK_GAIN : 0,
+      ).catch(() => undefined);
+      await AudioSession.configureAudio(VOICE_AUDIO_SESSION_CONFIG).catch(() => undefined);
       await AudioSession.startAudioSession();
 
       pc = new PeerConn({
@@ -762,7 +858,11 @@ export function useLiveVoiceRoom({
       pc.ontrack = (event) => {
         const track = event?.track;
         if (track && track.kind === "audio") {
+          const targetGain = speakerEnabledRef.current ? REMOTE_AUDIO_TRACK_GAIN : 0;
           track.enabled = speakerEnabledRef.current;
+          if (typeof track._setVolume === "function") {
+            track._setVolume(targetGain);
+          }
           remoteTracks.add(track);
         }
       };
@@ -771,7 +871,10 @@ export function useLiveVoiceRoom({
       const wantMic = Boolean(startWithMicrophoneRef.current && canPublishNow);
 
       if (wantMic && getUserMedia) {
-        localStream = await getUserMedia({ audio: true, video: false }).catch(() => null);
+        localStream = await getUserMedia({
+          audio: VOICE_AUDIO_CAPTURE_DEFAULTS,
+          video: false,
+        }).catch(() => null);
       }
       const audioTrack = localStream?.getAudioTracks?.()?.[0] || null;
       if (audioTrack) {
@@ -781,7 +884,11 @@ export function useLiveVoiceRoom({
         pc.addTransceiver("audio", { direction: "recvonly" });
       }
 
-      const offer = await pc.createOffer();
+      const rawOffer = await pc.createOffer();
+      const offer = {
+        type: rawOffer.type,
+        sdp: enhanceOpusOfferSdp(rawOffer.sdp),
+      };
       await pc.setLocalDescription(offer);
 
       const negRes = await fetch(`${tokenServerUrl}/voice/cloudflare/negotiate`, {
@@ -853,8 +960,13 @@ export function useLiveVoiceRoom({
         },
         setSpeakerEnabled: (nextSpeaker) => {
           speakerEnabledRef.current = Boolean(nextSpeaker);
+          const targetGain = speakerEnabledRef.current ? REMOTE_AUDIO_TRACK_GAIN : 0;
+          AudioSession.setDefaultRemoteAudioTrackVolume?.(targetGain).catch(() => undefined);
           remoteTracks.forEach((t) => {
             t.enabled = speakerEnabledRef.current;
+            if (typeof t._setVolume === "function") {
+              t._setVolume(targetGain);
+            }
           });
         },
         disconnect: async () => {

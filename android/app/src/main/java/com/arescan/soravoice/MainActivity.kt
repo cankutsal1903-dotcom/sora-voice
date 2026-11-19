@@ -1,5 +1,6 @@
 package com.arescan.soravoice
 
+import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
 
@@ -17,6 +18,8 @@ class MainActivity : ReactActivity() {
     // This is required for expo-splash-screen.
     setTheme(R.style.AppTheme);
     super.onCreate(null)
+    // Donanim ses tuslari her zaman medya ses kanalini (0%-100%) kontrol etsin.
+    volumeControlStream = AudioManager.STREAM_MUSIC
   }
 
   /**
