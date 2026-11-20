@@ -1013,12 +1013,16 @@ function SoraWealthCardBase({ spent = 0, title = "Cömertlik Seviyesi", onPress,
     [canShimmer, trackW],
   );
 
-  const ladderStart = Math.max(1, Math.min(lvl + 1, WEALTH_TIERS.length - 3));
-  const upcoming = WEALTH_TIERS.slice(ladderStart, ladderStart + 3);
-
-  const emblemSize = compact ? 48 : 60;
+  const emblemSize = 44;
   const fillColors = isRoyal ? ["#FFF1C1", BRAND.goldLight, BRAND.gold] : lvl >= 4 ? ["#7FE6FF", BRAND.blueLight] : ["#CFE0F5", BRAND.blueLight];
   const nameColor = isRoyal ? BRAND.goldLight : lvl === 0 ? "#DCE4EE" : "#FFFFFF";
+  const pctLabel = next ? `%${Math.floor(progress * 100)}` : "MAKS";
+  const sublineText =
+    lvl === 0
+      ? "Hediye gönderdikçe yükselirsin"
+      : next
+        ? `${formatCreditsCompact(spent)} · Sonraki: ${next.short} (${formatCreditsCompact(remaining)})`
+        : `${formatCreditsCompact(spent)} · Zirve seviyesi`;
 
   const body = (
     <LinearGradient
@@ -1027,15 +1031,14 @@ function SoraWealthCardBase({ spent = 0, title = "Cömertlik Seviyesi", onPress,
       end={{ x: 1, y: 1 }}
       style={[
         styles.card,
-        compact ? styles.cardCompact : null,
-        { borderColor: isRoyal ? withAlpha(BRAND.gold, 0.45) : "rgba(255,255,255,0.08)" },
+        { borderColor: isRoyal ? withAlpha(BRAND.gold, 0.42) : "rgba(255,255,255,0.08)" },
       ]}
     >
       <View pointerEvents="none" style={[styles.cardGlowBig, { backgroundColor: tier.glow }]} />
       <View pointerEvents="none" style={[styles.cardGlowSmall, { backgroundColor: tier.glow }]} />
       <LinearGradient
         pointerEvents="none"
-        colors={[withAlpha(tier.accent, 0), withAlpha(isRoyal ? BRAND.goldLight : tier.accent, 0.7), withAlpha(tier.accent, 0)]}
+        colors={[withAlpha(tier.accent, 0), withAlpha(isRoyal ? BRAND.goldLight : tier.accent, 0.65), withAlpha(tier.accent, 0)]}
         start={{ x: 0, y: 0.5 }}
         end={{ x: 1, y: 0.5 }}
         style={styles.cardTopLine}
@@ -1044,91 +1047,41 @@ function SoraWealthCardBase({ spent = 0, title = "Cömertlik Seviyesi", onPress,
       <View style={styles.cardRow}>
         <SoraWealthEmblem spent={spent} size={emblemSize} />
         <View style={styles.cardInfo}>
-          <View style={styles.cardTitleRow}>
-            <MaterialCommunityIcons name="gift" size={12} color={isRoyal ? BRAND.gold : "#8FB8F0"} />
-            <Text allowFontScaling={false} numberOfLines={1} style={styles.cardTitle}>
-              {title.toLocaleUpperCase("tr-TR")}
-            </Text>
-          </View>
           <View style={styles.cardNameRow}>
-            <Text numberOfLines={1} style={[styles.cardName, compact ? styles.cardNameCompact : null, { color: nameColor }]}>
+            <Text numberOfLines={1} style={[styles.cardName, { color: nameColor }]}>
               {tier.short}
             </Text>
-            {lvl > 0 ? <SoraWealthBadge level={lvl} size="sm" style={styles.cardBadge} /> : null}
+            <View style={[styles.cardKindPill, isRoyal && styles.cardKindPillRoyal]}>
+              <Text allowFontScaling={false} numberOfLines={1} style={[styles.cardKindText, isRoyal && styles.cardKindTextRoyal]}>
+                Cömertlik
+              </Text>
+            </View>
           </View>
           <Text numberOfLines={1} style={styles.cardMotto}>
-            {lvl === 0 ? "Hediye gönderdikçe yükselirsin" : `${tier.motto} · ${formatCredits(spent)} kredi`}
+            {sublineText}
           </Text>
         </View>
-        {onPress ? <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.55)" /> : null}
+        <View style={styles.cardRight}>
+          <Text allowFontScaling={false} style={[styles.cardPct, next ? (isRoyal && { color: BRAND.goldLight }) : { color: BRAND.goldLight }]}>
+            {pctLabel}
+          </Text>
+          {onPress ? <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.55)" /> : null}
+        </View>
       </View>
 
-      <View style={styles.progressBlock}>
-        <View style={styles.progressLabels}>
-          <Text allowFontScaling={false} style={styles.progressLabel}>
-            {`Sv. ${lvl}`}
-          </Text>
-          <Text allowFontScaling={false} style={[styles.progressLabel, next ? null : { color: BRAND.goldLight }]}>
-            {next ? `%${Math.floor(progress * 100)}` : "MAKS"}
-          </Text>
-        </View>
-        <View style={styles.progressTrack} onLayout={onTrackLayout}>
-          <Animated.View
-            style={[styles.progressFill, { width: Math.max(1, trackW), transform: [{ translateX: fillX }] }]}
-          >
-            <LinearGradient colors={fillColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
-            <View style={styles.progressCap} />
+      <View style={styles.progressTrack} onLayout={onTrackLayout}>
+        <Animated.View
+          style={[styles.progressFill, { width: Math.max(1, trackW), transform: [{ translateX: fillX }] }]}
+        >
+          <LinearGradient colors={fillColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+          <View style={styles.progressCap} />
+        </Animated.View>
+        {shimmerX ? (
+          <Animated.View pointerEvents="none" style={[styles.progressShimmer, { transform: [{ translateX: shimmerX }] }]}>
+            <LinearGradient colors={SHINE_COLORS} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
           </Animated.View>
-          {shimmerX ? (
-            <Animated.View pointerEvents="none" style={[styles.progressShimmer, { transform: [{ translateX: shimmerX }] }]}>
-              <LinearGradient colors={SHINE_COLORS} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
-            </Animated.View>
-          ) : null}
-        </View>
-        {next ? (
-          <Text numberOfLines={2} style={styles.progressText}>
-            {"Sonraki: "}
-            <Text style={styles.progressTextStrong}>{next.short}</Text>
-            {` · ${formatCredits(remaining)} kredi kaldı`}
-          </Text>
-        ) : (
-          <View style={styles.peakRow}>
-            <MaterialCommunityIcons name="crown" size={14} color={BRAND.goldLight} />
-            <Text style={styles.peakText}>Zirve seviyesine ulaştın</Text>
-          </View>
-        )}
+        ) : null}
       </View>
-
-      {!compact && upcoming.length ? (
-        <View style={styles.upcomingBlock}>
-          <Text allowFontScaling={false} style={styles.upcomingTitle}>
-            SIRADAKİ SEVİYELER
-          </Text>
-          <View style={styles.upcomingRow}>
-            {upcoming.map((t) => {
-              const unlocked = lvl >= t.level;
-              return (
-                <View key={`up${t.level}`} style={[styles.upcomingItem, unlocked ? null : styles.dimmed]}>
-                  <View>
-                    <SoraWealthEmblem level={t.level} size={34} animated={false} />
-                    {!unlocked ? (
-                      <View style={styles.lockDot}>
-                        <Ionicons name="lock-closed" size={8} color="#FFFFFF" />
-                      </View>
-                    ) : null}
-                  </View>
-                  <Text numberOfLines={1} style={styles.upcomingName}>
-                    {t.short}
-                  </Text>
-                  <Text numberOfLines={1} style={styles.upcomingMin}>
-                    {formatCreditsCompact(t.minSpent)}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        </View>
-      ) : null}
     </LinearGradient>
   );
 
@@ -1488,38 +1441,40 @@ const styles = StyleSheet.create({
 
   /* card */
   card: {
-    borderRadius: 20,
+    borderRadius: 17,
     borderWidth: 1,
-    padding: 13,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
     overflow: "hidden",
   },
   cardCompact: {
-    padding: 11,
-    borderRadius: 17,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 16,
   },
   cardGlowBig: {
     position: "absolute",
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    top: -90,
-    right: -60,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    top: -85,
+    right: -55,
     opacity: 0.1,
   },
   cardGlowSmall: {
     position: "absolute",
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    bottom: -70,
-    left: -40,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    bottom: -60,
+    left: -35,
     opacity: 0.07,
   },
   cardTopLine: {
     position: "absolute",
     top: 0,
-    left: 24,
-    right: 24,
+    left: 22,
+    right: 22,
     height: 1.5,
   },
   cardRow: {
@@ -1528,7 +1483,7 @@ const styles = StyleSheet.create({
   },
   cardInfo: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 10,
     minWidth: 0,
   },
   cardTitleRow: {
@@ -1538,50 +1493,84 @@ const styles = StyleSheet.create({
   cardTitle: {
     marginLeft: 5,
     color: "rgba(255,255,255,0.6)",
-    fontSize: 10.5,
+    fontSize: 10,
     fontWeight: "800",
-    letterSpacing: 1.1,
+    letterSpacing: 1.0,
   },
   cardNameRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 3,
+    gap: 6,
   },
   cardName: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: "900",
-    letterSpacing: 0.2,
+    letterSpacing: 0.15,
     flexShrink: 1,
   },
   cardNameCompact: {
-    fontSize: 16,
+    fontSize: 14.5,
   },
-  cardBadge: {
+  cardKindPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 7,
+    backgroundColor: "rgba(96,165,250,0.16)",
+    borderWidth: 0.8,
+    borderColor: "rgba(147,197,253,0.28)",
+  },
+  cardKindPillRoyal: {
+    backgroundColor: "rgba(246,200,110,0.14)",
+    borderColor: "rgba(246,200,110,0.32)",
+  },
+  cardKindText: {
+    color: "#B9DCFF",
+    fontSize: 9.5,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+  },
+  cardKindTextRoyal: {
+    color: BRAND.goldLight,
+  },
+  cardRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
     marginLeft: 8,
   },
+  cardPct: {
+    color: "#93C5FD",
+    fontSize: 11.5,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+  },
+  cardBadge: {
+    marginLeft: 6,
+  },
   cardMotto: {
-    marginTop: 3,
-    color: "rgba(255,255,255,0.62)",
-    fontSize: 12,
+    marginTop: 2,
+    color: "rgba(255,255,255,0.66)",
+    fontSize: 11.5,
     fontWeight: "600",
   },
   progressBlock: {
-    marginTop: 10,
+    marginTop: 8,
   },
   progressLabels: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 6,
+    marginBottom: 5,
   },
   progressLabel: {
     color: "rgba(255,255,255,0.7)",
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: "800",
   },
   progressTrack: {
-    height: 9,
-    borderRadius: 5,
-    backgroundColor: "rgba(255,255,255,0.09)",
+    marginTop: 9,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.1)",
     overflow: "hidden",
   },
   progressFill: {
@@ -1589,16 +1578,16 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     left: 0,
-    borderRadius: 5,
+    borderRadius: 3,
     overflow: "hidden",
   },
   progressCap: {
     position: "absolute",
-    top: 1,
-    bottom: 1,
-    right: 1,
-    width: 7,
-    borderRadius: 4,
+    top: 0.5,
+    bottom: 0.5,
+    right: 0.5,
+    width: 5,
+    borderRadius: 3,
     backgroundColor: "rgba(255,255,255,0.85)",
   },
   progressShimmer: {
