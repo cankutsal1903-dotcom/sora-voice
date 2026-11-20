@@ -8030,11 +8030,7 @@ function Room({
             <Ionicons name="mic-off" size={9} color="rgba(255,255,255,0.85)" />
           </View>
         )}
-        {participant.role === "host" ? (
-          <View style={[styles.roomSpeakerCrown, { zIndex: 12, elevation: 6 }]}>
-            <Ionicons name="sparkles" size={9} color="#11131A" />
-          </View>
-        ) : participant.role === "moderator" ? (
+        {participant.role === "moderator" ? (
           <View style={[styles.roomSpeakerCrown, styles.roomAdminBadge, { zIndex: 12, elevation: 6 }]}>
             <Ionicons name="shield-checkmark" size={9} color="#11131A" />
           </View>
@@ -8305,6 +8301,22 @@ function Room({
           )}
         </View>
 
+        <RoomQuickDock
+          inline
+          visible={!minimized && !roomKeyboard.visible && !giftOpen && !gamesOpen}
+          onSendReaction={handleSendQuickReaction}
+          onOpenGames={handleOpenGames}
+          leftSlot={
+            events.length > 0 ? (
+              <RoomEventCard
+                events={events}
+                onOpenEvent={onOpenEvent}
+                variant="strip"
+              />
+            ) : null
+          }
+        />
+
         <ScrollView
           ref={chatScrollRef}
           style={styles.roomChatScroll}
@@ -8339,26 +8351,7 @@ function Room({
           coins={coins}
           onPress={handleRoomComboPress}
           onExpire={handleExpireRoomCombo}
-          bottomOffset={70}
-        />
-
-        {!minimized && !roomKeyboard.visible && !giftOpen && !gamesOpen && events.length > 0 ? (
-          <RoomEventCard
-            events={events}
-            onOpenEvent={onOpenEvent}
-            compact
-            style={[
-              styles.roomEventCardAnchor,
-              { bottom: roomCombo?.gift ? 290 : 178 },
-            ]}
-          />
-        ) : null}
-
-        <RoomQuickDock
-          visible={!minimized && !roomKeyboard.visible && !giftOpen && !gamesOpen}
-          bottomOffset={roomCombo?.gift ? 186 : 74}
-          onSendReaction={handleSendQuickReaction}
-          onOpenGames={handleOpenGames}
+          bottomOffset={74}
         />
 
         {/* Alt bar: mesaj yazma alanı + hemen yanında hediye + mikrofon + ses + müzik */}

@@ -198,10 +198,12 @@ export const FloatingReactionsOverlay = memo(function FloatingReactionsOverlay({
   );
 });
 
-// ── 2) Sağ Alt Hızlı Tepki + Mini Oyun Dock'u ────────────────────────────────
+// ── 2) Hızlı Tepki + Mini Oyun Dock'u (satır içi şerit veya yüzen) ──────────
 export const RoomQuickDock = memo(function RoomQuickDock({
   visible = true,
   bottomOffset = 74,
+  inline = false,
+  leftSlot = null,
   onSendReaction,
   onOpenGames,
 }) {
@@ -247,12 +249,82 @@ export const RoomQuickDock = memo(function RoomQuickDock({
 
   const trayTranslateX = trayAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [24, 0],
+    outputRange: [20, 0],
   });
   const trayScale = trayAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0.88, 1],
+    outputRange: [0.92, 1],
   });
+
+  if (inline) {
+    return (
+      <View style={styles.inlineStripRoot}>
+        <View style={styles.inlineLeftSlot}>
+          {leftSlot || <View style={styles.inlineLeftSpacer} />}
+        </View>
+
+        <View style={styles.inlineButtonsRow}>
+          <Pressable
+            onPress={onOpenGames}
+            style={({ pressed }) => [
+              styles.inlineDockButton,
+              styles.dockGameButton,
+              pressed && styles.dockButtonPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Oda mini oyunlarını aç"
+          >
+            <Ionicons name="dice" size={19} color="#FDE68A" />
+          </Pressable>
+          <Pressable
+            onPress={handleToggleTray}
+            onLongPress={() => onSendReaction?.("heart")}
+            delayLongPress={220}
+            style={({ pressed }) => [
+              styles.inlineDockButton,
+              trayOpen ? styles.dockReactionButtonOpen : styles.dockReactionButton,
+              pressed && styles.dockButtonPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Hızlı tepki gönder"
+          >
+            <Ionicons
+              name={trayOpen ? "close" : "heart"}
+              size={19}
+              color={trayOpen ? "#FFFFFF" : "#FF6B93"}
+            />
+          </Pressable>
+        </View>
+
+        {trayOpen ? (
+          <Animated.View
+            style={[
+              styles.reactionTrayInline,
+              {
+                opacity: trayAnim,
+                transform: [{ translateX: trayTranslateX }, { scale: trayScale }],
+              },
+            ]}
+          >
+            {QUICK_REACTIONS.map((item) => (
+              <Pressable
+                key={item.id}
+                onPress={() => handlePickReaction(item.id)}
+                style={({ pressed }) => [
+                  styles.reactionTrayItem,
+                  pressed && styles.reactionTrayItemPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`${item.label} tepkisi gönder`}
+              >
+                <Text style={styles.reactionTrayEmoji}>{item.emoji}</Text>
+              </Pressable>
+            ))}
+          </Animated.View>
+        ) : null}
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.dockRoot, { bottom: bottomOffset }]} pointerEvents="box-none">
@@ -399,7 +471,7 @@ export const RoomEntranceBanner = memo(function RoomEntranceBanner({
       style={[
         styles.entranceWrap,
         {
-          bottom: 74,
+          top: insets.top + 58,
           opacity,
           transform: [{ translateX: slideX }],
         },
@@ -1003,6 +1075,66 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
+  inlineStripRoot: {
+    position: "relative",
+    marginHorizontal: 14,
+    marginTop: 2,
+    marginBottom: 8,
+    height: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    zIndex: 28,
+  },
+  inlineLeftSlot: {
+    flex: 1,
+    minWidth: 0,
+    height: 44,
+    justifyContent: "center",
+  },
+  inlineLeftSpacer: {
+    flex: 1,
+  },
+  inlineButtonsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  inlineDockButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    shadowColor: "#000000",
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
+  },
+  reactionTrayInline: {
+    position: "absolute",
+    left: 0,
+    right: 50,
+    top: 1,
+    bottom: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-evenly",
+    backgroundColor: "rgba(11, 20, 38, 0.96)",
+    borderWidth: 1,
+    borderColor: "rgba(124, 179, 255, 0.42)",
+    borderRadius: 15,
+    paddingHorizontal: 6,
+    shadowColor: "#000000",
+    shadowOpacity: 0.38,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 10,
+    zIndex: 32,
+  },
+
   dockRoot: {
     position: "absolute",
     right: 12,
@@ -1077,8 +1209,8 @@ const styles = StyleSheet.create({
 
   entranceWrap: {
     position: "absolute",
-    left: 12,
-    right: 68,
+    left: 14,
+    right: 14,
     zIndex: 45,
     elevation: 18,
   },

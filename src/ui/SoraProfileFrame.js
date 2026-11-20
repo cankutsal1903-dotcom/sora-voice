@@ -160,160 +160,208 @@ export const describeFrameRequirement = (itemId) => {
 };
 
 /* ------------------------------------------------------------------ */
-/* Paylaşılan animasyon saati                                          */
+/* Paylaşılan animasyon saatleri (native driver, zincirsiz)            */
 /* ------------------------------------------------------------------ */
 /*
- * Tek bir Animated.Value, native driver ile 12 sn'lik doğrusal döngüde döner.
- * Tüm efektler (nefes, titreme, yörünge, parıltı, köz) bu tek değerden
- * modül seviyesinde oluşturulan interpolasyonlarla türetilir; böylece ekranda
- * 10 çerçeve olsa bile JS tarafında kare başına iş yapılmaz.
+ * Beş bağımsız Animated.Value native driver ile döner; zincirlenmiş
+ * interpolate().interpolate() veya testere-dişi kenar hatası yoktur.
+ * Her başlatmada değerler 0'a sıfırlanır; sekme geçişlerinde asla donmaz.
  */
-const CLOCK_MS = 12000;
-const frameClock = new Animated.Value(0);
+const orbitFastClock = new Animated.Value(0);
+const orbitSlowClock = new Animated.Value(0);
+const pulseClock = new Animated.Value(0);
+const flameClock = new Animated.Value(0);
+const riseClockA = new Animated.Value(0);
+const riseClockB = new Animated.Value(0);
+const shimmerClock = new Animated.Value(0);
+
+const ALL_CLOCK_VALUES = [
+  orbitFastClock,
+  orbitSlowClock,
+  pulseClock,
+  flameClock,
+  riseClockA,
+  riseClockB,
+  shimmerClock,
+];
+
 let frameClockRefs = 0;
-let frameClockAnim = null;
+let frameClockAnims = null;
 
 const retainFrameClock = () => {
   frameClockRefs += 1;
-  if (!frameClockAnim) {
-    frameClockAnim = Animated.loop(
-      Animated.timing(frameClock, {
-        toValue: 1,
-        duration: CLOCK_MS,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    );
-    frameClockAnim.start();
+  if (!frameClockAnims) {
+    ALL_CLOCK_VALUES.forEach((v) => v.setValue(0));
+    frameClockAnims = [
+      Animated.loop(
+        Animated.timing(orbitFastClock, {
+          toValue: 1,
+          duration: 4000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+      ),
+      Animated.loop(
+        Animated.timing(orbitSlowClock, {
+          toValue: 1,
+          duration: 6800,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+      ),
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseClock, {
+            toValue: 1,
+            duration: 1050,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseClock, {
+            toValue: 0,
+            duration: 1050,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ]),
+      ),
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(flameClock, {
+            toValue: 1,
+            duration: 460,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(flameClock, {
+            toValue: 0,
+            duration: 460,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ]),
+      ),
+      Animated.loop(
+        Animated.timing(riseClockA, {
+          toValue: 1,
+          duration: 1350,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ),
+      Animated.loop(
+        Animated.timing(riseClockB, {
+          toValue: 1,
+          duration: 1750,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ),
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(shimmerClock, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+          Animated.timing(shimmerClock, {
+            toValue: 1,
+            duration: 1050,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.delay(1450),
+        ]),
+      ),
+    ];
+    frameClockAnims.forEach((anim) => anim.start());
   }
   return () => {
     frameClockRefs = Math.max(0, frameClockRefs - 1);
-    if (frameClockRefs === 0 && frameClockAnim) {
-      frameClockAnim.stop();
-      frameClockAnim = null;
+    if (frameClockRefs === 0 && frameClockAnims) {
+      frameClockAnims.forEach((anim) => anim.stop());
+      frameClockAnims = null;
     }
   };
 };
 
-/**
- * Periyodik anahtar kareleri (u ∈ [0,1], değer) saatin [0,1] aralığına
- * `cycles` kez yayar. Native interpolasyon easing desteklemediği için
- * yumuşaklık yoğun örnekleme ile sağlanır.
- */
-const periodicRange = (cycles, keys, offset = 0) => {
-  const pts = [];
-  for (let c = -1; c <= cycles; c += 1) {
-    for (let i = 0; i < keys.length; i += 1) {
-      pts.push([(c + keys[i][0] + offset) / cycles, keys[i][1]]);
-    }
-  }
-  const valueAt = (t) => {
-    for (let i = 0; i < pts.length - 1; i += 1) {
-      const a = pts[i];
-      const b = pts[i + 1];
-      if (t >= a[0] && t <= b[0]) {
-        if (b[0] === a[0]) return b[1];
-        return a[1] + ((b[1] - a[1]) * (t - a[0])) / (b[0] - a[0]);
-      }
-    }
-    return pts[0][1];
-  };
-  const inputRange = [0];
-  const outputRange = [valueAt(0)];
-  for (let i = 0; i < pts.length; i += 1) {
-    let t = pts[i][0];
-    if (t <= 0 || t >= 1) continue;
-    const prev = inputRange[inputRange.length - 1];
-    if (t <= prev) t = prev + 0.0001;
-    if (t >= 0.9999) continue;
-    inputRange.push(t);
-    outputRange.push(pts[i][1]);
-  }
-  inputRange.push(1);
-  outputRange.push(valueAt(1));
-  return { inputRange, outputRange, extrapolate: "clamp" };
-};
-
-const sineKeys = (lo, hi, samples = 8) =>
-  Array.from({ length: samples + 1 }, (_, i) => [
-    i / samples,
-    lo + (hi - lo) * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / samples)),
-  ]);
-
-const clockNode = (cycles, keys, offset = 0) =>
-  frameClock.interpolate(periodicRange(cycles, keys, offset));
-
-// 0..1 yumuşak nefes (2 sn) ve yavaş nefes (3 sn)
-const BREATH = clockNode(6, sineKeys(0, 1));
-const BREATH_SLOW = clockNode(4, sineKeys(0, 1), 0.35);
-// Düzensiz alev titremesi (0.75 sn), iki faz
-const FLICKER_KEYS = [
-  [0, 0],
-  [0.16, 0.82],
-  [0.3, 0.38],
-  [0.48, 1],
-  [0.66, 0.22],
-  [0.82, 0.64],
-  [1, 0],
-];
-const FLICKER_A = clockNode(16, FLICKER_KEYS);
-const FLICKER_B = clockNode(16, FLICKER_KEYS, 0.5);
 // Yörüngeler
-const ROT_CW_1 = frameClock.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
-const ROT_CW_2 = frameClock.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "720deg"] });
-const ROT_CCW_1 = frameClock.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "-360deg"] });
-// Işık süpürmesi: 0 → 1 kısa sürede geçer, sonra bekler (bant ekran dışında)
-const SWEEP_SLOW = clockNode(2, [[0, 0], [0.2, 1], [1, 1]], 0.1); // her 6 sn
-const SWEEP_MID = clockNode(3, [[0, 0], [0.28, 1], [1, 1]], 0.2); // her 4 sn
-// Yıldız göz kırpmaları (3 sn, farklı fazlar)
-const TWINKLE_KEYS = [[0, 0.18], [0.38, 0.22], [0.5, 1], [0.62, 0.22], [1, 0.18]];
-const TWINKLE = [0, 0.23, 0.47, 0.71, 0.89].map((o) => clockNode(4, TWINKLE_KEYS, o));
-const TWINKLE_SCALE = TWINKLE.map((n) =>
-  n.interpolate({ inputRange: [0.18, 1], outputRange: [0.55, 1.15] }),
-);
-// Kraliyet taç parıltısı (her 4 sn)
-const GLINT = clockNode(3, [[0, 0], [0.62, 0], [0.72, 1], [0.86, 0], [1, 0]], 0.05);
-const GLINT_SCALE = GLINT.interpolate({ inputRange: [0, 1], outputRange: [0.2, 1.2] });
-const GLINT_ROTATE = GLINT.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "90deg"] });
-// Yükselen közler: 2 sn testere dişi, kademeli fazlar
-const EMBER_OFFSETS = [0, 0.52, 0.17, 0.69, 0.34, 0.86];
-const EMBERS = EMBER_OFFSETS.map((o) => clockNode(6, [[0, 0], [1, 1]], o));
-const EMBER_OPACITY = EMBERS.map((n) =>
-  n.interpolate({ inputRange: [0, 0.12, 0.65, 1], outputRange: [0, 1, 0.7, 0] }),
-);
-const EMBER_SCALE = EMBERS.map((n) =>
-  n.interpolate({ inputRange: [0, 1], outputRange: [1, 0.35] }),
-);
+const ROT_CW_FAST = orbitFastClock.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
+const ROT_CCW_FAST = orbitFastClock.interpolate({ inputRange: [0, 1], outputRange: ["360deg", "0deg"] });
+const ROT_CW_SLOW = orbitSlowClock.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
 
-// Paylaşılan türev düğümler (boyuttan bağımsız)
+// Nefes / aura düğümleri (tek kademeli doğrudan interpolasyon)
 const AURA_T1 = {
-  opacity: BREATH_SLOW.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0.95] }),
-  scale: BREATH_SLOW.interpolate({ inputRange: [0, 1], outputRange: [0.97, 1.05] }),
+  opacity: pulseClock.interpolate({ inputRange: [0, 1], outputRange: [0.42, 0.88] }),
+  scale: pulseClock.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1.07] }),
 };
 const AURA_T2 = {
-  opacity: BREATH.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }),
-  scale: BREATH.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1.07] }),
+  opacity: pulseClock.interpolate({ inputRange: [0, 1], outputRange: [0.48, 0.96] }),
+  scale: pulseClock.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1.1] }),
 };
 const AURA_T3 = {
-  opacity: BREATH.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] }),
-  scale: BREATH.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.1] }),
+  opacity: pulseClock.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }),
+  scale: pulseClock.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.13] }),
 };
 const AURA_FLAME = {
-  opacity: FLICKER_A.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }),
-  scale: FLICKER_B.interpolate({ inputRange: [0, 1], outputRange: [0.97, 1.09] }),
+  opacity: flameClock.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.52, 1, 0.66] }),
+  scale: flameClock.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.95, 1.16, 1.02] }),
 };
-const FRAME_BREATH_SCALE = BREATH.interpolate({ inputRange: [0, 1], outputRange: [0.994, 1.018] });
-const ORBIT_OPACITY = BREATH.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
+
+const FRAME_BREATH_T1 = pulseClock.interpolate({ inputRange: [0, 1], outputRange: [0.992, 1.022] });
+const FRAME_BREATH_T2 = pulseClock.interpolate({ inputRange: [0, 1], outputRange: [0.986, 1.032] });
+const FRAME_ORBIT_SWAY = pulseClock.interpolate({ inputRange: [0, 1], outputRange: ["-2.6deg", "2.6deg"] });
+const ORBIT_OPACITY = pulseClock.interpolate({ inputRange: [0, 1], outputRange: [0.68, 1] });
+
+// Göz kırpan yıldızlar (2 zıt faz)
+const TWINKLE_OPACITY_A = pulseClock.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.22, 1, 0.25] });
+const TWINKLE_SCALE_A = pulseClock.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.55, 1.24, 0.6] });
+const TWINKLE_OPACITY_B = pulseClock.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.22, 0.95] });
+const TWINKLE_SCALE_B = pulseClock.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1.2, 0.55, 1.18] });
+
+// Kraliyet taç parıltısı (her 2.5 sn)
+const GLINT_OPACITY = shimmerClock.interpolate({
+  inputRange: [0, 0.35, 0.55, 0.85, 1],
+  outputRange: [0.18, 0.45, 1, 0.25, 0.18],
+});
+const GLINT_SCALE = shimmerClock.interpolate({
+  inputRange: [0, 0.55, 1],
+  outputRange: [0.45, 1.38, 0.45],
+});
+const GLINT_ROTATE = shimmerClock.interpolate({
+  inputRange: [0, 1],
+  outputRange: ["0deg", "90deg"],
+});
+
+// Alev titremesi (canlı 0.92 sn döngü)
 const FLAME_BACK = {
-  opacity: FLICKER_A.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.7] }),
-  scale: FLICKER_A.interpolate({ inputRange: [0, 1], outputRange: [1.0, 1.075] }),
-  rotate: FLICKER_B.interpolate({ inputRange: [0, 1], outputRange: ["-2.4deg", "2.4deg"] }),
+  opacity: flameClock.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.28, 0.68, 0.36] }),
+  scale: flameClock.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1.075, 0.985, 1.048] }),
+  rotate: flameClock.interpolate({ inputRange: [0, 0.5, 1], outputRange: ["4.4deg", "-4.4deg", "1.8deg"] }),
 };
 const FLAME_FRONT = {
-  scale: FLICKER_B.interpolate({ inputRange: [0, 1], outputRange: [0.992, 1.03] }),
-  rotate: FLICKER_A.interpolate({ inputRange: [0, 1], outputRange: ["1.2deg", "-1.2deg"] }),
+  scale: flameClock.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.982, 1.045, 1.008] }),
+  rotate: flameClock.interpolate({ inputRange: [0, 0.5, 1], outputRange: ["-2.4deg", "2.4deg", "-1.0deg"] }),
 };
-const HEAT_SCALE_Y = FLICKER_B.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.12] });
+const HEAT_SCALE_Y = flameClock.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.9, 1.18, 0.98] });
+
+// Yükselen köz opaklık ve ölçeği (2 bağımsız yükseliş temposu)
+const EMBER_OPACITY_A = riseClockA.interpolate({
+  inputRange: [0, 0.14, 0.72, 1],
+  outputRange: [0, 1, 0.85, 0],
+});
+const EMBER_SCALE_A = riseClockA.interpolate({
+  inputRange: [0, 0.22, 1],
+  outputRange: [0.65, 1.15, 0.35],
+});
+const EMBER_OPACITY_B = riseClockB.interpolate({
+  inputRange: [0, 0.16, 0.72, 1],
+  outputRange: [0, 1, 0.85, 0],
+});
+const EMBER_SCALE_B = riseClockB.interpolate({
+  inputRange: [0, 0.22, 1],
+  outputRange: [0.65, 1.15, 0.35],
+});
 
 /* ------------------------------------------------------------------ */
 /* Geometri                                                            */
@@ -376,11 +424,13 @@ export const getProfileFrameLayout = (
   };
 };
 
+const ORBIT_ANGLES_3 = [15, 135, 255];
 const ORBIT_ANGLES_4 = [20, 110, 200, 290];
 const ORBIT_ANGLES_6 = [10, 70, 130, 190, 250, 310];
 const TWINKLE_ANGLES = [-58, 28, 148, 212, 102];
-const EMBER_X = [-0.32, 0.18, -0.08, 0.34, -0.22, 0.06];
-const EMBER_COLORS = ["#FFD166", "#FF7A1A", "#FFF3B0", "#FF9F1C", "#FFE885", "#FF5A1F"];
+const EMBER_X = [-0.38, 0.24, -0.1, 0.38, -0.24, 0.1];
+const EMBER_Y_STAGGER = [0.0, 0.12, 0.04, 0.16, 0.08, 0.14];
+const EMBER_COLORS = ["#FFF3B0", "#FF7A1A", "#FFD166", "#FF9F1C", "#FFE885", "#FF5A1F"];
 
 const absCenter = (cx, cy, w, h = w) => ({
   position: "absolute",
@@ -420,30 +470,40 @@ export const ProfileFrame = memo(function ProfileFrame({
 
   const isFlame = styleKey === "flame";
   const isRoyal = styleKey === "royal";
+  const isOrbit = styleKey === "orbit";
 
-  // Boyuta bağlı (px) interpolasyonlar — yalnızca boyut değişince yeniden kurulur.
+  // Boyuta bağlı (px) doğrudan interpolasyonlar — yalnızca boyut değişince yeniden kurulur.
   const sized = useMemo(() => {
     if (!geo || !animate) return null;
     const shimmerD = geo.ringOuterR * 2;
-    const sweep = tier <= 1 ? SWEEP_SLOW : SWEEP_MID;
-    const shimmerX = sweep.interpolate({
+    const shimmerX = shimmerClock.interpolate({
       inputRange: [0, 1],
       outputRange: [-shimmerD * 0.85, shimmerD * 0.85],
     });
     let embers = null;
-    if (isFlame && size >= 40) {
-      const rise = size * 0.5;
-      const count = size >= 56 ? 6 : 3;
-      embers = EMBERS.slice(0, count).map((node, i) => ({
-        translateY: node.interpolate({ inputRange: [0, 1], outputRange: [0, -rise] }),
-        translateX: node.interpolate({
-          inputRange: [0, 0.5, 1],
-          outputRange: [0, size * (i % 2 ? 0.07 : -0.07), size * (i % 2 ? 0.02 : -0.03)],
-        }),
-      }));
+    if (isFlame && size >= 34) {
+      const rise = size * 0.62;
+      const count = size >= 52 ? 6 : 4;
+      embers = Array.from({ length: count }, (_, i) => {
+        const useB = i % 2 === 1;
+        const clock = useB ? riseClockB : riseClockA;
+        const startY = -EMBER_Y_STAGGER[i] * size;
+        const sway = size * (i % 2 ? 0.09 : -0.09);
+        return {
+          useB,
+          translateY: clock.interpolate({
+            inputRange: [0, 1],
+            outputRange: [startY, startY - rise],
+          }),
+          translateX: clock.interpolate({
+            inputRange: [0, 0.5, 1],
+            outputRange: [0, sway, sway * 0.3],
+          }),
+        };
+      });
     }
     return { shimmerD, shimmerX, embers };
-  }, [geo, animate, tier, isFlame, size]);
+  }, [geo, animate, isFlame, size]);
 
   if (!appearance || !geo) {
     return (
@@ -458,33 +518,35 @@ export const ProfileFrame = memo(function ProfileFrame({
 
   const half = size / 2;
   const aura = isFlame ? AURA_FLAME : tier >= 3 ? AURA_T3 : tier === 2 ? AURA_T2 : AURA_T1;
-  const auraD = geo.ringOuterR * 2 * (isFlame ? 1.06 : tier >= 3 ? 1.04 : 1.0);
-  const showShimmer = animate && sized && size >= 36;
-  const orbitCount = tier >= 3 ? 6 : tier === 2 ? 4 : 0;
-  const showOrbit = animate && !isFlame && orbitCount > 0 && size >= 34;
-  const showSecondOrbit = animate && tier >= 3 && !isFlame && size >= 44;
-  const showTwinkle = animate && tier >= 3 && !isFlame && size >= 40;
-  const showGlint = animate && isRoyal && size >= 40;
-  const sparkD = Math.max(4, Math.round(size * (tier >= 3 ? 0.075 : 0.07)));
-  const orbitR = geo.ringMidR;
-  const orbit2R = geo.ringOuterR * 1.02;
+  const auraD = geo.ringOuterR * 2 * (isFlame ? 1.12 : tier >= 3 ? 1.07 : 1.03);
+  const showShimmer = animate && sized && size >= 34;
+  const orbitCount = tier >= 3 ? 6 : tier === 2 ? 4 : 3;
+  const showOrbit = animate && orbitCount > 0 && size >= 32;
+  const showSecondOrbit = animate && tier >= 3 && size >= 36;
+  const showTwinkle = animate && tier >= 2 && !isFlame && size >= 36;
+  const showGlint = animate && isRoyal && size >= 34;
+  const sparkD = Math.max(4, Math.round(size * (isFlame ? 0.09 : tier >= 3 ? 0.08 : 0.07)));
+  const orbitR = isFlame ? geo.ringOuterR * 0.96 : geo.ringMidR * 1.03;
+  const orbit2R = geo.ringOuterR * 1.04;
   const sparkColor = appearance.sparkColor || "#FFFFFF";
   const shimmerPeak =
     isFlame
-      ? "rgba(255,240,200,0.5)"
+      ? "rgba(255,240,200,0.55)"
       : tier >= 3
-        ? "rgba(255,255,255,0.5)"
+        ? "rgba(255,255,255,0.55)"
         : tier === 2
-          ? "rgba(255,248,220,0.46)"
-          : "rgba(255,255,255,0.36)";
+          ? "rgba(255,248,220,0.5)"
+          : "rgba(255,255,255,0.42)";
 
   const frameTransform = !animate
     ? undefined
     : isFlame
       ? [{ scale: FLAME_FRONT.scale }, { rotate: FLAME_FRONT.rotate }]
-      : tier >= 2
-        ? [{ scale: FRAME_BREATH_SCALE }]
-        : undefined;
+      : isOrbit
+        ? [{ scale: FRAME_BREATH_T2 }, { rotate: FRAME_ORBIT_SWAY }]
+        : tier >= 2
+          ? [{ scale: FRAME_BREATH_T2 }]
+          : [{ scale: FRAME_BREATH_T1 }];
 
   const imageBox = {
     position: "absolute",
@@ -502,6 +564,9 @@ export const ProfileFrame = memo(function ProfileFrame({
     };
   }
 
+  const orbitAngles =
+    orbitCount === 6 ? ORBIT_ANGLES_6 : orbitCount === 4 ? ORBIT_ANGLES_4 : ORBIT_ANGLES_3;
+
   return (
     <View
       style={[
@@ -515,7 +580,7 @@ export const ProfileFrame = memo(function ProfileFrame({
       ]}
     >
       <View style={[styles.box, { width: size, height: size }]}>
-        {/* Aura / ısı halesi (avatarın arkasında) */}
+        {/* Yumuşak 3 katmanlı radyal aura / ısı halesi (avatarın arkasında) */}
         <Animated.View
           pointerEvents="none"
           style={[
@@ -526,19 +591,31 @@ export const ProfileFrame = memo(function ProfileFrame({
           <View
             style={[
               StyleSheet.absoluteFill,
-              { borderRadius: auraD / 2, backgroundColor: appearance.glowColor, opacity: 0.07 },
+              { borderRadius: auraD / 2, backgroundColor: appearance.glowColor, opacity: 0.09 },
             ]}
           />
           <View
             style={{
               position: "absolute",
-              left: auraD * 0.12,
-              top: auraD * 0.12,
-              width: auraD * 0.76,
-              height: auraD * 0.76,
-              borderRadius: auraD * 0.38,
+              left: auraD * 0.1,
+              top: auraD * 0.1,
+              width: auraD * 0.8,
+              height: auraD * 0.8,
+              borderRadius: auraD * 0.4,
               backgroundColor: appearance.glowColor,
-              opacity: 0.14,
+              opacity: 0.17,
+            }}
+          />
+          <View
+            style={{
+              position: "absolute",
+              left: auraD * 0.2,
+              top: auraD * 0.2,
+              width: auraD * 0.6,
+              height: auraD * 0.6,
+              borderRadius: auraD * 0.3,
+              backgroundColor: appearance.glowColor,
+              opacity: isFlame ? 0.3 : 0.26,
             }}
           />
         </Animated.View>
@@ -547,22 +624,22 @@ export const ProfileFrame = memo(function ProfileFrame({
           <Animated.View
             pointerEvents="none"
             style={[
-              absCenter(half, half - size * 0.32, geo.ringOuterR * 1.5, geo.ringOuterR * 1.4),
+              absCenter(half, half - size * 0.34, geo.ringOuterR * 1.55, geo.ringOuterR * 1.45),
               { transform: [{ scaleY: HEAT_SCALE_Y }] },
             ]}
           >
             <LinearGradient
-              colors={["rgba(255,70,10,0)", "rgba(255,120,30,0.38)", "rgba(255,60,10,0)"]}
+              colors={["rgba(255,70,10,0)", "rgba(255,132,30,0.44)", "rgba(255,60,10,0)"]}
               start={{ x: 0.5, y: 0 }}
               end={{ x: 0.5, y: 1 }}
-              style={[StyleSheet.absoluteFill, { borderRadius: geo.ringOuterR * 0.75 }]}
+              style={[StyleSheet.absoluteFill, { borderRadius: geo.ringOuterR * 0.78 }]}
             />
           </Animated.View>
         ) : null}
 
         {children}
 
-        {/* Alev arka katmanı: ana katmanla ters fazda titrer */}
+        {/* Alev arka katmanı: ana katmanla ters fazda canlı titrer */}
         {isFlame && animate ? (
           <Animated.Image
             pointerEvents="none"
@@ -574,7 +651,7 @@ export const ProfileFrame = memo(function ProfileFrame({
               {
                 opacity: FLAME_BACK.opacity,
                 transform: [
-                  { translateY: -size * 0.03 },
+                  { translateY: -size * 0.035 },
                   { scale: FLAME_BACK.scale },
                   { rotate: FLAME_BACK.rotate },
                 ],
@@ -621,7 +698,7 @@ export const ProfileFrame = memo(function ProfileFrame({
                 position: "absolute",
                 left: sized.shimmerD * 0.36,
                 top: -sized.shimmerD * 0.25,
-                width: sized.shimmerD * 0.28,
+                width: sized.shimmerD * 0.3,
                 height: sized.shimmerD * 1.5,
                 transform: [{ translateX: sized.shimmerX }, { rotate: "22deg" }],
               }}
@@ -636,47 +713,63 @@ export const ProfileFrame = memo(function ProfileFrame({
           </View>
         ) : null}
 
-        {/* Birincil yörünge */}
+        {/* Birincil yörünge (tüm seviyelerde belirgin dönen kıvılcımlar) */}
         {showOrbit ? (
           <Animated.View
             pointerEvents="none"
             style={[
               absCenter(half, half, orbitR * 2),
-              { opacity: ORBIT_OPACITY, transform: [{ rotate: tier >= 3 ? ROT_CW_2 : ROT_CW_1 }] },
+              {
+                opacity: ORBIT_OPACITY,
+                transform: [{ rotate: tier >= 3 ? ROT_CW_FAST : ROT_CW_SLOW }],
+              },
             ]}
           >
-            {(orbitCount === 6 ? ORBIT_ANGLES_6 : ORBIT_ANGLES_4).map((deg, idx) => {
+            {orbitAngles.map((deg, idx) => {
               const rad = (deg * Math.PI) / 180;
               const x = orbitR + Math.cos(rad) * orbitR;
               const y = orbitR + Math.sin(rad) * orbitR;
               const primary = idx % 2 === 0;
-              const d = primary ? sparkD : Math.max(3, Math.round(sparkD * 0.7));
+              const d = primary ? sparkD : Math.max(3, Math.round(sparkD * 0.72));
+              const dotBg = isFlame
+                ? primary
+                  ? "#FFF3B0"
+                  : "#FF7A1A"
+                : sparkColor;
               return (
-                <View key={deg} style={absCenter(x, y, d * 2.4)}>
+                <View key={deg} style={absCenter(x, y, d * 2.5)}>
                   <View
                     style={[
                       styles.sparkHalo,
-                      { borderRadius: d * 1.2, backgroundColor: appearance.glowColor },
+                      { borderRadius: d * 1.25, backgroundColor: appearance.glowColor },
                     ]}
                   />
                   <View
                     style={{
                       position: "absolute",
-                      left: d * 0.7,
-                      top: d * 0.7,
+                      left: d * 0.75,
+                      top: d * 0.75,
                       width: d,
                       height: d,
                       borderRadius: d / 2,
-                      backgroundColor: sparkColor,
+                      backgroundColor: dotBg,
                     }}
                   />
-                  {primary && size >= 52 ? (
+                  {primary && size >= 38 ? (
                     <View style={styles.sparkIconWrap}>
-                      <MaterialCommunityIcons
-                        name="star-four-points"
-                        size={Math.round(d * 1.9)}
-                        color="#FFFFFF"
-                      />
+                      {isFlame ? (
+                        <Ionicons
+                          name="flame"
+                          size={Math.max(8, Math.round(d * 1.65))}
+                          color="#FFE885"
+                        />
+                      ) : (
+                        <MaterialCommunityIcons
+                          name="star-four-points"
+                          size={Math.max(8, Math.round(d * 1.9))}
+                          color="#FFFFFF"
+                        />
+                      )}
                     </View>
                   ) : null}
                 </View>
@@ -685,23 +778,46 @@ export const ProfileFrame = memo(function ProfileFrame({
           </Animated.View>
         ) : null}
 
-        {/* Ters yönde dönen ikinci yörünge */}
+        {/* Ters yönde dönen ikinci yörünge (Seviye 3 ve 4 — Alev, Lila, Kraliyet) */}
         {showSecondOrbit ? (
           <Animated.View
             pointerEvents="none"
-            style={[absCenter(half, half, orbit2R * 2), { transform: [{ rotate: ROT_CCW_1 }] }]}
+            style={[absCenter(half, half, orbit2R * 2), { transform: [{ rotate: ROT_CCW_FAST }] }]}
           >
-            {ORBIT_ANGLES_4.map((deg) => {
+            {ORBIT_ANGLES_4.map((deg, idx) => {
               const rad = ((deg + 45) * Math.PI) / 180;
-              const d = Math.max(3, Math.round(sparkD * 0.6));
+              const d = Math.max(3.5, Math.round(sparkD * 0.68));
               return (
                 <View
                   key={deg}
-                  style={[
-                    absCenter(orbit2R + Math.cos(rad) * orbit2R, orbit2R + Math.sin(rad) * orbit2R, d),
-                    { borderRadius: d / 2, backgroundColor: appearance.accent || "#FFFFFF" },
-                  ]}
-                />
+                  style={absCenter(
+                    orbit2R + Math.cos(rad) * orbit2R,
+                    orbit2R + Math.sin(rad) * orbit2R,
+                    d * 2.1,
+                  )}
+                >
+                  <View
+                    style={[
+                      styles.sparkHalo,
+                      { borderRadius: d * 1.05, backgroundColor: appearance.glowColor, opacity: 0.6 },
+                    ]}
+                  />
+                  <View
+                    style={{
+                      position: "absolute",
+                      left: d * 0.55,
+                      top: d * 0.55,
+                      width: d,
+                      height: d,
+                      borderRadius: d / 2,
+                      backgroundColor: isFlame
+                        ? idx % 2 === 0
+                          ? "#FFD166"
+                          : "#FF9F1C"
+                        : appearance.accent || "#FFFFFF",
+                    }}
+                  />
+                </View>
               );
             })}
           </Animated.View>
@@ -709,10 +825,11 @@ export const ProfileFrame = memo(function ProfileFrame({
 
         {/* Göz kırpan yıldızlar */}
         {showTwinkle
-          ? TWINKLE_ANGLES.slice(0, size >= 56 ? 5 : 3).map((deg, i) => {
+          ? TWINKLE_ANGLES.slice(0, tier >= 3 ? (size >= 52 ? 5 : 4) : 3).map((deg, i) => {
               const rad = (deg * Math.PI) / 180;
-              const r = geo.ringOuterR * 0.97;
-              const s = Math.max(7, Math.round(size * 0.13));
+              const r = geo.ringOuterR * 0.98;
+              const s = Math.max(8, Math.round(size * 0.14));
+              const phaseB = i % 2 === 1;
               return (
                 <Animated.View
                   key={deg}
@@ -720,13 +837,16 @@ export const ProfileFrame = memo(function ProfileFrame({
                   style={[
                     absCenter(half + Math.cos(rad) * r, half + Math.sin(rad) * r, s),
                     styles.center,
-                    { opacity: TWINKLE[i], transform: [{ scale: TWINKLE_SCALE[i] }] },
+                    {
+                      opacity: phaseB ? TWINKLE_OPACITY_B : TWINKLE_OPACITY_A,
+                      transform: [{ scale: phaseB ? TWINKLE_SCALE_B : TWINKLE_SCALE_A }],
+                    },
                   ]}
                 >
                   <MaterialCommunityIcons
                     name="star-four-points"
                     size={s}
-                    color={i % 2 ? appearance.accent || "#FFFFFF" : "#FFFFFF"}
+                    color={phaseB ? appearance.accent || "#FFFFFF" : "#FFFFFF"}
                   />
                 </Animated.View>
               );
@@ -738,47 +858,61 @@ export const ProfileFrame = memo(function ProfileFrame({
           <Animated.View
             pointerEvents="none"
             style={[
-              absCenter(crownTip.x, crownTip.y, Math.max(14, size * 0.3)),
+              absCenter(crownTip.x, crownTip.y, Math.max(14, size * 0.32)),
               styles.center,
-              { opacity: GLINT, transform: [{ scale: GLINT_SCALE }, { rotate: GLINT_ROTATE }] },
+              { opacity: GLINT_OPACITY, transform: [{ scale: GLINT_SCALE }, { rotate: GLINT_ROTATE }] },
             ]}
           >
             <View
               style={[
                 styles.sparkHalo,
-                { borderRadius: Math.max(14, size * 0.3) / 2, backgroundColor: "rgba(255,226,140,0.45)" },
+                { borderRadius: Math.max(14, size * 0.32) / 2, backgroundColor: "rgba(255,226,140,0.52)" },
               ]}
             />
             <MaterialCommunityIcons
               name="star-four-points"
-              size={Math.max(12, Math.round(size * 0.24))}
+              size={Math.max(12, Math.round(size * 0.25))}
               color="#FFF8DC"
             />
           </Animated.View>
         ) : null}
 
-        {/* Yükselen közler */}
+        {/* Yükselen kor kıvılcımları (Alev çerçevesi — tacın üstüne doğru parlayarak yükselir) */}
         {sized?.embers
           ? sized.embers.map((em, i) => {
-              const d = Math.max(3, Math.round(size * (i % 3 === 0 ? 0.06 : 0.045)));
+              const d = Math.max(4, Math.round(size * (i % 2 === 0 ? 0.085 : 0.065)));
               return (
                 <Animated.View
                   key={i}
                   pointerEvents="none"
                   style={[
-                    absCenter(half + EMBER_X[i] * size, half - geo.holeR * 0.9, d),
+                    absCenter(half + EMBER_X[i] * size, half - geo.ringOuterR * 0.72, d * 2.2),
+                    styles.center,
                     {
-                      borderRadius: d / 2,
-                      backgroundColor: EMBER_COLORS[i],
-                      opacity: EMBER_OPACITY[i],
+                      opacity: em.useB ? EMBER_OPACITY_B : EMBER_OPACITY_A,
                       transform: [
                         { translateY: em.translateY },
                         { translateX: em.translateX },
-                        { scale: EMBER_SCALE[i] },
+                        { scale: em.useB ? EMBER_SCALE_B : EMBER_SCALE_A },
                       ],
                     },
                   ]}
-                />
+                >
+                  <View
+                    style={[
+                      StyleSheet.absoluteFill,
+                      { borderRadius: d * 1.1, backgroundColor: "rgba(255,120,20,0.45)" },
+                    ]}
+                  />
+                  <View
+                    style={{
+                      width: d,
+                      height: d,
+                      borderRadius: d / 2,
+                      backgroundColor: EMBER_COLORS[i],
+                    }}
+                  />
+                </Animated.View>
               );
             })
           : null}
@@ -807,7 +941,7 @@ export const FramePreviewTile = memo(function FramePreviewTile({
 }) {
   const app = appearance || PROFILE_ITEM_APPEARANCE[itemId] || null;
   const tileWidth = Math.max(98, Math.round(size * 2.45));
-  const stageHeight = Math.round(size * 1.56);
+  const stageHeight = Math.round(size * 1.72);
   const accent = app?.color || "#7CC4FF";
   const reqText = requirementText ?? describeFrameRequirement(itemId);
   const cleanName = typeof name === "string"

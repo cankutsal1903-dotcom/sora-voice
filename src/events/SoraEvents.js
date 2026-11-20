@@ -861,7 +861,13 @@ export const EventBannerCarousel = memo(function EventBannerCarousel({ events, o
 // 4) RoomEventCard
 // ---------------------------------------------------------------------------
 
-export const RoomEventCard = memo(function RoomEventCard({ events, onOpenEvent, style, compact = true }) {
+export const RoomEventCard = memo(function RoomEventCard({
+  events,
+  onOpenEvent,
+  style,
+  compact = true,
+  variant = "card",
+}) {
   const reducedMotion = useReducedMotion();
   const list = useMemo(() => rankEvents(events), [events]);
   const count = list.length;
@@ -869,9 +875,10 @@ export const RoomEventCard = memo(function RoomEventCard({ events, onOpenEvent, 
   const safeIndex = count ? index % count : 0;
   const fade = useRef(new Animated.Value(1)).current;
   const mountedRef = useRef(true);
+  const isStrip = variant === "strip";
 
   const cardWidth = compact ? 116 : 156;
-  const cardHeight = compact ? 50 : 62;
+  const cardHeight = isStrip ? 42 : compact ? 50 : 62;
 
   const shimmer = useLoopAnimation(!reducedMotion && count > 0, shimmerFactory);
   const glow = useLoopAnimation(!reducedMotion && count > 0, pulseFactory);
@@ -924,7 +931,8 @@ export const RoomEventCard = memo(function RoomEventCard({ events, onOpenEvent, 
   const event = list[safeIndex];
   const upcoming = event.startsAtMs > Date.now();
 
-  const shimmerX = shimmer.interpolate({ inputRange: [0, 1], outputRange: [-48, cardWidth + 24] });
+  const shimmerSpan = isStrip ? 260 : cardWidth;
+  const shimmerX = shimmer.interpolate({ inputRange: [0, 1], outputRange: [-48, shimmerSpan + 24] });
   const glowOpacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.14, 0.34] });
   const glowScale = glow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.02] });
 
@@ -934,20 +942,26 @@ export const RoomEventCard = memo(function RoomEventCard({ events, onOpenEvent, 
       hitSlop={6}
       accessibilityRole="button"
       accessibilityLabel={`${event.title} etkinliğini aç`}
-      style={({ pressed }) => [styles.roomRoot, { width: cardWidth, height: cardHeight }, style, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.roomRoot,
+        isStrip ? { flex: 1, height: cardHeight } : { width: cardWidth, height: cardHeight },
+        style,
+        pressed && styles.pressed,
+      ]}
     >
       <Animated.View
         pointerEvents="none"
         style={[
           styles.roomGlow,
-          { backgroundColor: withAlpha(event.accent, 0.5), opacity: glowOpacity, transform: [{ scale: glowScale }] },
+          isStrip && { borderRadius: 15 },
+          { backgroundColor: withAlpha(event.accent, 0.44), opacity: glowOpacity, transform: [{ scale: glowScale }] },
         ]}
       />
-      <Animated.View style={[styles.roomCard, { opacity: fade }]}>
+      <Animated.View style={[styles.roomCard, isStrip && styles.roomCardStrip, { opacity: fade }]}>
         <LinearGradient colors={event.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
         <LinearGradient
           pointerEvents="none"
-          colors={["rgba(8,14,26,0.42)", "rgba(8,14,26,0.05)"]}
+          colors={["rgba(8,14,26,0.44)", "rgba(8,14,26,0.08)"]}
           start={{ x: 0, y: 1 }}
           end={{ x: 1, y: 0 }}
           style={StyleSheet.absoluteFill}
@@ -955,45 +969,79 @@ export const RoomEventCard = memo(function RoomEventCard({ events, onOpenEvent, 
         {!reducedMotion ? (
           <Animated.View pointerEvents="none" style={[styles.roomShimmer, { transform: [{ translateX: shimmerX }, { rotate: "18deg" }] }]}>
             <LinearGradient
-              colors={["rgba(255,255,255,0)", "rgba(255,255,255,0.42)", "rgba(255,255,255,0)"]}
+              colors={["rgba(255,255,255,0)", "rgba(255,255,255,0.4)", "rgba(255,255,255,0)"]}
               start={{ x: 0, y: 0.5 }}
               end={{ x: 1, y: 0.5 }}
               style={StyleSheet.absoluteFill}
             />
           </Animated.View>
         ) : null}
-        <View style={[styles.roomRow, !compact && styles.roomRowLarge]}>
-          <View style={[styles.roomIconWrap, !compact && styles.roomIconWrapLarge]}>
-            <EventArtwork event={event} size={compact ? 21 : 30} />
-          </View>
-          <View style={styles.roomTextCol}>
-            <View style={styles.roomLiveRow}>
-              <View style={[styles.roomLiveDot, upcoming && styles.roomLiveDotUpcoming]} />
-              <Text style={styles.roomLiveText} numberOfLines={1}>
-                {upcoming ? "YAKINDA" : "ETKİNLİK"}
+        {isStrip ? (
+          <View style={styles.roomStripRow}>
+            <View style={styles.roomStripIconWrap}>
+              <EventArtwork event={event} size={22} />
+            </View>
+            <View style={styles.roomTextCol}>
+              <View style={styles.roomStripMetaRow}>
+                <View style={[styles.roomLiveDot, upcoming && styles.roomLiveDotUpcoming]} />
+                <Text style={styles.roomStripBadgeText} numberOfLines={1}>
+                  {upcoming ? "YAKINDA" : "ETKİNLİK"}
+                </Text>
+                <Text style={styles.roomStripDotSep}>·</Text>
+                <Ionicons name="time" size={9.5} color={BRAND.goldLight} />
+                <EventTimerText event={event} variant="short" style={styles.roomStripTimerText} />
+              </View>
+              <Text style={styles.roomStripTitle} numberOfLines={1}>
+                {event.short_title || event.title}
               </Text>
             </View>
-            <Text
-              style={[styles.roomTitle, !compact && styles.roomTitleLarge]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.78}
-            >
-              {compact ? event.short_title : event.title}
-            </Text>
-            <View style={styles.roomTimerRow}>
-              <Ionicons name="time" size={compact ? 9 : 10} color={BRAND.goldLight} />
-              <EventTimerText event={event} variant="short" style={[styles.roomTimerText, !compact && styles.roomTimerTextLarge]} />
+            <View style={styles.roomStripRight}>
+              {count > 1 ? (
+                <View style={styles.roomStripDots} pointerEvents="none">
+                  {list.map((item, i) => (
+                    <View key={item.id} style={[styles.roomDot, i === safeIndex && styles.roomDotActive]} />
+                  ))}
+                </View>
+              ) : null}
+              <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.82)" />
             </View>
           </View>
-        </View>
-        {count > 1 ? (
-          <View style={styles.roomDots} pointerEvents="none">
-            {list.map((item, i) => (
-              <View key={item.id} style={[styles.roomDot, i === safeIndex && styles.roomDotActive]} />
-            ))}
-          </View>
-        ) : null}
+        ) : (
+          <>
+            <View style={[styles.roomRow, !compact && styles.roomRowLarge]}>
+              <View style={[styles.roomIconWrap, !compact && styles.roomIconWrapLarge]}>
+                <EventArtwork event={event} size={compact ? 21 : 30} />
+              </View>
+              <View style={styles.roomTextCol}>
+                <View style={styles.roomLiveRow}>
+                  <View style={[styles.roomLiveDot, upcoming && styles.roomLiveDotUpcoming]} />
+                  <Text style={styles.roomLiveText} numberOfLines={1}>
+                    {upcoming ? "YAKINDA" : "ETKİNLİK"}
+                  </Text>
+                </View>
+                <Text
+                  style={[styles.roomTitle, !compact && styles.roomTitleLarge]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.78}
+                >
+                  {compact ? event.short_title : event.title}
+                </Text>
+                <View style={styles.roomTimerRow}>
+                  <Ionicons name="time" size={compact ? 9 : 10} color={BRAND.goldLight} />
+                  <EventTimerText event={event} variant="short" style={[styles.roomTimerText, !compact && styles.roomTimerTextLarge]} />
+                </View>
+              </View>
+            </View>
+            {count > 1 ? (
+              <View style={styles.roomDots} pointerEvents="none">
+                {list.map((item, i) => (
+                  <View key={item.id} style={[styles.roomDot, i === safeIndex && styles.roomDotActive]} />
+                ))}
+              </View>
+            ) : null}
+          </>
+        )}
       </Animated.View>
     </Pressable>
   );
@@ -1579,6 +1627,71 @@ const styles = StyleSheet.create({
   roomDots: { position: "absolute", right: 6, bottom: 4, flexDirection: "row" },
   roomDot: { width: 3, height: 3, borderRadius: 1.5, marginLeft: 2, backgroundColor: "rgba(255,255,255,0.4)" },
   roomDotActive: { backgroundColor: "#FFFFFF" },
+  roomCardStrip: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.24)",
+  },
+  roomStripRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingLeft: 8,
+    paddingRight: 9,
+  },
+  roomStripIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.24)",
+    marginRight: 8,
+  },
+  roomStripMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  roomStripBadgeText: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 8.5,
+    fontWeight: "900",
+    letterSpacing: 0.7,
+  },
+  roomStripDotSep: {
+    color: "rgba(255,255,255,0.48)",
+    fontSize: 9,
+    marginHorizontal: 4,
+    fontWeight: "800",
+  },
+  roomStripTimerText: {
+    color: BRAND.goldLight,
+    fontSize: 9.5,
+    fontWeight: "800",
+    marginLeft: 2.5,
+    fontVariant: ["tabular-nums"],
+  },
+  roomStripTitle: {
+    color: "#FFFFFF",
+    fontSize: 12.5,
+    fontWeight: "900",
+    marginTop: 0.5,
+    textShadowColor: "rgba(0,0,0,0.32)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  roomStripRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginLeft: 6,
+  },
+  roomStripDots: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
 
   // Sheet
   modalRoot: { flex: 1, justifyContent: "flex-end" },
