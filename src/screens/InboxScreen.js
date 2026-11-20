@@ -123,7 +123,7 @@ function EmptyState({ icon, title, description, action, onAction }) {
             ]}
           >
             <LinearGradient
-              colors={["#52A5FF", "#2F80ED", "#1D5FBF"]}
+              colors={["#3B8DF6", "#2563EB"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={[StyleSheet.absoluteFill, { borderRadius: 15 }]}
@@ -379,7 +379,7 @@ export const InboxScreen = memo(function InboxScreen({ currentUserId, profile })
                 >
                   {message.own ? (
                     <LinearGradient
-                      colors={["#4B9BFF", "#2F80ED", "#1E62C6"]}
+                      colors={["#3B8DF6", "#2563EB"]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={[styles.messageBubble, styles.messageBubbleOwn]}
@@ -431,10 +431,10 @@ export const InboxScreen = memo(function InboxScreen({ currentUserId, profile })
             ]}
           >
             <LinearGradient
-              colors={["#52A5FF", "#2F80ED", "#1D5FBF"]}
+              colors={["#3B8DF6", "#2563EB"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={[StyleSheet.absoluteFill, { borderRadius: 15 }]}
+              style={[StyleSheet.absoluteFill, { borderRadius: 21 }]}
             />
             {sending ? (
               <ActivityIndicator size="small" color={COLORS.primaryInk} />
@@ -464,7 +464,7 @@ export const InboxScreen = memo(function InboxScreen({ currentUserId, profile })
             ]}
           >
             <LinearGradient
-              colors={["#52A5FF", "#2F80ED", "#1D5FBF"]}
+              colors={["#3B8DF6", "#2563EB"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={[StyleSheet.absoluteFill, { borderRadius: 15 }]}
@@ -712,34 +712,34 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: COLORS.lineSoft || COLORS.line,
+    borderColor: "rgba(203,218,236,0.82)",
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    shadowColor: "#142744",
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
   avatar: { alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: "rgba(255,255,255,0.34)" },
   avatarText: { color: "#FFFFFF", fontWeight: "900" },
   conversationCopy: { flex: 1, minWidth: 0 },
   conversationTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
   conversationName: { flexShrink: 1, color: COLORS.text, fontSize: 15, fontWeight: "900" },
-  conversationTime: { color: COLORS.muted, fontSize: 10, fontWeight: "700" },
-  conversationMessage: { color: COLORS.textSecondary, fontSize: 12, marginTop: 5 },
-  conversationHandle: { color: COLORS.muted, fontSize: 10, marginTop: 3 },
+  conversationTime: { color: COLORS.muted, fontSize: 11, fontWeight: "700" },
+  conversationMessage: { color: COLORS.textSecondary, fontSize: 13, lineHeight: 18, marginTop: 4 },
+  conversationHandle: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
   chatHeader: {
     minHeight: 68,
     paddingHorizontal: 14,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.line,
+    borderBottomColor: "rgba(203,218,236,0.75)",
     backgroundColor: COLORS.surface,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    elevation: 2,
+    elevation: 1,
   },
   headerButton: {
     width: 40,
@@ -747,39 +747,70 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: COLORS.raised,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: "rgba(203,218,236,0.82)",
     alignItems: "center",
     justifyContent: "center",
   },
   chatHeaderCopy: { flex: 1, minWidth: 0 },
-  chatHeaderName: { flexShrink: 1, color: COLORS.text, fontSize: 15, fontWeight: "900" },
-  chatHeaderHandle: { color: COLORS.muted, fontSize: 10, marginTop: 2 },
+  chatHeaderName: { flexShrink: 1, color: COLORS.text, fontSize: 15.5, fontWeight: "900" },
+  chatHeaderHandle: { color: COLORS.muted, fontSize: 11.5, marginTop: 2 },
   savedBadge: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 10, backgroundColor: "rgba(47,128,237,0.12)", paddingHorizontal: 8, paddingVertical: 6 },
-  savedBadgeText: { color: COLORS.primary, fontSize: 9, fontWeight: "800" },
-  messageList: { flexGrow: 1, justifyContent: "flex-end", padding: 16, gap: 8 },
+  savedBadgeText: { color: COLORS.primary, fontSize: 10, fontWeight: "800" },
+  messageList: { flexGrow: 1, justifyContent: "flex-end", padding: 15, gap: 9 },
   messageRow: { flexDirection: "row", justifyContent: "flex-start" },
   messageRowOwn: { justifyContent: "flex-end" },
-  messageBubble: { maxWidth: "82%", paddingHorizontal: 13, paddingVertical: 10, borderRadius: 17, borderBottomLeftRadius: 5, backgroundColor: COLORS.raised, borderWidth: 1, borderColor: COLORS.line },
-  messageBubbleOwn: { borderBottomLeftRadius: 17, borderBottomRightRadius: 5, borderWidth: 0, shadowColor: "#2F80ED", shadowOpacity: 0.26, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
+  messageBubble: {
+    maxWidth: "82%",
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    borderRadius: 19,
+    borderBottomLeftRadius: 6,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: "rgba(203,218,236,0.86)",
+  },
+  messageBubbleOwn: {
+    borderBottomLeftRadius: 19,
+    borderBottomRightRadius: 6,
+    borderWidth: 0,
+  },
   messageBody: { color: COLORS.text, fontSize: 14, lineHeight: 20 },
   messageBodyOwn: { color: COLORS.primaryInk },
-  messageTime: { color: COLORS.muted, fontSize: 9, marginTop: 5, alignSelf: "flex-end" },
-  messageTimeOwn: { color: "rgba(255,255,255,0.82)" },
-  composer: { paddingHorizontal: 13, paddingTop: 10, paddingBottom: Platform.OS === "ios" ? 12 : 9, borderTopWidth: 1, borderTopColor: COLORS.line, backgroundColor: COLORS.background, flexDirection: "row", alignItems: "flex-end", gap: 8 },
-  composerInput: { flex: 1, minHeight: 43, maxHeight: 112, borderRadius: 15, paddingHorizontal: 14, paddingVertical: 11, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.line, color: COLORS.text, fontSize: 14 },
+  messageTime: { color: COLORS.muted, fontSize: 10.5, marginTop: 4, alignSelf: "flex-end" },
+  messageTimeOwn: { color: "rgba(255,255,255,0.84)" },
+  composer: {
+    paddingHorizontal: 12,
+    paddingTop: 9,
+    paddingBottom: Platform.OS === "ios" ? 12 : 9,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(203,218,236,0.75)",
+    backgroundColor: COLORS.surface,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 8,
+  },
+  composerInput: {
+    flex: 1,
+    minHeight: 41,
+    maxHeight: 110,
+    borderRadius: 21,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: "rgba(203,218,236,0.88)",
+    color: COLORS.text,
+    fontSize: 14,
+  },
   sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 15,
+    width: 41,
+    height: 41,
+    borderRadius: 21,
     backgroundColor: COLORS.primary,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
-    shadowColor: "#2F80ED",
-    shadowOpacity: 0.34,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 4,
+    elevation: 1,
   },
   sendButtonDisabled: { opacity: 0.42 },
   modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(4,5,9,0.64)" },
@@ -787,7 +818,7 @@ const styles = StyleSheet.create({
   sheetHandle: { width: 42, height: 4, borderRadius: 2, backgroundColor: "#C2CEDD", alignSelf: "center", marginBottom: 15 },
   sheetHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
   sheetTitle: { color: COLORS.text, fontSize: 25, fontWeight: "900", marginTop: 3 },
-  fieldLabel: { color: COLORS.muted, fontSize: 9, letterSpacing: 1.3, fontWeight: "900", marginBottom: 8 },
+  fieldLabel: { color: COLORS.muted, fontSize: 10.5, letterSpacing: 1.2, fontWeight: "900", marginBottom: 8 },
   handleInput: { height: 50, borderRadius: 15, paddingHorizontal: 14, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.line, flexDirection: "row", alignItems: "center" },
   handlePrefix: { color: COLORS.primary, fontSize: 16, fontWeight: "900" },
   handleTextInput: { flex: 1, color: COLORS.text, fontSize: 15, paddingLeft: 3 },
