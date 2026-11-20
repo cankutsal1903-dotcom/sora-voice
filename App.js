@@ -6209,7 +6209,7 @@ function Room({
   const [roomIsQuiet, setRoomIsQuiet] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [focusedSpeaker, setFocusedSpeaker] = useState(null);
-  const prevLastMessageIdRef = useRef(null);
+  const seenMessageIdsRef = useRef(new Set());
   const syncClientIdRef = useRef(
     `guest-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   );
@@ -7043,28 +7043,32 @@ function Room({
     setHypeWave(null);
     setUnreadChatCount(0);
     setFocusedSpeaker(null);
-    prevLastMessageIdRef.current = null;
+    seenMessageIdsRef.current = new Set();
     chatNearBottomRef.current = true;
     reactionWaveRef.current = { events: [], lastWaveAt: 0 };
   }, [room.id]);
 
   useEffect(() => {
     if (!messages.length) return;
-    const lastMsg = messages[messages.length - 1];
-    const lastId = lastMsg?.id || null;
-    if (!lastId) return;
-    if (!prevLastMessageIdRef.current) {
-      prevLastMessageIdRef.current = lastId;
-      return;
+    const seen = seenMessageIdsRef.current;
+    let incomingCount = 0;
+    for (let i = 0; i < messages.length; i += 1) {
+      const m = messages[i];
+      if (!m?.id || seen.has(m.id)) continue;
+      seen.add(m.id);
+      if (
+        !chatNearBottomRef.current &&
+        !m.system &&
+        !m.announcement &&
+        (!userId || m.userId !== userId)
+      ) {
+        incomingCount += 1;
+      }
     }
-    if (lastId === prevLastMessageIdRef.current) return;
-    const prevIdx = messages.findIndex((m) => m?.id === prevLastMessageIdRef.current);
-    const newlyAdded = prevIdx >= 0 ? messages.slice(prevIdx + 1) : [lastMsg];
-    prevLastMessageIdRef.current = lastId;
-    if (chatNearBottomRef.current) return;
-    const incomingCount = newlyAdded.filter(
-      (m) => m && !m.system && !m.announcement && (!userId || m.userId !== userId),
-    ).length;
+    if (seen.size > 300) {
+      const keep = new Set(messages.map((m) => m?.id).filter(Boolean));
+      seenMessageIdsRef.current = keep;
+    }
     if (incomingCount > 0) {
       setUnreadChatCount((curr) => Math.min(99, curr + incomingCount));
     }
