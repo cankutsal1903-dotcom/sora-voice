@@ -143,12 +143,18 @@ import {
 import { useRoomMusic } from "./src/room/useRoomMusic";
 import {
   FloatingReactionsOverlay,
+  QUICK_REACTIONS,
   RoomEntranceBanner,
   RoomGameResultBanner,
   RoomMiniGamesSheet,
   RoomReactionBar,
   RoomToolsSheet,
 } from "./src/room/RoomLiveliness";
+import {
+  RoomHypeWaveOverlay,
+  RoomIcebreakerSheet,
+  RoomIcebreakerStrip,
+} from "./src/room/RoomEngagement";
 import { playSfx } from "./src/audio/SoraSfx";
 import {
   PrestigeStylePicker,
@@ -6197,6 +6203,11 @@ function Room({
   const ownGiftSpentRef = useRef(ownGiftSpent);
   ownGiftSpentRef.current = ownGiftSpent;
   const [floatingReactions, setFloatingReactions] = useState([]);
+  const [hypeWave, setHypeWave] = useState(null);
+  const [icebreakerOpen, setIcebreakerOpen] = useState(false);
+  const [icebreakerDismissed, setIcebreakerDismissed] = useState(false);
+  const [roomIsQuiet, setRoomIsQuiet] = useState(false);
+  const reactionWaveRef = useRef({ events: [], lastWaveAt: 0 });
   const [entranceQueue, setEntranceQueue] = useState([]);
   const [activeGameEvent, setActiveGameEvent] = useState(null);
   const [roomGiftCatalog, setRoomGiftCatalog] = useState(GIFT_CATALOG);
@@ -6609,7 +6620,8 @@ function Room({
   useEffect(() => {
     if (!room.persisted || !supabase || !chatAccessReady) return undefined;
     let active = true;
-    const syncReplyTimers = [];
+    const pendingSyncReplies = new Map();
+    const syncRequesterId = userId || `guest-${room.id}`;
     const channel = supabase
       .channel(`room-messages-${room.id}`, {
         config: { broadcast: { self: false } },
@@ -6624,6 +6636,24 @@ function Room({
             senderId: payload.senderId,
             senderName: payload.senderName,
           });
+          recordReactionForWave({
+            reactionId: payload.reactionId,
+            senderId: payload.senderId,
+            isLocal: false,
+          });
+        },
+      )
+      .on(
+        "broadcast",
+        { event: "room_hype_wave" },
+        ({ payload }) => {
+          if (!active || !payload?.id) return;
+          const now = Date.now();
+          if (now - reactionWaveRef.current.lastWaveAt < 10000) return;
+          reactionWaveRef.current.lastWaveAt = now;
+          reactionWaveRef.current.events = [];
+          setHypeWave(payload);
+          playSfx("fanfare");
         },
       )
       .on(
@@ -6709,17 +6739,19 @@ function Room({
         "broadcast",
         { event: "room_party_sync_req" },
         ({ payload }) => {
-          if (!active || !payload?.requesterId || payload.requesterId === userId) return;
+          if (!active || !payload?.requesterId || payload.requesterId === syncRequesterId) return;
+          const isHostResponder = Boolean(room.hostId && room.hostId === userId);
           const now = Date.now();
           const snap = partyStateRef.current;
           const hasValidTimer = snap.timer && (!snap.timer.endsAt || snap.timer.endsAt > now);
           const hasValidPk = snap.pk && (!snap.pk.endsAt || snap.pk.endsAt > now);
-          if (!snap.poll && !hasValidTimer && !hasValidPk) return;
-          const delayMs =
-            room.hostId && room.hostId === userId
-              ? 40
-              : 180 + Math.floor(Math.random() * 280);
+          if (!isHostResponder && !snap.poll && !hasValidTimer && !hasValidPk) return;
+          const reqId = String(payload.requesterId);
+          const prevTimer = pendingSyncReplies.get(reqId);
+          if (prevTimer) clearTimeout(prevTimer);
+          const delayMs = isHostResponder ? 30 : 280 + Math.floor(Math.random() * 420);
           const t = setTimeout(() => {
+            pendingSyncReplies.delete(reqId);
             if (!active || roomRealtimeChannelRef.current !== channel) return;
             const latest = partyStateRef.current;
             const tNow = Date.now();
@@ -6731,13 +6763,14 @@ function Room({
               latest.pk && (!latest.pk.endsAt || latest.pk.endsAt > tNow)
                 ? latest.pk
                 : null;
-            if (!latest.poll && !validTimer && !validPk) return;
+            if (!isHostResponder && !latest.poll && !validTimer && !validPk) return;
             channel
               .send({
                 type: "broadcast",
                 event: "room_party_sync_state",
                 payload: {
-                  targetId: payload.requesterId,
+                  targetId: reqId,
+                  authoritative: isHostResponder,
                   poll: latest.poll || null,
                   timer: validTimer,
                   pk: validPk,
@@ -6745,7 +6778,7 @@ function Room({
               })
               .catch(() => undefined);
           }, delayMs);
-          syncReplyTimers.push(t);
+          pendingSyncReplies.set(reqId, t);
         },
       )
       .on(
@@ -6753,35 +6786,74 @@ function Room({
         { event: "room_party_sync_state" },
         ({ payload }) => {
           if (!active || !payload) return;
-          if (payload.targetId && userId && payload.targetId !== userId) return;
+          // Başka bir üye/oda sahibi zaten yanıtladıysa kendi bekleyen yanıtımızı iptal et (O(1))
+          if (payload.targetId) {
+            const targetKey = String(payload.targetId);
+            const queued = pendingSyncReplies.get(targetKey);
+            if (queued) {
+              clearTimeout(queued);
+              pendingSyncReplies.delete(targetKey);
+            }
+            if (targetKey !== syncRequesterId) return;
+          }
           const now = Date.now();
-          if (payload.poll) {
+          const isAuth = Boolean(payload.authoritative);
+          const validTimer =
+            payload.timer && (!payload.timer.endsAt || payload.timer.endsAt > now)
+              ? payload.timer
+              : null;
+          const validPk =
+            payload.pk && (!payload.pk.endsAt || payload.pk.endsAt > now)
+              ? payload.pk
+              : null;
+
+          if (isAuth) {
             setActivePoll((curr) => {
-              if (!curr) return payload.poll;
-              if (curr.id === payload.poll.id) {
-                return {
-                  ...curr,
-                  votes: { ...(payload.poll.votes || {}), ...(curr.votes || {}) },
-                };
+              if (!payload.poll) return null;
+              if (curr && curr.id === payload.poll.id) {
+                const nextVotes = { ...(payload.poll.votes || {}) };
+                if (userId && curr.votes?.[userId] !== undefined && nextVotes[userId] === undefined) {
+                  nextVotes[userId] = curr.votes[userId];
+                }
+                return { ...payload.poll, votes: nextVotes };
               }
-              return curr;
+              return payload.poll;
             });
-          }
-          if (payload.timer && (!payload.timer.endsAt || payload.timer.endsAt > now)) {
-            setActiveTimer((curr) => curr || payload.timer);
-          }
-          if (payload.pk && (!payload.pk.endsAt || payload.pk.endsAt > now)) {
+            setActiveTimer(validTimer);
             setActivePk((curr) => {
-              if (!curr) return payload.pk;
-              if (curr.id === payload.pk.id) {
+              if (!validPk) return null;
+              if (curr && curr.id === validPk.id) {
                 return {
-                  ...curr,
-                  leftScore: Math.max(curr.leftScore || 0, Number(payload.pk.leftScore || 0)),
-                  rightScore: Math.max(curr.rightScore || 0, Number(payload.pk.rightScore || 0)),
+                  ...validPk,
+                  leftScore: Math.max(curr.leftScore || 0, Number(validPk.leftScore || 0)),
+                  rightScore: Math.max(curr.rightScore || 0, Number(validPk.rightScore || 0)),
                 };
               }
-              return curr;
+              return validPk;
             });
+          } else {
+            if (payload.poll) {
+              setActivePoll((curr) => {
+                if (!curr || curr.id !== payload.poll.id) return payload.poll;
+                return {
+                  ...payload.poll,
+                  votes: { ...(curr.votes || {}), ...(payload.poll.votes || {}) },
+                };
+              });
+            }
+            if (validTimer) {
+              setActiveTimer((curr) => (!curr || curr.id !== validTimer.id ? validTimer : curr));
+            }
+            if (validPk) {
+              setActivePk((curr) => {
+                if (!curr || curr.id !== validPk.id) return validPk;
+                return {
+                  ...validPk,
+                  leftScore: Math.max(curr.leftScore || 0, Number(validPk.leftScore || 0)),
+                  rightScore: Math.max(curr.rightScore || 0, Number(validPk.rightScore || 0)),
+                };
+              });
+            }
           }
         },
       )
@@ -6850,7 +6922,7 @@ function Room({
             .send({
               type: "broadcast",
               event: "room_party_sync_req",
-              payload: { requesterId: userId || `guest-${Date.now()}` },
+              payload: { requesterId: syncRequesterId },
             })
             .catch(() => undefined);
           if (entranceSentRoomRef.current !== room.id) {
@@ -6900,7 +6972,8 @@ function Room({
     roomRealtimeChannelRef.current = channel;
     return () => {
       active = false;
-      syncReplyTimers.forEach((timerId) => clearTimeout(timerId));
+      pendingSyncReplies.forEach((timerId) => clearTimeout(timerId));
+      pendingSyncReplies.clear();
       if (roomRealtimeChannelRef.current === channel) {
         roomRealtimeChannelRef.current = null;
       }
@@ -6913,11 +6986,76 @@ function Room({
     room.hostId,
     room.id,
     room.persisted,
+    recordReactionForWave,
     showGameBanner,
     spawnFloatingReaction,
     userFamilyLevel,
     userId,
   ]);
+
+  const recordReactionForWave = useCallback(
+    ({ reactionId, senderId, isLocal = false }) => {
+      const now = Date.now();
+      const bucket = reactionWaveRef.current;
+      bucket.events = bucket.events.filter((e) => now - e.ts <= 6000);
+      bucket.events.push({ senderId: senderId || "anon", reactionId: reactionId || "heart", ts: now });
+      if (now - bucket.lastWaveAt < 12000) return;
+      const uniqueSenders = new Set(bucket.events.map((e) => e.senderId)).size;
+      const count = bucket.events.length;
+      if ((uniqueSenders >= 2 && count >= 4) || count >= 6) {
+        bucket.lastWaveAt = now;
+        bucket.events = [];
+        const matched = QUICK_REACTIONS.find((r) => r.id === reactionId);
+        const wavePayload = {
+          id: `wave-${now}-${Math.random().toString(36).slice(2, 6)}`,
+          count,
+          reactors: uniqueSenders,
+          emoji: matched?.emoji || "🔥",
+        };
+        setHypeWave(wavePayload);
+        playSfx("fanfare");
+        if (isLocal) {
+          roomRealtimeChannelRef.current
+            ?.send({
+              type: "broadcast",
+              event: "room_hype_wave",
+              payload: wavePayload,
+            })
+            ?.catch?.(() => undefined);
+        }
+      }
+    },
+    [],
+  );
+
+  const handleCompleteHypeWave = useCallback((waveId) => {
+    setHypeWave((curr) => (curr && curr.id === waveId ? null : curr));
+  }, []);
+
+  useEffect(() => {
+    setIcebreakerDismissed(false);
+    setHypeWave(null);
+    reactionWaveRef.current = { events: [], lastWaveAt: 0 };
+  }, [room.id]);
+
+  useEffect(() => {
+    const userMessages = messages.filter((m) => m && !m.system && !m.announcement);
+    if (userMessages.length < 2) {
+      setRoomIsQuiet(true);
+      return undefined;
+    }
+    const lastMsg = userMessages[userMessages.length - 1];
+    const lastTs = lastMsg?.createdAt ? new Date(lastMsg.createdAt).getTime() : 0;
+    const elapsed = Number.isFinite(lastTs) && lastTs > 0 ? Date.now() - lastTs : 0;
+    if (elapsed >= 25000) {
+      setRoomIsQuiet(true);
+      return undefined;
+    }
+    setRoomIsQuiet(false);
+    const waitMs = Math.max(1000, 25000 - Math.max(0, elapsed));
+    const timer = setTimeout(() => setRoomIsQuiet(true), waitMs);
+    return () => clearTimeout(timer);
+  }, [messages]);
 
   const handleSendQuickReaction = useCallback(
     (reactionId) => {
@@ -6932,6 +7070,11 @@ function Room({
       playSfx("pop");
       bumpMissionProgress("send_reaction", 1);
       spawnFloatingReaction(payload);
+      recordReactionForWave({
+        reactionId: payload.reactionId,
+        senderId: payload.senderId,
+        isLocal: true,
+      });
       roomRealtimeChannelRef.current
         ?.send({
           type: "broadcast",
@@ -6940,7 +7083,7 @@ function Room({
         })
         ?.catch?.(() => undefined);
     },
-    [profile?.name, spawnFloatingReaction, userId],
+    [profile?.name, recordReactionForWave, spawnFloatingReaction, userId],
   );
 
   const handleBroadcastMiniGame = useCallback(
@@ -8909,6 +9052,24 @@ function Room({
           onDismiss={handleCloseReactionTray}
         />
 
+        <RoomIcebreakerStrip
+          visible={
+            roomIsQuiet &&
+            !icebreakerDismissed &&
+            !chatLocked &&
+            !minimized &&
+            !roomKeyboard.visible &&
+            !activePoll &&
+            !reactionTrayOpen &&
+            !giftOpen &&
+            !gamesOpen &&
+            !toolsOpen
+          }
+          onSendPrompt={sendMessage}
+          onOpenAll={() => setIcebreakerOpen(true)}
+          onDismiss={() => setIcebreakerDismissed(true)}
+        />
+
         {/* Alt bar: mesaj yazma alanı + emoji + ses + mikrofon + hediye + 4 kareli araçlar */}
         <View style={styles.roomBottomBar}>
           <RoomComposer onSend={sendMessage} sending={messageSending} />
@@ -9166,6 +9327,7 @@ function Room({
         onOpenPk={() => setPkCreateOpen(true)}
         onOpenPoll={() => setPollCreateOpen(true)}
         onOpenTimer={() => setTimerCreateOpen(true)}
+        onOpenIcebreaker={() => setIcebreakerOpen(true)}
         onOpenEvents={() => {
           if (events[0]) onOpenEvent?.(events[0]);
         }}
@@ -9218,11 +9380,21 @@ function Room({
         onShareToChat={sendMessage}
         onDismiss={handleCloseGames}
       />
+      <RoomIcebreakerSheet
+        visible={icebreakerOpen}
+        onSendPrompt={sendMessage}
+        onDismiss={() => setIcebreakerOpen(false)}
+      />
       </SafeAreaView>
       <FloatingReactionsOverlay
         reactions={floatingReactions}
         onExpire={handleExpireReaction}
         minimized={minimized}
+      />
+      <RoomHypeWaveOverlay
+        wave={hypeWave}
+        minimized={minimized}
+        onComplete={handleCompleteHypeWave}
       />
       <RoomEntranceBanner
         entry={entranceQueue[0] || null}

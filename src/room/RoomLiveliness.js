@@ -1143,6 +1143,7 @@ export const RoomToolsSheet = memo(function RoomToolsSheet({
   onOpenPk,
   onOpenPoll,
   onOpenTimer,
+  onOpenIcebreaker,
   onOpenEvents,
   onOpenMusic,
   onOpenSettings,
@@ -1237,6 +1238,22 @@ export const RoomToolsSheet = memo(function RoomToolsSheet({
         onSelectGame?.("wheel");
       },
     },
+    ...(onOpenIcebreaker
+      ? [
+          {
+            id: "icebreaker",
+            label: "Konu Aç",
+            icon: "sparkles",
+            colors: ["#06B6D4", "#2563EB"],
+            iconColor: "#FEF08A",
+            badgeText: "YENİ",
+            onPress: () => {
+              onDismiss?.();
+              onOpenIcebreaker?.();
+            },
+          },
+        ]
+      : []),
     ...(hasEvents
       ? [
           {
