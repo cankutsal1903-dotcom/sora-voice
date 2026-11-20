@@ -439,6 +439,16 @@ export const RoomHypeWaveOverlay = memo(function RoomHypeWaveOverlay({
 
   useEffect(() => {
     if (!wave?.id || minimized) return undefined;
+    if (reducedMotion) {
+      bannerAnim.setValue(1);
+      glowAnim.setValue(0.45);
+      const staticTimer = setTimeout(() => {
+        bannerAnim.setValue(0);
+        glowAnim.setValue(0);
+        onCompleteRef.current?.(wave.id);
+      }, 2200);
+      return () => clearTimeout(staticTimer);
+    }
     bannerAnim.setValue(0);
     glowAnim.setValue(0);
     const anim = Animated.parallel([
@@ -491,7 +501,7 @@ export const RoomHypeWaveOverlay = memo(function RoomHypeWaveOverlay({
       anim.stop();
       clearTimeout(fallbackTimer);
     };
-  }, [bannerAnim, glowAnim, minimized, wave?.id]);
+  }, [bannerAnim, glowAnim, minimized, reducedMotion, wave?.id]);
 
   if (!wave?.id || minimized) return null;
 

@@ -6207,6 +6207,12 @@ function Room({
   const [icebreakerOpen, setIcebreakerOpen] = useState(false);
   const [icebreakerDismissed, setIcebreakerDismissed] = useState(false);
   const [roomIsQuiet, setRoomIsQuiet] = useState(false);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [focusedSpeaker, setFocusedSpeaker] = useState(null);
+  const prevLastMessageIdRef = useRef(null);
+  const syncClientIdRef = useRef(
+    `guest-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  );
   const reactionWaveRef = useRef({ events: [], lastWaveAt: 0 });
   const [entranceQueue, setEntranceQueue] = useState([]);
   const [activeGameEvent, setActiveGameEvent] = useState(null);
@@ -6621,7 +6627,7 @@ function Room({
     if (!room.persisted || !supabase || !chatAccessReady) return undefined;
     let active = true;
     const pendingSyncReplies = new Map();
-    const syncRequesterId = userId || `guest-${room.id}`;
+    const syncRequesterId = userId || syncClientIdRef.current;
     const channel = supabase
       .channel(`room-messages-${room.id}`, {
         config: { broadcast: { self: false } },
@@ -7035,8 +7041,34 @@ function Room({
   useEffect(() => {
     setIcebreakerDismissed(false);
     setHypeWave(null);
+    setUnreadChatCount(0);
+    setFocusedSpeaker(null);
+    prevLastMessageIdRef.current = null;
+    chatNearBottomRef.current = true;
     reactionWaveRef.current = { events: [], lastWaveAt: 0 };
   }, [room.id]);
+
+  useEffect(() => {
+    if (!messages.length) return;
+    const lastMsg = messages[messages.length - 1];
+    const lastId = lastMsg?.id || null;
+    if (!lastId) return;
+    if (!prevLastMessageIdRef.current) {
+      prevLastMessageIdRef.current = lastId;
+      return;
+    }
+    if (lastId === prevLastMessageIdRef.current) return;
+    const prevIdx = messages.findIndex((m) => m?.id === prevLastMessageIdRef.current);
+    const newlyAdded = prevIdx >= 0 ? messages.slice(prevIdx + 1) : [lastMsg];
+    prevLastMessageIdRef.current = lastId;
+    if (chatNearBottomRef.current) return;
+    const incomingCount = newlyAdded.filter(
+      (m) => m && !m.system && !m.announcement && (!userId || m.userId !== userId),
+    ).length;
+    if (incomingCount > 0) {
+      setUnreadChatCount((curr) => Math.min(99, curr + incomingCount));
+    }
+  }, [messages, userId]);
 
   useEffect(() => {
     const userMessages = messages.filter((m) => m && !m.system && !m.announcement);
@@ -8588,13 +8620,54 @@ function Room({
     (participant) => !stageParticipants.some((speaker) => speaker.userId === participant.userId),
   );
 
+  const activeSpeakingNow = useMemo(
+    () => stageParticipants.filter((p) => p?.isSpeaking),
+    [stageParticipants],
+  );
+  const activeSpeakingKey = useMemo(
+    () => activeSpeakingNow.map((p) => p.userId || p.name).join(","),
+    [activeSpeakingNow],
+  );
+  useEffect(() => {
+    if (activeSpeakingNow.length > 0) {
+      setFocusedSpeaker({
+        participant: activeSpeakingNow[0],
+        extraCount: activeSpeakingNow.length - 1,
+      });
+      return undefined;
+    }
+    const holdTimer = setTimeout(() => {
+      setFocusedSpeaker(null);
+    }, 1200);
+    return () => clearTimeout(holdTimer);
+  }, [activeSpeakingKey]);
+
+  const handlePressFocusedSpeaker = useCallback(() => {
+    const target = focusedSpeaker?.participant;
+    if (!target) return;
+    if (target.userId && target.userId === userId) {
+      handleOwnSeatPress();
+    } else {
+      openParticipantMenu(target);
+    }
+  }, [focusedSpeaker, handleOwnSeatPress, openParticipantMenu, userId]);
+
   const handleChatScroll = useCallback((event) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-    chatNearBottomRef.current =
+    const nearBottom =
       contentOffset.y + layoutMeasurement.height >= contentSize.height - 120;
+    chatNearBottomRef.current = nearBottom;
+    if (nearBottom) {
+      setUnreadChatCount((curr) => (curr > 0 ? 0 : curr));
+    }
   }, []);
   const handleChatContentSize = useCallback(() => {
     if (chatNearBottomRef.current) chatScrollRef.current?.scrollToEnd({ animated: true });
+  }, []);
+  const handleJumpToLatestChat = useCallback(() => {
+    chatNearBottomRef.current = true;
+    setUnreadChatCount(0);
+    chatScrollRef.current?.scrollToEnd?.({ animated: true });
   }, []);
 
   const voiceErrorText =
@@ -8884,6 +8957,23 @@ function Room({
                 canCancel={canModerate}
                 onCancel={handleCancelTimer}
               />
+              {focusedSpeaker?.participant ? (
+                <Pressable
+                  onPress={handlePressFocusedSpeaker}
+                  style={({ pressed }) => [
+                    styles.roomSpeakerFocusPill,
+                    pressed && { opacity: 0.86, transform: [{ scale: 0.96 }] },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${focusedSpeaker.participant.name} konuşuyor, profili aç`}
+                >
+                  <AudioBars color="#4ADE80" compact />
+                  <Text numberOfLines={1} style={styles.roomSpeakerFocusText}>
+                    {focusedSpeaker.participant.name}
+                    {focusedSpeaker.extraCount > 0 ? ` +${focusedSpeaker.extraCount}` : ""}
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
             {activeLuckyPackets[0] ? (
               <LuckyPacketBadge
@@ -9026,6 +9116,23 @@ function Room({
               />
             </View>
           </ScrollView>
+
+          {unreadChatCount > 0 && !minimized ? (
+            <Pressable
+              onPress={handleJumpToLatestChat}
+              style={({ pressed }) => [
+                styles.roomUnreadJumpPill,
+                pressed && { transform: [{ scale: 0.95 }], opacity: 0.9 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={`${unreadChatCount} yeni mesaja in`}
+            >
+              <Ionicons name="arrow-down" size={13} color="#FFFFFF" />
+              <Text style={styles.roomUnreadJumpText}>
+                {unreadChatCount >= 99 ? "99+" : unreadChatCount} yeni mesaj
+              </Text>
+            </Pressable>
+          ) : null}
 
           {!minimized && !roomKeyboard.visible && !giftOpen && !gamesOpen && !toolsOpen && events.length > 0 ? (
             <RoomEventCard
@@ -18228,6 +18335,49 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
     flexShrink: 1,
+  },
+  roomSpeakerFocusPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(22,163,74,0.22)",
+    borderWidth: 1,
+    borderColor: "rgba(74,222,128,0.45)",
+    maxWidth: 152,
+    flexShrink: 1,
+  },
+  roomSpeakerFocusText: {
+    color: "#DCFCE7",
+    fontSize: 11,
+    fontWeight: "800",
+    flexShrink: 1,
+  },
+  roomUnreadJumpPill: {
+    position: "absolute",
+    left: 14,
+    bottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(37,99,235,0.92)",
+    borderWidth: 1,
+    borderColor: "rgba(147,197,253,0.48)",
+    shadowColor: "#1D4ED8",
+    shadowOpacity: 0.38,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 5,
+  },
+  roomUnreadJumpText: {
+    color: "#FFFFFF",
+    fontSize: 11.5,
+    fontWeight: "900",
   },
   roomChatArea: {
     flex: 1,
