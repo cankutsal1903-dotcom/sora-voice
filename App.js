@@ -178,6 +178,7 @@ import {
   SoraWealthBadge,
   SoraWealthCard,
   WealthTierLadderSheet,
+  formatCreditsCompact,
   getWealthTier,
 } from "./src/ui/SoraWealthTier";
 import {
@@ -813,7 +814,7 @@ function Discover({
           <EventBannerCarousel
             events={events}
             onOpenEvent={onOpenEvent}
-            style={{ marginHorizontal: -18, marginTop: 4, marginBottom: 14 }}
+            style={{ marginTop: 2, marginBottom: 12 }}
           />
         ) : null}
         <LinearGradient
@@ -970,7 +971,7 @@ function Discover({
             <EventBannerCarousel
               events={events}
               onOpenEvent={onOpenEvent}
-              style={{ marginHorizontal: -18, marginTop: 2, marginBottom: 14 }}
+              style={{ marginTop: 2, marginBottom: 12 }}
             />
           </Reveal>
         ) : null}
@@ -2628,14 +2629,15 @@ function Profile({
               <ShimmerSweep width={360} bandWidth={80} color="rgba(255,255,255,0.55)" borderRadius={24} delay={2600} />
               <ProfileFrame
                 appearance={homeFrameAppearance}
-                size={homeFrameAppearance ? 60 : 68}
+                size={homeFrameAppearance ? 54 : 62}
+                padMode="tight"
                 style={styles.profileHomeAvatarWrap}
               >
                 <Avatar
                   label={(profile.name || "S").charAt(0).toUpperCase()}
                   color={profile.color}
                   uri={profile.avatarUrl}
-                  size={homeFrameAppearance ? 60 : 68}
+                  size={homeFrameAppearance ? 54 : 62}
                   bordered={!homeFrameAppearance}
                   circle
                 />
@@ -2750,7 +2752,7 @@ function Profile({
             pressed && { opacity: 0.86 },
           ]}
         >
-          <SoraLevelCrest level={level} size={44} />
+          <SoraLevelCrest level={level} size={38} />
           <View style={styles.pfLevelInfo}>
             <Text style={styles.pfLevelTitle}>
               Seviye {String(level).padStart(2, "0")}
@@ -3192,12 +3194,13 @@ function ProfileDetailSheet({
             <View
               style={[
                 styles.profileDetailCoverBottom,
-                frameAppearance && { left: 16, bottom: -22 },
+                frameAppearance && { left: 16, bottom: -18 },
               ]}
             >
               <ProfileFrame
                 appearance={frameAppearance}
-                size={frameAppearance ? 80 : 88}
+                size={frameAppearance ? 66 : 80}
+                padMode="tight"
                 style={
                   frameAppearance
                     ? { padding: 0, backgroundColor: "transparent", borderWidth: 0 }
@@ -3208,7 +3211,7 @@ function ProfileDetailSheet({
                   label={name.charAt(0).toUpperCase()}
                   color={color}
                   uri={person.avatarUrl || person.avatar_url || null}
-                  size={frameAppearance ? 80 : 88}
+                  size={frameAppearance ? 66 : 80}
                   bordered={!frameAppearance}
                   circle
                 />
@@ -7940,7 +7943,7 @@ function Room({
     const isCoupleSeat = variant === "couple";
     // Konuk (çift) koltuğu diğer tüm koltuklarla birebir aynı boyutta.
     const regularSeatSize = compactStage ? 58 : 66;
-    const avatarSize = isHostSeat ? 84 : regularSeatSize;
+    const avatarSize = isHostSeat ? 76 : regularSeatSize;
     const slotStyle = [
       styles.roomSpeakerSlot,
       isHostSeat && styles.roomHostStageSlot,
@@ -7990,10 +7993,10 @@ function Room({
       ];
     const seatedAvatarSize = seatFrameAppearance
       ? isHostSeat
-        ? 76
+        ? 66
         : compactStage
-          ? 54
-          : 62
+          ? 52
+          : 60
       : avatarSize;
     const seatBadges = (
       <>
@@ -8841,7 +8844,8 @@ function ProfileEditor({
             >
               <ProfileFrame
                 appearance={editorFrameAppearance}
-                size={editorFrameAppearance ? 74 : 84}
+                size={editorFrameAppearance ? 58 : 72}
+                padMode="tight"
                 overlay={
                   <View style={[styles.avatarEditBadge, { zIndex: 20, elevation: 8 }]}>
                     {avatarBusy ? (
@@ -8856,7 +8860,7 @@ function ProfileEditor({
                   label={(name || profile.name || "S").charAt(0).toUpperCase()}
                   color={profile.color}
                   uri={avatarUrl}
-                  size={editorFrameAppearance ? 74 : 84}
+                  size={editorFrameAppearance ? 58 : 72}
                   circle
                 />
               </ProfileFrame>
@@ -8979,13 +8983,13 @@ function ProfileEditor({
                       ? "Sahipsin"
                       : lockInfo.familyOnly
                         ? "Aile ödülü"
-                        : `${formatCredits(item.cost)}`;
+                        : formatCreditsCompact(item.cost);
                   return (
                     <FramePreviewTile
                       key={item.id}
                       itemId={item.id}
                       appearance={itemAppearance}
-                      size={44}
+                      size={40}
                       locked={!owned && lockInfo.locked}
                       requirementText={lockInfo.reason}
                       selected={previewItemId === item.id || (!previewItemId && equipped)}
@@ -14905,9 +14909,9 @@ const styles = StyleSheet.create({
     elevation: 7,
   },
   discoverEmptyHero: {
-    minHeight: 390,
-    borderRadius: 28,
-    padding: 24,
+    minHeight: 256,
+    borderRadius: 24,
+    padding: 18,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.13)",
@@ -14915,24 +14919,24 @@ const styles = StyleSheet.create({
   },
   discoverEmptyGlow: {
     position: "absolute",
-    width: 260,
-    height: 260,
-    borderRadius: 130,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
     backgroundColor: "rgba(47,128,237,0.12)",
-    top: -112,
-    right: -92,
+    top: -100,
+    right: -84,
   },
   discoverEmptyArt: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: 12,
-    marginBottom: 37,
+    gap: 10,
+    marginBottom: 18,
   },
   discoverEmptySeat: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 62,
+    height: 62,
+    borderRadius: 31,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(47,128,237,0.14)",
@@ -14941,33 +14945,33 @@ const styles = StyleSheet.create({
     transform: [{ rotate: "-5deg" }],
   },
   discoverEmptySeatSide: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: "rgba(255,255,255,0.10)",
     borderColor: "rgba(255,255,255,0.20)",
     transform: [{ rotate: "5deg" }],
   },
-  discoverEmptyCopy: { marginBottom: 22 },
+  discoverEmptyCopy: { marginBottom: 15 },
   discoverEmptyLabel: {
     color: COLORS.primary,
     fontSize: 10,
     fontWeight: "900",
-    letterSpacing: 1.6,
-    marginBottom: 9,
+    letterSpacing: 1.5,
+    marginBottom: 5,
   },
   discoverEmptyTitle: {
     color: "#F3F7FC",
-    fontSize: 30,
-    lineHeight: 35,
+    fontSize: 24,
+    lineHeight: 29,
     fontWeight: "900",
-    letterSpacing: -0.9,
-    marginBottom: 8,
+    letterSpacing: -0.7,
+    marginBottom: 5,
   },
   discoverEmptyDescription: {
     color: "rgba(255,255,255,0.74)",
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 13,
+    lineHeight: 19,
   },
   discoverEmptyButton: {
     minHeight: 50,

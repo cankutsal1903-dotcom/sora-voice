@@ -1016,7 +1016,7 @@ function SoraWealthCardBase({ spent = 0, title = "Cömertlik Seviyesi", onPress,
   const ladderStart = Math.max(1, Math.min(lvl + 1, WEALTH_TIERS.length - 3));
   const upcoming = WEALTH_TIERS.slice(ladderStart, ladderStart + 3);
 
-  const emblemSize = compact ? 58 : 80;
+  const emblemSize = compact ? 48 : 60;
   const fillColors = isRoyal ? ["#FFF1C1", BRAND.goldLight, BRAND.gold] : lvl >= 4 ? ["#7FE6FF", BRAND.blueLight] : ["#CFE0F5", BRAND.blueLight];
   const nameColor = isRoyal ? BRAND.goldLight : lvl === 0 ? "#DCE4EE" : "#FFFFFF";
 
@@ -1110,7 +1110,7 @@ function SoraWealthCardBase({ spent = 0, title = "Cömertlik Seviyesi", onPress,
               return (
                 <View key={`up${t.level}`} style={[styles.upcomingItem, unlocked ? null : styles.dimmed]}>
                   <View>
-                    <SoraWealthEmblem level={t.level} size={42} animated={false} />
+                    <SoraWealthEmblem level={t.level} size={34} animated={false} />
                     {!unlocked ? (
                       <View style={styles.lockDot}>
                         <Ionicons name="lock-closed" size={8} color="#FFFFFF" />
@@ -1364,10 +1364,10 @@ const styles = StyleSheet.create({
   },
   badgeHalo: {
     position: "absolute",
-    top: -2,
-    bottom: -2,
-    left: -3,
-    right: -3,
+    top: -1,
+    bottom: -1,
+    left: -1.5,
+    right: -1.5,
   },
   badgePill: {
     flexDirection: "row",
@@ -1488,32 +1488,32 @@ const styles = StyleSheet.create({
 
   /* card */
   card: {
-    borderRadius: 22,
+    borderRadius: 20,
     borderWidth: 1,
-    padding: 16,
+    padding: 13,
     overflow: "hidden",
   },
   cardCompact: {
-    padding: 12,
-    borderRadius: 18,
+    padding: 11,
+    borderRadius: 17,
   },
   cardGlowBig: {
     position: "absolute",
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
     top: -90,
     right: -60,
-    opacity: 0.55,
+    opacity: 0.22,
   },
   cardGlowSmall: {
     position: "absolute",
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
     bottom: -70,
     left: -40,
-    opacity: 0.35,
+    opacity: 0.16,
   },
   cardTopLine: {
     position: "absolute",
@@ -1548,13 +1548,13 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   cardName: {
-    fontSize: 21,
+    fontSize: 18,
     fontWeight: "900",
     letterSpacing: 0.2,
     flexShrink: 1,
   },
   cardNameCompact: {
-    fontSize: 18,
+    fontSize: 16,
   },
   cardBadge: {
     marginLeft: 8,
@@ -1566,7 +1566,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   progressBlock: {
-    marginTop: 14,
+    marginTop: 10,
   },
   progressLabels: {
     flexDirection: "row",
@@ -1630,17 +1630,17 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   upcomingBlock: {
-    marginTop: 14,
-    paddingTop: 12,
+    marginTop: 10,
+    paddingTop: 9,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: "rgba(255,255,255,0.12)",
   },
   upcomingTitle: {
     color: "rgba(255,255,255,0.5)",
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: "800",
-    letterSpacing: 1.2,
-    marginBottom: 8,
+    letterSpacing: 1.1,
+    marginBottom: 6,
   },
   upcomingRow: {
     flexDirection: "row",

@@ -399,7 +399,7 @@ export const RoomEntranceBanner = memo(function RoomEntranceBanner({
       style={[
         styles.entranceWrap,
         {
-          top: insets.top + 58,
+          bottom: 74,
           opacity,
           transform: [{ translateX: slideX }],
         },
@@ -1077,17 +1077,17 @@ const styles = StyleSheet.create({
 
   entranceWrap: {
     position: "absolute",
-    left: 14,
-    right: 14,
+    left: 12,
+    right: 68,
     zIndex: 45,
     elevation: 18,
   },
   entranceCard: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 18,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 9,
     borderWidth: 1,
     borderColor: "rgba(186, 230, 253, 0.45)",
     shadowColor: "#000000",

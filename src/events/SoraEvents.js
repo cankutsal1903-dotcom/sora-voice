@@ -46,8 +46,8 @@ const LEADERBOARD_CACHE_TTL_MS = 30_000;
 const LEADERBOARD_LIMIT = 20;
 const AUTO_ADVANCE_MS = 5_000;
 const ROOM_ROTATE_MS = 6_000;
-const CARD_GAP = 12;
-const BANNER_HEIGHT = 150;
+const CARD_GAP = 0;
+const BANNER_HEIGHT = 128;
 
 const BRAND = {
   blue: "#1C5FB8",
@@ -725,7 +725,7 @@ const BannerCard = memo(function BannerCard({ event, width, floatValue, pulseVal
           style={[styles.bannerArtGlow, { backgroundColor: withAlpha(event.accent, 0.42), transform: [{ scale: glowScale }] }]}
         />
         <Animated.View style={{ transform: [{ translateY }, { rotate }] }}>
-          <EventArtwork event={event} size={96} />
+          <EventArtwork event={event} size={78} />
         </Animated.View>
         <Animated.View style={[styles.bannerSparkA, { opacity: sparkOpacity }]}>
           <Ionicons name="sparkles" size={16} color="#FFF4CC" />
@@ -763,12 +763,17 @@ export const EventBannerCarousel = memo(function EventBannerCarousel({ events, o
   const reducedMotion = useReducedMotion();
   const list = useMemo(() => rankEvents(events), [events]);
   const count = list.length;
-  const cardWidth = Math.max(240, Math.round(windowWidth - 40));
+  const [containerWidth, setContainerWidth] = useState(0);
+  const cardWidth = Math.max(240, Math.round(containerWidth || (windowWidth - 36)));
   const interval = cardWidth + CARD_GAP;
   const scrollRef = useRef(null);
   const [index, setIndex] = useState(0);
   const [dragging, setDragging] = useState(false);
   const safeIndex = count ? Math.min(index, count - 1) : 0;
+  const handleContainerLayout = useCallback((e) => {
+    const w = Math.round(e?.nativeEvent?.layout?.width || 0);
+    if (w > 120) setContainerWidth((prev) => (prev === w ? prev : w));
+  }, []);
 
   const floatValue = useLoopAnimation(!reducedMotion && count > 0, floatFactory);
   const pulseValue = useLoopAnimation(!reducedMotion && count > 0, pulseFactory);
@@ -808,15 +813,13 @@ export const EventBannerCarousel = memo(function EventBannerCarousel({ events, o
   const activeColor = list[safeIndex]?.colors?.[1] || BRAND.blue;
 
   return (
-    <View style={[styles.carouselRoot, style]}>
+    <View style={[styles.carouselRoot, style]} onLayout={handleContainerLayout}>
       <ScrollView
         ref={scrollRef}
         horizontal
+        pagingEnabled
         showsHorizontalScrollIndicator={false}
-        snapToInterval={interval}
-        snapToAlignment="start"
         decelerationRate="fast"
-        disableIntervalMomentum
         contentContainerStyle={styles.carouselContent}
         onScrollBeginDrag={handleBeginDrag}
         onScrollEndDrag={handleEndDrag}
@@ -867,8 +870,8 @@ export const RoomEventCard = memo(function RoomEventCard({ events, onOpenEvent, 
   const fade = useRef(new Animated.Value(1)).current;
   const mountedRef = useRef(true);
 
-  const cardWidth = compact ? 108 : 156;
-  const cardHeight = compact ? 58 : 68;
+  const cardWidth = compact ? 116 : 156;
+  const cardHeight = compact ? 50 : 62;
 
   const shimmer = useLoopAnimation(!reducedMotion && count > 0, shimmerFactory);
   const glow = useLoopAnimation(!reducedMotion && count > 0, pulseFactory);
@@ -922,8 +925,8 @@ export const RoomEventCard = memo(function RoomEventCard({ events, onOpenEvent, 
   const upcoming = event.startsAtMs > Date.now();
 
   const shimmerX = shimmer.interpolate({ inputRange: [0, 1], outputRange: [-48, cardWidth + 24] });
-  const glowOpacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.85] });
-  const glowScale = glow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.05] });
+  const glowOpacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.14, 0.34] });
+  const glowScale = glow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.02] });
 
   return (
     <Pressable
@@ -961,7 +964,7 @@ export const RoomEventCard = memo(function RoomEventCard({ events, onOpenEvent, 
         ) : null}
         <View style={[styles.roomRow, !compact && styles.roomRowLarge]}>
           <View style={[styles.roomIconWrap, !compact && styles.roomIconWrapLarge]}>
-            <EventArtwork event={event} size={compact ? 24 : 32} />
+            <EventArtwork event={event} size={compact ? 21 : 30} />
           </View>
           <View style={styles.roomTextCol}>
             <View style={styles.roomLiveRow}>
@@ -1282,72 +1285,73 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
         </Animated.View>
 
         <Animated.View style={[styles.sheet, { height: sheetHeight, transform: [{ translateY }] }]}>
-          {/* Hero */}
-          <View style={styles.hero}>
-            <LinearGradient colors={[BRAND.ink, BRAND.navy]} style={StyleSheet.absoluteFill} />
-            <LinearGradient
-              colors={[withAlpha(ev.colors[0], 0.96), withAlpha(ev.colors[1] || last, 0.82), withAlpha(last, 0.5)]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <LinearGradient
-              colors={["rgba(16,24,32,0)", "rgba(16,24,32,0.6)"]}
-              start={{ x: 0, y: 0.3 }}
-              end={{ x: 0, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <View pointerEvents="none" style={[styles.heroOrbA, { backgroundColor: withAlpha(ev.accent, 0.25) }]} />
-            <View pointerEvents="none" style={styles.heroOrbB} />
+          <Pressable
+            onPress={handleDismiss}
+            hitSlop={10}
+            style={[styles.closeBtn, { zIndex: 20 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Kapat"
+          >
+            <Ionicons name="close" size={19} color="#FFFFFF" />
+          </Pressable>
 
-            <View style={styles.grabber} />
-            <Pressable
-              onPress={handleDismiss}
-              hitSlop={10}
-              style={styles.closeBtn}
-              accessibilityRole="button"
-              accessibilityLabel="Kapat"
-            >
-              <Ionicons name="close" size={20} color="#FFFFFF" />
-            </Pressable>
-
-            <View style={styles.heroTop}>
-              <View style={styles.heroTextCol}>
-                <LiveKicker upcoming={upcoming} pulseValue={pulseValue} />
-                <Text style={styles.heroTitle} numberOfLines={2}>
-                  {ev.title}
-                </Text>
-                {ev.subtitle ? (
-                  <Text style={styles.heroSubtitle} numberOfLines={2}>
-                    {ev.subtitle}
-                  </Text>
-                ) : null}
-                <View style={styles.heroDateRow}>
-                  <Ionicons name="calendar-outline" size={12} color="rgba(255,255,255,0.8)" />
-                  <Text style={styles.heroDate} numberOfLines={1}>
-                    {formatDateTime(ev.startsAtMs)} – {formatDateTime(ev.endsAtMs)}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.heroArt} pointerEvents="none">
-                <Animated.View
-                  style={[styles.heroArtGlow, { backgroundColor: withAlpha(ev.accent, 0.45), transform: [{ scale: artGlow }] }]}
-                />
-                <Animated.View style={{ transform: [{ translateY: artY }] }}>
-                  <EventArtwork event={ev} size={92} />
-                </Animated.View>
-              </View>
-            </View>
-
-            <CountdownBoxes event={ev} />
-          </View>
-
-          {/* Gövde */}
+          {/* Tam kaydırılabilir içerik (Hero + Kurallar + Ödüller + Sıralama) */}
           <ScrollView
             style={styles.body}
-            contentContainerStyle={[styles.bodyContent, { paddingBottom: bottomPad + 96 }]}
+            contentContainerStyle={{ paddingBottom: bottomPad + 92 }}
             showsVerticalScrollIndicator={false}
           >
+            <View style={styles.hero}>
+              <LinearGradient colors={[BRAND.ink, BRAND.navy]} style={StyleSheet.absoluteFill} />
+              <LinearGradient
+                colors={[withAlpha(ev.colors[0], 0.96), withAlpha(ev.colors[1] || last, 0.82), withAlpha(last, 0.5)]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <LinearGradient
+                colors={["rgba(16,24,32,0)", "rgba(16,24,32,0.58)"]}
+                start={{ x: 0, y: 0.3 }}
+                end={{ x: 0, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <View pointerEvents="none" style={[styles.heroOrbA, { backgroundColor: withAlpha(ev.accent, 0.22) }]} />
+              <View pointerEvents="none" style={styles.heroOrbB} />
+
+              <View style={styles.grabber} />
+
+              <View style={styles.heroTop}>
+                <View style={styles.heroTextCol}>
+                  <LiveKicker upcoming={upcoming} pulseValue={pulseValue} />
+                  <Text style={styles.heroTitle} numberOfLines={2}>
+                    {ev.title}
+                  </Text>
+                  {ev.subtitle ? (
+                    <Text style={styles.heroSubtitle} numberOfLines={2}>
+                      {ev.subtitle}
+                    </Text>
+                  ) : null}
+                  <View style={styles.heroDateRow}>
+                    <Ionicons name="calendar-outline" size={11} color="rgba(255,255,255,0.8)" />
+                    <Text style={styles.heroDate} numberOfLines={1}>
+                      {formatDateTime(ev.startsAtMs)} – {formatDateTime(ev.endsAtMs)}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.heroArt} pointerEvents="none">
+                  <Animated.View
+                    style={[styles.heroArtGlow, { backgroundColor: withAlpha(ev.accent, 0.36), transform: [{ scale: artGlow }] }]}
+                  />
+                  <Animated.View style={{ transform: [{ translateY: artY }] }}>
+                    <EventArtwork event={ev} size={74} />
+                  </Animated.View>
+                </View>
+              </View>
+
+              <CountdownBoxes event={ev} />
+            </View>
+
+            <View style={styles.bodyContent}>
             {ev.description ? <Text style={styles.description}>{ev.description}</Text> : null}
 
             {ev.rules.length ? (
@@ -1374,6 +1378,7 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
             ) : null}
 
             <LeaderboardSection event={ev} enabled={mounted} currentUserId={currentUserId} />
+            </View>
           </ScrollView>
 
           {/* Yapışkan CTA */}
@@ -1429,20 +1434,20 @@ const styles = StyleSheet.create({
 
   // Carousel
   carouselRoot: { width: "100%" },
-  carouselContent: { paddingHorizontal: 20, paddingVertical: 6 },
-  carouselGap: { marginRight: CARD_GAP },
+  carouselContent: { paddingHorizontal: 0, paddingVertical: 3 },
+  carouselGap: { marginRight: 0 },
   bannerCard: {
     height: BANNER_HEIGHT,
-    borderRadius: 22,
+    borderRadius: 20,
     overflow: "hidden",
     backgroundColor: BRAND.navy,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.16)",
     shadowColor: "#0B1E3F",
-    shadowOpacity: 0.28,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 5,
   },
   bannerOrbLarge: { position: "absolute", width: 190, height: 190, borderRadius: 95, right: -52, top: -40 },
   bannerOrbSmall: {
@@ -1467,23 +1472,23 @@ const styles = StyleSheet.create({
   bannerSheen: { position: "absolute", top: 0, bottom: 0, left: "30%", width: 90, transform: [{ skewX: "-18deg" }] },
   bannerArtWrap: {
     position: "absolute",
-    right: 4,
+    right: 6,
     top: 0,
     bottom: 0,
-    width: 128,
+    width: 104,
     alignItems: "center",
     justifyContent: "center",
   },
-  bannerArtGlow: { position: "absolute", width: 96, height: 96, borderRadius: 48 },
-  bannerSparkA: { position: "absolute", top: 18, left: 14 },
-  bannerSparkB: { position: "absolute", bottom: 26, right: 18 },
-  bannerContent: { position: "absolute", left: 16, top: 14, bottom: 14, right: 124, justifyContent: "space-between" },
+  bannerArtGlow: { position: "absolute", width: 78, height: 78, borderRadius: 39 },
+  bannerSparkA: { position: "absolute", top: 14, left: 10 },
+  bannerSparkB: { position: "absolute", bottom: 20, right: 14 },
+  bannerContent: { position: "absolute", left: 14, top: 11, bottom: 11, right: 108, justifyContent: "space-between" },
   bannerTitle: {
     color: "#FFFFFF",
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "900",
     letterSpacing: -0.3,
-    marginTop: 6,
+    marginTop: 4,
     textShadowColor: "rgba(0,0,0,0.35)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
@@ -1529,28 +1534,28 @@ const styles = StyleSheet.create({
 
   // Oda kartı
   roomRoot: { overflow: "visible" },
-  roomGlow: { position: "absolute", top: -2, left: -2, right: -2, bottom: -2, borderRadius: 16 },
+  roomGlow: { position: "absolute", top: -1.5, left: -1.5, right: -1.5, bottom: -1.5, borderRadius: 14 },
   roomCard: {
     flex: 1,
-    borderRadius: 14,
+    borderRadius: 13,
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.26)",
+    borderWidth: 1.1,
+    borderColor: "rgba(255,255,255,0.28)",
     backgroundColor: BRAND.navy,
   },
-  roomShimmer: { position: "absolute", top: -20, bottom: -20, width: 36, left: 0 },
-  roomRow: { flex: 1, flexDirection: "row", alignItems: "center", paddingHorizontal: 6 },
+  roomShimmer: { position: "absolute", top: -20, bottom: -20, width: 32, left: 0 },
+  roomRow: { flex: 1, flexDirection: "row", alignItems: "center", paddingHorizontal: 7 },
   roomRowLarge: { paddingHorizontal: 9 },
   roomIconWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 27,
+    height: 27,
+    borderRadius: 13.5,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.16)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.22)",
-    marginRight: 5,
+    marginRight: 6,
   },
   roomIconWrapLarge: { width: 40, height: 40, borderRadius: 20, marginRight: 8 },
   roomTextCol: { flex: 1, minWidth: 0, justifyContent: "center" },
@@ -1585,7 +1590,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "#FFFFFF",
   },
-  hero: { paddingTop: 10, paddingHorizontal: 18, paddingBottom: 16, overflow: "hidden" },
+  hero: { paddingTop: 10, paddingHorizontal: 16, paddingBottom: 14, overflow: "hidden" },
   heroOrbA: { position: "absolute", width: 240, height: 240, borderRadius: 120, right: -70, top: -70 },
   heroOrbB: {
     position: "absolute",
@@ -1621,41 +1626,41 @@ const styles = StyleSheet.create({
   heroTextCol: { flex: 1, paddingRight: 8 },
   heroTitle: {
     color: "#FFFFFF",
-    fontSize: 25,
+    fontSize: 21,
     fontWeight: "900",
     letterSpacing: -0.4,
-    marginTop: 10,
+    marginTop: 7,
     textShadowColor: "rgba(0,0,0,0.35)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 5,
   },
-  heroSubtitle: { color: "rgba(255,255,255,0.88)", fontSize: 13, fontWeight: "600", lineHeight: 18, marginTop: 4 },
-  heroDateRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
-  heroDate: { color: "rgba(255,255,255,0.8)", fontSize: 11, fontWeight: "700", marginLeft: 5 },
-  heroArt: { width: 110, height: 110, alignItems: "center", justifyContent: "center" },
-  heroArtGlow: { position: "absolute", width: 100, height: 100, borderRadius: 50 },
+  heroSubtitle: { color: "rgba(255,255,255,0.88)", fontSize: 12.5, fontWeight: "600", lineHeight: 17, marginTop: 3 },
+  heroDateRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
+  heroDate: { color: "rgba(255,255,255,0.8)", fontSize: 10.5, fontWeight: "700", marginLeft: 5 },
+  heroArt: { width: 88, height: 88, alignItems: "center", justifyContent: "center", marginRight: 22 },
+  heroArtGlow: { position: "absolute", width: 80, height: 80, borderRadius: 40 },
   cdWrap: {
-    marginTop: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 18,
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 16,
     backgroundColor: "rgba(16,24,32,0.42)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",
   },
-  cdLabel: { color: "rgba(255,255,255,0.72)", fontSize: 10.5, fontWeight: "800", letterSpacing: 0.6, textAlign: "center" },
-  cdRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 6 },
-  cdColon: { color: BRAND.goldLight, fontSize: 20, fontWeight: "900", marginHorizontal: 5, marginBottom: 12 },
+  cdLabel: { color: "rgba(255,255,255,0.72)", fontSize: 10, fontWeight: "800", letterSpacing: 0.6, textAlign: "center" },
+  cdRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5 },
+  cdColon: { color: BRAND.goldLight, fontSize: 17, fontWeight: "900", marginHorizontal: 4, marginBottom: 10 },
   cdBox: {
-    minWidth: 54,
-    paddingVertical: 6,
-    borderRadius: 12,
+    minWidth: 46,
+    paddingVertical: 4,
+    borderRadius: 10,
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.1)",
     borderWidth: 1,
     borderColor: "rgba(255,217,120,0.28)",
   },
-  cdValue: { color: "#FFFFFF", fontSize: 22, fontWeight: "900", fontVariant: ["tabular-nums"] },
+  cdValue: { color: "#FFFFFF", fontSize: 18, fontWeight: "900", fontVariant: ["tabular-nums"] },
   cdUnit: { color: BRAND.goldLight, fontSize: 9, fontWeight: "900", letterSpacing: 0.8, marginTop: 1 },
 
   body: { flex: 1, backgroundColor: "#FFFFFF" },

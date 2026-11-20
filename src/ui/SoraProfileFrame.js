@@ -806,10 +806,13 @@ export const FramePreviewTile = memo(function FramePreviewTile({
   style,
 }) {
   const app = appearance || PROFILE_ITEM_APPEARANCE[itemId] || null;
-  const layout = getProfileFrameLayout(app, size);
-  const tileWidth = Math.max(96, Math.ceil(layout.width + 16));
+  const tileWidth = Math.max(98, Math.round(size * 2.45));
+  const stageHeight = Math.round(size * 1.56);
   const accent = app?.color || "#7CC4FF";
   const reqText = requirementText ?? describeFrameRequirement(itemId);
+  const cleanName = typeof name === "string"
+    ? name.replace(/\s*[çÇ]er[çc]evesi$/i, "").replace(/\s*[çÇ]er[çc]eve$/i, "").trim()
+    : name;
 
   return (
     <Pressable
@@ -837,8 +840,8 @@ export const FramePreviewTile = memo(function FramePreviewTile({
         end={{ x: 0.5, y: 0.7 }}
         style={styles.tileTint}
       />
-      <View style={[styles.tileStage, { height: layout.height }]}>
-        <ProfileFrame appearance={app} size={size}>
+      <View style={[styles.tileStage, { height: stageHeight }]}>
+        <ProfileFrame appearance={app} size={size} padMode="tight">
           <LinearGradient
             colors={["#4A5A8E", "#1E2748"]}
             start={{ x: 0, y: 0 }}
@@ -849,9 +852,9 @@ export const FramePreviewTile = memo(function FramePreviewTile({
           </LinearGradient>
         </ProfileFrame>
       </View>
-      {name ? (
-        <Text style={styles.tileName} numberOfLines={1}>
-          {name}
+      {cleanName ? (
+        <Text style={styles.tileName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+          {cleanName}
         </Text>
       ) : null}
       {priceText ? (
