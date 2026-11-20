@@ -82,7 +82,7 @@ export const FloatingGlow = memo(function FloatingGlow({
   const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
   // Sert kenarlı tek daire yerine iç içe, düşük opaklıklı halkalar:
   // RN'de blur olmadığı için yumuşak bir ışıma etkisi verir.
-  const layers = [1, 0.8, 0.6, 0.4];
+  const layers = [1, 0.86, 0.72, 0.58, 0.44, 0.3];
   return (
     <Animated.View
       pointerEvents="none"
@@ -107,7 +107,7 @@ export const FloatingGlow = memo(function FloatingGlow({
             height: size * f,
             borderRadius: (size * f) / 2,
             backgroundColor: color,
-            opacity: 0.3,
+            opacity: 0.17,
           }}
         />
       ))}

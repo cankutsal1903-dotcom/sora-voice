@@ -514,6 +514,19 @@ const NotificationCenter = memo(function NotificationCenter({
   onDismiss,
   onClear,
 }) {
+  // Art arda gelen aynı bildirimleri tek satırda "×N" olarak grupla.
+  const groupedNotifications = useMemo(() => {
+    const out = [];
+    for (const item of notifications || []) {
+      const last = out[out.length - 1];
+      if (last && last.text === item.text && last.icon === item.icon) {
+        last.count += 1;
+      } else {
+        out.push({ ...item, count: 1 });
+      }
+    }
+    return out;
+  }, [notifications]);
   return (
     <Modal
       transparent
@@ -541,8 +554,8 @@ const NotificationCenter = memo(function NotificationCenter({
           </View>
           {notifications.length ? (
             <FlatList
-              data={notifications}
-              keyExtractor={(item) => item.id}
+              data={groupedNotifications}
+              keyExtractor={(item, index) => `${item.id}-${index}`}
               renderItem={({ item }) => (
                 <View style={styles.notificationRow}>
                   <View
@@ -554,13 +567,20 @@ const NotificationCenter = memo(function NotificationCenter({
                     <Ionicons name={item.icon} size={16} color="#fff" />
                   </View>
                   <View style={styles.notificationText}>
-                    <Text style={styles.notificationMessage}>{item.text}</Text>
+                    <Text style={styles.notificationMessage} numberOfLines={2}>
+                      {item.text}
+                    </Text>
                     <Text style={styles.notificationTime}>{item.time}</Text>
                   </View>
+                  {item.count > 1 ? (
+                    <View style={styles.notificationCount}>
+                      <Text style={styles.notificationCountText}>×{item.count}</Text>
+                    </View>
+                  ) : null}
                 </View>
               )}
-              scrollEnabled={false}
-              nestedScrollEnabled={false}
+              style={{ flexGrow: 0 }}
+              showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.notificationList}
             />
           ) : (
@@ -3141,7 +3161,7 @@ function ProfileDetailSheet({
               colors={COLORS.gradients.dark}
               style={StyleSheet.absoluteFill}
             />
-            <View style={[styles.profileDetailOrb, { backgroundColor: `${color}22` }]} />
+            <View style={[styles.profileDetailOrb, { backgroundColor: `${color}14` }]} />
             <FloatingGlow
               color="rgba(82,165,255,0.26)"
               size={168}
@@ -12807,6 +12827,16 @@ const styles = StyleSheet.create({
   notificationSubtitle: { color: COLORS.muted, fontSize: 12, marginTop: 3 },
   notificationClear: { color: COLORS.text, fontSize: 12, fontWeight: "900" },
   notificationList: { paddingTop: 4 },
+  notificationCount: {
+    alignSelf: "center",
+    minWidth: 34,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(47,128,237,0.12)",
+    alignItems: "center",
+  },
+  notificationCountText: { color: COLORS.primary, fontSize: 11, fontWeight: "900" },
   notificationRow: {
     flexDirection: "row",
     gap: 11,
