@@ -1,7 +1,8 @@
-import { memo } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { memo, useEffect, useMemo } from "react";
+import { Animated, Easing, Image, StyleSheet, Text, View } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useReducedMotion } from "./Motion";
 
 export const GIFT_CATEGORIES = [
   { key: "all", label: "Tümü" },
@@ -281,6 +282,103 @@ export const getBadgeTierConfigForLevel = (rawLevel = 1) => {
   return LEVEL_BADGE_TIERS[tierIndex] || LEVEL_BADGE_TIERS[0];
 };
 
+/* ---- Rozet efektleri: tek paylaşılan native saat (12 sn döngü) ---- */
+const CREST_CLOCK_MS = 12000;
+const crestClock = new Animated.Value(0);
+let crestClockRefs = 0;
+let crestClockAnim = null;
+
+const retainCrestClock = () => {
+  crestClockRefs += 1;
+  if (!crestClockAnim) {
+    crestClockAnim = Animated.loop(
+      Animated.timing(crestClock, {
+        toValue: 1,
+        duration: CREST_CLOCK_MS,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    crestClockAnim.start();
+  }
+  return () => {
+    crestClockRefs = Math.max(0, crestClockRefs - 1);
+    if (crestClockRefs === 0 && crestClockAnim) {
+      crestClockAnim.stop();
+      crestClockAnim = null;
+    }
+  };
+};
+
+// Periyodik anahtar kareleri saatin [0,1] aralığına yayar (native interpolasyon easing desteklemez).
+const crestPeriodic = (cycles, keys, offset = 0) => {
+  const pts = [];
+  for (let c = -1; c <= cycles; c += 1) {
+    for (let i = 0; i < keys.length; i += 1) pts.push([(c + keys[i][0] + offset) / cycles, keys[i][1]]);
+  }
+  const valueAt = (t) => {
+    for (let i = 0; i < pts.length - 1; i += 1) {
+      const a = pts[i];
+      const b = pts[i + 1];
+      if (t >= a[0] && t <= b[0]) {
+        return b[0] === a[0] ? b[1] : a[1] + ((b[1] - a[1]) * (t - a[0])) / (b[0] - a[0]);
+      }
+    }
+    return pts[0][1];
+  };
+  const inputRange = [0];
+  const outputRange = [valueAt(0)];
+  for (let i = 0; i < pts.length; i += 1) {
+    let t = pts[i][0];
+    if (t <= 0 || t >= 1) continue;
+    const prev = inputRange[inputRange.length - 1];
+    if (t <= prev) t = prev + 0.0001;
+    if (t >= 0.9999) continue;
+    inputRange.push(t);
+    outputRange.push(pts[i][1]);
+  }
+  inputRange.push(1);
+  outputRange.push(valueAt(1));
+  return crestClock.interpolate({ inputRange, outputRange, extrapolate: "clamp" });
+};
+const crestSine = (samples = 8) =>
+  Array.from({ length: samples + 1 }, (_, i) => [i / samples, 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / samples)]);
+
+const C_BREATH = crestPeriodic(4, crestSine()); // 3 sn
+const C_FLOAT = crestPeriodic(3, crestSine(), 0.25); // 4 sn
+const C_SWEEP = crestPeriodic(3, [[0, 0], [0.26, 1], [1, 1]], 0.4); // her 4 sn
+const C_ROT = crestClock.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
+const C_TWINKLE_A = crestPeriodic(6, [[0, 0.35], [0.5, 1], [1, 0.35]]);
+const C_TWINKLE_B = crestPeriodic(6, [[0, 1], [0.5, 0.35], [1, 1]]);
+const C_GLOW_OPACITY = C_BREATH.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] });
+const C_GLOW_SCALE = C_BREATH.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1.06] });
+const CREST_RING_ANGLES = [-90, -30, 30, 90, 150, 210];
+
+// Kademeye göre hale rengi/büyüklüğü, seviye hapı gradyanı, parıltı rengi
+const CREST_FX = [
+  { glow: "rgba(96,165,250,0.20)", glowScale: 0.92, pill: ["#2E63B0", "#132A55"], sweep: "rgba(255,255,255,0.32)", spark: "#BFE0FF" },
+  { glow: "rgba(191,219,254,0.26)", glowScale: 1.0, pill: ["#6383B8", "#1D2D55"], sweep: "rgba(255,255,255,0.38)", spark: "#E2E8F0" },
+  { glow: "rgba(255,196,64,0.32)", glowScale: 1.06, pill: ["#E6A51F", "#6E4205"], sweep: "rgba(255,246,210,0.5)", spark: "#FDE047" },
+  { glow: "rgba(103,232,249,0.34)", glowScale: 1.1, pill: ["#25B9E3", "#1C3C9E"], sweep: "rgba(230,252,255,0.52)", spark: "#A5F3FC" },
+  { glow: "rgba(255,200,60,0.40)", glowScale: 1.15, pill: ["#F2B620", "#1E3A9E"], sweep: "rgba(255,248,215,0.55)", spark: "#FDE68A" },
+  { glow: "rgba(255,226,110,0.46)", glowScale: 1.22, pill: ["#F7C948", "#8A4B08"], sweep: "rgba(255,252,230,0.6)", spark: "#72EFDD" },
+];
+
+const ACHIEVEMENT_FX = {
+  "first-listen": { glow: "rgba(96,165,250,0.30)", sweep: "rgba(255,255,255,0.42)" },
+  host: { glow: "rgba(255,196,64,0.32)", sweep: "rgba(255,246,210,0.5)" },
+  curator: { glow: "rgba(45,212,191,0.30)", sweep: "rgba(230,255,250,0.45)" },
+  family: { glow: "rgba(192,132,252,0.32)", sweep: "rgba(250,240,255,0.48)" },
+};
+
+const crestAbsCenter = (cx, cy, w, h = w) => ({
+  position: "absolute",
+  left: cx - w / 2,
+  top: cy - h / 2,
+  width: w,
+  height: h,
+});
+
 /**
  * Her 10 seviyede bir (1, 10, 20, 30, 40, 50+) giderek daha şahşahlı hale gelen özel kullanıcı seviye rozeti.
  */
@@ -293,20 +391,144 @@ export const SoraLevelCrest = memo(function SoraLevelCrest({
 }) {
   const tier = getBadgeTierConfigForLevel(level);
   const artwork = LEVEL_BADGE_ARTWORK[tier.code];
+  const reducedMotion = useReducedMotion();
+  const fx = CREST_FX[tier.tier] || CREST_FX[0];
+  const animate = Boolean(artwork && !locked && !reducedMotion && size >= 28 && tier.tier >= 1);
+
+  useEffect(() => {
+    if (!animate) return undefined;
+    return retainCrestClock();
+  }, [animate]);
+
+  const floatY = useMemo(
+    () =>
+      animate && tier.tier >= 4
+        ? C_FLOAT.interpolate({ inputRange: [0, 1], outputRange: [size * 0.025, -size * 0.035] })
+        : null,
+    [animate, tier.tier, size],
+  );
+  const sweepX = useMemo(
+    () =>
+      animate && tier.tier >= 2
+        ? C_SWEEP.interpolate({ inputRange: [0, 1], outputRange: [-size * 0.62, size * 0.62] })
+        : null,
+    [animate, tier.tier, size],
+  );
+
   if (artwork) {
+    const glowD = size * fx.glowScale;
+    const shimmerD = size * 0.64;
+    const ringR = size * 0.56;
+    const showRing = animate && tier.tier >= 5 && size >= 34;
+    const pillFont = Math.max(8, Math.min(11, Math.round(size * 0.19)));
     return (
-      <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center", position: "relative" }}>
-        <Image
-          source={artwork}
-          resizeMode="contain"
-          resizeMethod="resize"
-          accessible={false}
-          fadeDuration={0}
-          style={{ width: size, height: size, opacity: locked ? 0.34 : 1 }}
-        />
+      <View style={[artStyles.crestArtRoot, { width: size, height: size }]}>
+        {!locked ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              crestAbsCenter(size / 2, size / 2, glowD),
+              animate ? { opacity: C_GLOW_OPACITY, transform: [{ scale: C_GLOW_SCALE }] } : artStyles.crestGlowStatic,
+            ]}
+          >
+            <View style={[artStyles.crestFill, { borderRadius: glowD / 2, backgroundColor: fx.glow, opacity: 0.5 }]} />
+            <View
+              style={{
+                position: "absolute",
+                left: glowD * 0.14,
+                top: glowD * 0.14,
+                width: glowD * 0.72,
+                height: glowD * 0.72,
+                borderRadius: glowD * 0.36,
+                backgroundColor: fx.glow,
+              }}
+            />
+          </Animated.View>
+        ) : null}
+
+        {showRing ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[crestAbsCenter(size / 2, size / 2, ringR * 2), { transform: [{ rotate: C_ROT }] }]}
+          >
+            {CREST_RING_ANGLES.map((deg, i) => {
+              const rad = (deg * Math.PI) / 180;
+              const s = Math.max(6, Math.round(size * (i % 2 ? 0.1 : 0.14)));
+              return (
+                <Animated.View
+                  key={deg}
+                  style={[
+                    crestAbsCenter(ringR + Math.cos(rad) * ringR, ringR + Math.sin(rad) * ringR, s),
+                    artStyles.crestCenter,
+                    { opacity: i % 2 ? C_TWINKLE_B : C_TWINKLE_A },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="star-four-points"
+                    size={s}
+                    color={i % 2 ? fx.spark : "#FFFFFF"}
+                  />
+                </Animated.View>
+              );
+            })}
+          </Animated.View>
+        ) : null}
+
+        <Animated.View
+          style={[
+            artStyles.crestArtBody,
+            { width: size, height: size },
+            floatY ? { transform: [{ translateY: floatY }] } : null,
+          ]}
+        >
+          <Image
+            source={artwork}
+            resizeMode="contain"
+            resizeMethod="resize"
+            accessible={false}
+            fadeDuration={0}
+            style={{ width: size, height: size, opacity: locked ? 0.34 : 1 }}
+          />
+          {sweepX ? (
+            <View
+              pointerEvents="none"
+              style={[
+                crestAbsCenter(size / 2, size * 0.5, shimmerD),
+                { borderRadius: shimmerD / 2, overflow: "hidden" },
+              ]}
+            >
+              <Animated.View
+                style={{
+                  position: "absolute",
+                  left: shimmerD * 0.36,
+                  top: -shimmerD * 0.25,
+                  width: shimmerD * 0.28,
+                  height: shimmerD * 1.5,
+                  transform: [{ translateX: sweepX }, { rotate: "24deg" }],
+                }}
+              >
+                <LinearGradient
+                  colors={["rgba(255,255,255,0)", fx.sweep, "rgba(255,255,255,0)"]}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={artStyles.crestFill}
+                />
+              </Animated.View>
+            </View>
+          ) : null}
+        </Animated.View>
+
         {showLevel || showLevelTag ? (
-          <View style={[artStyles.crestLevelPill, { borderColor: tier.border }]}>
-            <Text style={artStyles.crestLevelText}>Sv.{level}</Text>
+          <View style={[artStyles.crestPillWrap, { borderColor: tier.border, opacity: locked ? 0.6 : 1 }]}>
+            <LinearGradient
+              colors={fx.pill}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={artStyles.crestPillGrad}
+            >
+              <View style={artStyles.crestPillGloss} />
+              <Text style={[artStyles.crestPillText, { fontSize: pillFont }]}>Sv.{level}</Text>
+            </LinearGradient>
           </View>
         ) : null}
       </View>
@@ -503,16 +725,81 @@ export const SoraAchievementBadge = memo(function SoraAchievementBadge({
   locked = false,
 }) {
   const artwork = ACHIEVEMENT_BADGE_ARTWORK[badgeId];
+  const reducedMotion = useReducedMotion();
+  const animate = Boolean(artwork && !locked && !reducedMotion && size >= 28);
+
+  useEffect(() => {
+    if (!animate) return undefined;
+    return retainCrestClock();
+  }, [animate]);
+
+  const sweepX = useMemo(
+    () =>
+      animate ? C_SWEEP.interpolate({ inputRange: [0, 1], outputRange: [-size * 0.62, size * 0.62] }) : null,
+    [animate, size],
+  );
+
   if (!artwork) return null;
+  const fx = ACHIEVEMENT_FX[badgeId] || ACHIEVEMENT_FX["first-listen"];
+  const glowD = size * 1.04;
+  const shimmerD = size * 0.68;
   return (
-    <Image
-      source={artwork}
-      resizeMode="contain"
-      resizeMethod="resize"
-      accessible={false}
-      fadeDuration={0}
-      style={{ width: size, height: size, opacity: locked ? 0.34 : 1 }}
-    />
+    <View style={[artStyles.crestArtRoot, { width: size, height: size }]}>
+      {!locked ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            crestAbsCenter(size / 2, size / 2, glowD),
+            animate ? { opacity: C_GLOW_OPACITY, transform: [{ scale: C_GLOW_SCALE }] } : artStyles.crestGlowStatic,
+          ]}
+        >
+          <View style={[artStyles.crestFill, { borderRadius: glowD / 2, backgroundColor: fx.glow, opacity: 0.5 }]} />
+          <View
+            style={{
+              position: "absolute",
+              left: glowD * 0.14,
+              top: glowD * 0.14,
+              width: glowD * 0.72,
+              height: glowD * 0.72,
+              borderRadius: glowD * 0.36,
+              backgroundColor: fx.glow,
+            }}
+          />
+        </Animated.View>
+      ) : null}
+      <Image
+        source={artwork}
+        resizeMode="contain"
+        resizeMethod="resize"
+        accessible={false}
+        fadeDuration={0}
+        style={{ width: size, height: size, opacity: locked ? 0.34 : 1 }}
+      />
+      {sweepX ? (
+        <View
+          pointerEvents="none"
+          style={[crestAbsCenter(size / 2, size / 2, shimmerD), { borderRadius: shimmerD / 2, overflow: "hidden" }]}
+        >
+          <Animated.View
+            style={{
+              position: "absolute",
+              left: shimmerD * 0.36,
+              top: -shimmerD * 0.25,
+              width: shimmerD * 0.28,
+              height: shimmerD * 1.5,
+              transform: [{ translateX: sweepX }, { rotate: "24deg" }],
+            }}
+          >
+            <LinearGradient
+              colors={["rgba(255,255,255,0)", fx.sweep, "rgba(255,255,255,0)"]}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={artStyles.crestFill}
+            />
+          </Animated.View>
+        </View>
+      ) : null}
+    </View>
   );
 });
 
@@ -580,5 +867,59 @@ const artStyles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "900",
     letterSpacing: 0.2,
+  },
+  crestArtRoot: {
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+    overflow: "visible",
+  },
+  crestArtBody: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  crestFill: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  },
+  crestCenter: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  crestGlowStatic: {
+    opacity: 0.8,
+  },
+  crestPillWrap: {
+    position: "absolute",
+    bottom: -4,
+    zIndex: 6,
+    borderRadius: 99,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  crestPillGrad: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  crestPillGloss: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    height: "50%",
+    backgroundColor: "rgba(255,255,255,0.18)",
+  },
+  crestPillText: {
+    color: "#FFFFFF",
+    fontWeight: "900",
+    letterSpacing: 0.3,
+    textShadowColor: "rgba(0,0,0,0.55)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });

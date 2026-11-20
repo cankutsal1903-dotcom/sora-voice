@@ -174,6 +174,33 @@ import {
 } from "./src/ui/SoraGiftArtwork";
 import { SoraGiftEffect } from "./src/ui/SoraGiftEffect";
 import { CoinBlastEffect } from "./src/ui/CoinBlastEffect";
+import {
+  SoraWealthBadge,
+  SoraWealthCard,
+  WealthTierLadderSheet,
+  getWealthTier,
+} from "./src/ui/SoraWealthTier";
+import {
+  PROFILE_ITEM_APPEARANCE,
+  ProfileFrame,
+  FramePreviewTile,
+  FRAME_UNLOCK_RULES,
+  describeFrameRequirement,
+} from "./src/ui/SoraProfileFrame";
+import {
+  EventBannerCarousel,
+  EventDetailSheet,
+  RoomEventCard,
+  useSoraEvents,
+} from "./src/events/SoraEvents";
+import { FloatingGlow, ShimmerSweep } from "./src/ui/SoraFx";
+import {
+  addLocalGiftSpent,
+  loadOwnGiftSpent,
+  setKnownGiftSpent,
+  useGiftSpent,
+  useGiftSpentMap,
+} from "./src/data/wealthStore";
 import { GiftComboButton } from "./src/ui/GiftComboButton";
 import { KeyboardSafeView, useKeyboardInset } from "./src/ui/useKeyboardInset";
 
@@ -399,458 +426,6 @@ const createRequestUuid = () => {
     return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
   });
 };
-const PROFILE_ITEM_APPEARANCE = {
-  frame_sky: {
-    color: "#58A0F0",
-    accent: "#DFF4FF",
-    glowColor: "rgba(88,160,240,0.34)",
-    sparkColor: "#E0F7FF",
-    width: 3,
-    style: "halo",
-    tier: 1,
-    frameScale: 1.38,
-    overhang: { top: 0.18, bottom: 0.18, side: 0.18 },
-    asset: require("./assets/frames/frame_sky.png"),
-  },
-  frame_family_silver: {
-    color: "#4C9AFF",
-    accent: "#E7F5FF",
-    glowColor: "rgba(96,165,250,0.36)",
-    sparkColor: "#E8F6FF",
-    width: 3.5,
-    style: "crown",
-    tier: 1,
-    frameScale: 1.39,
-    overhang: { top: 0.18, bottom: 0.18, side: 0.18 },
-    asset: require("./assets/frames/frame_family_silver.png"),
-  },
-  frame_amber: {
-    color: "#E89B1E",
-    accent: "#FFE082",
-    glowColor: "rgba(255,168,24,0.48)",
-    sparkColor: "#FFF5BA",
-    width: 3,
-    style: "gem",
-    tier: 2,
-    animated: true,
-    frameScale: 1.45,
-    overhang: { top: 0.21, bottom: 0.21, side: 0.21 },
-    asset: require("./assets/frames/frame_amber.png"),
-  },
-  frame_lilac: {
-    color: "#9B6BFF",
-    accent: "#F3E5FF",
-    glowColor: "rgba(168,85,247,0.52)",
-    sparkColor: "#FAE8FF",
-    width: 3,
-    style: "orbit",
-    tier: 3,
-    animated: true,
-    frameScale: 1.41,
-    overhang: { top: 0.2, bottom: 0.2, side: 0.2 },
-    asset: require("./assets/frames/frame_lilac.png"),
-  },
-  frame_family_royal: {
-    color: "#1D5FBF",
-    accent: "#FFD978",
-    glowColor: "rgba(245,180,32,0.50)",
-    sparkColor: "#FFF4B8",
-    width: 4,
-    style: "royal",
-    tier: 3,
-    animated: true,
-    frameScale: 1.59,
-    overhang: { top: 0.28, bottom: 0.17, side: 0.22 },
-    asset: require("./assets/frames/frame_family_royal.png"),
-  },
-  frame_flame: {
-    color: "#F04B24",
-    accent: "#FFD166",
-    glowColor: "rgba(255,72,16,0.62)",
-    sparkColor: "#FFE885",
-    width: 4,
-    style: "flame",
-    tier: 4,
-    animated: true,
-    frameScale: 1.8,
-    overhang: { top: 0.38, bottom: 0.18, side: 0.24 },
-    asset: require("./assets/frames/frame_flame.png"),
-  },
-};
-
-const sharedFrameOrbitAnim = new Animated.Value(0);
-const sharedFramePulseAnim = new Animated.Value(0);
-const sharedFrameRiseAnim = new Animated.Value(0);
-let activeAnimatedFrameWatchers = 0;
-let sharedFrameRafId = null;
-let sharedFrameLastTick = 0;
-
-const tickSharedFrameClock = () => {
-  if (activeAnimatedFrameWatchers <= 0) {
-    sharedFrameRafId = null;
-    return;
-  }
-  const now = Date.now();
-  if (now - sharedFrameLastTick >= 28) {
-    sharedFrameLastTick = now;
-    sharedFrameOrbitAnim.setValue((now % 4400) / 4400);
-    sharedFramePulseAnim.setValue(0.5 - 0.5 * Math.cos(((now % 920) / 920) * Math.PI * 2));
-    sharedFrameRiseAnim.setValue((now % 1250) / 1250);
-  }
-  sharedFrameRafId = requestAnimationFrame(tickSharedFrameClock);
-};
-
-const retainSharedFrameClock = () => {
-  activeAnimatedFrameWatchers += 1;
-  if (sharedFrameRafId === null) {
-    sharedFrameLastTick = 0;
-    sharedFrameRafId = requestAnimationFrame(tickSharedFrameClock);
-  }
-  return () => {
-    activeAnimatedFrameWatchers = Math.max(0, activeAnimatedFrameWatchers - 1);
-    if (activeAnimatedFrameWatchers === 0 && sharedFrameRafId !== null) {
-      cancelAnimationFrame(sharedFrameRafId);
-      sharedFrameRafId = null;
-    }
-  };
-};
-
-const FRAME_ORBIT_ANGLES_4 = [25, 115, 205, 295];
-const FRAME_ORBIT_ANGLES_6 = [15, 75, 135, 195, 255, 315];
-const FRAME_ORBIT_ANGLES_8 = [0, 45, 90, 135, 180, 225, 270, 315];
-
-const ProfileFrame = memo(function ProfileFrame({
-  appearance,
-  size,
-  children,
-  overlay = null,
-  compactHorizontal = false,
-  style,
-}) {
-  const styleKey = appearance?.style || null;
-  const tier = appearance?.tier || 0;
-  const shouldAnimate = Boolean(appearance && tier >= 1);
-
-  useEffect(() => {
-    if (!shouldAnimate) return undefined;
-    return retainSharedFrameClock();
-  }, [shouldAnimate]);
-
-  if (!appearance) {
-    return (
-      <View style={[{ alignItems: "center", justifyContent: "center" }, style]}>
-        <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
-          {children}
-          {overlay}
-        </View>
-      </View>
-    );
-  }
-
-  const overhang = appearance.overhang || { top: 0.18, bottom: 0.18, side: 0.18 };
-  const padTop = Math.ceil(size * overhang.top);
-  const padBottom = Math.ceil(size * overhang.bottom);
-  const padSide = compactHorizontal ? 2 : Math.ceil(size * overhang.side);
-  const frameSize = Math.round(size * (appearance.frameScale || 1.42));
-  const offset = (size - frameSize) / 2;
-
-  const isFlame = styleKey === "flame";
-  const isOrbit = styleKey === "orbit";
-  const isRoyal = styleKey === "royal";
-  const isGem = styleKey === "gem";
-  const isExpensive = tier >= 2;
-
-  const mainScale = isFlame
-    ? sharedFramePulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.985, 1.045] })
-    : isOrbit || isRoyal
-      ? sharedFramePulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.99, 1.032] })
-      : isGem
-        ? sharedFramePulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.992, 1.026] })
-        : sharedFramePulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.996, 1.012] });
-
-  const mainRotate = isFlame
-    ? sharedFramePulseAnim.interpolate({ inputRange: [0, 1], outputRange: ["-2.2deg", "2.2deg"] })
-    : isOrbit
-      ? sharedFramePulseAnim.interpolate({ inputRange: [0, 1], outputRange: ["-3.6deg", "3.6deg"] })
-      : "0deg";
-
-  const secondaryScale = sharedFramePulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1.06, 0.97],
-  });
-  const secondaryRotate = sharedFramePulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["4.8deg", "-4.8deg"],
-  });
-  const secondaryOpacity = sharedFramePulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.3, 0.68],
-  });
-
-  const auraScale = sharedFramePulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: isFlame ? [0.96, 1.14] : [0.98, 1.09],
-  });
-  const auraOpacity = sharedFramePulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: isFlame ? [0.34, 0.82] : [0.22, 0.58],
-  });
-
-  const orbitRotateCw = sharedFrameOrbitAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
-  });
-  const orbitRotateCcw = sharedFrameOrbitAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["360deg", "0deg"],
-  });
-  const sparkTwinkle = sharedFramePulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.45, 1],
-  });
-
-  const riseTranslateY = sharedFrameRiseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [2, -Math.max(8, Math.round(size * 0.18))],
-  });
-  const riseOpacity = sharedFrameRiseAnim.interpolate({
-    inputRange: [0, 0.25, 0.85, 1],
-    outputRange: [0, 1, 0.75, 0],
-  });
-
-  const orbitRadius = Math.round(size * (isFlame ? 0.57 : isRoyal ? 0.56 : 0.55));
-  const orbitBoxSize = orbitRadius * 2;
-  const orbitBoxOffset = (size - orbitBoxSize) / 2;
-  const orbitAngles = isFlame
-    ? FRAME_ORBIT_ANGLES_8
-    : isOrbit || isRoyal
-      ? FRAME_ORBIT_ANGLES_6
-      : FRAME_ORBIT_ANGLES_4;
-  const sparkDotSize = Math.max(5, Math.round(size * (isFlame ? 0.095 : 0.08)));
-  const auraSize = Math.round(size * (isFlame ? 1.18 : 1.12));
-  const auraOffset = (size - auraSize) / 2;
-
-  return (
-    <View
-      style={[
-        {
-          paddingTop: padTop,
-          paddingBottom: padBottom,
-          paddingHorizontal: padSide,
-          alignItems: "center",
-          justifyContent: "center",
-          overflow: "visible",
-        },
-        style,
-      ]}
-    >
-      <View
-        style={{
-          width: size,
-          height: size,
-          alignItems: "center",
-          justifyContent: "center",
-          overflow: "visible",
-        }}
-      >
-        {isExpensive ? (
-          <Animated.View
-            pointerEvents="none"
-            style={{
-              position: "absolute",
-              width: auraSize,
-              height: auraSize,
-              left: auraOffset,
-              top: auraOffset,
-              borderRadius: auraSize / 2,
-              backgroundColor: appearance.glowColor || "rgba(255,140,0,0.4)",
-              opacity: auraOpacity,
-              transform: [{ scale: auraScale }],
-            }}
-          />
-        ) : null}
-
-        {children}
-
-        {isFlame && appearance.asset ? (
-          <Animated.Image
-            pointerEvents="none"
-            source={appearance.asset}
-            resizeMode="contain"
-            style={{
-              position: "absolute",
-              width: frameSize,
-              height: frameSize,
-              left: offset,
-              top: offset,
-              opacity: secondaryOpacity,
-              transform: [{ scale: secondaryScale }, { rotate: secondaryRotate }],
-            }}
-          />
-        ) : null}
-
-        {appearance.asset ? (
-          <Animated.Image
-            pointerEvents="none"
-            source={appearance.asset}
-            resizeMode="contain"
-            style={{
-              position: "absolute",
-              width: frameSize,
-              height: frameSize,
-              left: offset,
-              top: offset,
-              transform: [{ scale: mainScale }, { rotate: mainRotate }],
-            }}
-          />
-        ) : (
-          <View
-            pointerEvents="none"
-            style={{
-              position: "absolute",
-              width: size + 10,
-              height: size + 10,
-              left: -5,
-              top: -5,
-              borderRadius: (size + 10) / 2,
-              borderWidth: appearance.width || 3,
-              borderColor: appearance.color,
-            }}
-          />
-        )}
-
-        {isExpensive && size >= 34 ? (
-          <Animated.View
-            pointerEvents="none"
-            style={{
-              position: "absolute",
-              width: orbitBoxSize,
-              height: orbitBoxSize,
-              left: orbitBoxOffset,
-              top: orbitBoxOffset,
-              opacity: sparkTwinkle,
-              transform: [{ rotate: orbitRotateCw }],
-            }}
-          >
-            {orbitAngles.map((deg, idx) => {
-              const rad = (deg * Math.PI) / 180;
-              const cx = orbitRadius + Math.cos(rad) * orbitRadius - sparkDotSize / 2;
-              const cy = orbitRadius + Math.sin(rad) * orbitRadius - sparkDotSize / 2;
-              const isPrimarySpark = idx % 2 === 0;
-              return (
-                <View
-                  key={deg}
-                  style={{
-                    position: "absolute",
-                    left: cx,
-                    top: cy,
-                    width: sparkDotSize,
-                    height: sparkDotSize,
-                    borderRadius: sparkDotSize / 2,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    backgroundColor: isFlame
-                      ? isPrimarySpark
-                        ? "#FFF3B0"
-                        : "#FF6B00"
-                      : appearance.sparkColor || "#FFFFFF",
-                    shadowColor: appearance.accent || "#FFFFFF",
-                    shadowOpacity: 0.95,
-                    shadowRadius: 4,
-                    elevation: 3,
-                  }}
-                >
-                  {isPrimarySpark && size >= 52 ? (
-                    <Ionicons
-                      name={isFlame ? "flame" : "sparkles"}
-                      size={Math.max(8, Math.round(sparkDotSize * 1.15))}
-                      color={isFlame ? "#FFE066" : "#FFFFFF"}
-                    />
-                  ) : null}
-                </View>
-              );
-            })}
-          </Animated.View>
-        ) : null}
-
-        {(isOrbit || isFlame) && size >= 44 ? (
-          <Animated.View
-            pointerEvents="none"
-            style={{
-              position: "absolute",
-              width: orbitBoxSize + 8,
-              height: orbitBoxSize + 8,
-              left: orbitBoxOffset - 4,
-              top: orbitBoxOffset - 4,
-              transform: [{ rotate: orbitRotateCcw }],
-            }}
-          >
-            {FRAME_ORBIT_ANGLES_4.map((deg) => {
-              const r2 = orbitRadius + 4;
-              const rad = ((deg + 45) * Math.PI) / 180;
-              const d2 = Math.max(4, Math.round(sparkDotSize * 0.72));
-              return (
-                <View
-                  key={deg}
-                  style={{
-                    position: "absolute",
-                    left: r2 + Math.cos(rad) * r2 - d2 / 2,
-                    top: r2 + Math.sin(rad) * r2 - d2 / 2,
-                    width: d2,
-                    height: d2,
-                    borderRadius: d2 / 2,
-                    backgroundColor: isFlame ? "#FFD166" : "#F5D0FE",
-                  }}
-                />
-              );
-            })}
-          </Animated.View>
-        ) : null}
-
-        {isFlame && size >= 42 ? (
-          <Animated.View
-            pointerEvents="none"
-            style={{
-              position: "absolute",
-              top: -Math.round(size * 0.22),
-              left: 0,
-              right: 0,
-              flexDirection: "row",
-              justifyContent: "center",
-              gap: Math.max(6, Math.round(size * 0.14)),
-              opacity: riseOpacity,
-              transform: [{ translateY: riseTranslateY }],
-            }}
-          >
-            <View
-              style={{
-                width: Math.max(4, Math.round(size * 0.06)),
-                height: Math.max(4, Math.round(size * 0.06)),
-                borderRadius: 99,
-                backgroundColor: "#FF9F1C",
-              }}
-            />
-            <Ionicons
-              name="flame"
-              size={Math.max(10, Math.round(size * 0.16))}
-              color="#FFF3B0"
-            />
-            <View
-              style={{
-                width: Math.max(4, Math.round(size * 0.06)),
-                height: Math.max(4, Math.round(size * 0.06)),
-                borderRadius: 99,
-                backgroundColor: "#FF5400",
-              }}
-            />
-          </Animated.View>
-        ) : null}
-
-        {overlay}
-      </View>
-    </View>
-  );
-});
 const DEFAULT_CHATS = [
   {
     id: "ece",
@@ -1122,6 +697,8 @@ function Discover({
   recentRoomIds,
   notificationCount,
   currentUserId,
+  events = [],
+  onOpenEvent,
   onOpenNotifications,
   onOpenRoom,
   onCreate,
@@ -1232,11 +809,26 @@ function Discover({
             onPress={onOpenNotifications}
           />
         </View>
+        {events.length > 0 ? (
+          <EventBannerCarousel
+            events={events}
+            onOpenEvent={onOpenEvent}
+            style={{ marginTop: 4, marginBottom: 14 }}
+          />
+        ) : null}
         <LinearGradient
-          colors={["#111820", "#1D2E43"]}
+          colors={["#101B2E", "#193052", "#0E1726"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
           style={styles.discoverEmptyHero}
         >
           <View style={styles.discoverEmptyGlow} />
+          <FloatingGlow
+            color="rgba(82,165,255,0.28)"
+            size={180}
+            style={{ top: -48, right: -42 }}
+          />
+          <ShimmerSweep duration={4400} color="rgba(255,255,255,0.14)" />
           <View style={styles.discoverEmptyArt}>
             <View style={styles.discoverEmptySeat}>
               <Ionicons name="mic-outline" size={25} color={COLORS.primary} />
@@ -1263,9 +855,23 @@ function Discover({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Yeni sesli oda aç"
-            style={styles.discoverEmptyButton}
+            style={({ pressed }) => [
+              styles.discoverEmptyButton,
+              { paddingHorizontal: 0, overflow: "hidden" },
+              pressed && { transform: [{ scale: 0.97 }], opacity: 0.92 },
+            ]}
             onPress={onCreate}
           >
+            <LinearGradient
+              colors={["#52A5FF", "#2F80ED", "#1E62C6"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[
+                StyleSheet.absoluteFill,
+                { borderRadius: 15 },
+              ]}
+            />
+            <ShimmerSweep duration={3400} color="rgba(255,255,255,0.28)" />
             <Text style={styles.discoverEmptyButtonText}>Oda aç</Text>
             <Ionicons
               name="arrow-forward"
@@ -1316,8 +922,18 @@ function Discover({
                 accessibilityRole="button"
                 accessibilityLabel="Yeni sesli oda aç"
                 onPress={onCreate}
-                style={styles.discoverCreateButton}
+                style={({ pressed }) => [
+                  styles.discoverCreateButton,
+                  { overflow: "hidden" },
+                  pressed && { transform: [{ scale: 0.93 }], opacity: 0.9 },
+                ]}
               >
+                <LinearGradient
+                  colors={["#52A5FF", "#2F80ED", "#1D5FBF"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[StyleSheet.absoluteFill, { borderRadius: 15 }]}
+                />
                 <Ionicons name="add" size={23} color={COLORS.primaryInk} />
               </Pressable>
             </View>
@@ -1349,21 +965,40 @@ function Discover({
           </View>
         )}
 
+        {events.length > 0 ? (
+          <Reveal delay={25} distance={8}>
+            <EventBannerCarousel
+              events={events}
+              onOpenEvent={onOpenEvent}
+              style={{ marginTop: 2, marginBottom: 14 }}
+            />
+          </Reveal>
+        ) : null}
+
         <Reveal delay={50}>
           <Pressable
             onPress={() => handleOpenRoom(featuredRoom)}
             accessibilityRole="button"
             accessibilityLabel={`${featuredRoom.title} öne çıkan canlı odasını aç`}
-            style={styles.featurePressable}
+            style={({ pressed }) => [
+              styles.featurePressable,
+              pressed && { transform: [{ scale: 0.988 }], opacity: 0.95 },
+            ]}
           >
             <LinearGradient
-              colors={[...featuredRoomBrand.colors, "#111820"]}
+              colors={[...featuredRoomBrand.colors, "#0E1726"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.featureCardModern}
             >
               <View style={styles.featureGlowOne} />
               <View style={styles.featureGlowTwo} />
+              <FloatingGlow
+                color="rgba(120,192,255,0.24)"
+                size={164}
+                style={{ top: -44, right: -34 }}
+              />
+              <ShimmerSweep duration={4600} color="rgba(255,255,255,0.14)" />
               <View style={styles.featureTop}>
                 <View style={styles.featureLivePill}>
                   <LivePulse size={6} />
@@ -1405,13 +1040,18 @@ function Discover({
                       </Text>
                     </View>
                   </View>
-                  <View style={styles.featureJoinButton}>
+                  <LinearGradient
+                    colors={["#52A5FF", "#2F80ED", "#1D5FBF"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.featureJoinButton}
+                  >
                     <Ionicons
                       name="arrow-forward"
                       size={18}
                       color={COLORS.primaryInk}
                     />
-                  </View>
+                  </LinearGradient>
                 </View>
               </View>
             </LinearGradient>
@@ -2747,6 +2387,7 @@ const UserLevelSheet = memo(function UserLevelSheet({
 function Profile({
   profile,
   userId = null,
+  giftSpent = 0,
   followedUserIds = [],
   family = null,
   coins,
@@ -2948,8 +2589,14 @@ function Profile({
   const badgeTier = getBadgeTierConfigForLevel(level);
   const homeFrameAppearance = PROFILE_ITEM_APPEARANCE[profile.activeFrameId];
   const homeThemeAppearance = PROFILE_ITEM_APPEARANCE[profile.activeProfileThemeId];
+  const [wealthLadderOpen, setWealthLadderOpen] = useState(false);
   return (
     <>
+      <WealthTierLadderSheet
+        visible={wealthLadderOpen}
+        spent={giftSpent || 0}
+        onDismiss={() => setWealthLadderOpen(false)}
+      />
       <ScrollView
         contentContainerStyle={styles.pageContent}
         showsVerticalScrollIndicator={false}
@@ -2971,6 +2618,14 @@ function Profile({
                 pressed && styles.profileHomePressed,
               ]}
             >
+              <LinearGradient
+                pointerEvents="none"
+                colors={["rgba(47,128,237,0.10)", "rgba(255,255,255,0)", "rgba(246,200,110,0.10)"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.profileHomeIdentityTint}
+              />
+              <ShimmerSweep width={360} bandWidth={80} color="rgba(255,255,255,0.55)" borderRadius={24} delay={2600} />
               <ProfileFrame
                 appearance={homeFrameAppearance}
                 size={homeFrameAppearance ? 60 : 68}
@@ -2995,6 +2650,11 @@ function Profile({
                     <Text style={styles.profileLevelInlineText}>Sv. {level}</Text>
                   </View>
                 </View>
+                {giftSpent > 0 ? (
+                  <View style={styles.profileWealthInlineRow}>
+                    <SoraWealthBadge spent={giftSpent} size="sm" showName />
+                  </View>
+                ) : null}
                 <Text style={styles.profileHomeHandle} numberOfLines={1}>
                   @{profile.handle}
                   {profile.publicId ? ` · ID: ${profile.publicId}` : ""}
@@ -3005,6 +2665,15 @@ function Profile({
               </View>
               <Ionicons name="chevron-forward" size={21} color={COLORS.muted} />
             </Pressable>
+          </View>
+        </Reveal>
+
+        <Reveal delay={45} distance={10}>
+          <View style={styles.profileWealthCardWrap}>
+            <SoraWealthCard
+              spent={giftSpent || 0}
+              onPress={() => setWealthLadderOpen(true)}
+            />
           </View>
         </Reveal>
 
@@ -3022,6 +2691,7 @@ function Profile({
                 end={{ x: 1, y: 1 }}
                 style={styles.profileBanner}
               >
+                <ShimmerSweep width={200} bandWidth={60} borderRadius={20} delay={1800} />
                 <View style={styles.profileBannerCopy}>
                   <Text style={styles.profileBannerTitle}>Profilini düzenle</Text>
                   <Text style={styles.profileBannerCaption}>Görünümünü kişiselleştir</Text>
@@ -3041,6 +2711,7 @@ function Profile({
                 end={{ x: 1, y: 1 }}
                 style={styles.profileBanner}
               >
+                <ShimmerSweep width={200} bandWidth={60} borderRadius={20} delay={3100} />
                 <View style={styles.profileBannerCopy}>
                   <Text style={styles.profileBannerTitle}>Cüzdan</Text>
                   <Text style={styles.profileBannerCaption}>Bakiyeni yönet</Text>
@@ -3422,6 +3093,8 @@ function ProfileDetailSheet({
   }, [isSelf, visible]);
 
   const person = remoteProfile || profile || {};
+  const targetUserId = userId || person.id || person.userId || null;
+  const targetGiftSpent = useGiftSpent(targetUserId) || 0;
   const name = person.name || person.display_name || "Sora kullanıcısı";
   const handle = person.handle ? `@${person.handle.replace(/^@+/, "")}` : "Sora kullanıcısı";
   const color = person.color || person.avatar_color || COLORS.primaryLight;
@@ -3465,6 +3138,11 @@ function ProfileDetailSheet({
               style={StyleSheet.absoluteFill}
             />
             <View style={[styles.profileDetailOrb, { backgroundColor: `${color}55` }]} />
+            <FloatingGlow
+              color="rgba(82,165,255,0.26)"
+              size={168}
+              style={{ top: -24, left: -34 }}
+            />
             <View style={styles.profileDetailTopRow}>
               <Pressable
                 onPress={onDismiss}
@@ -3560,6 +3238,14 @@ function ProfileDetailSheet({
               <View style={styles.profileLevelInlinePill}>
                 <Text style={styles.profileLevelInlineText}>Sv. {personLevel}</Text>
               </View>
+            </View>
+            <View style={{ marginTop: 6, alignSelf: "flex-start" }}>
+              <SoraWealthBadge
+                spent={targetGiftSpent}
+                size="md"
+                showName
+                showZero={isSelf}
+              />
             </View>
             <Text style={styles.profileDetailHandle}>
               {handle}
@@ -3675,6 +3361,10 @@ function ProfileDetailSheet({
                   </View>
                 ) : null}
               </Pressable>
+
+              <View style={{ marginHorizontal: 18, marginTop: 12 }}>
+                <SoraWealthCard spent={targetGiftSpent} compact />
+              </View>
 
               <View style={styles.profileDetailSection}>
                 <Text style={styles.profileDetailSectionTitle}>Hakkında</Text>
@@ -3818,6 +3508,22 @@ const BottomTabButton = memo(function BottomTabButton({
     }).start();
   }, [reducedMotion, scaleAnim]);
 
+  const glowAnim = useRef(new Animated.Value(selected ? 1 : 0)).current;
+  useEffect(() => {
+    if (reducedMotion) {
+      glowAnim.setValue(selected ? 1 : 0);
+      return;
+    }
+    Animated.spring(glowAnim, {
+      toValue: selected ? 1 : 0,
+      friction: 6,
+      tension: 140,
+      useNativeDriver: true,
+    }).start();
+  }, [glowAnim, reducedMotion, selected]);
+  const pillScale = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] });
+  const iconLift = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -1.5] });
+
   return (
     <Pressable
       onPress={() => onSelect(tabKey)}
@@ -3828,7 +3534,6 @@ const BottomTabButton = memo(function BottomTabButton({
       accessibilityState={{ selected }}
       style={({ pressed }) => [
         styles.tabItem,
-        selected && styles.tabItemActive,
         !selected && pressed && styles.tabItemPressed,
       ]}
     >
@@ -3838,11 +3543,29 @@ const BottomTabButton = memo(function BottomTabButton({
           !reducedMotion && { transform: [{ scale: scaleAnim }] },
         ]}
       >
-        <Ionicons
-          name={selected ? activeIcon : icon}
-          size={20}
-          color={selected ? COLORS.primary : COLORS.muted}
-        />
+        <View style={styles.tabIconWrap}>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.tabActivePill,
+              { opacity: glowAnim, transform: [{ scaleX: pillScale }] },
+            ]}
+          >
+            <LinearGradient
+              colors={["#2F80ED", "#1C5FB8"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.tabActivePillFill}
+            />
+          </Animated.View>
+          <Animated.View style={{ transform: [{ translateY: iconLift }] }}>
+            <Ionicons
+              name={selected ? activeIcon : icon}
+              size={20}
+              color={selected ? "#FFFFFF" : COLORS.muted}
+            />
+          </Animated.View>
+        </View>
         <Text
           numberOfLines={1}
           maxFontSizeMultiplier={1.15}
@@ -6059,6 +5782,7 @@ const RoomMessageRow = memo(function RoomMessageRow({
   canReport,
   senderAvatarUrl = null,
   senderColor = "#2F80ED",
+  senderGiftSpent = 0,
   onPressSender,
   onReport,
 }) {
@@ -6118,6 +5842,11 @@ const RoomMessageRow = memo(function RoomMessageRow({
             />
           </View>
         ) : null}
+        {showAvatar && senderGiftSpent >= 1000000 ? (
+          <View style={{ marginRight: 5, marginTop: 1 }}>
+            <SoraWealthBadge spent={senderGiftSpent} size="sm" />
+          </View>
+        ) : null}
         <Text
           style={[
             styles.messageText,
@@ -6158,6 +5887,15 @@ const RoomMessageList = memo(function RoomMessageList({
   onPressSender,
   onReport,
 }) {
+  const messageUserIds = useMemo(() => {
+    const ids = [];
+    for (const item of messages || []) {
+      if (item?.userId && !item.system && !item.announcement) ids.push(item.userId);
+    }
+    return ids;
+  }, [messages]);
+  const giftSpentMap = useGiftSpentMap(messageUserIds);
+
   return (
     <View style={styles.messageList}>
       {messages.map((item) => {
@@ -6171,12 +5909,14 @@ const RoomMessageList = memo(function RoomMessageList({
           item.avatarColor
           || mapped?.color
           || (isSelf ? currentProfile?.color || COLORS.primary : "#2F80ED");
+        const senderGiftSpent = item.userId ? giftSpentMap[item.userId] || 0 : 0;
         return (
           <RoomMessageRow
             key={item.id}
             item={item}
             senderAvatarUrl={senderAvatarUrl}
             senderColor={senderColor}
+            senderGiftSpent={senderGiftSpent}
             onPressSender={onPressSender}
             canReport={Boolean(
               canReportBase &&
@@ -6241,6 +5981,9 @@ function Room({
   onEditProfile,
   userFamilyLevel = 0,
   coinBlastEvent = null,
+  events = [],
+  onOpenEvent,
+  openGiftNonce = 0,
   minimized = false,
 }) {
   const insets = useSafeAreaInsets();
@@ -6276,6 +6019,13 @@ function Room({
   const playedGiftIdsRef = useRef(new Set());
   const giftRoomMinimizedRef = useRef(minimized);
   useEffect(() => { giftRoomMinimizedRef.current = minimized; }, [minimized]);
+  const lastGiftNonceRef = useRef(openGiftNonce);
+  useEffect(() => {
+    if (openGiftNonce && openGiftNonce !== lastGiftNonceRef.current) {
+      lastGiftNonceRef.current = openGiftNonce;
+      setGiftOpen(true);
+    }
+  }, [openGiftNonce]);
   const spawnFloatingReaction = useCallback(({ reactionId, senderId, senderName }) => {
     if (giftRoomMinimizedRef.current) return;
     const now = Date.now();
@@ -8187,11 +7937,14 @@ function Room({
   const renderStageSeat = (participant, seatIndex, variant = "regular") => {
     const isHostSeat = variant === "host";
     const isCoupleSeat = variant === "couple";
-    const avatarSize = isHostSeat ? 84 : compactStage ? 58 : 66;
+    // Konuk (çift) koltuğu diğer tüm koltuklarla birebir aynı boyutta.
+    const regularSeatSize = compactStage ? 58 : 66;
+    const avatarSize = isHostSeat ? 84 : regularSeatSize;
     const slotStyle = [
       styles.roomSpeakerSlot,
       isHostSeat && styles.roomHostStageSlot,
-      (isHostSeat || isCoupleSeat) && roomDetails.coupleSeat && styles.roomHostPairSlot,
+      isHostSeat && roomDetails.coupleSeat && styles.roomHostPairSlot,
+      isCoupleSeat && styles.roomCouplePairSlot,
       compactStage && !isHostSeat && styles.roomSpeakerSlotCompact,
     ];
     if (!participant) {
@@ -8281,6 +8034,7 @@ function Room({
             appearance={seatFrameAppearance}
             size={seatedAvatarSize}
             compactHorizontal={!isHostSeat}
+            padMode="tight"
             overlay={seatBadges}
           >
             <View
@@ -8563,6 +8317,18 @@ function Room({
           bottomOffset={70}
         />
 
+        {!minimized && !roomKeyboard.visible && !giftOpen && !gamesOpen && events.length > 0 ? (
+          <RoomEventCard
+            events={events}
+            onOpenEvent={onOpenEvent}
+            compact
+            style={[
+              styles.roomEventCardAnchor,
+              { bottom: roomCombo?.gift ? 290 : 178 },
+            ]}
+          />
+        ) : null}
+
         <RoomQuickDock
           visible={!minimized && !roomKeyboard.visible && !giftOpen && !gamesOpen}
           bottomOffset={roomCombo?.gift ? 186 : 74}
@@ -8574,11 +8340,22 @@ function Room({
         <View style={styles.roomBottomBar}>
           <RoomComposer onSend={sendMessage} sending={messageSending} />
           <Pressable
-            style={[styles.roomBarButton, styles.roomBarGift]}
+            style={({ pressed }) => [
+              styles.roomBarButton,
+              styles.roomBarGift,
+              { overflow: "hidden" },
+              pressed && { transform: [{ scale: 0.92 }], opacity: 0.9 },
+            ]}
             onPress={handleOpenGift}
             accessibilityRole="button"
             accessibilityLabel="Hediye gönder"
           >
+            <LinearGradient
+              colors={["#52A5FF", "#2F80ED", "#7C3AED"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[StyleSheet.absoluteFill, { borderRadius: 21 }]}
+            />
             <Ionicons name="gift" size={19} color="#FFFFFF" />
           </Pressable>
           <Pressable
@@ -8806,6 +8583,7 @@ function Room({
 function ProfileEditor({
   visible,
   profile,
+  giftSpent = 0,
   onDismiss,
   onSave,
   onEquipItem,
@@ -8902,6 +8680,36 @@ function ProfileEditor({
   const editorFrameId =
     activePreview?.item_type === "frame" ? activePreview.id : profile.activeFrameId;
   const editorFrameAppearance = PROFILE_ITEM_APPEARANCE[editorFrameId];
+  const myUserLevel = Math.max(1, Math.floor(Number(profile.userLevel || 1)));
+  const myWealthInfo = useMemo(() => getWealthTier(giftSpent), [giftSpent]);
+  const myWealthLevel = myWealthInfo.tier.level;
+  const getFrameLockInfo = (item) => {
+    if (!item) return { locked: false, familyOnly: false, reason: "" };
+    if (ownedItemIds.includes(item.id)) {
+      return { locked: false, familyOnly: false, reason: "" };
+    }
+    const rule = FRAME_UNLOCK_RULES[item.id] || {};
+    if (item.purchasable === false || rule.familyOnly) {
+      return {
+        locked: true,
+        familyOnly: true,
+        reason: describeFrameRequirement(item.id) || "Aile seviye ödülü ile açılır",
+      };
+    }
+    const reqUserLevel = Number(item.min_user_level ?? rule.minUserLevel ?? 0);
+    const reqWealthLevel = Number(item.min_wealth_level ?? rule.minWealthLevel ?? 0);
+    const levelLocked = reqUserLevel > 0 && myUserLevel < reqUserLevel;
+    const wealthLocked = reqWealthLevel > 0 && myWealthLevel < reqWealthLevel;
+    const requirementText = describeFrameRequirement(item.id)
+      || (reqUserLevel > 0 ? `Seviye ${reqUserLevel} gerekir` : "");
+    return {
+      locked: levelLocked || wealthLocked,
+      familyOnly: false,
+      reqUserLevel,
+      reqWealthLevel,
+      reason: requirementText,
+    };
+  };
   const isEquippedItem = (item) =>
     item?.item_type === "frame"
       ? profile.activeFrameId === item.id
@@ -8928,28 +8736,58 @@ function ProfileEditor({
         .finally(() => setItemBusy(null));
       return;
     }
-    if (item.purchasable === false) {
+    const lockInfo = getFrameLockInfo(item);
+    if (lockInfo.familyOnly) {
       Alert.alert(
         "Aile seviye ödülü",
         "Bu çerçeve doğrudan kredi ile satılmaz; aile seviyen yükseldiğinde ücretsiz açılır.",
       );
       return;
     }
-    Alert.alert("Önizleme ve satın alma", `${item.name} · ${item.cost} kredi. Satın almak istiyor musun?`, [
-      { text: "Vazgeç", style: "cancel" },
-      { text: "Satın al", onPress: async () => {
-        if (itemBusy) return;
-        setItemBusy(item.id);
-        try {
-          await purchaseProfileItem({ itemId: item.id, requestId: createRequestUuid() });
-          setOwnedItemIds((ids) => [...ids, item.id]);
-          await onBalanceRefresh?.();
-          Alert.alert("Ürün alındı", "Profilinden etkinleştirebilirsin.");
-        } catch (error) {
-          Alert.alert(error?.message?.includes("Insufficient") ? "Bakiye yetersiz" : "Satın alma tamamlanamadı", error?.message?.includes("Insufficient") ? "Bu ürün için yeterli kredin yok." : "Bağlantıyı kontrol edip tekrar dene. Bakiye düşürülmediyse yeniden deneyebilirsin.");
-        } finally { setItemBusy(null); }
-      } },
-    ]);
+    if (lockInfo.locked) {
+      Alert.alert(
+        "Prestij kilidi",
+        `${item.name} herkese açık değil.\n\nGereksinim: ${lockInfo.reason}\nMevcut durumun: Seviye ${myUserLevel} · ${myWealthInfo.tier.name}`,
+      );
+      return;
+    }
+    Alert.alert(
+      "Prestij çerçevesi satın al",
+      `${item.name} · ${formatCredits(item.cost)} kredi. Satın almak istiyor musun?`,
+      [
+        { text: "Vazgeç", style: "cancel" },
+        {
+          text: "Satın al",
+          onPress: async () => {
+            if (itemBusy) return;
+            setItemBusy(item.id);
+            try {
+              await purchaseProfileItem({ itemId: item.id, requestId: createRequestUuid() });
+              setOwnedItemIds((ids) => [...ids, item.id]);
+              await onBalanceRefresh?.();
+              Alert.alert("Çerçeve açıldı", "Profilinden hemen etkinleştirebilirsin.");
+            } catch (error) {
+              const msg = String(error?.message || "");
+              if (msg.includes("Insufficient")) {
+                Alert.alert("Bakiye yetersiz", "Bu çerçeve için yeterli kredin yok.");
+              } else if (msg.includes("Item level locked") || msg.includes("Item wealth locked")) {
+                Alert.alert(
+                  "Prestij kilidi",
+                  `Bu çerçeveyi açmak için ${lockInfo.reason || "daha yüksek seviye"} gerekiyor.`,
+                );
+              } else {
+                Alert.alert(
+                  "Satın alma tamamlanamadı",
+                  "Bağlantıyı kontrol edip tekrar dene. Bakiye düşürülmediyse yeniden deneyebilirsin.",
+                );
+              }
+            } finally {
+              setItemBusy(null);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const save = () => {
@@ -9068,150 +8906,140 @@ function ProfileEditor({
           />
           {profileItems.length > 0 ? (
             <>
-              <Text style={styles.fieldLabel}>PROFİL ÇERÇEVELERİ</Text>
+              <Text style={styles.fieldLabel}>PRESTİJ ÇERÇEVELERİ</Text>
               {activePreview ? (
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 14,
-                    padding: 12,
-                    marginBottom: 10,
-                    borderRadius: 14,
-                    backgroundColor:
-                      PROFILE_ITEM_APPEARANCE[activePreview.id]?.background ||
-                      activePreview.appearance?.background ||
-                      "#F1F7FB",
-                    borderWidth: 1.5,
-                    borderColor:
-                      PROFILE_ITEM_APPEARANCE[activePreview.id]?.color ||
-                      activePreview.appearance?.color ||
-                      COLORS.line,
-                  }}
-                >
-                  {activePreview.item_type === "frame" ? (
-                    <ProfileFrame
-                      appearance={PROFILE_ITEM_APPEARANCE[activePreview.id]}
-                      size={44}
+                (() => {
+                  const previewLock = getFrameLockInfo(activePreview);
+                  const previewOwned = ownedItemIds.includes(activePreview.id);
+                  const previewEquipped = isEquippedItem(activePreview);
+                  return (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 14,
+                        padding: 12,
+                        marginBottom: 10,
+                        borderRadius: 16,
+                        backgroundColor: "#111A2E",
+                        borderWidth: 1.5,
+                        borderColor:
+                          PROFILE_ITEM_APPEARANCE[activePreview.id]?.color || COLORS.primary,
+                      }}
                     >
-                      <Avatar
-                        label={(name || profile.name || "S").charAt(0).toUpperCase()}
-                        color={profile.color}
-                        uri={avatarUrl}
-                        size={44}
-                        circle
-                      />
-                    </ProfileFrame>
-                  ) : null}
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: COLORS.text, fontWeight: "800" }}>
-                      Önizleme · {activePreview.name}
-                    </Text>
-                    <Text style={styles.walletActivityTime}>
-                      {isEquippedItem(activePreview)
-                        ? "Şu anda profilinde aktif"
-                        : ownedItemIds.includes(activePreview.id)
-                          ? "Sahipsin · etkinleştirebilirsin"
-                          : activePreview.purchasable === false
-                            ? "Aile seviye ödülü ile açılır"
-                            : `${activePreview.cost.toLocaleString("tr-TR")} kredi`}
-                    </Text>
-                  </View>
-                </View>
+                      {activePreview.item_type === "frame" ? (
+                        <ProfileFrame
+                          appearance={PROFILE_ITEM_APPEARANCE[activePreview.id]}
+                          size={44}
+                        >
+                          <Avatar
+                            label={(name || profile.name || "S").charAt(0).toUpperCase()}
+                            color={profile.color}
+                            uri={avatarUrl}
+                            size={44}
+                            circle
+                          />
+                        </ProfileFrame>
+                      ) : null}
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: "#FFFFFF", fontWeight: "900", fontSize: 14 }}>
+                          {activePreview.name}
+                        </Text>
+                        <Text style={{ color: "rgba(220,235,255,0.82)", fontSize: 12, marginTop: 2 }}>
+                          {previewEquipped
+                            ? "Şu anda profilinde aktif"
+                            : previewOwned
+                              ? "Sahipsin · profilinde etkinleştirebilirsin"
+                              : previewLock.familyOnly
+                                ? "Aile seviye ödülü ile açılır"
+                                : previewLock.locked
+                                  ? `Kilitli · ${previewLock.reason}`
+                                  : `${formatCredits(activePreview.cost)} kredi`}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })()
               ) : null}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 10, paddingVertical: 4 }}
+                style={{ marginBottom: 14 }}
+              >
                 {profileItems.map((item) => {
                   const owned = ownedItemIds.includes(item.id);
                   const equipped = isEquippedItem(item);
+                  const lockInfo = getFrameLockInfo(item);
                   const itemAppearance = PROFILE_ITEM_APPEARANCE[item.id];
-                  const subtitle = equipped
-                    ? "Aktif · dokun kaldır"
+                  const priceLabel = equipped
+                    ? "Aktif"
                     : owned
-                      ? "Sahipsin · etkinleştir"
-                      : item.purchasable === false
-                        ? "Aile seviye ödülü"
-                        : `${item.cost.toLocaleString("tr-TR")} kredi`;
+                      ? "Sahipsin"
+                      : lockInfo.familyOnly
+                        ? "Aile ödülü"
+                        : `${formatCredits(item.cost)}`;
                   return (
-                    <Pressable
+                    <FramePreviewTile
                       key={item.id}
+                      itemId={item.id}
+                      appearance={itemAppearance}
+                      size={44}
+                      locked={!owned && lockInfo.locked}
+                      requirementText={lockInfo.reason}
+                      selected={previewItemId === item.id || (!previewItemId && equipped)}
                       onPress={() => setPreviewItemId(item.id)}
-                      onLongPress={() => handleProfileItem(item)}
-                      style={[
-                        styles.transferOption,
-                        previewItemId === item.id && styles.transferOptionActive,
-                        { marginRight: 8, alignItems: "center", minWidth: 118, paddingVertical: 12 },
-                      ]}
-                    >
-                      <View
-                        style={{
-                          height: 76,
-                          alignItems: "center",
-                          justifyContent: "center",
-                          marginBottom: 4,
-                        }}
-                      >
-                        {item.item_type === "frame" && itemAppearance ? (
-                          <ProfileFrame appearance={itemAppearance} size={40}>
-                            <Avatar
-                              label={(name || profile.name || "S").charAt(0).toUpperCase()}
-                              color={profile.color}
-                              uri={avatarUrl}
-                              size={40}
-                              circle
-                            />
-                          </ProfileFrame>
-                        ) : (
-                          <View
-                            style={{
-                              width: 42,
-                              height: 42,
-                              borderRadius: 21,
-                              backgroundColor: itemAppearance?.background || "#E7F2FF",
-                              borderWidth: 2.5,
-                              borderColor: itemAppearance?.accent || COLORS.primary,
-                            }}
-                          />
-                        )}
-                      </View>
-                      <Text
-                        style={[
-                          styles.transferOptionText,
-                          previewItemId === item.id && styles.transferOptionTextActive,
-                        ]}
-                      >
-                        {item.name}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.walletActivityTime,
-                          { textAlign: "center" },
-                          previewItemId === item.id && { color: "rgba(255,255,255,0.88)" },
-                        ]}
-                      >
-                        {subtitle}
-                      </Text>
-                    </Pressable>
+                      name={item.name}
+                      priceText={priceLabel}
+                    />
                   );
                 })}
               </ScrollView>
               {activePreview ? (
-                <Pressable
-                  disabled={Boolean(itemBusy)}
-                  onPress={() => handleProfileItem(activePreview)}
-                  style={[styles.transferCreateButton, { marginBottom: 10 }]}
-                >
-                  <Text style={styles.transferCreateButtonText}>
-                    {isEquippedItem(activePreview)
-                      ? activePreview.item_type === "frame"
-                        ? "Çerçeveyi kaldır"
-                        : "Temayı kaldır"
-                      : ownedItemIds.includes(activePreview.id)
-                        ? "Çerçeveyi etkinleştir"
-                        : activePreview.purchasable === false
-                          ? "Aile seviye ödülü"
-                          : `Satın al · ${activePreview.cost.toLocaleString("tr-TR")} kredi`}
-                  </Text>
-                </Pressable>
+                (() => {
+                  const previewLock = getFrameLockInfo(activePreview);
+                  const previewOwned = ownedItemIds.includes(activePreview.id);
+                  const previewEquipped = isEquippedItem(activePreview);
+                  const isLockedPreview = !previewOwned && previewLock.locked;
+                  return (
+                    <Pressable
+                      disabled={Boolean(itemBusy)}
+                      onPress={() => handleProfileItem(activePreview)}
+                      style={({ pressed }) => [
+                        styles.transferCreateButton,
+                        { marginBottom: 12, overflow: "hidden", paddingVertical: 0, minHeight: 46 },
+                        pressed && { transform: [{ scale: 0.98 }], opacity: 0.92 },
+                      ]}
+                    >
+                      <LinearGradient
+                        colors={
+                          isLockedPreview
+                            ? ["#27344E", "#192338"]
+                            : previewEquipped
+                              ? ["#3A4A68", "#222E44"]
+                              : ["#52A5FF", "#2F80ED", "#1D5FBF"]
+                        }
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={[
+                          StyleSheet.absoluteFill,
+                          { borderRadius: 14 },
+                        ]}
+                      />
+                      <Text style={[styles.transferCreateButtonText, { color: "#FFFFFF" }]}>
+                        {previewEquipped
+                          ? "Çerçeveyi kaldır"
+                          : previewOwned
+                            ? "Çerçeveyi etkinleştir"
+                            : previewLock.familyOnly
+                              ? "Aile seviye ödülü"
+                              : previewLock.locked
+                                ? `Kilitli · ${previewLock.reason}`
+                                : `Satın al · ${formatCredits(activePreview.cost)} kredi`}
+                      </Text>
+                    </Pressable>
+                  );
+                })()
               ) : null}
             </>
           ) : null}
@@ -9553,6 +9381,25 @@ function AppContent() {
   const [adminRole, setAdminRole] = useState(null);
   const [authSession, setAuthSession] = useState(
     isSupabaseConfigured ? undefined : null,
+  );
+  const { events: soraEvents } = useSoraEvents();
+  const [activeEvent, setActiveEvent] = useState(null);
+  const [roomGiftTrigger, setRoomGiftTrigger] = useState(0);
+  const ownGiftSpent = useGiftSpent(authSession?.user?.id) || 0;
+  useEffect(() => {
+    const uid = authSession?.user?.id;
+    if (uid) {
+      loadOwnGiftSpent(uid).catch(() => undefined);
+    }
+  }, [authSession?.user?.id]);
+  const handleLocalGiftSpent = useCallback(
+    (amount) => {
+      const uid = authSession?.user?.id;
+      if (uid && Number(amount) > 0) {
+        addLocalGiftSpent(uid, Number(amount));
+      }
+    },
+    [authSession?.user?.id],
   );
   const [brandLaunchVisible, setBrandLaunchVisible] = useState(true);
   const [brandLaunchMinDone, setBrandLaunchMinDone] = useState(false);
@@ -10439,6 +10286,7 @@ function AppContent() {
       const qtyPrefix = cleanQty > 1 ? `${cleanQty}x ` : "";
       settled = true;
       settleOptimisticGiftSpend(totalCost, result.balance);
+      addLocalGiftSpent(authSession.user.id, Number(result.gift_cost || totalCost));
       setPromoWalletBalance(result.promo_balance || 0);
       setPaidWalletBalance(result.paid_balance || 0);
       setWalletActivities((items) => [{
@@ -11347,6 +11195,25 @@ function AppContent() {
     );
   }
 
+  const handleEventSendGift = useCallback(() => {
+    setActiveEvent(null);
+    if (room) {
+      setRoomMinimized(false);
+      setRoomGiftTrigger((n) => n + 1);
+      return;
+    }
+    setActiveTab("discover");
+    if (rooms.length > 0) {
+      openRoom(rooms[0]);
+      setTimeout(() => setRoomGiftTrigger((n) => n + 1), 650);
+    } else {
+      Alert.alert(
+        "Odaya katıl",
+        "Etkinliğe katılmak için bir sesli oda aç veya canlı bir odaya girip hediye gönder.",
+      );
+    }
+  }, [openRoom, room, rooms]);
+
   const screens = {
     discover: (
       <Discover
@@ -11356,6 +11223,8 @@ function AppContent() {
         recentRoomIds={recentRoomIds}
         notificationCount={notifications.length}
         currentUserId={authSession?.user?.id}
+        events={soraEvents}
+        onOpenEvent={setActiveEvent}
         onOpenNotifications={handleOpenNotifications}
         onOpenRoom={openRoom}
         onCreate={handleOpenCreate}
@@ -11376,6 +11245,7 @@ function AppContent() {
         onRollbackGiftSpend={rollbackOptimisticGiftSpend}
         onApplyWalletBalance={applyAuthoritativeWalletBalance}
         onCoinBlast={triggerCoinBlast}
+        onGiftSpent={handleLocalGiftSpent}
         onBalanceRefresh={refreshWalletData}
         onFamilyChange={setMyFamily}
         onOpenUserProfile={setInspectedUserId}
@@ -11385,6 +11255,7 @@ function AppContent() {
       <Profile
         profile={profile}
         userId={authSession?.user?.id}
+        giftSpent={ownGiftSpent}
         followedUserIds={followedUserIds}
         family={myFamily}
         coins={walletBalance}
@@ -11426,6 +11297,9 @@ function AppContent() {
               coins={walletBalance}
               userFamilyLevel={myFamily?.level || 0}
               coinBlastEvent={coinBlastQueue[0] || null}
+              events={soraEvents}
+              onOpenEvent={setActiveEvent}
+              openGiftNonce={roomGiftTrigger}
               onSendGift={sendGift}
               onLeave={leaveCurrentRoom}
               onUpdateRoom={updateRoomSettings}
@@ -11582,6 +11456,7 @@ function AppContent() {
       <ProfileEditor
         visible={profileEditorOpen}
         profile={profile}
+        giftSpent={ownGiftSpent}
         onDismiss={handleCloseProfileEditor}
         onSave={saveProfile}
         onEquipItem={equipProfileItem}
@@ -11660,6 +11535,13 @@ function AppContent() {
         onClear={clearNotifications}
       />
       <Onboarding visible={onboardingOpen} onComplete={completeOnboarding} />
+      <EventDetailSheet
+        visible={Boolean(activeEvent)}
+        event={activeEvent}
+        currentUserId={authSession?.user?.id}
+        onDismiss={() => setActiveEvent(null)}
+        onSendGift={handleEventSendGift}
+      />
       <CoinBlastEffect
         event={coinBlastQueue[0] || null}
         onComplete={handleCompleteCoinBlast}
@@ -12006,11 +11888,16 @@ const styles = StyleSheet.create({
     borderColor: COLORS.line,
   },
   categoryChipActive: {
-    backgroundColor: COLORS.text,
-    borderColor: COLORS.text,
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primaryDark,
+    shadowColor: COLORS.primary,
+    shadowOpacity: 0.34,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
   },
   categoryText: { color: COLORS.muted, fontSize: 13, fontWeight: "700" },
-  categoryTextActive: { color: COLORS.primary },
+  categoryTextActive: { color: "#FFFFFF" },
   listHeading: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -15005,10 +14892,16 @@ const styles = StyleSheet.create({
   discoverCreateButton: {
     width: 42,
     height: 42,
-    borderRadius: 14,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: COLORS.primary,
+    overflow: "hidden",
+    shadowColor: COLORS.primary,
+    shadowOpacity: 0.42,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 7,
   },
   discoverEmptyHero: {
     minHeight: 390,
@@ -15105,13 +14998,18 @@ const styles = StyleSheet.create({
   iconButton: {
     width: 42,
     height: 42,
-    borderRadius: 14,
+    borderRadius: 15,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: COLORS.surface,
     position: "relative",
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: "rgba(47,128,237,0.14)",
+    shadowColor: "#1C5FB8",
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
   },
   kicker: {
     color: COLORS.primary,
@@ -15464,13 +15362,19 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 10,
-    paddingTop: 6,
+    paddingHorizontal: 12,
+    paddingTop: 7,
     paddingBottom: 8,
-    backgroundColor: COLORS.surface,
+    backgroundColor: "rgba(255,255,255,0.98)",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     borderTopWidth: 1,
-    borderTopColor: COLORS.line,
-    ...ELEVATION.raised,
+    borderTopColor: "rgba(47,128,237,0.12)",
+    shadowColor: "#1C5FB8",
+    shadowOpacity: 0.14,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 16,
   },
   tabRow: {
     flexDirection: "row",
@@ -15482,11 +15386,9 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     minHeight: 52,
-    paddingVertical: 6,
+    paddingVertical: 4,
     paddingHorizontal: 4,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: "transparent",
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -15495,23 +15397,45 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minWidth: 0,
   },
+  tabIconWrap: {
+    width: 52,
+    height: 30,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tabActivePill: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 15,
+    shadowColor: "#2F80ED",
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 5,
+  },
+  tabActivePillFill: {
+    flex: 1,
+    borderRadius: 15,
+  },
   tabItemActive: {
-    backgroundColor: COLORS.primarySoft,
-    borderColor: "rgba(47,128,237,0.20)",
+    backgroundColor: "transparent",
   },
   tabItemPressed: {
     backgroundColor: "rgba(47,128,237,0.06)",
   },
   tabLabel: {
     color: COLORS.muted,
-    fontSize: 11,
+    fontSize: 10.5,
     lineHeight: 14,
     fontWeight: "700",
     marginTop: 3,
     textAlign: "center",
   },
   tabLabelActive: {
-    color: COLORS.primary,
+    color: COLORS.primaryDark,
     fontWeight: "900",
   },
   profileCover: {
@@ -16528,15 +16452,21 @@ const styles = StyleSheet.create({
   },
   profileHomeIdentity: {
     flex: 1,
-    minHeight: 96,
+    minHeight: 104,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    padding: 12,
-    borderRadius: 20,
+    padding: 14,
+    borderRadius: 24,
     backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: "rgba(47,128,237,0.16)",
+    overflow: "hidden",
+    shadowColor: "#1C5FB8",
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 5,
   },
   profileHomePressed: { opacity: 0.82 },
   profileHomeAvatarWrap: { position: "relative" },
@@ -17280,11 +17210,34 @@ const styles = StyleSheet.create({
   roomHostSeatRow: {
     flexDirection: "row",
     justifyContent: "center",
-    alignItems: "flex-start",
+    alignItems: "center",
     width: "100%",
     marginBottom: 10,
   },
   roomHostPairSlot: { width: "36%" },
+  roomCouplePairSlot: { width: "36%", minHeight: 84, justifyContent: "center" },
+  profileHomeIdentityTint: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  profileWealthInlineRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    marginBottom: 1,
+  },
+  profileWealthCardWrap: {
+    marginTop: 12,
+  },
+  roomEventCardAnchor: {
+    position: "absolute",
+    right: 12,
+    zIndex: 28,
+    elevation: 8,
+  },
   roomSpeakerGridCompact: { rowGap: 4 },
   roomSpeakerSlotCompact: { minHeight: 76, paddingVertical: 2, gap: 4 },
   roomAdminBadge: { backgroundColor: "#9CD3FF" },

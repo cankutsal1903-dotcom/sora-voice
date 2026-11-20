@@ -48,6 +48,9 @@ import { GiftComboButton } from "../ui/GiftComboButton";
 import { KeyboardSafeView, useKeyboardInset } from "../ui/useKeyboardInset";
 import { SoraGiftEffect } from "../ui/SoraGiftEffect";
 import { CoinBlastEffect } from "../ui/CoinBlastEffect";
+import { ShimmerSweep } from "../ui/SoraFx";
+import { SoraWealthBadge } from "../ui/SoraWealthTier";
+import { useGiftSpentMap } from "../data/wealthStore";
 
 const GIFT_QUANTITIES = [1, 5, 10, 50, 100];
 
@@ -156,6 +159,7 @@ export function CommunityScreen({
   onRollbackGiftSpend,
   onApplyWalletBalance,
   onCoinBlast,
+  onGiftSpent,
   onBalanceRefresh,
   onFamilyChange,
   onOpenUserProfile,
@@ -496,6 +500,7 @@ export function CommunityScreen({
       });
       settled = true;
       onSettleGiftSpend?.(totalCost, result.balance);
+      onGiftSpent?.(Number(result.giftCost || result.gift_cost || totalCost));
       playGiftEffect({
         ...gift,
         name: result.giftName || gift.name,
@@ -1174,6 +1179,19 @@ export function CommunityScreen({
     return map;
   }, [familyMembers]);
 
+  const chatParticipantIds = useMemo(() => {
+    const ids = [];
+    if (currentUserId) ids.push(currentUserId);
+    for (const m of messages) {
+      if (m?.userId) ids.push(m.userId);
+    }
+    for (const mem of familyMembers) {
+      if (mem?.userId) ids.push(mem.userId);
+    }
+    return ids;
+  }, [currentUserId, familyMembers, messages]);
+  const giftSpentMap = useGiftSpentMap(chatParticipantIds);
+
   const renderMessageItem = (msg) => {
     const isGift = msg.kind === "gift";
     const meta = msg.metadata || {};
@@ -1182,6 +1200,7 @@ export function CommunityScreen({
     const giftQty = Number(meta.quantity) || 1;
     const giftCost = Number(meta.total_cost) || 0;
     const giftXp = Number(meta.awarded_xp) || 0;
+    const senderSpent = msg.userId ? giftSpentMap[msg.userId] || 0 : 0;
 
     const knownMember = msg.userId ? memberById.get(msg.userId) : null;
     const resolvedAvatarUrl = msg.own
@@ -1220,10 +1239,20 @@ export function CommunityScreen({
         {!msg.own ? avatarNode : null}
 
         <View style={[styles.msgContentCol, msg.own && styles.msgContentColOwn]}>
-          {!msg.own ? (
-            <Text numberOfLines={1} style={styles.msgSender}>
-              {resolvedSenderName}
-            </Text>
+          {(!msg.own || senderSpent >= 1000000) ? (
+            <View
+              style={[
+                styles.msgSenderRow,
+                msg.own && { flexDirection: "row-reverse" },
+              ]}
+            >
+              <Text numberOfLines={1} style={styles.msgSender}>
+                {resolvedSenderName}
+              </Text>
+              {senderSpent >= 1000000 ? (
+                <SoraWealthBadge spent={senderSpent} size="sm" />
+              ) : null}
+            </View>
           ) : null}
 
           {isGift ? (
@@ -1296,20 +1325,31 @@ export function CommunityScreen({
       {myFamily ? (
         // ── Üye olunan aile varsa doğrudan Aile Sohbeti açılır ─────────────────
         <KeyboardSafeView style={{ flex: 1 }} iosOffset={insets.top}>
-          <View style={styles.chatHeader}>
+          <LinearGradient
+            colors={["#101D36", "#1A325C", "#0F192E"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.chatHeader}
+          >
+            <ShimmerSweep duration={4800} color="rgba(255,255,255,0.12)" />
             <Pressable
               onPress={() => openFamilyDetail(myFamily.id, "levels")}
               style={styles.chatHeaderIdentity}
             >
-              <FamilyAvatar uri={myFamily.avatarUrl} name={myFamily.name} size={44} radius={15} />
+              <FamilyAvatar uri={myFamily.avatarUrl} name={myFamily.name} size={46} radius={15} />
               <View style={{ flex: 1 }}>
                 <View style={styles.chatTitleRow}>
                   <Text numberOfLines={1} style={styles.chatTitle}>
                     {myFamily.name}
                   </Text>
-                  <View style={styles.levelBadge}>
-                    <Text style={styles.levelBadgeText}>Sv. {myFamily.level}</Text>
-                  </View>
+                  <LinearGradient
+                    colors={["#FFD66B", "#F59E0B"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.chatHeaderLevelBadge}
+                  >
+                    <Text style={styles.chatHeaderLevelBadgeText}>Sv. {myFamily.level}</Text>
+                  </LinearGradient>
                 </View>
                 <Text numberOfLines={1} style={styles.chatSubtitle}>
                   {myFamily.memberCount} üye
@@ -1321,19 +1361,25 @@ export function CommunityScreen({
               <Pressable
                 onPress={() => setDiscoverModalOpen(true)}
                 accessibilityLabel="Aileleri keşfet"
-                style={styles.headerIconBtn}
+                style={({ pressed }) => [
+                  styles.headerIconBtn,
+                  pressed && { transform: [{ scale: 0.93 }], opacity: 0.85 },
+                ]}
               >
-                <Ionicons name="compass-outline" size={19} color={COLORS.primary} />
+                <Ionicons name="compass-outline" size={19} color="#9CC8FF" />
               </Pressable>
               <Pressable
                 onPress={() => openFamilyDetail(myFamily.id, "levels")}
                 accessibilityLabel="Aile profili ve seviyeler"
-                style={styles.headerIconBtn}
+                style={({ pressed }) => [
+                  styles.headerIconBtn,
+                  pressed && { transform: [{ scale: 0.93 }], opacity: 0.85 },
+                ]}
               >
-                <Ionicons name="shield-checkmark-outline" size={19} color={COLORS.primary} />
+                <Ionicons name="shield-checkmark-outline" size={19} color="#FFD66B" />
               </Pressable>
             </View>
-          </View>
+          </LinearGradient>
 
           <View style={styles.xpStrip}>
             <View style={{ flex: 1 }}>
@@ -1344,7 +1390,10 @@ export function CommunityScreen({
                 </Text>
               </View>
               <View style={styles.progressTrack}>
-                <View
+                <LinearGradient
+                  colors={["#52A5FF", "#2F80ED", "#7C3AED"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
                   style={[
                     styles.progressFill,
                     { width: `${Math.max(4, Math.round((myProgress?.ratio || 0) * 100))}%` },
@@ -1355,9 +1404,18 @@ export function CommunityScreen({
             <Pressable
               onPress={() => openGiftSheet(null)}
               accessibilityLabel="Ailede hediye gönder"
-              style={styles.giftHeaderPill}
+              style={({ pressed }) => [
+                styles.giftHeaderPill,
+                pressed && { transform: [{ scale: 0.94 }], opacity: 0.9 },
+              ]}
             >
-              <Ionicons name="gift-outline" size={14} color={COLORS.primary} />
+              <LinearGradient
+                colors={["#52A5FF", "#2F80ED", "#7C3AED"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[StyleSheet.absoluteFill, { borderRadius: 12 }]}
+              />
+              <Ionicons name="gift" size={14} color="#FFFFFF" />
               <Text style={styles.giftHeaderPillText}>Hediye</Text>
             </Pressable>
           </View>
@@ -1438,19 +1496,35 @@ export function CommunityScreen({
             <Pressable
               onPress={() => openGiftSheet(null)}
               accessibilityLabel="Hediye kutusu"
-              style={styles.composerGiftBtn}
+              style={({ pressed }) => [
+                styles.composerGiftBtn,
+                pressed && { transform: [{ scale: 0.92 }] },
+              ]}
             >
-              <Ionicons name="gift-outline" size={20} color={COLORS.primary} />
+              <LinearGradient
+                colors={["#52A5FF", "#2F80ED", "#7C3AED"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+              />
+              <Ionicons name="gift" size={19} color="#FFFFFF" />
             </Pressable>
             <Pressable
               disabled={sendingMessage || !draft.trim()}
               onPress={handleSendMessage}
               accessibilityLabel="Mesaj gönder"
-              style={[
+              style={({ pressed }) => [
                 styles.sendBtn,
                 (!draft.trim() || sendingMessage) && styles.sendBtnDisabled,
+                pressed && { transform: [{ scale: 0.92 }] },
               ]}
             >
+              <LinearGradient
+                colors={["#52A5FF", "#2F80ED", "#1D5FBF"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+              />
               {sendingMessage ? (
                 <ActivityIndicator size="small" color={COLORS.primaryInk} />
               ) : (
@@ -2338,25 +2412,34 @@ const styles = StyleSheet.create({
   // ── Aile Sohbeti ve Hediye Mesajı Stilleri ──────────────────────────────────
   chatHeader: {
     paddingHorizontal: 16,
-    paddingVertical: 11,
-    backgroundColor: COLORS.surface,
+    paddingVertical: 13,
+    overflow: "hidden",
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.lineSoft,
+    borderBottomColor: "rgba(120,180,255,0.18)",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
+    elevation: 4,
   },
   chatHeaderIdentity: { flex: 1, flexDirection: "row", alignItems: "center", gap: 11 },
   chatTitleRow: { flexDirection: "row", alignItems: "center", gap: 7 },
-  chatTitle: { flexShrink: 1, color: COLORS.text, fontSize: 16, fontWeight: "900" },
-  chatSubtitle: { color: COLORS.textSecondary, fontSize: 11, marginTop: 2 },
+  chatTitle: { flexShrink: 1, color: "#FFFFFF", fontSize: 16, fontWeight: "900" },
+  chatHeaderLevelBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 9,
+  },
+  chatHeaderLevelBadgeText: { color: "#1A1204", fontSize: 10, fontWeight: "900" },
+  chatSubtitle: { color: "rgba(210,228,255,0.78)", fontSize: 11, marginTop: 2, fontWeight: "600" },
   chatHeaderActions: { flexDirection: "row", alignItems: "center", gap: 8 },
   headerIconBtn: {
     width: 38,
     height: 38,
     borderRadius: 13,
-    backgroundColor: COLORS.primarySoft,
+    backgroundColor: "rgba(255,255,255,0.11)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2374,37 +2457,46 @@ const styles = StyleSheet.create({
   xpStripTitle: { color: COLORS.text, fontSize: 11, fontWeight: "800" },
   xpStripValue: { color: COLORS.textSecondary, fontSize: 10, fontWeight: "800" },
   progressTrack: {
-    height: 6,
-    borderRadius: 3,
+    height: 7,
+    borderRadius: 4,
     backgroundColor: COLORS.raised,
     overflow: "hidden",
     marginTop: 5,
   },
-  progressFill: { height: "100%", borderRadius: 3, backgroundColor: COLORS.primary },
+  progressFill: { height: "100%", borderRadius: 4 },
   giftHeaderPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    paddingHorizontal: 11,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: COLORS.primarySoft,
-    borderWidth: 1,
-    borderColor: "rgba(47,128,237,0.24)",
+    paddingHorizontal: 13,
+    height: 34,
+    borderRadius: 12,
+    overflow: "hidden",
+    shadowColor: "#2F80ED",
+    shadowOpacity: 0.34,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
   },
-  giftHeaderPillText: { color: COLORS.primary, fontSize: 11, fontWeight: "900" },
+  giftHeaderPillText: { color: "#FFFFFF", fontSize: 11, fontWeight: "900" },
   messagesList: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 20, gap: 11 },
   msgRow: { flexDirection: "row", alignItems: "flex-end", gap: 9 },
   msgRowOwn: { justifyContent: "flex-end" },
   msgAvatarPress: { width: 38, height: 38, alignItems: "center", justifyContent: "center" },
   msgContentCol: { maxWidth: "75%", alignItems: "flex-start" },
   msgContentColOwn: { alignItems: "flex-end" },
+  msgSenderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+    paddingHorizontal: 3,
+  },
   msgSender: {
     color: COLORS.textSecondary,
     fontSize: 11,
     fontWeight: "800",
-    marginBottom: 3,
-    marginLeft: 4,
+    flexShrink: 1,
   },
   msgBubble: {
     minHeight: 38,
@@ -2502,11 +2594,10 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: COLORS.primarySoft,
-    borderWidth: 1,
-    borderColor: "rgba(47,128,237,0.24)",
+    overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
+    elevation: 3,
   },
   composerInput: {
     flex: 1,
@@ -2525,9 +2616,11 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
+    overflow: "hidden",
     backgroundColor: COLORS.primary,
     alignItems: "center",
     justifyContent: "center",
+    elevation: 3,
   },
   sendBtnDisabled: { opacity: 0.45 },
 

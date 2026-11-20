@@ -1378,13 +1378,13 @@ export const listProfileItems = async () => {
   if (!uid) return { items: [], ownedIds: [], active: {} };
   let catalog = await client
     .from("profile_item_catalog")
-    .select("id,name,item_type,appearance,cost,purchasable")
+    .select("id,name,item_type,appearance,cost,purchasable,min_user_level,min_wealth_level")
     .eq("active", true)
     .order("cost");
   if (catalog.error) {
     catalog = await client
       .from("profile_item_catalog")
-      .select("id,name,item_type,appearance,cost")
+      .select("id,name,item_type,appearance,cost,purchasable")
       .eq("active", true)
       .order("cost");
   }
