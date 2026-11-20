@@ -1,7 +1,11 @@
 import { memo, useEffect, useRef } from "react";
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { SoraGiftArtwork } from "./SoraGiftArtwork";
+
+const formatComboCoins = (value) =>
+  new Intl.NumberFormat("tr-TR").format(Math.max(0, Math.floor(Number(value) || 0)));
 
 const COMBO_DURATION_MS = 5000;
 const RING_SIZE = 80;
@@ -11,6 +15,7 @@ const CORE_SIZE = 64;
 
 export const GiftComboButton = memo(function GiftComboButton({
   combo,
+  coins = null,
   onPress,
   onExpire,
   bottomOffset = 82,
@@ -169,6 +174,14 @@ export const GiftComboButton = memo(function GiftComboButton({
           <Text style={styles.counterText}>x{comboCount}</Text>
         </View>
       </Pressable>
+      {typeof coins === "number" ? (
+        <View style={styles.liveCoinPill} pointerEvents="none">
+          <Ionicons name="diamond" size={10} color="#60A5FA" />
+          <Text style={styles.liveCoinText} numberOfLines={1}>
+            {formatComboCoins(coins)}
+          </Text>
+        </View>
+      ) : null}
     </Animated.View>
   );
 });
@@ -176,8 +189,26 @@ export const GiftComboButton = memo(function GiftComboButton({
 const styles = StyleSheet.create({
   anchor: {
     position: "absolute",
+    alignItems: "center",
     zIndex: 95,
     elevation: 14,
+  },
+  liveCoinPill: {
+    marginTop: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    backgroundColor: "rgba(9, 16, 30, 0.92)",
+    borderWidth: 1,
+    borderColor: "rgba(96, 165, 250, 0.45)",
+  },
+  liveCoinText: {
+    color: "#F8FAFC",
+    fontSize: 10.5,
+    fontWeight: "800",
   },
   touchWrap: {
     width: RING_SIZE,

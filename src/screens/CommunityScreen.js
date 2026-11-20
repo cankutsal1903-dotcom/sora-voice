@@ -47,6 +47,7 @@ import {
 import { GiftComboButton } from "../ui/GiftComboButton";
 import { KeyboardSafeView, useKeyboardInset } from "../ui/useKeyboardInset";
 import { SoraGiftEffect } from "../ui/SoraGiftEffect";
+import { CoinBlastEffect } from "../ui/CoinBlastEffect";
 
 const GIFT_QUANTITIES = [1, 5, 10, 50, 100];
 
@@ -149,6 +150,12 @@ export function CommunityScreen({
   currentUserId,
   profile,
   coins = 0,
+  coinBlastEvent = null,
+  onReserveGiftSpend,
+  onSettleGiftSpend,
+  onRollbackGiftSpend,
+  onApplyWalletBalance,
+  onCoinBlast,
   onBalanceRefresh,
   onFamilyChange,
   onOpenUserProfile,
@@ -435,7 +442,7 @@ export function CommunityScreen({
     if (!myFamily?.id || !currentUserId) return;
     const preferred =
       targetUserId
-      || giftRecipients.find((item) => !item.isSelf)?.userId
+      || giftRecipients.find((item) => item.isSelf)?.userId
       || currentUserId;
     setGiftRecipientId(preferred);
     setGiftQuantity(1);
@@ -473,6 +480,8 @@ export function CommunityScreen({
   const executeSendFamilyGift = useCallback(async ({ gift, recipient, quantity }) => {
     if (!myFamily?.id || !gift || !recipient?.userId) return false;
     const totalCost = Math.max(0, Number(gift.cost || 0) * Number(quantity || 1));
+    let settled = false;
+    onReserveGiftSpend?.(totalCost);
     pendingGiftSpendRef.current += totalCost;
     sendingGiftCountRef.current += 1;
     setSendingGift(true);
@@ -485,6 +494,8 @@ export function CommunityScreen({
         quantity,
         requestId,
       });
+      settled = true;
+      onSettleGiftSpend?.(totalCost, result.balance);
       playGiftEffect({
         ...gift,
         name: result.giftName || gift.name,
@@ -538,15 +549,24 @@ export function CommunityScreen({
       if (recipient.userId === currentUserId) {
         const blast = await claimSelfGiftBlast(requestId).catch(() => null);
         const reward = Number(blast?.reward_amount || 0);
+        if (blast?.balance !== null && blast?.balance !== undefined) {
+          onApplyWalletBalance?.(Number(blast.balance));
+        }
         if (reward > 0) {
-          Alert.alert("Hediye patlaması!", `${formatCredits(reward)} kredi geri kazandın.`);
+          const multiplier = Number(blast.multiplier_basis || 0) / 100;
+          onCoinBlast?.({ reward, multiplier });
         }
       }
-      await onBalanceRefresh?.().catch?.(() => undefined);
+      onBalanceRefresh?.().catch?.(() => undefined);
       return true;
     } catch (err) {
+      if (!settled) {
+        settled = true;
+        onRollbackGiftSpend?.(totalCost);
+      }
       setComboState(null);
       Alert.alert("Hediye gönderilemedi", describeFamilyError(err));
+      onBalanceRefresh?.().catch?.(() => undefined);
       return false;
     } finally {
       pendingGiftSpendRef.current = Math.max(0, pendingGiftSpendRef.current - totalCost);
@@ -556,7 +576,12 @@ export function CommunityScreen({
   }, [
     currentUserId,
     myFamily?.id,
+    onApplyWalletBalance,
     onBalanceRefresh,
+    onCoinBlast,
+    onReserveGiftSpend,
+    onRollbackGiftSpend,
+    onSettleGiftSpend,
     playGiftEffect,
     profile?.avatarUrl,
     profile?.color,
@@ -581,8 +606,7 @@ export function CommunityScreen({
       return;
     }
     const totalCost = Number(gift.cost || 0) * giftQuantity;
-    const availableCoins =
-      typeof coins === "number" ? Math.max(0, coins - pendingGiftSpendRef.current) : Infinity;
+    const availableCoins = typeof coins === "number" ? Math.max(0, coins) : Infinity;
     if (availableCoins < totalCost) {
       Alert.alert(
         "Bakiye yetersiz",
@@ -615,8 +639,7 @@ export function CommunityScreen({
     if (!comboState?.gift || !comboState?.recipient?.userId) return;
     const { gift, recipient, quantity } = comboState;
     const totalCost = Number(gift.cost || 0) * quantity;
-    const availableCoins =
-      typeof coins === "number" ? Math.max(0, coins - pendingGiftSpendRef.current) : Infinity;
+    const availableCoins = typeof coins === "number" ? Math.max(0, coins) : Infinity;
     if (availableCoins < totalCost) {
       setComboState(null);
       Alert.alert(
@@ -1378,6 +1401,7 @@ export function CommunityScreen({
 
           <GiftComboButton
             combo={giftSheetOpen ? null : comboState}
+            coins={coins}
             onPress={handleComboGiftPress}
             onExpire={handleExpireCombo}
             bottomOffset={keyboard.visible ? 68 : 132 + Math.max(insets.bottom, 8)}
@@ -1642,6 +1666,7 @@ export function CommunityScreen({
               </View>
             ) : null}
           </View>
+          <CoinBlastEffect event={coinBlastEvent} />
         </View>
       </Modal>
 

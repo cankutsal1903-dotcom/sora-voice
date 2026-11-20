@@ -173,6 +173,7 @@ import {
   getBadgeTierConfigForLevel,
 } from "./src/ui/SoraGiftArtwork";
 import { SoraGiftEffect } from "./src/ui/SoraGiftEffect";
+import { CoinBlastEffect } from "./src/ui/CoinBlastEffect";
 import { GiftComboButton } from "./src/ui/GiftComboButton";
 import { KeyboardSafeView, useKeyboardInset } from "./src/ui/useKeyboardInset";
 
@@ -4054,26 +4055,37 @@ const GiftSheet = memo(function GiftSheet({
   userFamilyLevel = 0,
   gifts = GIFT_CATALOG,
   recipients = [],
+  coinBlastEvent = null,
   onDismiss,
   onSend,
 }) {
   const [recipientId, setRecipientId] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [selectedGiftId, setSelectedGiftId] = useState(gifts[0]?.id || null);
+  const wasVisibleRef = useRef(false);
   useEffect(() => {
+    const justOpened = visible && !wasVisibleRef.current;
+    wasVisibleRef.current = visible;
     if (visible) {
-      setRecipientId((prev) =>
-        recipients.some((item) => item.userId === prev)
-          ? prev
-          : recipients[0]?.userId || null,
-      );
-      setQuantity(1);
+      const defaultSelfId = recipients.find((item) => item.isSelf)?.userId || recipients[0]?.userId || null;
+      if (justOpened) {
+        setRecipientId(defaultSelfId);
+        setQuantity(1);
+      } else {
+        setRecipientId((prev) =>
+          recipients.some((item) => item.userId === prev) ? prev : defaultSelfId,
+        );
+      }
       setSelectedGiftId((prev) =>
         gifts.some((item) => item.id === prev) ? prev : gifts[0]?.id || null,
       );
     }
   }, [visible, recipients, gifts]);
-  const selectedRecipient = recipients.find((item) => item.userId === recipientId) || recipients[0] || null;
+  const selectedRecipient =
+    recipients.find((item) => item.userId === recipientId)
+    || recipients.find((item) => item.isSelf)
+    || recipients[0]
+    || null;
   const selectedGift = useMemo(
     () => gifts.find((item) => item.id === selectedGiftId) || gifts[0] || null,
     [gifts, selectedGiftId],
@@ -4302,6 +4314,7 @@ const GiftSheet = memo(function GiftSheet({
             </View>
           ) : null}
         </View>
+        <CoinBlastEffect event={coinBlastEvent} />
       </View>
     </Modal>
   );
@@ -6227,6 +6240,7 @@ function Room({
   onMinimize,
   onEditProfile,
   userFamilyLevel = 0,
+  coinBlastEvent = null,
   minimized = false,
 }) {
   const insets = useSafeAreaInsets();
@@ -6973,7 +6987,7 @@ function Room({
     if (!roomCombo?.gift || !roomCombo?.recipient?.userId) return;
     const { gift, recipient, quantity } = roomCombo;
     const totalCost = Number(gift.cost || 0) * quantity;
-    const availableCoins = typeof coins === "number" ? coins - pendingRoomGiftSpendRef.current : Infinity;
+    const availableCoins = typeof coins === "number" ? coins : Infinity;
     if (availableCoins < totalCost) {
       setRoomCombo(null);
       Alert.alert(
@@ -8114,7 +8128,7 @@ function Room({
           },
         ]
       : [];
-    return [...others, ...selfEntry];
+    return [...selfEntry, ...others];
   }, [activeRoomParticipants, profile?.avatarUrl, profile?.color, profile?.name, userId]);
 
   const handleMessageSenderPress = useCallback(
@@ -8543,6 +8557,7 @@ function Room({
 
         <GiftComboButton
           combo={minimized || giftOpen ? null : roomCombo}
+          coins={coins}
           onPress={handleRoomComboPress}
           onExpire={handleExpireRoomCombo}
           bottomOffset={70}
@@ -8550,7 +8565,7 @@ function Room({
 
         <RoomQuickDock
           visible={!minimized && !roomKeyboard.visible && !giftOpen && !gamesOpen}
-          bottomOffset={roomCombo?.gift ? 162 : 74}
+          bottomOffset={roomCombo?.gift ? 186 : 74}
           onSendReaction={handleSendQuickReaction}
           onOpenGames={handleOpenGames}
         />
@@ -8704,6 +8719,7 @@ function Room({
         userFamilyLevel={userFamilyLevel}
         gifts={roomGiftCatalog}
         recipients={roomGiftRecipients}
+        coinBlastEvent={coinBlastEvent}
         onDismiss={handleCloseGift}
         onSend={handleSendGiftFromSheet}
       />
@@ -9444,6 +9460,9 @@ function AppContent() {
   const [profile, setProfile] = useState(DEFAULT_PROFILE);
   const [appSettings, setAppSettings] = useState(DEFAULT_APP_SETTINGS);
   const [walletBalance, setWalletBalance] = useState(SEEDED_WALLET_BALANCE);
+  const walletBalanceRef = useRef(SEEDED_WALLET_BALANCE);
+  walletBalanceRef.current = walletBalance;
+  const [coinBlastQueue, setCoinBlastQueue] = useState([]);
   const [promoWalletBalance, setPromoWalletBalance] = useState(0);
   const [paidWalletBalance, setPaidWalletBalance] = useState(0);
   const [walletActivities, setWalletActivities] = useState([]);
@@ -9461,6 +9480,55 @@ function AppContent() {
   const [inspectedUserId, setInspectedUserId] = useState(null);
   const [inspectedReportTarget, setInspectedReportTarget] = useState(null);
   const pendingGiftSpendRef = useRef(0);
+  const triggerCoinBlast = useCallback(({ reward, multiplier = 0 }) => {
+    const cleanReward = Math.max(0, Math.round(Number(reward) || 0));
+    if (!cleanReward) return;
+    const key = `blast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    setCoinBlastQueue((current) => [
+      ...current.slice(-3),
+      { key, reward: cleanReward, multiplier: Number(multiplier) || 0 },
+    ]);
+  }, []);
+  const handleCompleteCoinBlast = useCallback((key) => {
+    setCoinBlastQueue((current) => current.filter((item) => item.key !== key));
+  }, []);
+  const applyAuthoritativeWalletBalance = useCallback((authoritativeBalance) => {
+    if (authoritativeBalance === null || authoritativeBalance === undefined) return;
+    const numeric = Number(authoritativeBalance);
+    if (!Number.isFinite(numeric)) return;
+    const next = Math.max(0, numeric - pendingGiftSpendRef.current);
+    walletBalanceRef.current = next;
+    setWalletBalance(next);
+  }, []);
+  const reserveOptimisticGiftSpend = useCallback((amount) => {
+    const delta = Math.max(0, Number(amount) || 0);
+    if (!delta) return;
+    pendingGiftSpendRef.current += delta;
+    const next = Math.max(0, Number(walletBalanceRef.current || 0) - delta);
+    walletBalanceRef.current = next;
+    setWalletBalance(next);
+  }, []);
+  const settleOptimisticGiftSpend = useCallback((amount, authoritativeBalance = null) => {
+    const delta = Math.max(0, Number(amount) || 0);
+    pendingGiftSpendRef.current = Math.max(0, pendingGiftSpendRef.current - delta);
+    if (authoritativeBalance !== null && authoritativeBalance !== undefined) {
+      const numeric = Number(authoritativeBalance);
+      if (Number.isFinite(numeric)) {
+        const next = Math.max(0, numeric - pendingGiftSpendRef.current);
+        walletBalanceRef.current = next;
+        setWalletBalance(next);
+      }
+    }
+  }, []);
+  const rollbackOptimisticGiftSpend = useCallback((amount) => {
+    const delta = Math.max(0, Number(amount) || 0);
+    pendingGiftSpendRef.current = Math.max(0, pendingGiftSpendRef.current - delta);
+    if (delta > 0) {
+      const next = Math.max(0, Number(walletBalanceRef.current || 0) + delta);
+      walletBalanceRef.current = next;
+      setWalletBalance(next);
+    }
+  }, []);
   const [roomMinimized, setRoomMinimized] = useState(false);
   const [passwordPromptRoom, setPasswordPromptRoom] = useState(null);
   const [passwordPromptError, setPasswordPromptError] = useState(null);
@@ -10313,7 +10381,7 @@ function AppContent() {
       getWallet(),
       listWalletTransactions(),
     ]);
-    setWalletBalance(wallet.balance);
+    applyAuthoritativeWalletBalance(wallet.balance);
     setPromoWalletBalance(wallet.promo_balance || 0);
     setPaidWalletBalance(wallet.paid_balance || 0);
     setDailyRewardClaimed(
@@ -10349,14 +10417,15 @@ function AppContent() {
     if (!recipient?.userId || !roomId) return false;
     const cleanQty = Math.max(1, Math.floor(Number(quantity) || 1));
     const totalCost = Number(gift.cost || 0) * cleanQty;
-    if (walletBalance - pendingGiftSpendRef.current < totalCost) {
+    if (Number(walletBalanceRef.current || 0) < totalCost) {
       Alert.alert(
         "Bakiye yetersiz",
         `${cleanQty > 1 ? `${cleanQty}x ` : ""}${gift.name} hediyesi için ${formatCredits(totalCost)} kredi gerekiyor.`,
       );
       return false;
     }
-    pendingGiftSpendRef.current += totalCost;
+    let settled = false;
+    reserveOptimisticGiftSpend(totalCost);
     try {
       const requestKey = requestId || createRequestUuid();
       const result = await sendRoomGift({
@@ -10368,7 +10437,8 @@ function AppContent() {
       });
       if (!result) throw new Error("Gift response missing");
       const qtyPrefix = cleanQty > 1 ? `${cleanQty}x ` : "";
-      setWalletBalance(result.balance);
+      settled = true;
+      settleOptimisticGiftSpend(totalCost, result.balance);
       setPromoWalletBalance(result.promo_balance || 0);
       setPaidWalletBalance(result.paid_balance || 0);
       setWalletActivities((items) => [{
@@ -10379,14 +10449,16 @@ function AppContent() {
       if (recipient.userId === authSession.user.id) {
         const blast = await claimSelfGiftBlast(requestKey).catch(() => null);
         const reward = Number(blast?.reward_amount || 0);
-        if (blast?.balance !== null && blast?.balance !== undefined) setWalletBalance(Number(blast.balance));
+        if (blast?.balance !== null && blast?.balance !== undefined) {
+          applyAuthoritativeWalletBalance(Number(blast.balance));
+        }
         if (reward > 0) {
           const multiplier = Number(blast.multiplier_basis || 0) / 100;
           setWalletActivities((items) => [{
             id: `blast-${requestKey}`, icon: "flame", color: "#F04B24",
             text: `Hediye patlaması · ${multiplier}x geri dönüş`, amount: reward, time: "Şimdi",
           }, ...items]);
-          Alert.alert("Hediye patlaması!", `${formatCredits(reward)} kredi geri kazandın.`);
+          triggerCoinBlast({ reward, multiplier });
         }
       }
       pushNotification({
@@ -10399,19 +10471,21 @@ function AppContent() {
       refreshWalletData().catch(() => undefined);
       return result;
     } catch (error) {
+      if (!settled) {
+        settled = true;
+        rollbackOptimisticGiftSpend(totalCost);
+      }
       Alert.alert("Hediye gönderilemedi", error?.message?.includes("Insufficient")
         ? "Bakiye yetersiz. Cüzdanındaki kredi miktarı yenileniyor."
         : error?.message?.includes("membership")
           ? "Alıcı artık bu odada değil. Oda listesini yenileyip tekrar dene."
           : "Bağlantı hatası oluştu. Bakiye düşürülmedi; tekrar deneyebilirsin.");
       getWallet().then((wallet) => {
-        setWalletBalance(wallet.balance);
+        applyAuthoritativeWalletBalance(wallet.balance);
         setPromoWalletBalance(wallet.promo_balance || 0);
         setPaidWalletBalance(wallet.paid_balance || 0);
       }).catch(() => undefined);
       return false;
-    } finally {
-      pendingGiftSpendRef.current = Math.max(0, pendingGiftSpendRef.current - totalCost);
     }
   };
 
@@ -11296,6 +11370,12 @@ function AppContent() {
         currentUserId={authSession?.user?.id}
         profile={profile}
         coins={walletBalance}
+        coinBlastEvent={coinBlastQueue[0] || null}
+        onReserveGiftSpend={reserveOptimisticGiftSpend}
+        onSettleGiftSpend={settleOptimisticGiftSpend}
+        onRollbackGiftSpend={rollbackOptimisticGiftSpend}
+        onApplyWalletBalance={applyAuthoritativeWalletBalance}
+        onCoinBlast={triggerCoinBlast}
         onBalanceRefresh={refreshWalletData}
         onFamilyChange={setMyFamily}
         onOpenUserProfile={setInspectedUserId}
@@ -11345,6 +11425,7 @@ function AppContent() {
               accessToken={authSession?.access_token}
               coins={walletBalance}
               userFamilyLevel={myFamily?.level || 0}
+              coinBlastEvent={coinBlastQueue[0] || null}
               onSendGift={sendGift}
               onLeave={leaveCurrentRoom}
               onUpdateRoom={updateRoomSettings}
@@ -11579,6 +11660,10 @@ function AppContent() {
         onClear={clearNotifications}
       />
       <Onboarding visible={onboardingOpen} onComplete={completeOnboarding} />
+      <CoinBlastEffect
+        event={coinBlastQueue[0] || null}
+        onComplete={handleCompleteCoinBlast}
+      />
     </View>
   );
 }
