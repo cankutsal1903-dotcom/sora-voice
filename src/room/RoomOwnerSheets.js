@@ -283,6 +283,12 @@ export const RoomMenuSheet = memo(function RoomMenuSheet({
               onPress={() => onAction("music")}
             />
             <MenuTile
+              icon="dice-outline"
+              label="Oda Oyunları"
+              state="Zar · D/C · Çark"
+              onPress={() => onAction("games")}
+            />
+            <MenuTile
               icon="hand-left-outline"
               label="Mikrofon İstekleri"
               badge={requestCount}
@@ -343,6 +349,16 @@ export const RoomMenuSheet = memo(function RoomMenuSheet({
             <View style={{ flex: 1 }}>
               <Text style={sheetStyles.rowTitle}>Müzik sesi</Text>
               <Text style={sheetStyles.rowDescription}>Odadaki müziği kendi cihazında ayarla</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
+          </Pressable>
+          <Pressable onPress={() => onAction("games")} style={sheetStyles.row}>
+            <View style={sheetStyles.rowIcon}>
+              <Ionicons name="dice-outline" size={18} color={COLORS.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={sheetStyles.rowTitle}>Oda oyunları</Text>
+              <Text style={sheetStyles.rowDescription}>Zar, Doğruluk-Cesaret ve Şans Çarkı</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
           </Pressable>

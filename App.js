@@ -142,6 +142,13 @@ import {
 } from "./src/room/RoomOwnerSheets";
 import { useRoomMusic } from "./src/room/useRoomMusic";
 import {
+  FloatingReactionsOverlay,
+  RoomEntranceBanner,
+  RoomGameResultBanner,
+  RoomMiniGamesSheet,
+  RoomQuickDock,
+} from "./src/room/RoomLiveliness";
+import {
   configureNotificationChannel,
   registerPushToken,
   unregisterPushToken,
@@ -6237,13 +6244,68 @@ function Room({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState(null);
   const [giftOpen, setGiftOpen] = useState(false);
+  const [gamesOpen, setGamesOpen] = useState(false);
+  const [floatingReactions, setFloatingReactions] = useState([]);
+  const [entranceQueue, setEntranceQueue] = useState([]);
+  const [activeGameEvent, setActiveGameEvent] = useState(null);
   const [roomGiftCatalog, setRoomGiftCatalog] = useState(GIFT_CATALOG);
   const [giftFlight, setGiftFlight] = useState(null);
   const [roomCombo, setRoomCombo] = useState(null);
   const roomKeyboard = useKeyboardInset();
+  const roomRealtimeChannelRef = useRef(null);
+  const profileRef = useRef(profile);
+  profileRef.current = profile;
+  const entranceSentRoomRef = useRef(null);
+  const reactionSeqRef = useRef(0);
+  const lastReactionAtRef = useRef(0);
+  const lastReactionSenderAtRef = useRef(new Map());
   const playedGiftIdsRef = useRef(new Set());
   const giftRoomMinimizedRef = useRef(minimized);
   useEffect(() => { giftRoomMinimizedRef.current = minimized; }, [minimized]);
+  const spawnFloatingReaction = useCallback(({ reactionId, senderId, senderName }) => {
+    if (giftRoomMinimizedRef.current) return;
+    const now = Date.now();
+    const senderKey = String(senderId || senderName || "anon");
+    const lastSeen = lastReactionSenderAtRef.current.get(senderKey) || 0;
+    const showSender = now - lastSeen > 2200;
+    lastReactionSenderAtRef.current.set(senderKey, now);
+    if (lastReactionSenderAtRef.current.size > 60) {
+      lastReactionSenderAtRef.current.delete(lastReactionSenderAtRef.current.keys().next().value);
+    }
+    reactionSeqRef.current += 1;
+    const seq = reactionSeqRef.current;
+    const bubble = {
+      key: `rx-${now}-${seq}`,
+      reactionId: reactionId || "heart",
+      senderName: senderName || "",
+      showSender,
+      startX: ((seq % 5) - 2) * 11,
+      sway: (seq % 2 === 0 ? 1 : -1) * (14 + (seq % 4) * 5),
+      rise: 220 + (seq % 4) * 28,
+      duration: 1700 + (seq % 3) * 180,
+      bottomBase: 118,
+      rightBase: 18,
+    };
+    setFloatingReactions((current) => [...current.slice(-15), bubble]);
+  }, []);
+  const handleExpireReaction = useCallback((key) => {
+    setFloatingReactions((current) => current.filter((item) => item.key !== key));
+  }, []);
+  const enqueueRoomEntrance = useCallback((entry) => {
+    if (!entry?.name || giftRoomMinimizedRef.current) return;
+    const key = `ent-${entry.userId || entry.name}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    setEntranceQueue((current) => [...current.slice(-3), { ...entry, key }]);
+  }, []);
+  const handleCompleteEntrance = useCallback((key) => {
+    setEntranceQueue((current) => current.filter((item) => item.key !== key));
+  }, []);
+  const showGameBanner = useCallback((payload) => {
+    if (!payload?.summary || giftRoomMinimizedRef.current) return;
+    setActiveGameEvent({
+      ...payload,
+      key: `game-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    });
+  }, []);
   const playGiftEffect = useCallback((gift) => {
     const eventId = gift?.eventId;
     if (!eventId || playedGiftIdsRef.current.has(eventId)) return;
@@ -6255,8 +6317,13 @@ function Room({
   }, []);
   useEffect(() => {
     playedGiftIdsRef.current.clear();
+    entranceSentRoomRef.current = null;
     setGiftFlight(null);
     setRoomCombo(null);
+    setFloatingReactions([]);
+    setEntranceQueue([]);
+    setActiveGameEvent(null);
+    setGamesOpen(false);
   }, [room.id]);
   const [selectedParticipant, setSelectedParticipant] = useState(null);
   const [profileParticipant, setProfileParticipant] = useState(null);
@@ -6271,6 +6338,7 @@ function Room({
   useEffect(() => {
     if (!minimized) return;
     setGiftOpen(false);
+    setGamesOpen(false);
     setSettingsOpen(false);
     setMenuSheet(null);
     setSelfSheetOpen(false);
@@ -6575,7 +6643,37 @@ function Room({
     if (!room.persisted || !supabase || !chatAccessReady) return undefined;
     let active = true;
     const channel = supabase
-      .channel(`room-messages-${room.id}`)
+      .channel(`room-messages-${room.id}`, {
+        config: { broadcast: { self: false } },
+      })
+      .on(
+        "broadcast",
+        { event: "room_reaction" },
+        ({ payload }) => {
+          if (!active || !payload?.reactionId) return;
+          spawnFloatingReaction({
+            reactionId: payload.reactionId,
+            senderId: payload.senderId,
+            senderName: payload.senderName,
+          });
+        },
+      )
+      .on(
+        "broadcast",
+        { event: "room_entrance" },
+        ({ payload }) => {
+          if (!active || !payload?.name) return;
+          enqueueRoomEntrance(payload);
+        },
+      )
+      .on(
+        "broadcast",
+        { event: "room_game" },
+        ({ payload }) => {
+          if (!active || !payload?.summary) return;
+          showGameBanner(payload);
+        },
+      )
       .on(
         "postgres_changes",
         {
@@ -6632,17 +6730,99 @@ function Room({
         if (!active) return;
         if (status === "SUBSCRIBED") {
           setChatRealtimeStatus("live");
+          if (entranceSentRoomRef.current !== room.id) {
+            entranceSentRoomRef.current = room.id;
+            const liveProfile = profileRef.current;
+            const entryPayload = {
+              userId: userId || null,
+              name: liveProfile?.name || "Sora kullanıcısı",
+              avatarUrl: liveProfile?.avatarUrl || null,
+              color: liveProfile?.color || COLORS.primary,
+              level: Math.max(1, Math.floor(Number(liveProfile?.userLevel || liveProfile?.user_level || 1))),
+              familyLevel: Number(userFamilyLevel || 0),
+              role: room.hostId && room.hostId === userId ? "host" : "member",
+            };
+            enqueueRoomEntrance(entryPayload);
+            channel
+              .send({
+                type: "broadcast",
+                event: "room_entrance",
+                payload: entryPayload,
+              })
+              .catch(() => undefined);
+          }
         } else if (["CHANNEL_ERROR", "TIMED_OUT"].includes(status)) {
           setChatRealtimeStatus("error");
         } else if (status === "CLOSED") {
           setChatRealtimeStatus("offline");
         }
       });
+    roomRealtimeChannelRef.current = channel;
     return () => {
       active = false;
+      if (roomRealtimeChannelRef.current === channel) {
+        roomRealtimeChannelRef.current = null;
+      }
       supabase.removeChannel(channel);
     };
-  }, [chatAccessReady, playGiftEffect, room.id, room.persisted]);
+  }, [
+    chatAccessReady,
+    enqueueRoomEntrance,
+    playGiftEffect,
+    room.hostId,
+    room.id,
+    room.persisted,
+    showGameBanner,
+    spawnFloatingReaction,
+    userFamilyLevel,
+    userId,
+  ]);
+
+  const handleSendQuickReaction = useCallback(
+    (reactionId) => {
+      const now = Date.now();
+      if (now - lastReactionAtRef.current < 120) return;
+      lastReactionAtRef.current = now;
+      const payload = {
+        reactionId: reactionId || "heart",
+        senderId: userId || "self",
+        senderName: profile?.name || "Sora kullanıcısı",
+      };
+      spawnFloatingReaction(payload);
+      roomRealtimeChannelRef.current
+        ?.send({
+          type: "broadcast",
+          event: "room_reaction",
+          payload,
+        })
+        ?.catch?.(() => undefined);
+    },
+    [profile?.name, spawnFloatingReaction, userId],
+  );
+
+  const handleBroadcastMiniGame = useCallback(
+    (gamePayload) => {
+      if (!gamePayload?.summary) return;
+      const payload = {
+        ...gamePayload,
+        actorId: userId || "self",
+        actorName: profile?.name || "Sora kullanıcısı",
+      };
+      showGameBanner(payload);
+      roomRealtimeChannelRef.current
+        ?.send({
+          type: "broadcast",
+          event: "room_game",
+          payload,
+        })
+        ?.catch?.(() => undefined);
+    },
+    [profile?.name, showGameBanner, userId],
+  );
+
+  const handleOpenGames = useCallback(() => setGamesOpen(true), []);
+  const handleCloseGames = useCallback(() => setGamesOpen(false), []);
+  const handleDismissGameBanner = useCallback(() => setActiveGameEvent(null), []);
 
   const refreshMembers = useCallback(() => {
     if (!room.persisted) return Promise.resolve();
@@ -7841,7 +8021,8 @@ function Room({
         return;
       }
       openLater(() => setMenuSheet(key));
-    } else if (key === "invite") openLater(shareRoom);
+    } else if (key === "games") openLater(() => setGamesOpen(true));
+    else if (key === "invite") openLater(shareRoom);
     else if (key === "report") openLater(reportRoom);
     else if (key === "blockHost") openLater(handleBlockHost);
   };
@@ -8367,6 +8548,13 @@ function Room({
           bottomOffset={70}
         />
 
+        <RoomQuickDock
+          visible={!minimized && !roomKeyboard.visible && !giftOpen && !gamesOpen}
+          bottomOffset={roomCombo?.gift ? 162 : 74}
+          onSendReaction={handleSendQuickReaction}
+          onOpenGames={handleOpenGames}
+        />
+
         {/* Alt bar: mesaj yazma alanı + hemen yanında hediye + mikrofon + ses + müzik */}
         <View style={styles.roomBottomBar}>
           <RoomComposer onSend={sendMessage} sending={messageSending} />
@@ -8570,7 +8758,30 @@ function Room({
           setSelectedParticipant(null);
         }}
       />
+      <RoomMiniGamesSheet
+        visible={gamesOpen}
+        participants={activeRoomParticipants}
+        actorName={profile?.name || "Sora kullanıcısı"}
+        onBroadcastGame={handleBroadcastMiniGame}
+        onShareToChat={sendMessage}
+        onDismiss={handleCloseGames}
+      />
       </SafeAreaView>
+      <FloatingReactionsOverlay
+        reactions={floatingReactions}
+        onExpire={handleExpireReaction}
+        minimized={minimized}
+      />
+      <RoomEntranceBanner
+        entry={entranceQueue[0] || null}
+        onComplete={handleCompleteEntrance}
+        minimized={minimized}
+      />
+      <RoomGameResultBanner
+        event={activeGameEvent}
+        onDismiss={handleDismissGameBanner}
+        minimized={minimized}
+      />
       <SoraGiftEffect gift={minimized ? null : giftFlight} />
     </View>
   );
