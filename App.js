@@ -11077,6 +11077,25 @@ function AppContent() {
     };
   }, [authSession?.user?.id, refreshMySanction]);
 
+  const handleEventSendGift = useCallback(() => {
+    setActiveEvent(null);
+    if (room) {
+      setRoomMinimized(false);
+      setRoomGiftTrigger((n) => n + 1);
+      return;
+    }
+    setActiveTab("discover");
+    if (rooms.length > 0) {
+      openRoom(rooms[0]);
+      setTimeout(() => setRoomGiftTrigger((n) => n + 1), 650);
+    } else {
+      Alert.alert(
+        "Odaya katıl",
+        "Etkinliğe katılmak için bir sesli oda aç veya canlı bir odaya girip hediye gönder.",
+      );
+    }
+  }, [openRoom, room, rooms]);
+
   // --- Kosullu ekranlar (tum hook'lar yukarida cagrildi) ---
   if (brandLaunchVisible || (isSupabaseConfigured && authSession === undefined))
     return (
@@ -11194,25 +11213,6 @@ function AppContent() {
       </SafeAreaView>
     );
   }
-
-  const handleEventSendGift = useCallback(() => {
-    setActiveEvent(null);
-    if (room) {
-      setRoomMinimized(false);
-      setRoomGiftTrigger((n) => n + 1);
-      return;
-    }
-    setActiveTab("discover");
-    if (rooms.length > 0) {
-      openRoom(rooms[0]);
-      setTimeout(() => setRoomGiftTrigger((n) => n + 1), 650);
-    } else {
-      Alert.alert(
-        "Odaya katıl",
-        "Etkinliğe katılmak için bir sesli oda aç veya canlı bir odaya girip hediye gönder.",
-      );
-    }
-  }, [openRoom, room, rooms]);
 
   const screens = {
     discover: (
