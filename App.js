@@ -149,6 +149,30 @@ import {
   RoomReactionBar,
   RoomToolsSheet,
 } from "./src/room/RoomLiveliness";
+import { playSfx } from "./src/audio/SoraSfx";
+import {
+  PrestigeStylePicker,
+  getPrestigePrefsSnapshot,
+  resolveBubbleStyle,
+} from "./src/ui/PrestigeStyles";
+import {
+  DailyMissionsSheet,
+  bumpMissionProgress,
+  useDailyMissionsBadge,
+} from "./src/missions/DailyMissionsSheet";
+import {
+  LuckyPacketBadge,
+  LuckyPacketClaimModal,
+  LuckyPacketCreateSheet,
+  RoomLeaderboardSheet,
+  RoomPkBar,
+  RoomPkCreateSheet,
+  RoomPollBanner,
+  RoomPollCreateSheet,
+  RoomTimerCreateSheet,
+  RoomTimerPill,
+  RoomTrophyPill,
+} from "./src/room/RoomPartyWidgets";
 import {
   configureNotificationChannel,
   registerPushToken,
@@ -2421,10 +2445,13 @@ function Profile({
   onOpenSettings,
   onOpenWallet,
   onClaimDailyReward,
+  onBalanceUpdate,
   onSyncUserLevel,
   onOpenUserProfile,
 }) {
   const [safetyOpen, setSafetyOpen] = useState(false);
+  const [missionsOpen, setMissionsOpen] = useState(false);
+  const { claimableCount: missionClaimable } = useDailyMissionsBadge(Boolean(userId));
   const [levelSheetOpen, setLevelSheetOpen] = useState(false);
   const [syncingLevel, setSyncingLevel] = useState(false);
   const [recentActivity, setRecentActivity] = useState([]);
@@ -2447,8 +2474,16 @@ function Profile({
       setSyncingLevel(false);
     }
   }, [onSyncUserLevel, syncingLevel]);
+  const openDailyMissions = useCallback(() => setMissionsOpen(true), []);
   const actions = useMemo(
     () => [
+      [
+        "flame-outline",
+        missionClaimable > 0
+          ? `Görevler & Giriş Serisi · ${missionClaimable} ödül hazır`
+          : "Görevler & 7 Günlük Seri",
+        openDailyMissions,
+      ],
       [
         "gift-outline",
         dailyRewardClaimed
@@ -2461,9 +2496,11 @@ function Profile({
     ],
     [
       dailyRewardClaimed,
+      missionClaimable,
       onClaimDailyReward,
       onOpenSettings,
       onOpenWallet,
+      openDailyMissions,
       openSafetyCenter,
     ],
   );
@@ -3026,6 +3063,11 @@ function Profile({
         onSync={handleManualLevelSync}
         onDismiss={() => setLevelSheetOpen(false)}
       />
+      <DailyMissionsSheet
+        visible={missionsOpen}
+        onDismiss={() => setMissionsOpen(false)}
+        onBalanceUpdate={onBalanceUpdate}
+      />
     </>
   );
 }
@@ -3099,6 +3141,7 @@ function ProfileDetailSheet({
   }, [visible]);
 
   const [followCounts, setFollowCounts] = useState(null);
+  const [detailWealthOpen, setDetailWealthOpen] = useState(false);
   useEffect(() => {
     if (!visible || !isSelf || !supabase) return undefined;
     let active = true;
@@ -3389,7 +3432,11 @@ function ProfileDetailSheet({
               </Pressable>
 
               <View style={{ marginHorizontal: 18, marginTop: 12 }}>
-                <SoraWealthCard spent={targetGiftSpent} compact />
+                <SoraWealthCard
+                  spent={targetGiftSpent}
+                  compact
+                  onPress={() => setDetailWealthOpen(true)}
+                />
               </View>
 
               <View style={styles.profileDetailSection}>
@@ -3468,6 +3515,11 @@ function ProfileDetailSheet({
             </View>
           ) : null}
         </ScrollView>
+        <WealthTierLadderSheet
+          visible={detailWealthOpen}
+          spent={targetGiftSpent}
+          onDismiss={() => setDetailWealthOpen(false)}
+        />
       </View>
     </Modal>
   );
@@ -5806,6 +5858,7 @@ const RoomComposer = memo(function RoomComposer({
 const RoomMessageRow = memo(function RoomMessageRow({
   item,
   canReport,
+  isSelf = false,
   senderAvatarUrl = null,
   senderColor = "#2F80ED",
   senderGiftSpent = 0,
@@ -5821,6 +5874,11 @@ const RoomMessageRow = memo(function RoomMessageRow({
   const showAvatar = !item.system && !item.announcement;
   const isGiftMsg = item.kind === "gift";
   const giftMeta = item.metadata || {};
+  const bubblePrefId =
+    giftMeta.bubble_style || (isSelf ? getPrestigePrefsSnapshot().bubbleId : null);
+  const bubbleTheme =
+    showAvatar && !isGiftMsg ? resolveBubbleStyle(bubblePrefId, senderGiftSpent) : null;
+  const hasPrestigeBubble = Boolean(bubbleTheme && bubbleTheme.id !== "default");
 
   return (
     <View style={styles.messageRow}>
@@ -5844,6 +5902,11 @@ const RoomMessageRow = memo(function RoomMessageRow({
       <View
         style={[
           styles.messageBubble,
+          hasPrestigeBubble && {
+            backgroundColor: bubbleTheme.bg,
+            borderColor: bubbleTheme.border,
+            borderWidth: 1,
+          },
           item.system && styles.messageBubbleSystem,
           item.announcement && styles.messageBubbleAnnouncement,
           isGiftMsg && styles.messageBubbleGift,
@@ -5940,6 +6003,7 @@ const RoomMessageList = memo(function RoomMessageList({
           <RoomMessageRow
             key={item.id}
             item={item}
+            isSelf={isSelf}
             senderAvatarUrl={senderAvatarUrl}
             senderColor={senderColor}
             senderGiftSpent={senderGiftSpent}
@@ -5995,6 +6059,8 @@ function Room({
   onLeave,
   onUpdateRoom,
   onSendGift,
+  onBalanceUpdate,
+  ownGiftSpent = 0,
   coins,
   initialSpeakerOn = true,
   initialMicrophoneOn = false,
@@ -6031,6 +6097,21 @@ function Room({
   const [gamesInitialTab, setGamesInitialTab] = useState("dice");
   const [toolsOpen, setToolsOpen] = useState(false);
   const [reactionTrayOpen, setReactionTrayOpen] = useState(false);
+  const [roomGiftTotal, setRoomGiftTotal] = useState(0);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [activeLuckyPackets, setActiveLuckyPackets] = useState([]);
+  const [luckyCreateOpen, setLuckyCreateOpen] = useState(false);
+  const [activeLuckyModal, setActiveLuckyModal] = useState(null);
+  const [activePoll, setActivePoll] = useState(null);
+  const [pollCreateOpen, setPollCreateOpen] = useState(false);
+  const [activeTimer, setActiveTimer] = useState(null);
+  const [timerCreateOpen, setTimerCreateOpen] = useState(false);
+  const [activePk, setActivePk] = useState(null);
+  const [pkCreateOpen, setPkCreateOpen] = useState(false);
+  const activePkRef = useRef(null);
+  activePkRef.current = activePk;
+  const ownGiftSpentRef = useRef(ownGiftSpent);
+  ownGiftSpentRef.current = ownGiftSpent;
   const [floatingReactions, setFloatingReactions] = useState([]);
   const [entranceQueue, setEntranceQueue] = useState([]);
   const [activeGameEvent, setActiveGameEvent] = useState(null);
@@ -6106,7 +6187,10 @@ function Room({
     if (playedGiftIdsRef.current.size > 160) {
       playedGiftIdsRef.current.delete(playedGiftIdsRef.current.values().next().value);
     }
-    if (!giftRoomMinimizedRef.current) setGiftFlight({ ...gift, stamp: Date.now() });
+    if (!giftRoomMinimizedRef.current) {
+      playSfx("fanfare");
+      setGiftFlight({ ...gift, stamp: Date.now() });
+    }
   }, []);
   useEffect(() => {
     playedGiftIdsRef.current.clear();
@@ -6117,6 +6201,12 @@ function Room({
     setEntranceQueue([]);
     setActiveGameEvent(null);
     setGamesOpen(false);
+    setRoomGiftTotal(0);
+    setActiveLuckyPackets([]);
+    setActiveLuckyModal(null);
+    setActivePoll(null);
+    setActiveTimer(null);
+    setActivePk(null);
   }, [room.id]);
   const [selectedParticipant, setSelectedParticipant] = useState(null);
   const [profileParticipant, setProfileParticipant] = useState(null);
@@ -6468,6 +6558,69 @@ function Room({
         },
       )
       .on(
+        "broadcast",
+        { event: "room_lucky_packet" },
+        ({ payload }) => {
+          if (!active || !payload?.packet?.id) return;
+          setActiveLuckyPackets((curr) => [
+            payload.packet,
+            ...curr.filter((p) => p.id !== payload.packet.id),
+          ]);
+        },
+      )
+      .on(
+        "broadcast",
+        { event: "room_poll" },
+        ({ payload }) => {
+          if (!active) return;
+          setActivePoll(payload?.poll || null);
+        },
+      )
+      .on(
+        "broadcast",
+        { event: "room_poll_vote" },
+        ({ payload }) => {
+          if (!active || !payload?.pollId || !payload?.userId) return;
+          setActivePoll((curr) =>
+            curr && curr.id === payload.pollId
+              ? { ...curr, votes: { ...(curr.votes || {}), [payload.userId]: payload.optionIndex } }
+              : curr,
+          );
+        },
+      )
+      .on(
+        "broadcast",
+        { event: "room_timer" },
+        ({ payload }) => {
+          if (!active) return;
+          setActiveTimer(payload?.timer || null);
+        },
+      )
+      .on(
+        "broadcast",
+        { event: "room_pk" },
+        ({ payload }) => {
+          if (!active) return;
+          setActivePk(payload?.pk || null);
+        },
+      )
+      .on(
+        "broadcast",
+        { event: "room_pk_score" },
+        ({ payload }) => {
+          if (!active || !payload?.pkId) return;
+          setActivePk((curr) =>
+            curr && curr.id === payload.pkId
+              ? {
+                  ...curr,
+                  leftScore: Math.max(curr.leftScore || 0, Number(payload.leftScore || 0)),
+                  rightScore: Math.max(curr.rightScore || 0, Number(payload.rightScore || 0)),
+                }
+              : curr,
+          );
+        },
+      )
+      .on(
         "postgres_changes",
         {
           event: "INSERT",
@@ -6493,6 +6646,10 @@ function Room({
           setMessages((current) => mergeRoomMessages(current, [incoming]));
           if (row.kind === "gift" && row.metadata?.gift_id) {
             const meta = row.metadata;
+            const cost = Math.max(0, Number(meta.gift_cost || 0));
+            if (cost > 0 && row.sender_id !== userId) {
+              setRoomGiftTotal((curr) => curr + cost);
+            }
             playGiftEffect({
               id: meta.gift_id,
               name: meta.gift_name || "Hediye",
@@ -6532,9 +6689,26 @@ function Room({
               avatarUrl: liveProfile?.avatarUrl || null,
               color: liveProfile?.color || COLORS.primary,
               level: Math.max(1, Math.floor(Number(liveProfile?.userLevel || liveProfile?.user_level || 1))),
+              wealthLevel: getWealthTier(ownGiftSpentRef.current || 0).tier.level,
+              entranceStyle: getPrestigePrefsSnapshot().entranceId,
               familyLevel: Number(userFamilyLevel || 0),
               role: room.hostId && room.hostId === userId ? "host" : "member",
             };
+            bumpMissionProgress("join_room", 1);
+            supabase
+              .rpc("get_room_gift_leaderboard", { p_room_id: room.id, p_limit: 5 })
+              .then(({ data: lb }) => {
+                if (active && lb && typeof lb.room_total === "number") {
+                  setRoomGiftTotal(lb.room_total);
+                }
+              })
+              .catch(() => undefined);
+            supabase
+              .rpc("list_active_lucky_packets", { p_room_id: room.id })
+              .then(({ data: pkts }) => {
+                if (active && Array.isArray(pkts)) setActiveLuckyPackets(pkts);
+              })
+              .catch(() => undefined);
             enqueueRoomEntrance(entryPayload);
             channel
               .send({
@@ -6581,6 +6755,8 @@ function Room({
         senderId: userId || "self",
         senderName: profile?.name || "Sora kullanıcısı",
       };
+      playSfx("pop");
+      bumpMissionProgress("send_reaction", 1);
       spawnFloatingReaction(payload);
       roomRealtimeChannelRef.current
         ?.send({
@@ -6629,6 +6805,132 @@ function Room({
   const handleCloseTools = useCallback(() => setToolsOpen(false), []);
   const handleClearRoomChat = useCallback(() => setMessages([]), []);
   const handleDismissGameBanner = useCallback(() => setActiveGameEvent(null), []);
+
+  const handleLuckyPacketCreated = useCallback(
+    (res) => {
+      if (typeof res?.balance === "number") onBalanceUpdate?.(res.balance);
+      const pkt = res?.packet;
+      if (!pkt?.id) return;
+      setActiveLuckyPackets((curr) => [pkt, ...curr.filter((p) => p.id !== pkt.id)]);
+      roomRealtimeChannelRef.current
+        ?.send({
+          type: "broadcast",
+          event: "room_lucky_packet",
+          payload: { packet: pkt },
+        })
+        ?.catch?.(() => undefined);
+    },
+    [onBalanceUpdate],
+  );
+
+  const handleLuckyPacketClaimed = useCallback(
+    (packetId, data) => {
+      if (typeof data?.balance === "number") onBalanceUpdate?.(data.balance);
+      setActiveLuckyPackets((curr) =>
+        curr
+          .map((p) =>
+            p.id === packetId
+              ? {
+                  ...p,
+                  remaining_slots: data?.remaining_slots ?? p.remaining_slots,
+                  remaining_amount: data?.remaining_amount ?? p.remaining_amount,
+                  status: data?.status || p.status,
+                  my_claim: data?.claimed_amount || p.my_claim,
+                }
+              : p,
+          )
+          .filter((p) => p.status === "active" && Number(p.remaining_slots) > 0),
+      );
+    },
+    [onBalanceUpdate],
+  );
+
+  const handleCreatePoll = useCallback(
+    ({ question, options }) => {
+      const poll = {
+        id: `poll-${Date.now()}`,
+        question,
+        options,
+        votes: {},
+        creatorName: profile?.name || "Oda",
+      };
+      setActivePoll(poll);
+      roomRealtimeChannelRef.current
+        ?.send({ type: "broadcast", event: "room_poll", payload: { poll } })
+        ?.catch?.(() => undefined);
+    },
+    [profile?.name],
+  );
+
+  const handleVotePoll = useCallback(
+    (pollId, optionIndex) => {
+      const uid = userId || "self";
+      playSfx("pop");
+      setActivePoll((curr) =>
+        curr && curr.id === pollId
+          ? { ...curr, votes: { ...(curr.votes || {}), [uid]: optionIndex } }
+          : curr,
+      );
+      roomRealtimeChannelRef.current
+        ?.send({
+          type: "broadcast",
+          event: "room_poll_vote",
+          payload: { pollId, userId: uid, optionIndex },
+        })
+        ?.catch?.(() => undefined);
+    },
+    [userId],
+  );
+
+  const handleClosePoll = useCallback(() => {
+    setActivePoll(null);
+    roomRealtimeChannelRef.current
+      ?.send({ type: "broadcast", event: "room_poll", payload: { poll: null } })
+      ?.catch?.(() => undefined);
+  }, []);
+
+  const handleStartTimer = useCallback(({ durationSec, label }) => {
+    const timer = {
+      id: `timer-${Date.now()}`,
+      label,
+      endsAt: Date.now() + durationSec * 1000,
+    };
+    setActiveTimer(timer);
+    roomRealtimeChannelRef.current
+      ?.send({ type: "broadcast", event: "room_timer", payload: { timer } })
+      ?.catch?.(() => undefined);
+  }, []);
+
+  const handleCancelTimer = useCallback(() => {
+    setActiveTimer(null);
+    roomRealtimeChannelRef.current
+      ?.send({ type: "broadcast", event: "room_timer", payload: { timer: null } })
+      ?.catch?.(() => undefined);
+  }, []);
+
+  const handleStartPk = useCallback(({ leftId, rightId, leftName, rightName, durationSec }) => {
+    const pk = {
+      id: `pk-${Date.now()}`,
+      leftId,
+      rightId,
+      leftName,
+      rightName,
+      leftScore: 0,
+      rightScore: 0,
+      endsAt: Date.now() + durationSec * 1000,
+    };
+    setActivePk(pk);
+    roomRealtimeChannelRef.current
+      ?.send({ type: "broadcast", event: "room_pk", payload: { pk } })
+      ?.catch?.(() => undefined);
+  }, []);
+
+  const handleEndPk = useCallback(() => {
+    setActivePk(null);
+    roomRealtimeChannelRef.current
+      ?.send({ type: "broadcast", event: "room_pk", payload: { pk: null } })
+      ?.catch?.(() => undefined);
+  }, []);
 
   const refreshMembers = useCallback(() => {
     if (!room.persisted) return Promise.resolve();
@@ -6717,6 +7019,29 @@ function Room({
         if (!sent) {
           setRoomCombo(null);
           return false;
+        }
+        bumpMissionProgress("send_gift", 1);
+        const giftPoints = Math.max(0, Number(sent.gift_cost || reservedCost || 0));
+        if (giftPoints > 0) {
+          setRoomGiftTotal((curr) => curr + giftPoints);
+          const pkNow = activePkRef.current;
+          if (pkNow && Date.now() < pkNow.endsAt) {
+            const addToRight = Boolean(pkNow.rightId && recipient?.userId === pkNow.rightId);
+            const nextLeft = (pkNow.leftScore || 0) + (addToRight ? 0 : giftPoints);
+            const nextRight = (pkNow.rightScore || 0) + (addToRight ? giftPoints : 0);
+            setActivePk((curr) =>
+              curr && curr.id === pkNow.id
+                ? { ...curr, leftScore: nextLeft, rightScore: nextRight }
+                : curr,
+            );
+            roomRealtimeChannelRef.current
+              ?.send({
+                type: "broadcast",
+                event: "room_pk_score",
+                payload: { pkId: pkNow.id, leftScore: nextLeft, rightScore: nextRight },
+              })
+              ?.catch?.(() => undefined);
+          }
         }
         playGiftEffect({
           ...gift,
@@ -7064,6 +7389,7 @@ function Room({
             text: cleanMessage,
           });
           messageGuard.record(cleanMessage);
+          bumpMissionProgress("send_chat", 1);
           setMessages((current) =>
             mergeRoomMessages(
               current.filter((item) => item.id !== pendingId),
@@ -8228,6 +8554,33 @@ function Room({
           </View>
         ) : null}
 
+        {/* Üst bar altı: Oda liderlik kupası + canlı sayaç + şanslı paket */}
+        {!roomKeyboard.visible ? (
+          <View style={styles.roomSubHeaderRow}>
+            <View style={styles.roomSubHeaderLeft}>
+              <RoomTrophyPill
+                totalCoins={roomGiftTotal}
+                onPress={() => setLeaderboardOpen(true)}
+              />
+              <RoomTimerPill
+                timer={activeTimer}
+                canCancel={canModerate}
+                onCancel={handleCancelTimer}
+              />
+            </View>
+            {activeLuckyPackets[0] ? (
+              <LuckyPacketBadge
+                packet={activeLuckyPackets[0]}
+                onPress={(pkt) => setActiveLuckyModal(pkt)}
+              />
+            ) : null}
+          </View>
+        ) : null}
+
+        {!roomKeyboard.visible && activePk ? (
+          <RoomPkBar pk={activePk} canEnd={canModerate} onEnd={handleEndPk} />
+        ) : null}
+
         {/* Sahne sabit kalır, yalnızca sohbet alanı dikey kayar */}
         <View style={styles.roomSurface}>
           {/* Sahne: oda sahibi (+ çift koltuğu) + 4'erli sıralar */}
@@ -8319,6 +8672,15 @@ function Room({
         </View>
 
         <View style={styles.roomChatArea}>
+          {!roomKeyboard.visible && activePoll ? (
+            <RoomPollBanner
+              poll={activePoll}
+              currentUserId={userId}
+              canClose={canModerate}
+              onVote={handleVotePoll}
+              onClosePoll={handleClosePoll}
+            />
+          ) : null}
           <ScrollView
             ref={chatScrollRef}
             style={styles.roomChatScroll}
@@ -8623,8 +8985,13 @@ function Room({
         visible={toolsOpen}
         hasEvents={events.length > 0}
         musicPlaying={musicPlaying}
+        canModerate={canModerate}
         requestCount={canModerate ? micRequests.length : 0}
         onSelectGame={handleOpenGames}
+        onOpenLuckyPacket={() => setLuckyCreateOpen(true)}
+        onOpenPk={() => setPkCreateOpen(true)}
+        onOpenPoll={() => setPollCreateOpen(true)}
+        onOpenTimer={() => setTimerCreateOpen(true)}
         onOpenEvents={() => {
           if (events[0]) onOpenEvent?.(events[0]);
         }}
@@ -8632,6 +8999,41 @@ function Room({
         onOpenSettings={handleOpenSettings}
         onClearChat={handleClearRoomChat}
         onDismiss={handleCloseTools}
+      />
+      <RoomLeaderboardSheet
+        visible={leaderboardOpen}
+        roomId={room.id}
+        roomTitle={roomDetails.title}
+        currentUserId={userId}
+        onDismiss={() => setLeaderboardOpen(false)}
+      />
+      <LuckyPacketCreateSheet
+        visible={luckyCreateOpen}
+        roomId={room.id}
+        coins={coins}
+        onCreated={handleLuckyPacketCreated}
+        onDismiss={() => setLuckyCreateOpen(false)}
+      />
+      <LuckyPacketClaimModal
+        packet={activeLuckyModal}
+        onClaimed={handleLuckyPacketClaimed}
+        onDismiss={() => setActiveLuckyModal(null)}
+      />
+      <RoomPollCreateSheet
+        visible={pollCreateOpen}
+        onCreate={handleCreatePoll}
+        onDismiss={() => setPollCreateOpen(false)}
+      />
+      <RoomTimerCreateSheet
+        visible={timerCreateOpen}
+        onStart={handleStartTimer}
+        onDismiss={() => setTimerCreateOpen(false)}
+      />
+      <RoomPkCreateSheet
+        visible={pkCreateOpen}
+        participants={activeRoomParticipants}
+        onStart={handleStartPk}
+        onDismiss={() => setPkCreateOpen(false)}
       />
       <RoomMiniGamesSheet
         visible={gamesOpen}
@@ -9127,6 +9529,7 @@ function ProfileEditor({
               ) : null}
             </>
           ) : null}
+          <PrestigeStylePicker giftSpent={giftSpent} />
           <Pressable onPress={save}>
             <LinearGradient colors={BRAND_GRADIENT} style={styles.createSubmit}>
               <Text style={styles.createSubmitText}>Değişiklikleri kaydet</Text>
@@ -11351,6 +11754,7 @@ function AppContent() {
         onOpenSettings={handleOpenSettings}
         onOpenWallet={handleOpenWallet}
         onClaimDailyReward={claimDailyReward}
+        onBalanceUpdate={setWalletBalance}
         onSyncUserLevel={syncUserLevelAndNotify}
         onOpenUserProfile={setInspectedUserId}
       />
@@ -11385,6 +11789,8 @@ function AppContent() {
               onOpenEvent={setActiveEvent}
               openGiftNonce={roomGiftTrigger}
               onSendGift={sendGift}
+              onBalanceUpdate={setWalletBalance}
+              ownGiftSpent={ownGiftSpent}
               onLeave={leaveCurrentRoom}
               onUpdateRoom={updateRoomSettings}
               isFollowingHost={followedUserIds.includes(room.hostId)}
@@ -17325,6 +17731,20 @@ const styles = StyleSheet.create({
   },
   profileWealthCardWrap: {
     marginTop: 12,
+  },
+  roomSubHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingBottom: 2,
+    gap: 8,
+  },
+  roomSubHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexShrink: 1,
   },
   roomChatArea: {
     flex: 1,

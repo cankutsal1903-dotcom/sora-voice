@@ -10,11 +10,13 @@ import {
   Text,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "../theme/colors";
 import { useReducedMotion } from "../ui/Motion";
+import { playSfx, useSfxEnabled } from "../audio/SoraSfx";
+import { resolveEntranceStyle } from "../ui/PrestigeStyles";
 
 export const QUICK_REACTIONS = [
   { id: "heart", emoji: "❤️", label: "Kalp", tint: "#FF4D79" },
@@ -448,22 +450,19 @@ export const RoomEntranceBanner = memo(function RoomEntranceBanner({
   if (!entry || minimized) return null;
 
   const level = Math.max(1, Math.floor(Number(entry.level) || 1));
+  const wealthLevel = Math.max(0, Math.floor(Number(entry.wealthLevel) || 0));
   const isHost = entry.role === "host";
-  const isVip = !isHost && (level >= 10 || Number(entry.familyLevel || 0) >= 3);
+  const isVip = !isHost && (wealthLevel >= 4 || level >= 10 || Number(entry.familyLevel || 0) >= 3);
+  const stylePreset = resolveEntranceStyle(entry.entranceStyle, wealthLevel, isHost);
 
-  const gradientColors = isHost
-    ? ["rgba(246,200,110,0.95)", "rgba(196,130,36,0.94)", "rgba(88,52,14,0.92)"]
-    : isVip
-      ? ["rgba(124,92,255,0.95)", "rgba(47,128,237,0.93)", "rgba(16,35,70,0.92)"]
-      : ["rgba(47,128,237,0.92)", "rgba(25,68,136,0.92)", "rgba(12,24,48,0.9)"];
-
-  const badgeIcon = isHost ? "sparkles" : isVip ? "diamond" : "flash";
-  const badgeTint = isHost ? "#FFF5D6" : isVip ? "#E9D5FF" : "#BAE6FD";
-  const subtitle = isHost
-    ? "Oda sahibi sahneye geldi"
-    : isVip
-      ? "Odaya ışınlandı"
-      : "Odaya katıldı";
+  const gradientColors = stylePreset?.colors || [
+    "rgba(47,128,237,0.92)",
+    "rgba(25,68,136,0.92)",
+    "rgba(12,24,48,0.9)",
+  ];
+  const badgeIcon = stylePreset?.icon || (isHost ? "sparkles" : isVip ? "diamond" : "flash");
+  const badgeTint = stylePreset?.tint || (isHost ? "#FFF5D6" : isVip ? "#E9D5FF" : "#BAE6FD");
+  const subtitle = stylePreset?.tagline || (isHost ? "Oda sahibi sahneye geldi" : isVip ? "Odaya ışınlandı" : "Odaya katıldı");
 
   return (
     <Animated.View
@@ -483,6 +482,7 @@ export const RoomEntranceBanner = memo(function RoomEntranceBanner({
         end={{ x: 1, y: 0.5 }}
         style={[
           styles.entranceCard,
+          stylePreset?.border && { borderColor: stylePreset.border },
           isHost && styles.entranceCardHost,
           isVip && styles.entranceCardVip,
         ]}
@@ -512,7 +512,11 @@ export const RoomEntranceBanner = memo(function RoomEntranceBanner({
           </Text>
         </View>
         <View style={styles.entranceSpark}>
-          <Ionicons name={badgeIcon} size={17} color={badgeTint} />
+          {stylePreset?.iconLib === "mci" ? (
+            <MaterialCommunityIcons name={badgeIcon} size={17} color={badgeTint} />
+          ) : (
+            <Ionicons name={badgeIcon} size={17} color={badgeTint} />
+          )}
         </View>
       </LinearGradient>
     </Animated.View>
@@ -680,6 +684,7 @@ export const RoomMiniGamesSheet = memo(function RoomMiniGamesSheet({
 
   const rollDice = () => {
     if (diceRolling) return;
+    playSfx("dice");
     clearTimers();
     setDiceRolling(true);
     setSharedFeedback(false);
@@ -740,6 +745,7 @@ export const RoomMiniGamesSheet = memo(function RoomMiniGamesSheet({
 
   const spinWheel = () => {
     if (wheelSpinning) return;
+    playSfx("dice");
     clearTimers();
     setSharedFeedback(false);
 
@@ -1130,8 +1136,13 @@ export const RoomToolsSheet = memo(function RoomToolsSheet({
   visible = false,
   hasEvents = false,
   musicPlaying = false,
+  canModerate = false,
   requestCount = 0,
   onSelectGame,
+  onOpenLuckyPacket,
+  onOpenPk,
+  onOpenPoll,
+  onOpenTimer,
   onOpenEvents,
   onOpenMusic,
   onOpenSettings,
@@ -1139,8 +1150,60 @@ export const RoomToolsSheet = memo(function RoomToolsSheet({
   onDismiss,
 }) {
   const insets = useSafeAreaInsets();
+  const { sfxEnabled, toggleSfx } = useSfxEnabled();
 
   const partyItems = [
+    {
+      id: "lucky_packet",
+      label: "Şanslı Paket",
+      icon: "gift",
+      colors: ["#EF4444", "#B91C1C"],
+      iconColor: "#FEF08A",
+      badgeText: "YENİ",
+      onPress: () => {
+        onDismiss?.();
+        onOpenLuckyPacket?.();
+      },
+    },
+    ...(canModerate
+      ? [
+          {
+            id: "pk",
+            label: "PK",
+            icon: "sword-cross",
+            iconLib: "mci",
+            colors: ["#E11D48", "#2563EB"],
+            iconColor: "#FFFFFF",
+            badgeText: "YENİ",
+            onPress: () => {
+              onDismiss?.();
+              onOpenPk?.();
+            },
+          },
+          {
+            id: "poll",
+            label: "Oylama",
+            icon: "stats-chart",
+            colors: ["#0EA5E9", "#1D4ED8"],
+            iconColor: "#FFFFFF",
+            onPress: () => {
+              onDismiss?.();
+              onOpenPoll?.();
+            },
+          },
+          {
+            id: "timer",
+            label: "Geri Sayım",
+            icon: "hourglass",
+            colors: ["#F59E0B", "#D97706"],
+            iconColor: "#FFFBEB",
+            onPress: () => {
+              onDismiss?.();
+              onOpenTimer?.();
+            },
+          },
+        ]
+      : []),
     {
       id: "dice",
       label: "Şans Zarı",
@@ -1205,6 +1268,16 @@ export const RoomToolsSheet = memo(function RoomToolsSheet({
       },
     },
     {
+      id: "sfx",
+      label: sfxEnabled ? "Efekt Sesi" : "Ses Kapalı",
+      icon: sfxEnabled ? "volume-medium-outline" : "volume-mute-outline",
+      active: sfxEnabled,
+      iconColor: sfxEnabled ? "#86EFAC" : "#94A3B8",
+      onPress: () => {
+        toggleSfx();
+      },
+    },
+    {
       id: "settings",
       label: "Ayarlar",
       icon: "settings-outline",
@@ -1251,7 +1324,11 @@ export const RoomToolsSheet = memo(function RoomToolsSheet({
                     end={{ x: 1, y: 1 }}
                     style={styles.toolsOrbParty}
                   >
-                    <Ionicons name={item.icon} size={25} color={item.iconColor} />
+                    {item.iconLib === "mci" ? (
+                      <MaterialCommunityIcons name={item.icon} size={24} color={item.iconColor} />
+                    ) : (
+                      <Ionicons name={item.icon} size={25} color={item.iconColor} />
+                    )}
                   </LinearGradient>
                   {item.badgeText ? (
                     <View style={styles.toolsHotBadge}>
@@ -1266,7 +1343,7 @@ export const RoomToolsSheet = memo(function RoomToolsSheet({
             ))}
           </View>
 
-          <Text style={[styles.toolsSectionTitle, { marginTop: 18 }]}>Araçlar</Text>
+          <Text style={[styles.toolsSectionTitle, { marginTop: 12 }]}>Araçlar</Text>
           <View style={styles.toolsGrid}>
             {utilityItems.map((item) => (
               <Pressable
