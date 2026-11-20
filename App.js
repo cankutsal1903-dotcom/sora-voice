@@ -2886,7 +2886,12 @@ const Profile = memo(function Profile({
               >
                 <View style={styles.profileBannerCopy}>
                   <Text style={styles.profileBannerTitle}>Cüzdan</Text>
-                  <Text numberOfLines={1} style={styles.profileBannerBalance}>
+                  <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.76}
+                    style={styles.profileBannerBalance}
+                  >
                     {formatCredits(coins)} kredi
                   </Text>
                 </View>
@@ -3969,6 +3974,8 @@ const RoomSettingsSheet = memo(function RoomSettingsSheet({
 });
 
 const ROOM_GIFT_QUANTITIES = [1, 5, 10, 50, 100];
+const safeHexAccent = (hex) =>
+  typeof hex === "string" && /^#[0-9a-fA-F]{6}$/.test(hex.trim()) ? hex.trim() : COLORS.primary;
 
 const GiftSheet = memo(function GiftSheet({
   visible,
@@ -4147,6 +4154,7 @@ const GiftSheet = memo(function GiftSheet({
                 const active = selectedGift?.id === gift.id;
                 const lockedByFamily = Number(gift.minFamilyLevel || 0) > Number(userFamilyLevel || 0);
                 const totalCost = Number(gift.cost || 0) * quantity;
+                const accent = safeHexAccent(gift.color);
                 return (
                   <Pressable
                     key={gift.id}
@@ -4154,10 +4162,19 @@ const GiftSheet = memo(function GiftSheet({
                     style={({ pressed }) => [
                       styles.roomGiftGridCard,
                       active && styles.roomGiftGridCardActive,
+                      active && {
+                        borderColor: accent,
+                        backgroundColor: `${accent}16`,
+                      },
                       lockedByFamily && { opacity: 0.65 },
                       pressed && { transform: [{ scale: 0.98 }] },
                     ]}
                   >
+                    {active ? (
+                      <View style={[styles.roomGiftCheckBadge, { backgroundColor: accent }]}>
+                        <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+                      </View>
+                    ) : null}
                     <View style={{ marginBottom: 7 }}>
                       <SoraGiftArtwork
                         giftId={gift.id}
@@ -4174,7 +4191,7 @@ const GiftSheet = memo(function GiftSheet({
                       <Ionicons
                         name={lockedByFamily ? "lock-closed-outline" : "diamond"}
                         size={11}
-                        color="#2F80ED"
+                        color={lockedByFamily ? COLORS.muted : "#F59E0B"}
                       />
                       <Text numberOfLines={1} style={styles.giftCostText}>
                         {lockedByFamily
@@ -16674,10 +16691,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(47,128,237,0.22)",
   },
-  tabActivePillFill: {
-    flex: 1,
-    borderRadius: 15,
-  },
   tabItemActive: {
     backgroundColor: "transparent",
   },
@@ -17362,7 +17375,7 @@ const styles = StyleSheet.create({
   },
   roomSpeakerAvatarActive: { borderColor: COLORS.primary },
   roomSpeakerAvatarSpeaking: {
-    borderColor: "#4ADE80",
+    borderColor: "#38BDF8",
     borderWidth: 2.5,
   },
   roomSpeakerInitial: { color: "#FFFFFF", fontSize: 20, fontWeight: "900" },
@@ -19145,13 +19158,25 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 6,
     borderRadius: 18,
-    backgroundColor: COLORS.surfaceRaised,
+    backgroundColor: COLORS.surface,
     borderWidth: 1.5,
-    borderColor: COLORS.line,
+    borderColor: "rgba(203,218,236,0.82)",
+    position: "relative",
   },
   roomGiftGridCardActive: {
     backgroundColor: COLORS.primarySoft,
     borderColor: COLORS.primary,
+  },
+  roomGiftCheckBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
   },
   roomGiftQtyHeader: {
     flexDirection: "row",

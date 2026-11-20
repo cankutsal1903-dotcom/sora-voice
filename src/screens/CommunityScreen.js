@@ -56,6 +56,8 @@ import { SoraWealthBadge } from "../ui/SoraWealthTier";
 import { useGiftSpentMap } from "../data/wealthStore";
 
 const GIFT_QUANTITIES = [1, 5, 10, 50, 100];
+const safeHexAccent = (hex) =>
+  typeof hex === "string" && /^#[0-9a-fA-F]{6}$/.test(hex.trim()) ? hex.trim() : COLORS.primary;
 
 const resolveGiftIcon = (iconName) => {
   if (!iconName || iconName === "crown") return "trophy";
@@ -1911,6 +1913,7 @@ export const CommunityScreen = memo(function CommunityScreen({
                     Number(gift.minFamilyLevel || 0) > Number(myFamily?.level || 1);
                   const totalCost = Number(gift.cost || 0) * giftQuantity;
                   const xpGain = Math.floor(totalCost / FAMILY_COINS_PER_XP);
+                  const accent = safeHexAccent(gift.color);
                   return (
                     <Pressable
                       key={gift.id}
@@ -1919,10 +1922,19 @@ export const CommunityScreen = memo(function CommunityScreen({
                       style={({ pressed }) => [
                         styles.giftItemCard,
                         active && styles.giftItemCardActive,
+                        active && {
+                          borderColor: accent,
+                          backgroundColor: `${accent}16`,
+                        },
                         lockedByLevel && { opacity: 0.62 },
                         pressed && { transform: [{ scale: 0.98 }] },
                       ]}
                     >
+                      {active ? (
+                        <View style={[styles.giftItemCheckBadge, { backgroundColor: accent }]}>
+                          <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+                        </View>
+                      ) : null}
                       <View style={{ marginBottom: 7 }}>
                         <SoraGiftArtwork
                           giftId={gift.id}
@@ -1939,7 +1951,7 @@ export const CommunityScreen = memo(function CommunityScreen({
                         <Ionicons
                           name={lockedByLevel ? "lock-closed-outline" : "diamond"}
                           size={11}
-                          color={COLORS.primary}
+                          color={lockedByLevel ? COLORS.muted : "#F59E0B"}
                         />
                         <Text numberOfLines={1} style={styles.giftItemCostText}>
                           {lockedByLevel
@@ -3039,15 +3051,27 @@ const styles = StyleSheet.create({
     width: "31.5%",
     paddingVertical: 11,
     paddingHorizontal: 8,
-    borderRadius: 16,
-    backgroundColor: COLORS.background,
+    borderRadius: 17,
+    backgroundColor: COLORS.surface,
     borderWidth: 1.5,
-    borderColor: COLORS.lineSoft,
+    borderColor: "rgba(203,218,236,0.82)",
     alignItems: "center",
+    position: "relative",
   },
   giftItemCardActive: {
     backgroundColor: COLORS.primarySoft,
     borderColor: COLORS.primary,
+  },
+  giftItemCheckBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
   },
   giftSendBar: {
     flexDirection: "row",
