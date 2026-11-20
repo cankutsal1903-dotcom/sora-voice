@@ -965,7 +965,11 @@ export const RoomMiniGamesSheet = memo(function RoomMiniGamesSheet({
 
 const styles = StyleSheet.create({
   floatingLayer: {
-    ...StyleSheet.absoluteFillObject,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     zIndex: 35,
     elevation: 14,
   },
@@ -1274,9 +1278,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 5,
+    gap: 4,
     paddingVertical: 9,
-    paddingHorizontal: 8,
+    paddingHorizontal: 5,
     borderRadius: 14,
     backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
@@ -1288,7 +1292,7 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     color: "#9BB2D1",
-    fontSize: 11.5,
+    fontSize: 10.5,
     fontWeight: "700",
   },
   tabLabelActive: {

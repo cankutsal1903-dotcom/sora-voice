@@ -179,12 +179,12 @@ const GiftScene = memo(function GiftScene({ gift, onComplete }) {
             colors={["rgba(8, 15, 34, 0.78)", "rgba(12, 24, 52, 0.56)", `${recipe.color}28`]}
             start={{ x: 0.2, y: 0 }}
             end={{ x: 0.8, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
           />
         </Animated.View>
         {!reducedMotion ? <>
           <Animated.View style={[styles.aura, { width: artworkSize * 1.5, height: artworkSize * 1.5, borderRadius: artworkSize, opacity: interpolate(progress, [0, 0.5, 0.28, 0.42, 0.2, 0]), transform: [{ scale: interpolate(progress, [0.3, 0.9, 1.2, 1, 1.1, 1.5]) }] }]}>
-            <LinearGradient colors={[`${recipe.color}42`, `${recipe.color}06`, "transparent"]} style={StyleSheet.absoluteFillObject} />
+            <LinearGradient colors={[`${recipe.color}42`, `${recipe.color}06`, "transparent"]} style={StyleSheet.absoluteFill} />
           </Animated.View>
           {Array.from({ length: recipe.rings || 0 }, (_, ring) => (
             <Animated.View key={`ring-${ring}`} style={[styles.ring, { width: artworkSize, height: artworkSize, borderRadius: artworkSize, borderColor: ring % 2 ? recipe.accent : recipe.color, opacity: interpolate(progress, [0, 0.7 - ring * 0.1, 0.4, 0.22, 0.08, 0]), transform: [{ scale: interpolate(progress, [0.15 + ring * 0.15, 0.6 + ring * 0.2, 1 + ring * 0.25, 1.35 + ring * 0.3, 1.7 + ring * 0.35, 2 + ring * 0.4]) }, { scaleY: recipe.motion === "waterfall" ? 0.35 : 1 }] }]} />
@@ -194,12 +194,12 @@ const GiftScene = memo(function GiftScene({ gift, onComplete }) {
           )) : null}
           {recipe.beams ? [-1, 1].map((side) => (
             <Animated.View key={`beam-${side}`} style={[styles.beam, { width: artworkSize * 0.55, height: artworkSize * 1.65, opacity: interpolate(progress, [0, 0.1, 0.35, 0.18, 0.3, 0]), transform: [{ rotate: interpolate(progress, [side * 55, side * 27, side * 12, side * 32, side * 17, side * 45].map((n) => `${n}deg`)) }] }]}>
-              <LinearGradient colors={[`${recipe.accent}D0`, `${recipe.color}38`, "transparent"]} style={StyleSheet.absoluteFillObject} />
+              <LinearGradient colors={[`${recipe.accent}D0`, `${recipe.color}38`, "transparent"]} style={StyleSheet.absoluteFill} />
             </Animated.View>
           )) : null}
           {recipe.curtains ? [-1, 1].map((side) => (
             <Animated.View key={`curtain-${side}`} style={[styles.curtain, { width: unit * 0.42, height: artworkSize * 1.3, opacity, transform: [{ translateX: interpolate(progress, [side * unit * 0.1, side * unit * 0.17, side * unit * 0.37, side * unit * 0.4, side * unit * 0.4, side * unit * 0.45]) }] }]}>
-              <LinearGradient colors={["#1C3C82", "#4B73CC", "#152957", "#3E61B5"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[StyleSheet.absoluteFillObject, { borderBottomWidth: 2, borderBottomColor: recipe.color }]} />
+              <LinearGradient colors={["#1C3C82", "#4B73CC", "#152957", "#3E61B5"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[StyleSheet.absoluteFill, { borderBottomWidth: 2, borderBottomColor: recipe.color }]} />
             </Animated.View>
           )) : null}
           {Array.from({ length: count }, (_, index) => {
