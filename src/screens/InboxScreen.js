@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -29,15 +29,30 @@ import { FloatingGlow, ShimmerSweep } from "../ui/SoraFx";
 import { SoraWealthBadge } from "../ui/SoraWealthTier";
 import { useGiftSpentMap } from "../data/wealthStore";
 
+const TR_TIME_FMT = new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", minute: "2-digit" });
+const TR_DAY_FMT = new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short" });
+
+let cachedInboxUserId = null;
+let cachedInboxConversations = null;
+const cachedDirectMessages = new Map();
+
+function resetInboxCachesIfUserChanged(userId) {
+  if (userId && cachedInboxUserId && cachedInboxUserId !== userId) {
+    cachedInboxConversations = null;
+    cachedDirectMessages.clear();
+  }
+  if (userId) cachedInboxUserId = userId;
+}
+
 const formatMessageTime = (value) => {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   const today = new Date();
   if (date.toDateString() === today.toDateString()) {
-    return new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", minute: "2-digit" }).format(date);
+    return TR_TIME_FMT.format(date);
   }
-  return new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short" }).format(date);
+  return TR_DAY_FMT.format(date);
 };
 
 const isNetworkError = (error) => {
@@ -63,7 +78,7 @@ const friendlyError = (error) => {
   return message;
 };
 
-function Avatar({ name, color, size = 48, uri = null }) {
+const Avatar = memo(function Avatar({ name, color, size = 48, uri = null }) {
   return (
     <View style={[styles.avatar, { width: size, height: size, borderRadius: size * 0.34, backgroundColor: color || "#7FCBEA", overflow: "hidden" }]}>
       {uri ? (
@@ -73,7 +88,7 @@ function Avatar({ name, color, size = 48, uri = null }) {
       )}
     </View>
   );
-}
+});
 
 function EmptyState({ icon, title, description, action, onAction }) {
   return (
@@ -123,16 +138,19 @@ function EmptyState({ icon, title, description, action, onAction }) {
   );
 }
 
-export function InboxScreen({ currentUserId, profile }) {
+export const InboxScreen = memo(function InboxScreen({ currentUserId, profile }) {
+  resetInboxCachesIfUserChanged(currentUserId);
   const insets = useSafeAreaInsets();
   const keyboard = useKeyboardInset();
   const chatScrollRef = useRef(null);
-  const [conversations, setConversations] = useState([]);
+  const [conversations, setConversations] = useState(
+    () => (Array.isArray(cachedInboxConversations) ? cachedInboxConversations : []),
+  );
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !Array.isArray(cachedInboxConversations));
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
@@ -165,6 +183,8 @@ export function InboxScreen({ currentUserId, profile }) {
         await new Promise((resolve) => setTimeout(resolve, 750));
         nextConversations = await listDirectConversations();
       }
+      cachedInboxUserId = currentUserId;
+      cachedInboxConversations = nextConversations;
       setConversations(nextConversations);
       setSelectedConversation((current) => current ? nextConversations.find((item) => item.id === current.id) || current : current);
     } catch (loadError) {
@@ -175,28 +195,42 @@ export function InboxScreen({ currentUserId, profile }) {
   }, [currentUserId]);
 
   useEffect(() => {
-    loadConversations();
+    loadConversations({ silent: Array.isArray(cachedInboxConversations) });
   }, [loadConversations]);
 
   useEffect(() => {
     if (!selectedConversation?.id || !currentUserId) return undefined;
     let active = true;
-    setMessagesLoading(true);
+    const convId = selectedConversation.id;
+    const cachedMsgs = cachedDirectMessages.get(convId);
+    if (cachedMsgs) {
+      setMessages(cachedMsgs);
+    }
+    const showSpinner = !cachedMsgs;
+    if (showSpinner) setMessagesLoading(true);
     setError("");
-    listDirectMessages({ conversationId: selectedConversation.id, currentUserId })
-      .then((nextMessages) => { if (active) setMessages(nextMessages); })
-      .catch((loadError) => { if (active) setError(friendlyError(loadError)); })
-      .finally(() => { if (active) setMessagesLoading(false); });
+    listDirectMessages({ conversationId: convId, currentUserId })
+      .then((nextMessages) => {
+        cachedDirectMessages.set(convId, nextMessages);
+        if (active) setMessages(nextMessages);
+      })
+      .catch((loadError) => { if (active && !cachedMsgs) setError(friendlyError(loadError)); })
+      .finally(() => { if (active && showSpinner) setMessagesLoading(false); });
 
     const unsubscribe = subscribeToDirectMessages({
-      conversationId: selectedConversation.id,
+      conversationId: convId,
       onMessage: (message) => {
         if (!active) return;
-        setMessages((current) => current.some((item) => item.id === message.id) ? current : [...current, {
-          ...message,
-          own: message.userId === currentUserId,
-          sender: message.userId === currentUserId ? (profile?.name || "Sen") : (selectedConversation?.name || "Sora kullanıcısı"),
-        }]);
+        setMessages((current) => {
+          if (current.some((item) => item.id === message.id)) return current;
+          const next = [...current, {
+            ...message,
+            own: message.userId === currentUserId,
+            sender: message.userId === currentUserId ? (profile?.name || "Sen") : (selectedConversation?.name || "Sora kullanıcısı"),
+          }];
+          cachedDirectMessages.set(convId, next);
+          return next;
+        });
         loadConversations({ silent: true });
       },
     });
@@ -220,7 +254,7 @@ export function InboxScreen({ currentUserId, profile }) {
 
   const openConversation = (conversation) => {
     setSelectedConversation(conversation);
-    setMessages([]);
+    setMessages(cachedDirectMessages.get(conversation?.id) || []);
     setDraft("");
     setError("");
   };
@@ -256,7 +290,12 @@ export function InboxScreen({ currentUserId, profile }) {
     try {
       const sentMessage = await sendDirectMessage({ conversationId: targetConvId, userId: currentUserId, text });
       if (selectedConversationIdRef.current === targetConvId) {
-        setMessages((current) => current.some((item) => item.id === sentMessage.id) ? current : [...current, { ...sentMessage, sender: profile?.name || "Sen" }]);
+        setMessages((current) => {
+          if (current.some((item) => item.id === sentMessage.id)) return current;
+          const next = [...current, { ...sentMessage, sender: profile?.name || "Sen" }];
+          cachedDirectMessages.set(targetConvId, next);
+          return next;
+        });
       }
       loadConversations({ silent: true });
     } catch (sendError) {
@@ -495,7 +534,7 @@ export function InboxScreen({ currentUserId, profile }) {
                           {conversation.name}
                         </Text>
                         {partnerSpent >= 1000000 ? (
-                          <SoraWealthBadge spent={partnerSpent} size="sm" />
+                          <SoraWealthBadge spent={partnerSpent} size="sm" animated={false} />
                         ) : null}
                       </View>
                       <Text style={styles.conversationTime}>
@@ -578,7 +617,7 @@ export function InboxScreen({ currentUserId, profile }) {
       </Modal>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },

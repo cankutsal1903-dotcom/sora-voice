@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Image,
   Modal,
   Platform,
@@ -30,6 +31,7 @@ import {
   joinFamily,
   leaveFamily,
   listFamilies,
+  listFamilyMembersLite,
   listFamilyMessages,
   listRoomGiftCatalog,
   sendFamilyGift,
@@ -67,17 +69,58 @@ const createUuid = () =>
     return (ch === "x" ? rand : (rand & 0x3) | 0x8).toString(16);
   });
 
+const TR_NUMBER_FMT = new Intl.NumberFormat("tr-TR");
+const TR_TIME_FMT = new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", minute: "2-digit" });
+
 const formatCredits = (value) =>
-  new Intl.NumberFormat("tr-TR").format(Math.max(0, Math.floor(Number(value) || 0)));
+  TR_NUMBER_FMT.format(Math.max(0, Math.floor(Number(value) || 0)));
 
 const formatMessageTime = (iso) => {
   if (!iso) return "";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", minute: "2-digit" }).format(date);
+  return TR_TIME_FMT.format(date);
 };
 
-function FamilyAvatar({ uri, name, size = 52, radius = 18 }) {
+// Modül seviyesi önbellek — sekme geçişlerinde ve yeniden açılışta 0ms anlık açılış
+let cachedFamiliesUserId = null;
+let cachedFamiliesList = null;
+const familyMessagesCache = new Map();
+const familyMembersCache = new Map();
+const familyPrefetchInFlight = new Set();
+
+function resetFamilyCachesIfUserChanged(userId) {
+  if (userId && cachedFamiliesUserId && cachedFamiliesUserId !== userId) {
+    cachedFamiliesList = null;
+    familyMessagesCache.clear();
+    familyMembersCache.clear();
+    familyPrefetchInFlight.clear();
+  }
+  if (userId) cachedFamiliesUserId = userId;
+}
+
+export function prefetchFamilyChat(communityId, currentUserId) {
+  if (!communityId || !currentUserId) return;
+  resetFamilyCachesIfUserChanged(currentUserId);
+  if (familyMessagesCache.has(communityId) || familyPrefetchInFlight.has(communityId)) return;
+  familyPrefetchInFlight.add(communityId);
+  Promise.all([
+    listFamilyMessages({ communityId, currentUserId, limit: 50 })
+      .then((rows) => {
+        if (Array.isArray(rows)) familyMessagesCache.set(communityId, rows);
+      })
+      .catch(() => undefined),
+    listFamilyMembersLite(communityId)
+      .then((members) => {
+        if (Array.isArray(members)) familyMembersCache.set(communityId, members);
+      })
+      .catch(() => undefined),
+  ]).finally(() => {
+    familyPrefetchInFlight.delete(communityId);
+  });
+}
+
+const FamilyAvatar = memo(function FamilyAvatar({ uri, name, size = 52, radius = 18 }) {
   const initial = String(name || "A").trim().charAt(0).toUpperCase() || "A";
   if (uri) {
     return (
@@ -110,9 +153,9 @@ function FamilyAvatar({ uri, name, size = 52, radius = 18 }) {
       </Text>
     </LinearGradient>
   );
-}
+});
 
-function MemberAvatar({ uri, name, color = "#2F80ED", size = 38 }) {
+const MemberAvatar = memo(function MemberAvatar({ uri, name, color = "#2F80ED", size = 38 }) {
   const initial = String(name || "S").trim().charAt(0).toUpperCase() || "S";
   if (uri) {
     return (
@@ -147,11 +190,243 @@ function MemberAvatar({ uri, name, color = "#2F80ED", size = 38 }) {
       </Text>
     </View>
   );
-}
+});
 
-export function CommunityScreen({
+const FamilyMessageRow = memo(function FamilyMessageRow({
+  msg,
+  knownMember,
+  senderSpent,
+  profile,
+  onOpenUserProfile,
+  onOpenGiftSheet,
+}) {
+  const isGift = msg.kind === "gift";
+  const meta = msg.metadata || {};
+  const giftColor = meta.gift_color || COLORS.primary;
+  const giftIcon = resolveGiftIcon(meta.gift_icon);
+  const giftQty = Number(meta.quantity) || 1;
+  const giftCost = Number(meta.total_cost) || 0;
+  const giftXp = Number(meta.awarded_xp) || 0;
+
+  const resolvedAvatarUrl = msg.own
+    ? (profile?.avatarUrl || msg.senderAvatarUrl || knownMember?.avatarUrl || null)
+    : (msg.senderAvatarUrl || knownMember?.avatarUrl || null);
+  const resolvedSenderName = msg.own
+    ? (profile?.name || msg.senderName || "Sen")
+    : (msg.senderName || knownMember?.name || "Aile üyesi");
+  const resolvedSenderColor = msg.own
+    ? (profile?.color || msg.senderColor || COLORS.primary)
+    : (msg.senderColor || knownMember?.color || COLORS.primary);
+
+  const handleOpenProfile = useCallback(() => {
+    if (msg.userId) onOpenUserProfile?.(msg.userId);
+  }, [msg.userId, onOpenUserProfile]);
+
+  const handleLongPressGift = useCallback(() => {
+    if (msg.userId) onOpenGiftSheet?.(msg.userId);
+  }, [msg.userId, onOpenGiftSheet]);
+
+  const avatarNode = (
+    <Pressable
+      onPress={handleOpenProfile}
+      onLongPress={handleLongPressGift}
+      delayLongPress={240}
+      style={styles.msgAvatarPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${resolvedSenderName} profili`}
+    >
+      <MemberAvatar
+        uri={resolvedAvatarUrl}
+        name={resolvedSenderName}
+        color={resolvedSenderColor}
+        size={38}
+      />
+    </Pressable>
+  );
+
+  return (
+    <View style={[styles.msgRow, msg.own && styles.msgRowOwn]}>
+      {!msg.own ? avatarNode : null}
+
+      <View style={[styles.msgContentCol, msg.own && styles.msgContentColOwn]}>
+        {(!msg.own || senderSpent >= 1000000) ? (
+          <View
+            style={[
+              styles.msgSenderRow,
+              msg.own && { flexDirection: "row-reverse" },
+            ]}
+          >
+            <Text numberOfLines={1} style={styles.msgSender}>
+              {resolvedSenderName}
+            </Text>
+            {senderSpent >= 1000000 ? (
+              <SoraWealthBadge spent={senderSpent} size="sm" animated={false} />
+            ) : null}
+          </View>
+        ) : null}
+
+        {isGift ? (
+          <Pressable
+            onLongPress={handleLongPressGift}
+            delayLongPress={240}
+            style={({ pressed }) => [
+              styles.giftMsgCard,
+              msg.own && styles.giftMsgCardOwn,
+              pressed && { opacity: 0.9 },
+            ]}
+          >
+            <SoraGiftArtwork
+              giftId={meta.gift_id}
+              giftName={meta.gift_name}
+              fallbackIcon={giftIcon}
+              fallbackColor={giftColor}
+              size={42}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.giftMsgTitle}>
+                {giftQty > 1 ? `${giftQty}x ` : ""}
+                {meta.gift_name || "Aile Hediyesi"}
+              </Text>
+              <Text style={styles.giftMsgBody}>{msg.text}</Text>
+              <View style={styles.giftMsgMetaRow}>
+                {giftCost > 0 ? (
+                  <Text style={styles.giftMsgMetaChip}>
+                    {formatCredits(giftCost)} kredi
+                  </Text>
+                ) : null}
+                {giftXp > 0 ? (
+                  <Text style={styles.giftMsgXpChip}>
+                    +{formatCredits(giftXp)} XP
+                  </Text>
+                ) : null}
+                <Text style={styles.giftMsgTime}>{formatMessageTime(msg.createdAt)}</Text>
+              </View>
+            </View>
+          </Pressable>
+        ) : (
+          <Pressable
+            onLongPress={handleLongPressGift}
+            delayLongPress={240}
+            style={({ pressed }) => [
+              styles.msgBubble,
+              msg.own ? styles.msgBubbleOwn : styles.msgBubbleOther,
+              pressed && { opacity: 0.88 },
+            ]}
+          >
+            <View style={styles.msgInlineRow}>
+              <Text style={[styles.msgText, msg.own && styles.msgTextOwn]}>
+                {msg.text}
+              </Text>
+              <Text style={[styles.msgTime, msg.own && styles.msgTimeOwn]}>
+                {formatMessageTime(msg.createdAt)}
+              </Text>
+            </View>
+          </Pressable>
+        )}
+      </View>
+
+      {msg.own ? avatarNode : null}
+    </View>
+  );
+});
+
+const FamilyChatComposer = memo(function FamilyChatComposer({
   currentUserId,
   profile,
+  sendingMessage,
+  onSendText,
+  onOpenGiftSheet,
+  onOpenUserProfile,
+  bottomMargin,
+}) {
+  const [draft, setDraft] = useState("");
+  const canSend = !sendingMessage && !!draft.trim();
+
+  const handleSend = useCallback(async () => {
+    const cleanText = draft.trim();
+    if (!cleanText || sendingMessage) return;
+    const ok = await onSendText(cleanText);
+    if (ok) setDraft("");
+  }, [draft, onSendText, sendingMessage]);
+
+  const handleAvatarPress = useCallback(() => {
+    if (currentUserId) onOpenUserProfile?.(currentUserId);
+  }, [currentUserId, onOpenUserProfile]);
+
+  const handleGiftPress = useCallback(() => {
+    onOpenGiftSheet?.(null);
+  }, [onOpenGiftSheet]);
+
+  return (
+    <View style={[styles.composerRow, { marginBottom: bottomMargin }]}>
+      <Pressable
+        onPress={handleAvatarPress}
+        style={styles.composerAvatarWrap}
+        accessibilityRole="button"
+        accessibilityLabel="Profil fotoğrafın"
+      >
+        <MemberAvatar
+          uri={profile?.avatarUrl || null}
+          name={profile?.name || "Sen"}
+          color={profile?.color || COLORS.primary}
+          size={38}
+        />
+      </Pressable>
+      <TextInput
+        value={draft}
+        onChangeText={setDraft}
+        placeholder="Ailene mesaj yaz..."
+        placeholderTextColor={COLORS.muted}
+        maxLength={1000}
+        multiline
+        style={styles.composerInput}
+      />
+      <Pressable
+        onPress={handleGiftPress}
+        accessibilityLabel="Hediye kutusu"
+        style={({ pressed }) => [
+          styles.composerGiftBtn,
+          pressed && { transform: [{ scale: 0.92 }] },
+        ]}
+      >
+        <LinearGradient
+          colors={["#52A5FF", "#2F80ED", "#7C3AED"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+        />
+        <Ionicons name="gift" size={19} color="#FFFFFF" />
+      </Pressable>
+      <Pressable
+        disabled={!canSend}
+        onPress={handleSend}
+        accessibilityLabel="Mesaj gönder"
+        style={({ pressed }) => [
+          styles.sendBtn,
+          !canSend && styles.sendBtnDisabled,
+          pressed && { transform: [{ scale: 0.92 }] },
+        ]}
+      >
+        <LinearGradient
+          colors={["#52A5FF", "#2F80ED", "#1D5FBF"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+        />
+        {sendingMessage ? (
+          <ActivityIndicator size="small" color={COLORS.primaryInk} />
+        ) : (
+          <Ionicons name="send" size={17} color={COLORS.primaryInk} />
+        )}
+      </Pressable>
+    </View>
+  );
+});
+
+export const CommunityScreen = memo(function CommunityScreen({
+  currentUserId,
+  profile,
+  initialFamily = null,
   coins = 0,
   coinBlastEvent = null,
   onReserveGiftSpend,
@@ -164,10 +439,18 @@ export function CommunityScreen({
   onFamilyChange,
   onOpenUserProfile,
 }) {
+  resetFamilyCachesIfUserChanged(currentUserId);
   const insets = useSafeAreaInsets();
   const keyboard = useKeyboardInset();
-  const [families, setFamilies] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [families, setFamilies] = useState(() => {
+    if (Array.isArray(cachedFamiliesList) && cachedFamiliesList.length > 0) {
+      return cachedFamiliesList;
+    }
+    return initialFamily ? [{ ...initialFamily, joined: true }] : [];
+  });
+  const [loading, setLoading] = useState(
+    () => !(Array.isArray(cachedFamiliesList) && cachedFamiliesList.length > 0) && !initialFamily,
+  );
   const [error, setError] = useState("");
 
   // Arama ve keşfet
@@ -205,16 +488,28 @@ export function CommunityScreen({
   const [savingEdit, setSavingEdit] = useState(false);
 
   // Aile sohbeti ve üyeler
-  const [messages, setMessages] = useState([]);
-  const [familyMembers, setFamilyMembers] = useState([]);
+  const initialFamilyId =
+    (Array.isArray(cachedFamiliesList) ? cachedFamiliesList.find((item) => item.joined)?.id : null)
+    || initialFamily?.id
+    || null;
+  const [messages, setMessages] = useState(
+    () => (initialFamilyId ? familyMessagesCache.get(initialFamilyId) || [] : []),
+  );
+  const [familyMembers, setFamilyMembers] = useState(
+    () => (initialFamilyId ? familyMembersCache.get(initialFamilyId) || [] : []),
+  );
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [messagesError, setMessagesError] = useState("");
-  const [draft, setDraft] = useState("");
   const [sendingMessage, setSendingMessage] = useState(false);
   const sendInFlightRef = useRef(false);
   const draftMessageIdRef = useRef(null);
   const draftFingerprintRef = useRef("");
   const chatScrollRef = useRef(null);
+  const memberByIdRef = useRef(new Map());
+
+  const scrollToLatest = useCallback((animated = true) => {
+    chatScrollRef.current?.scrollToOffset?.({ offset: 0, animated });
+  }, []);
 
   // Aile hediye kutusu
   const [giftCatalog, setGiftCatalog] = useState(DEFAULT_GIFT_CATALOG);
@@ -248,14 +543,21 @@ export function CommunityScreen({
   }, [myFamily?.id]);
 
   useEffect(() => {
+    if (initialFamily?.id && families.length === 0) {
+      setFamilies([{ ...initialFamily, joined: true }]);
+      setLoading(false);
+    }
+  }, [initialFamily, families.length]);
+
+  useEffect(() => {
     if (keyboard.visible && myFamily?.id) {
       const timer = setTimeout(() => {
-        chatScrollRef.current?.scrollToEnd?.({ animated: true });
+        scrollToLatest(true);
       }, 80);
       return () => clearTimeout(timer);
     }
     return undefined;
-  }, [keyboard.visible, myFamily?.id]);
+  }, [keyboard.visible, myFamily?.id, scrollToLatest]);
 
   useEffect(() => {
     onFamilyChange?.(myFamily);
@@ -267,16 +569,20 @@ export function CommunityScreen({
     setError("");
     try {
       const rows = await listFamilies(currentUserId);
+      cachedFamiliesUserId = currentUserId;
+      cachedFamiliesList = rows;
       setFamilies(rows);
     } catch (loadErr) {
       setError(describeFamilyError(loadErr));
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [currentUserId, discoverModalOpen]);
+  }, [currentUserId]);
 
   useEffect(() => {
-    loadFamilies();
+    const hasSeed =
+      (Array.isArray(cachedFamiliesList) && cachedFamiliesList.length > 0) || Boolean(initialFamily);
+    loadFamilies({ silent: hasSeed });
     if (!currentUserId) return undefined;
     const unsubscribe = subscribeToCommunities(() => {
       loadFamilies({ silent: true });
@@ -297,42 +603,44 @@ export function CommunityScreen({
     return () => {
       active = false;
     };
-  }, [currentUserId, discoverModalOpen]);
+  }, [currentUserId]);
 
   const loadMessages = useCallback(async (communityId, { silent = false } = {}) => {
     if (!communityId || !currentUserId) return;
-    if (!silent) setMessagesLoading(true);
-    setMessagesError("");
-    try {
-      const [rows, details] = await Promise.all([
-        listFamilyMessages({ communityId, currentUserId }),
-        getFamilyDetails(communityId, currentUserId).catch(() => null),
-      ]);
-      setMessages(rows);
-      if (details?.members) {
-        setFamilyMembers(details.members);
-      }
-      if (details?.family) {
-        setFamilies((prev) =>
-          prev.map((item) =>
-            item.id === communityId
-              ? {
-                  ...item,
-                  xp: details.family.xp,
-                  level: details.family.level,
-                  giftCoinsTotal: details.family.giftCoinsTotal,
-                  memberCount: details.family.memberCount,
-                }
-              : item,
-          ),
-        );
-      }
-    } catch (msgErr) {
-      setMessagesError(describeFamilyError(msgErr, "Aile sohbeti yüklenemedi."));
-    } finally {
-      if (!silent) setMessagesLoading(false);
+    const cachedMsgs = familyMessagesCache.get(communityId);
+    const cachedMems = familyMembersCache.get(communityId);
+    if (cachedMsgs) {
+      setMessages(cachedMsgs);
     }
-  }, [currentUserId, discoverModalOpen]);
+    if (cachedMems) {
+      setFamilyMembers(cachedMems);
+    }
+    const showSpinner = !silent && !cachedMsgs;
+    if (showSpinner) setMessagesLoading(true);
+    setMessagesError("");
+
+    // Üye listesini sohbeti bekletmeden paralel yükle (tek hafif sorgu)
+    listFamilyMembersLite(communityId)
+      .then((members) => {
+        if (Array.isArray(members)) {
+          familyMembersCache.set(communityId, members);
+          setFamilyMembers(members);
+        }
+      })
+      .catch(() => undefined);
+
+    try {
+      const rows = await listFamilyMessages({ communityId, currentUserId, limit: 50 });
+      familyMessagesCache.set(communityId, rows);
+      setMessages(rows);
+    } catch (msgErr) {
+      if (!cachedMsgs) {
+        setMessagesError(describeFamilyError(msgErr, "Aile sohbeti yüklenemedi."));
+      }
+    } finally {
+      if (showSpinner) setMessagesLoading(false);
+    }
+  }, [currentUserId]);
 
   useEffect(() => {
     if (!myFamily?.id || !currentUserId) {
@@ -342,8 +650,9 @@ export function CommunityScreen({
       return undefined;
     }
     loadMessages(myFamily.id);
+    const communityId = myFamily.id;
     const unsubscribe = subscribeToFamilyMessages({
-      communityId: myFamily.id,
+      communityId,
       onMessage: (incoming) => {
         if (incoming.kind === "gift" && incoming.metadata?.gift_id) {
           const meta = incoming.metadata;
@@ -356,19 +665,20 @@ export function CommunityScreen({
             eventId: incoming.id,
           });
         }
+        const isOwn = incoming.userId === currentUserId;
+        const known = incoming.userId ? memberByIdRef.current.get(incoming.userId) : null;
         setMessages((prev) => {
           if (prev.some((item) => item.id === incoming.id)) return prev;
-          const isOwn = incoming.userId === currentUserId;
-          return [
+          const next = [
             ...prev,
             {
               id: incoming.id,
               communityId: incoming.communityId,
               userId: incoming.userId,
-              senderName: isOwn ? (profile?.name || "Sen") : null,
-              senderHandle: isOwn ? (profile?.handle || "sora") : "uye",
-              senderColor: isOwn ? (profile?.color || COLORS.primary) : COLORS.primary,
-              senderAvatarUrl: isOwn ? (profile?.avatarUrl || null) : null,
+              senderName: isOwn ? (profile?.name || "Sen") : (known?.name || null),
+              senderHandle: isOwn ? (profile?.handle || "sora") : (known?.handle || "uye"),
+              senderColor: isOwn ? (profile?.color || COLORS.primary) : (known?.color || COLORS.primary),
+              senderAvatarUrl: isOwn ? (profile?.avatarUrl || null) : (known?.avatarUrl || null),
               text: incoming.text,
               kind: incoming.kind || "text",
               metadata: incoming.metadata || {},
@@ -376,9 +686,18 @@ export function CommunityScreen({
               createdAt: incoming.createdAt,
             },
           ];
+          familyMessagesCache.set(communityId, next);
+          return next;
         });
-        if (incoming.userId !== currentUserId) {
-          loadMessages(myFamily.id, { silent: true });
+        if (!isOwn && !known) {
+          listFamilyMembersLite(communityId)
+            .then((members) => {
+              if (Array.isArray(members)) {
+                familyMembersCache.set(communityId, members);
+                setFamilyMembers(members);
+              }
+            })
+            .catch(() => undefined);
         }
       },
     });
@@ -455,9 +774,12 @@ export function CommunityScreen({
     );
     setComboState(null);
     setGiftSheetOpen(true);
-    getFamilyDetails(myFamily.id, currentUserId)
-      .then((details) => {
-        if (details?.members) setFamilyMembers(details.members);
+    listFamilyMembersLite(myFamily.id)
+      .then((members) => {
+        if (Array.isArray(members)) {
+          familyMembersCache.set(myFamily.id, members);
+          setFamilyMembers(members);
+        }
       })
       .catch(() => undefined);
   }, [currentUserId, giftCatalog, giftRecipients, myFamily?.id]);
@@ -510,13 +832,14 @@ export function CommunityScreen({
       });
 
       if (result.messageId) {
+        const communityId = myFamily.id;
         setMessages((prev) => {
           if (prev.some((item) => item.id === result.messageId)) return prev;
-          return [
+          const next = [
             ...prev,
             {
               id: result.messageId,
-              communityId: myFamily.id,
+              communityId,
               userId: currentUserId,
               senderName: profile?.name || "Sen",
               senderHandle: profile?.handle || "sora",
@@ -529,11 +852,13 @@ export function CommunityScreen({
               createdAt: result.createdAt,
             },
           ];
+          familyMessagesCache.set(communityId, next);
+          return next;
         });
       }
 
-      setFamilies((prev) =>
-        prev.map((item) =>
+      setFamilies((prev) => {
+        const next = prev.map((item) =>
           item.id === myFamily.id
             ? {
                 ...item,
@@ -545,11 +870,13 @@ export function CommunityScreen({
                     : item.giftCoinsTotal,
               }
             : item,
-        ),
-      );
+        );
+        cachedFamiliesList = next;
+        return next;
+      });
 
       requestAnimationFrame(() => {
-        chatScrollRef.current?.scrollToEnd?.({ animated: true });
+        scrollToLatest(true);
       });
       if (recipient.userId === currentUserId) {
         const blast = await claimSelfGiftBlast(requestId).catch(() => null);
@@ -927,10 +1254,10 @@ export function CommunityScreen({
     savingEdit,
   ]);
 
-  const handleSendMessage = useCallback(async () => {
-    if (!myFamily?.id || sendInFlightRef.current || sendingMessage) return;
-    const cleanText = draft.trim();
-    if (!cleanText) return;
+  const handleSendText = useCallback(async (rawText) => {
+    if (!myFamily?.id || sendInFlightRef.current || sendingMessage) return false;
+    const cleanText = String(rawText || "").trim();
+    if (!cleanText) return false;
 
     sendInFlightRef.current = true;
     setSendingMessage(true);
@@ -939,17 +1266,17 @@ export function CommunityScreen({
         draftFingerprintRef.current = cleanText;
         draftMessageIdRef.current = createUuid();
       }
+      const communityId = myFamily.id;
       const sent = await sendFamilyMessage({
-        communityId: myFamily.id,
+        communityId,
         text: cleanText,
         clientMessageId: draftMessageIdRef.current,
       });
       draftMessageIdRef.current = null;
       draftFingerprintRef.current = "";
-      setDraft("");
       setMessages((prev) => {
         if (prev.some((item) => item.id === sent.id)) return prev;
-        return [
+        const next = [
           ...prev,
           {
             id: sent.id,
@@ -966,23 +1293,27 @@ export function CommunityScreen({
             createdAt: sent.createdAt,
           },
         ];
+        familyMessagesCache.set(communityId, next);
+        return next;
       });
       requestAnimationFrame(() => {
-        chatScrollRef.current?.scrollToEnd?.({ animated: true });
+        scrollToLatest(true);
       });
+      return true;
     } catch (err) {
       Alert.alert("Mesaj gönderilemedi", describeFamilyError(err));
+      return false;
     } finally {
       sendInFlightRef.current = false;
       setSendingMessage(false);
     }
   }, [
-    draft,
     myFamily?.id,
     profile?.avatarUrl,
     profile?.color,
     profile?.handle,
     profile?.name,
+    scrollToLatest,
     sendingMessage,
   ]);
 
@@ -1178,6 +1509,7 @@ export function CommunityScreen({
     }
     return map;
   }, [familyMembers]);
+  memberByIdRef.current = memberById;
 
   const chatParticipantIds = useMemo(() => {
     const ids = [];
@@ -1192,133 +1524,26 @@ export function CommunityScreen({
   }, [currentUserId, familyMembers, messages]);
   const giftSpentMap = useGiftSpentMap(chatParticipantIds);
 
-  const renderMessageItem = (msg) => {
-    const isGift = msg.kind === "gift";
-    const meta = msg.metadata || {};
-    const giftColor = meta.gift_color || COLORS.primary;
-    const giftIcon = resolveGiftIcon(meta.gift_icon);
-    const giftQty = Number(meta.quantity) || 1;
-    const giftCost = Number(meta.total_cost) || 0;
-    const giftXp = Number(meta.awarded_xp) || 0;
-    const senderSpent = msg.userId ? giftSpentMap[msg.userId] || 0 : 0;
+  const reversedMessages = useMemo(
+    () => (messages.length ? [...messages].reverse() : []),
+    [messages],
+  );
 
-    const knownMember = msg.userId ? memberById.get(msg.userId) : null;
-    const resolvedAvatarUrl = msg.own
-      ? (profile?.avatarUrl || msg.senderAvatarUrl || knownMember?.avatarUrl || null)
-      : (msg.senderAvatarUrl || knownMember?.avatarUrl || null);
-    const resolvedSenderName = msg.own
-      ? (profile?.name || msg.senderName || "Sen")
-      : (msg.senderName || knownMember?.name || "Aile üyesi");
-    const resolvedSenderColor = msg.own
-      ? (profile?.color || msg.senderColor || COLORS.primary)
-      : (msg.senderColor || knownMember?.color || COLORS.primary);
+  const chatKeyExtractor = useCallback((item) => String(item.id), []);
 
-    const avatarNode = (
-      <Pressable
-        onPress={() => msg.userId && onOpenUserProfile?.(msg.userId)}
-        onLongPress={() => msg.userId && openGiftSheet(msg.userId)}
-        delayLongPress={240}
-        style={styles.msgAvatarPress}
-        accessibilityRole="button"
-        accessibilityLabel={`${resolvedSenderName} profili`}
-      >
-        <MemberAvatar
-          uri={resolvedAvatarUrl}
-          name={resolvedSenderName}
-          color={resolvedSenderColor}
-          size={38}
-        />
-      </Pressable>
-    );
-
-    return (
-      <View
-        key={msg.id}
-        style={[styles.msgRow, msg.own && styles.msgRowOwn]}
-      >
-        {!msg.own ? avatarNode : null}
-
-        <View style={[styles.msgContentCol, msg.own && styles.msgContentColOwn]}>
-          {(!msg.own || senderSpent >= 1000000) ? (
-            <View
-              style={[
-                styles.msgSenderRow,
-                msg.own && { flexDirection: "row-reverse" },
-              ]}
-            >
-              <Text numberOfLines={1} style={styles.msgSender}>
-                {resolvedSenderName}
-              </Text>
-              {senderSpent >= 1000000 ? (
-                <SoraWealthBadge spent={senderSpent} size="sm" />
-              ) : null}
-            </View>
-          ) : null}
-
-          {isGift ? (
-            <Pressable
-              onLongPress={() => msg.userId && openGiftSheet(msg.userId)}
-              delayLongPress={240}
-              style={({ pressed }) => [
-                styles.giftMsgCard,
-                msg.own && styles.giftMsgCardOwn,
-                pressed && { opacity: 0.9 },
-              ]}
-            >
-              <SoraGiftArtwork
-                giftId={meta.gift_id}
-                giftName={meta.gift_name}
-                fallbackIcon={giftIcon}
-                fallbackColor={giftColor}
-                size={42}
-              />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.giftMsgTitle}>
-                  {giftQty > 1 ? `${giftQty}x ` : ""}
-                  {meta.gift_name || "Aile Hediyesi"}
-                </Text>
-                <Text style={styles.giftMsgBody}>{msg.text}</Text>
-                <View style={styles.giftMsgMetaRow}>
-                  {giftCost > 0 ? (
-                    <Text style={styles.giftMsgMetaChip}>
-                      {formatCredits(giftCost)} kredi
-                    </Text>
-                  ) : null}
-                  {giftXp > 0 ? (
-                    <Text style={styles.giftMsgXpChip}>
-                      +{formatCredits(giftXp)} XP
-                    </Text>
-                  ) : null}
-                  <Text style={styles.giftMsgTime}>{formatMessageTime(msg.createdAt)}</Text>
-                </View>
-              </View>
-            </Pressable>
-          ) : (
-            <Pressable
-              onLongPress={() => msg.userId && openGiftSheet(msg.userId)}
-              delayLongPress={240}
-              style={({ pressed }) => [
-                styles.msgBubble,
-                msg.own ? styles.msgBubbleOwn : styles.msgBubbleOther,
-                pressed && { opacity: 0.88 },
-              ]}
-            >
-              <View style={styles.msgInlineRow}>
-                <Text style={[styles.msgText, msg.own && styles.msgTextOwn]}>
-                  {msg.text}
-                </Text>
-                <Text style={[styles.msgTime, msg.own && styles.msgTimeOwn]}>
-                  {formatMessageTime(msg.createdAt)}
-                </Text>
-              </View>
-            </Pressable>
-          )}
-        </View>
-
-        {msg.own ? avatarNode : null}
-      </View>
-    );
-  };
+  const renderChatItem = useCallback(
+    ({ item: msg }) => (
+      <FamilyMessageRow
+        msg={msg}
+        knownMember={msg.userId ? memberById.get(msg.userId) : null}
+        senderSpent={msg.userId ? giftSpentMap[msg.userId] || 0 : 0}
+        profile={profile}
+        onOpenUserProfile={onOpenUserProfile}
+        onOpenGiftSheet={openGiftSheet}
+      />
+    ),
+    [giftSpentMap, memberById, onOpenUserProfile, openGiftSheet, profile],
+  );
 
   return (
     <View collapsable={false} style={styles.screen}>
@@ -1446,15 +1671,20 @@ export function CommunityScreen({
               </Text>
             </View>
           ) : (
-            <ScrollView
+            <FlatList
               ref={chatScrollRef}
+              data={reversedMessages}
+              renderItem={renderChatItem}
+              keyExtractor={chatKeyExtractor}
+              inverted
               contentContainerStyle={styles.messagesList}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
-              onContentSizeChange={() => chatScrollRef.current?.scrollToEnd?.({ animated: false })}
-            >
-              {messages.map(renderMessageItem)}
-            </ScrollView>
+              initialNumToRender={14}
+              maxToRenderPerBatch={10}
+              windowSize={7}
+              updateCellsBatchingPeriod={40}
+            />
           )}
 
           <GiftComboButton
@@ -1465,73 +1695,15 @@ export function CommunityScreen({
             bottomOffset={keyboard.visible ? 68 : 132 + Math.max(insets.bottom, 8)}
           />
 
-          <View
-            style={[
-              styles.composerRow,
-              { marginBottom: keyboard.visible ? 0 : 64 + Math.max(insets.bottom, 8) },
-            ]}
-          >
-            <Pressable
-              onPress={() => currentUserId && onOpenUserProfile?.(currentUserId)}
-              style={styles.composerAvatarWrap}
-              accessibilityRole="button"
-              accessibilityLabel="Profil fotoğrafın"
-            >
-              <MemberAvatar
-                uri={profile?.avatarUrl || null}
-                name={profile?.name || "Sen"}
-                color={profile?.color || COLORS.primary}
-                size={38}
-              />
-            </Pressable>
-            <TextInput
-              value={draft}
-              onChangeText={setDraft}
-              placeholder="Ailene mesaj yaz..."
-              placeholderTextColor={COLORS.muted}
-              maxLength={1000}
-              multiline
-              style={styles.composerInput}
-            />
-            <Pressable
-              onPress={() => openGiftSheet(null)}
-              accessibilityLabel="Hediye kutusu"
-              style={({ pressed }) => [
-                styles.composerGiftBtn,
-                pressed && { transform: [{ scale: 0.92 }] },
-              ]}
-            >
-              <LinearGradient
-                colors={["#52A5FF", "#2F80ED", "#7C3AED"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
-              />
-              <Ionicons name="gift" size={19} color="#FFFFFF" />
-            </Pressable>
-            <Pressable
-              disabled={sendingMessage || !draft.trim()}
-              onPress={handleSendMessage}
-              accessibilityLabel="Mesaj gönder"
-              style={({ pressed }) => [
-                styles.sendBtn,
-                (!draft.trim() || sendingMessage) && styles.sendBtnDisabled,
-                pressed && { transform: [{ scale: 0.92 }] },
-              ]}
-            >
-              <LinearGradient
-                colors={["#52A5FF", "#2F80ED", "#1D5FBF"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
-              />
-              {sendingMessage ? (
-                <ActivityIndicator size="small" color={COLORS.primaryInk} />
-              ) : (
-                <Ionicons name="send" size={17} color={COLORS.primaryInk} />
-              )}
-            </Pressable>
-          </View>
+          <FamilyChatComposer
+            currentUserId={currentUserId}
+            profile={profile}
+            sendingMessage={sendingMessage}
+            onSendText={handleSendText}
+            onOpenGiftSheet={openGiftSheet}
+            onOpenUserProfile={onOpenUserProfile}
+            bottomMargin={keyboard.visible ? 0 : 64 + Math.max(insets.bottom, 8)}
+          />
         </KeyboardSafeView>
       ) : (
         // ── Kullanıcı henüz ailede değilse sade Keşfet + ID Arama + Aile Kurma ─
@@ -2243,7 +2415,7 @@ export function CommunityScreen({
       <SoraGiftEffect gift={giftEffect} />
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   screen: { flex: 1, position: "relative", backgroundColor: COLORS.background },
@@ -2479,7 +2651,14 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   giftHeaderPillText: { color: "#FFFFFF", fontSize: 11, fontWeight: "900" },
-  messagesList: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 20, gap: 11 },
+  messagesList: {
+    paddingHorizontal: 14,
+    paddingTop: 20,
+    paddingBottom: 14,
+    gap: 11,
+    flexGrow: 1,
+    justifyContent: "flex-end",
+  },
   msgRow: { flexDirection: "row", alignItems: "flex-end", gap: 9 },
   msgRowOwn: { justifyContent: "flex-end" },
   msgAvatarPress: { width: 38, height: 38, alignItems: "center", justifyContent: "center" },

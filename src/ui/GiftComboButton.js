@@ -4,8 +4,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { SoraGiftArtwork } from "./SoraGiftArtwork";
 
+const TR_NUM_FMT = new Intl.NumberFormat("tr-TR");
 const formatComboCoins = (value) =>
-  new Intl.NumberFormat("tr-TR").format(Math.max(0, Math.floor(Number(value) || 0)));
+  TR_NUM_FMT.format(Math.max(0, Math.floor(Number(value) || 0)));
 
 const COMBO_DURATION_MS = 5000;
 const RING_SIZE = 80;

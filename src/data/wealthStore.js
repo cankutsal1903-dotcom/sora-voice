@@ -1,19 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../auth/supabase";
 
-// Kullanıcıların hediye harcama toplamı (cömertlik seviyesi) için hafif önbellek.
-// profiles.gift_spent_total sütunu henüz yoksa sessizce devre dışı kalır;
-// kendi profilin için cüzdan işlemlerinden hesaplama yapılır.
+// Kullanıcıların hediye harcama toplamı (cömertlik seviyesi) için hedefli önbellek.
+// Her bileşen yalnızca izlediği kullanıcı kimlikleri değiştiğinde yeniden çizilir.
 const spentCache = new Map();
 const listeners = new Set();
 let columnSupported = null; // null: bilinmiyor, true/false: test edildi
 let pendingIds = new Set();
 let flushTimer = null;
 
-const emit = () => {
+const emitChanged = (changedIds) => {
+  if (!changedIds || changedIds.size === 0) return;
   listeners.forEach((fn) => {
     try {
-      fn();
+      fn(changedIds);
     } catch {
       // yoksay
     }
@@ -25,7 +25,7 @@ export const setKnownGiftSpent = (userId, spent) => {
   const value = Math.max(0, Number(spent) || 0);
   if (spentCache.get(userId) === value) return;
   spentCache.set(userId, value);
-  emit();
+  emitChanged(new Set([userId]));
 };
 
 export const addLocalGiftSpent = (userId, amount) => {
@@ -33,7 +33,7 @@ export const addLocalGiftSpent = (userId, amount) => {
   const delta = Math.max(0, Number(amount) || 0);
   if (!delta) return;
   spentCache.set(userId, (spentCache.get(userId) || 0) + delta);
-  emit();
+  emitChanged(new Set([userId]));
 };
 
 export const getCachedGiftSpent = (userId) =>
@@ -56,10 +56,16 @@ const flush = async () => {
       return;
     }
     columnSupported = true;
+    const changed = new Set();
     (data || []).forEach((row) => {
-      if (row?.id) spentCache.set(row.id, Math.max(0, Number(row.gift_spent_total) || 0));
+      if (!row?.id) return;
+      const next = Math.max(0, Number(row.gift_spent_total) || 0);
+      if (spentCache.get(row.id) !== next) {
+        spentCache.set(row.id, next);
+        changed.add(row.id);
+      }
     });
-    emit();
+    emitChanged(changed);
   } catch {
     // ağ hatası: daha sonra tekrar denenir
   }
@@ -68,20 +74,38 @@ const flush = async () => {
 export const requestGiftSpent = (userIds = []) => {
   if (columnSupported === false) return;
   let added = false;
-  userIds.forEach((id) => {
+  for (let i = 0; i < userIds.length; i += 1) {
+    const id = userIds[i];
     if (id && !spentCache.has(id) && !pendingIds.has(id)) {
       pendingIds.add(id);
       added = true;
     }
-  });
-  if (added && !flushTimer) flushTimer = setTimeout(flush, 120);
+  }
+  if (added && !flushTimer) flushTimer = setTimeout(flush, 40);
 };
 
 export const loadOwnGiftSpent = async (userId) => {
   if (!userId || !supabase) return null;
-  requestGiftSpent([userId]);
-  await new Promise((resolve) => setTimeout(resolve, 260));
-  if (columnSupported === true && spentCache.has(userId)) return spentCache.get(userId);
+  if (columnSupported !== false) {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("gift_spent_total")
+        .eq("id", userId)
+        .maybeSingle();
+      if (!error && data) {
+        columnSupported = true;
+        const total = Math.max(0, Number(data.gift_spent_total) || 0);
+        setKnownGiftSpent(userId, total);
+        return total;
+      }
+      if (error && (String(error.message || "").includes("gift_spent_total") || error.code === "42703")) {
+        columnSupported = false;
+      }
+    } catch {
+      return getCachedGiftSpent(userId);
+    }
+  }
   try {
     const { data, error } = await supabase
       .from("wallet_transactions")
@@ -89,7 +113,7 @@ export const loadOwnGiftSpent = async (userId) => {
       .eq("user_id", userId)
       .eq("type", "gift")
       .lt("amount", 0)
-      .limit(10000);
+      .limit(2000);
     if (error) return null;
     const total = (data || []).reduce((sum, row) => sum + Math.max(0, -Number(row.amount) || 0), 0);
     setKnownGiftSpent(userId, total);
@@ -100,28 +124,64 @@ export const loadOwnGiftSpent = async (userId) => {
 };
 
 export const useGiftSpent = (userId) => {
-  const [, force] = useState(0);
+  const [val, setVal] = useState(() => getCachedGiftSpent(userId));
   useEffect(() => {
-    const fn = () => force((n) => n + 1);
+    setVal(getCachedGiftSpent(userId));
+    if (!userId) return undefined;
+    const fn = (changedIds) => {
+      if (changedIds.has(userId)) {
+        setVal(getCachedGiftSpent(userId));
+      }
+    };
     listeners.add(fn);
-    if (userId) requestGiftSpent([userId]);
+    requestGiftSpent([userId]);
     return () => listeners.delete(fn);
   }, [userId]);
-  return getCachedGiftSpent(userId);
+  return val;
+};
+
+const buildSubsetMap = (ids) => {
+  const out = {};
+  for (let i = 0; i < ids.length; i += 1) {
+    const id = ids[i];
+    if (spentCache.has(id)) out[id] = spentCache.get(id);
+  }
+  return out;
 };
 
 export const useGiftSpentMap = (userIds = []) => {
-  const [, force] = useState(0);
-  const key = userIds.filter(Boolean).sort().join(",");
+  const uniqueIds = [];
+  const seen = new Set();
+  for (let i = 0; i < userIds.length; i += 1) {
+    const id = userIds[i];
+    if (id && !seen.has(id)) {
+      seen.add(id);
+      uniqueIds.push(id);
+    }
+  }
+  uniqueIds.sort();
+  const key = uniqueIds.join(",");
+  const watchedRef = useRef(seen);
+  watchedRef.current = seen;
+
+  const [snapshot, setSnapshot] = useState(() => buildSubsetMap(uniqueIds));
+
   useEffect(() => {
-    const fn = () => force((n) => n + 1);
+    const ids = key ? key.split(",") : [];
+    setSnapshot(buildSubsetMap(ids));
+    if (!ids.length) return undefined;
+    const fn = (changedIds) => {
+      for (const id of changedIds) {
+        if (watchedRef.current.has(id)) {
+          setSnapshot(buildSubsetMap(ids));
+          return;
+        }
+      }
+    };
     listeners.add(fn);
-    requestGiftSpent(key ? key.split(",") : []);
+    requestGiftSpent(ids);
     return () => listeners.delete(fn);
   }, [key]);
-  const snapshot = {};
-  spentCache.forEach((value, id) => {
-    snapshot[id] = value;
-  });
+
   return snapshot;
 };

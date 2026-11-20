@@ -4,8 +4,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useReducedMotion } from "./Motion";
 
+const TR_NUM_FMT = new Intl.NumberFormat("tr-TR");
 const formatBlastAmount = (value) =>
-  new Intl.NumberFormat("tr-TR").format(Math.max(0, Math.round(Number(value) || 0)));
+  TR_NUM_FMT.format(Math.max(0, Math.round(Number(value) || 0)));
 
 const PARTICLE_SPECS = Array.from({ length: 16 }, (_, idx) => {
   const angle = (idx / 16) * Math.PI * 2 + (idx % 2 === 0 ? 0.12 : -0.08);

@@ -19,8 +19,9 @@ import { supabase } from "../auth/supabase";
 import { playSfx } from "../audio/SoraSfx";
 import { SoraWealthBadge } from "../ui/SoraWealthTier";
 
+const TR_NUM_FMT = new Intl.NumberFormat("tr-TR");
 const fmtNum = (v) =>
-  new Intl.NumberFormat("tr-TR").format(Math.max(0, Math.floor(Number(v) || 0)));
+  TR_NUM_FMT.format(Math.max(0, Math.floor(Number(v) || 0)));
 
 const fmtShort = (v) => {
   const n = Math.max(0, Number(v) || 0);

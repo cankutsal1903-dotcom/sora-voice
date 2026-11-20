@@ -14,8 +14,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "../auth/supabase";
 import { playSfx } from "../audio/SoraSfx";
 
+const TR_NUM_FMT = new Intl.NumberFormat("tr-TR");
 const fmtNum = (n) =>
-  new Intl.NumberFormat("tr-TR").format(Math.max(0, Math.floor(Number(n) || 0)));
+  TR_NUM_FMT.format(Math.max(0, Math.floor(Number(n) || 0)));
 
 const fmtShort = (n) => {
   const v = Number(n) || 0;

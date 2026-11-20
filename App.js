@@ -186,7 +186,7 @@ import {
 import { AudioBars, BrandLaunch, LivePulse, Reveal, useReducedMotion } from "./src/ui/Motion";
 import { installGlobalErrorReporting } from "./src/observability/errorReporting";
 import { InboxScreen } from "./src/screens/InboxScreen";
-import { CommunityScreen } from "./src/screens/CommunityScreen";
+import { CommunityScreen, prefetchFamilyChat } from "./src/screens/CommunityScreen";
 import { COLORS as APP_COLORS } from "./src/theme/colors";
 import {
   DEFAULT_GIFT_CATALOG,
@@ -230,8 +230,24 @@ import {
 import { GiftComboButton } from "./src/ui/GiftComboButton";
 import { KeyboardSafeView, useKeyboardInset } from "./src/ui/useKeyboardInset";
 
+const TR_NUM_FMT = new Intl.NumberFormat("tr-TR");
+const TR_SCHEDULED_DATE_FMT = new Intl.DateTimeFormat("tr-TR", {
+  day: "2-digit",
+  month: "long",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+const TR_SHORT_DATETIME_FMT = new Intl.DateTimeFormat("tr-TR", {
+  dateStyle: "short",
+  timeStyle: "short",
+});
+const TR_MED_DATETIME_FMT = new Intl.DateTimeFormat("tr-TR", {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+
 const formatCredits = (value) =>
-  new Intl.NumberFormat("tr-TR").format(Math.max(0, Math.floor(Number(value) || 0)));
+  TR_NUM_FMT.format(Math.max(0, Math.floor(Number(value) || 0)));
 
 const COLORS = APP_COLORS;
 
@@ -317,13 +333,7 @@ const parseScheduledDate = (value) => {
   return date > now ? date : null;
 };
 
-const formatScheduledDate = (date) =>
-  new Intl.DateTimeFormat("tr-TR", {
-    day: "2-digit",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+const formatScheduledDate = (date) => TR_SCHEDULED_DATE_FMT.format(date);
 
 const INITIAL_ROOMS = [
   {
@@ -736,7 +746,7 @@ function Onboarding({ visible, onComplete }) {
   );
 }
 
-function Discover({
+const Discover = memo(function Discover({
   rooms,
   profile,
   favoriteRoomIds,
@@ -1199,7 +1209,7 @@ function Discover({
       </ScrollView>
     </>
   );
-}
+});
 
 function ScheduleAgenda({
   visible,
@@ -2430,7 +2440,7 @@ const UserLevelSheet = memo(function UserLevelSheet({
   );
 });
 
-function Profile({
+const Profile = memo(function Profile({
   profile,
   userId = null,
   giftSpent = 0,
@@ -3070,7 +3080,7 @@ function Profile({
       />
     </>
   );
-}
+});
 
 const formatHistoryTime = (item) => {
   if (!item?.visitedTs) return item?.visitedAt || "";
@@ -5933,7 +5943,7 @@ const RoomMessageRow = memo(function RoomMessageRow({
         ) : null}
         {showAvatar && senderGiftSpent >= 1000000 ? (
           <View style={{ marginRight: 5, marginTop: 1 }}>
-            <SoraWealthBadge spent={senderGiftSpent} size="sm" />
+            <SoraWealthBadge spent={senderGiftSpent} size="sm" animated={false} />
           </View>
         ) : null}
         <Text
@@ -6940,11 +6950,11 @@ function Room({
   }, [room.id, room.persisted]);
 
   useEffect(() => {
-    if (!room.persisted || liveVoice.status !== "connected") return undefined;
+    if (!room.persisted || liveVoice.status !== "connected" || minimized) return undefined;
     refreshMembers();
-    const interval = setInterval(refreshMembers, canModerate ? 5000 : 8000);
+    const interval = setInterval(refreshMembers, canModerate ? 8000 : 12000);
     return () => clearInterval(interval);
-  }, [canModerate, liveVoice.participantCount, liveVoice.status, refreshMembers, room.persisted]);
+  }, [canModerate, liveVoice.participantCount, liveVoice.status, minimized, refreshMembers, room.persisted]);
 
   const voiceStatusRef = useRef(liveVoice.status);
   const voiceReconnectRef = useRef(liveVoice.reconnect);
@@ -9786,6 +9796,11 @@ function AppContent() {
   const [walletOpen, setWalletOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("discover");
+  const [mountedTabs, setMountedTabs] = useState(() => ({ discover: true }));
+  const handleSelectTab = useCallback((nextTab) => {
+    setMountedTabs((prev) => (prev[nextTab] ? prev : { ...prev, [nextTab]: true }));
+    setActiveTab(nextTab);
+  }, []);
   const [room, setRoom] = useState(null);
   const openRoomIdRef = useRef(null);
   openRoomIdRef.current = room?.id || null;
@@ -10018,6 +10033,7 @@ function AppContent() {
         setWalletActivities([]);
         setDailyRewardClaimed(false);
         setMyFamily(null);
+        setMountedTabs({ discover: true });
         setFollowedUserIds([]);
         setActiveSanction(null);
         setInspectedUserId(null);
@@ -10096,10 +10112,7 @@ function AppContent() {
             : "#5D91D8",
       text: transaction.description,
       amount: transaction.amount,
-      time: new Intl.DateTimeFormat("tr-TR", {
-        dateStyle: "short",
-        timeStyle: "short",
-      }).format(new Date(transaction.created_at)),
+      time: TR_SHORT_DATETIME_FMT.format(new Date(transaction.created_at)),
     });
     (async () => {
       if (!openRoomIdRef.current) {
@@ -10194,7 +10207,11 @@ function AppContent() {
       .catch(() => undefined);
     getMyFamily(user.id)
       .then((family) => {
-        if (active) setMyFamily(family);
+        if (!active) return;
+        setMyFamily(family);
+        if (family?.id) {
+          prefetchFamilyChat(family.id, user.id);
+        }
       })
       .catch(() => undefined);
     return () => {
@@ -10735,10 +10752,7 @@ function AppContent() {
               : "#5D91D8",
         text: transaction.description,
         amount: transaction.amount,
-        time: new Intl.DateTimeFormat("tr-TR", {
-          dateStyle: "short",
-          timeStyle: "short",
-        }).format(new Date(transaction.created_at)),
+        time: TR_SHORT_DATETIME_FMT.format(new Date(transaction.created_at)),
       })),
     );
   };
@@ -11606,10 +11620,7 @@ function AppContent() {
 
   if (activeSanction) {
     const expiryLabel = activeSanction.expiresAt
-      ? new Intl.DateTimeFormat("tr-TR", {
-          dateStyle: "medium",
-          timeStyle: "short",
-        }).format(new Date(activeSanction.expiresAt))
+      ? TR_MED_DATETIME_FMT.format(new Date(activeSanction.expiresAt))
       : null;
     return (
       <SafeAreaView style={[styles.app, { justifyContent: "center", paddingHorizontal: 24 }]}>
@@ -11701,71 +11712,87 @@ function AppContent() {
     );
   }
 
-  const screens = {
-    discover: (
-      <Discover
-        rooms={rooms}
-        profile={profile}
-        favoriteRoomIds={favoriteRoomIds}
-        recentRoomIds={recentRoomIds}
-        notificationCount={notifications.length}
-        currentUserId={authSession?.user?.id}
-        events={soraEvents}
-        onOpenEvent={setActiveEvent}
-        onOpenNotifications={handleOpenNotifications}
-        onOpenRoom={openRoom}
-        onCreate={handleOpenCreate}
-        onToggleFavorite={toggleFavorite}
-      />
-    ),
-    inbox: (
-      <InboxScreen currentUserId={authSession?.user?.id} profile={profile} />
-    ),
-    community: (
-      <CommunityScreen
-        currentUserId={authSession?.user?.id}
-        profile={profile}
-        coins={walletBalance}
-        coinBlastEvent={coinBlastQueue[0] || null}
-        onReserveGiftSpend={reserveOptimisticGiftSpend}
-        onSettleGiftSpend={settleOptimisticGiftSpend}
-        onRollbackGiftSpend={rollbackOptimisticGiftSpend}
-        onApplyWalletBalance={applyAuthoritativeWalletBalance}
-        onCoinBlast={triggerCoinBlast}
-        onGiftSpent={handleLocalGiftSpent}
-        onBalanceRefresh={refreshWalletData}
-        onFamilyChange={setMyFamily}
-        onOpenUserProfile={setInspectedUserId}
-      />
-    ),
-    profile: (
-      <Profile
-        profile={profile}
-        userId={authSession?.user?.id}
-        giftSpent={ownGiftSpent}
-        followedUserIds={followedUserIds}
-        family={myFamily}
-        coins={walletBalance}
-        favoriteCount={favoriteRoomIds.length}
-        hostedRoomCount={hostedRoomCount}
-        myRooms={myHostedRooms}
-        dailyRewardClaimed={dailyRewardClaimed}
-        onEdit={handleOpenProfileEditor}
-        onOpenSettings={handleOpenSettings}
-        onOpenWallet={handleOpenWallet}
-        onClaimDailyReward={claimDailyReward}
-        onBalanceUpdate={setWalletBalance}
-        onSyncUserLevel={syncUserLevelAndNotify}
-        onOpenUserProfile={setInspectedUserId}
-      />
-    ),
-  };
   return (
     <View style={styles.app}>
       <SafeAreaView edges={["top", "left", "right"]} style={styles.safeArea}>
         <StatusBar barStyle="dark-content" />
-        {screens[activeTab]}
-        <BottomNavigation active={activeTab} onChange={setActiveTab} />
+        <View
+          pointerEvents={activeTab === "discover" ? "auto" : "none"}
+          style={[styles.tabPane, activeTab !== "discover" && styles.tabPaneHidden]}
+        >
+          <Discover
+            rooms={rooms}
+            profile={profile}
+            favoriteRoomIds={favoriteRoomIds}
+            recentRoomIds={recentRoomIds}
+            notificationCount={notifications.length}
+            currentUserId={authSession?.user?.id}
+            events={soraEvents}
+            onOpenEvent={setActiveEvent}
+            onOpenNotifications={handleOpenNotifications}
+            onOpenRoom={openRoom}
+            onCreate={handleOpenCreate}
+            onToggleFavorite={toggleFavorite}
+          />
+        </View>
+        {mountedTabs.inbox ? (
+          <View
+            pointerEvents={activeTab === "inbox" ? "auto" : "none"}
+            style={[styles.tabPane, activeTab !== "inbox" && styles.tabPaneHidden]}
+          >
+            <InboxScreen currentUserId={authSession?.user?.id} profile={profile} />
+          </View>
+        ) : null}
+        {mountedTabs.community ? (
+          <View
+            pointerEvents={activeTab === "community" ? "auto" : "none"}
+            style={[styles.tabPane, activeTab !== "community" && styles.tabPaneHidden]}
+          >
+            <CommunityScreen
+              currentUserId={authSession?.user?.id}
+              profile={profile}
+              initialFamily={myFamily}
+              coins={walletBalance}
+              coinBlastEvent={activeTab === "community" ? (coinBlastQueue[0] || null) : null}
+              onReserveGiftSpend={reserveOptimisticGiftSpend}
+              onSettleGiftSpend={settleOptimisticGiftSpend}
+              onRollbackGiftSpend={rollbackOptimisticGiftSpend}
+              onApplyWalletBalance={applyAuthoritativeWalletBalance}
+              onCoinBlast={triggerCoinBlast}
+              onGiftSpent={handleLocalGiftSpent}
+              onBalanceRefresh={refreshWalletData}
+              onFamilyChange={setMyFamily}
+              onOpenUserProfile={setInspectedUserId}
+            />
+          </View>
+        ) : null}
+        {mountedTabs.profile ? (
+          <View
+            pointerEvents={activeTab === "profile" ? "auto" : "none"}
+            style={[styles.tabPane, activeTab !== "profile" && styles.tabPaneHidden]}
+          >
+            <Profile
+              profile={profile}
+              userId={authSession?.user?.id}
+              giftSpent={ownGiftSpent}
+              followedUserIds={followedUserIds}
+              family={myFamily}
+              coins={walletBalance}
+              favoriteCount={favoriteRoomIds.length}
+              hostedRoomCount={hostedRoomCount}
+              myRooms={myHostedRooms}
+              dailyRewardClaimed={dailyRewardClaimed}
+              onEdit={handleOpenProfileEditor}
+              onOpenSettings={handleOpenSettings}
+              onOpenWallet={handleOpenWallet}
+              onClaimDailyReward={claimDailyReward}
+              onBalanceUpdate={setWalletBalance}
+              onSyncUserLevel={syncUserLevelAndNotify}
+              onOpenUserProfile={setInspectedUserId}
+            />
+          </View>
+        ) : null}
+        <BottomNavigation active={activeTab} onChange={handleSelectTab} />
       </SafeAreaView>
       {room ? (
         <>
@@ -12186,6 +12213,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     paddingTop: Platform.OS === "android" ? 8 : 0,
   },
+  tabPane: { flex: 1 },
+  tabPaneHidden: { display: "none" },
   discoverScroll: { flex: 1 },
   pageContent: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 104 },
   topBar: {

@@ -3,6 +3,22 @@ import { fetchHostPresence } from "../room/roomApi";
 
 const FALLBACK_COLORS = ["#5140BD", "#252458"];
 const ROOM_SELECT = "*, profiles!rooms_host_id_fkey(display_name, handle, avatar_color, avatar_url)";
+let TR_SCHEDULE_FMT = null;
+try {
+  TR_SCHEDULE_FMT = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" });
+} catch {
+  TR_SCHEDULE_FMT = null;
+}
+
+const formatScheduleDate = (iso) => {
+  if (!iso) return "Yakında";
+  try {
+    const d = new Date(iso);
+    return TR_SCHEDULE_FMT ? TR_SCHEDULE_FMT.format(d) : d.toLocaleString("tr-TR");
+  } catch {
+    return "Yakında";
+  }
+};
 
 const requireClient = () => {
   if (!supabase) throw new Error("Supabase yapılandırılmadı.");
@@ -37,7 +53,7 @@ export const mapRoom = (room) => {
     coupleSeat: Boolean(room.couple_seat),
     backgroundPath: room.background_path || null,
     musicState: room.music_state || null,
-    startsAt: room.schedule_label || (room.starts_at ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(room.starts_at)) : "Yakında"),
+    startsAt: room.schedule_label || formatScheduleDate(room.starts_at),
     startsAtIso: room.starts_at || null,
     userCreated: true,
     persisted: true,
@@ -933,6 +949,30 @@ export const findFamilyByCode = async (rawCode, currentUserId) => {
   return data ? mapFamily(data, currentUserId) : null;
 };
 
+export const listFamilyMembersLite = async (communityId) => {
+  if (!communityId) return [];
+  const client = requireClient();
+  const { data, error } = await client
+    .from("community_members")
+    .select("user_id, role, joined_at, profiles(id, display_name, handle, avatar_color, avatar_url)")
+    .eq("community_id", communityId)
+    .order("joined_at", { ascending: true })
+    .limit(80);
+  if (error || !Array.isArray(data)) return [];
+  return data.map((row) => {
+    const p = profileFromJoin(row.profiles);
+    return {
+      userId: row.user_id,
+      role: row.role || "member",
+      joinedAt: row.joined_at,
+      name: p?.display_name || "Sora kullanıcısı",
+      handle: p?.handle || "sora",
+      color: p?.avatar_color || "#2F80ED",
+      avatarUrl: p?.avatar_url || null,
+    };
+  });
+};
+
 export const getFamilyDetails = async (communityId, currentUserId) => {
   if (!communityId) return null;
   const client = requireClient();
@@ -940,7 +980,7 @@ export const getFamilyDetails = async (communityId, currentUserId) => {
     client.from("communities").select(FAMILY_SELECT_EXTENDED).eq("id", communityId).maybeSingle(),
     client
       .from("community_members")
-      .select("user_id, role, joined_at, profiles(id, display_name, handle, avatar_color, avatar_url)")
+      .select("user_id, role, joined_at, profiles(id, display_name, handle, avatar_color, avatar_url, public_id)")
       .eq("community_id", communityId)
       .order("joined_at", { ascending: true }),
     client.from("family_level_configs").select("*").order("level", { ascending: true }),
@@ -959,15 +999,6 @@ export const getFamilyDetails = async (communityId, currentUserId) => {
   if (!familyRow) return null;
 
   const memberRows = membersRes.error ? [] : (membersRes.data || []);
-  const memberIds = memberRows.map((row) => row.user_id).filter(Boolean);
-  const publicIdByUser = new Map();
-  if (memberIds.length > 0) {
-    const { data: idRows } = await client.from("profiles").select("id, public_id").in("id", memberIds);
-    (idRows || []).forEach((item) => {
-      if (item?.id && item.public_id) publicIdByUser.set(item.id, item.public_id);
-    });
-  }
-
   const checkedInToday = false;
 
   const members = memberRows.map((row) => {
@@ -980,7 +1011,7 @@ export const getFamilyDetails = async (communityId, currentUserId) => {
       handle: p?.handle || "sora",
       color: p?.avatar_color || "#2F80ED",
       avatarUrl: p?.avatar_url || null,
-      publicId: publicIdByUser.get(row.user_id) || null,
+      publicId: p?.public_id || null,
     };
   });
 
@@ -1062,21 +1093,22 @@ export const updateFamilyProfile = async ({ communityId, name = null, descriptio
   return Array.isArray(data) ? data[0] : data;
 };
 
-export const listFamilyMessages = async ({ communityId, currentUserId }) => {
+export const listFamilyMessages = async ({ communityId, currentUserId, limit = 50 }) => {
   const client = requireClient();
+  const safeLimit = Math.max(15, Math.min(120, Number(limit) || 50));
   let { data, error } = await client
     .from("family_messages")
     .select("id, community_id, sender_id, body, kind, metadata, created_at, profiles!family_messages_sender_id_fkey(display_name, handle, avatar_color, avatar_url)")
     .eq("community_id", communityId)
     .order("created_at", { ascending: false })
-    .limit(120);
+    .limit(safeLimit);
   if (error) {
     const legacy = await client
       .from("family_messages")
       .select("id, community_id, sender_id, body, created_at, profiles!family_messages_sender_id_fkey(display_name, handle, avatar_color, avatar_url)")
       .eq("community_id", communityId)
       .order("created_at", { ascending: false })
-      .limit(120);
+      .limit(safeLimit);
     throwIfError(legacy.error);
     data = legacy.data;
   }
@@ -1235,7 +1267,14 @@ export const claimSelfGiftBlast = async (requestId) => {
   return data?.[0] || { reward_amount: 0, multiplier_basis: 0, balance: null };
 };
 
-export const listRoomGiftCatalog = async () => {
+let cachedGiftCatalog = null;
+let cachedGiftCatalogAt = 0;
+const GIFT_CATALOG_TTL_MS = 5 * 60_000;
+
+export const listRoomGiftCatalog = async ({ force = false } = {}) => {
+  if (!force && cachedGiftCatalog && Date.now() - cachedGiftCatalogAt < GIFT_CATALOG_TTL_MS) {
+    return cachedGiftCatalog;
+  }
   const client = requireClient();
   let { data, error } = await client
     .from("gift_catalog")
@@ -1252,13 +1291,16 @@ export const listRoomGiftCatalog = async () => {
     throwIfError(legacy.error);
     data = legacy.data;
   }
-  return (data || []).map((row) => ({
+  const mapped = (data || []).map((row) => ({
     ...row,
     icon: row.icon === "crown" ? "trophy" : row.icon,
     category: row.category || "affordable",
     sortOrder: Number(row.sort_order) || 100,
     minFamilyLevel: row.min_family_level || 0,
   }));
+  cachedGiftCatalog = mapped;
+  cachedGiftCatalogAt = Date.now();
+  return mapped;
 };
 
 const EVEN_LEVEL_REWARD_MAP = {
