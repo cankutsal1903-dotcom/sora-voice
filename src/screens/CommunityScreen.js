@@ -1932,16 +1932,16 @@ export const CommunityScreen = memo(function CommunityScreen({
                     >
                       {active ? (
                         <View style={[styles.giftItemCheckBadge, { backgroundColor: accent }]}>
-                          <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+                          <Ionicons name="checkmark" size={9} color="#FFFFFF" />
                         </View>
                       ) : null}
-                      <View style={{ marginBottom: 7 }}>
+                      <View style={{ marginBottom: 6, marginTop: 2 }}>
                         <SoraGiftArtwork
                           giftId={gift.id}
                           giftName={gift.name}
                           fallbackIcon={resolveGiftIcon(gift.icon)}
                           fallbackColor={gift.color || COLORS.primary}
-                          size={70}
+                          size={62}
                         />
                       </View>
                       <Text numberOfLines={1} style={styles.giftItemName}>
@@ -3064,11 +3064,11 @@ const styles = StyleSheet.create({
   },
   giftItemCheckBadge: {
     position: "absolute",
-    top: 6,
-    right: 6,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    top: 5,
+    right: 5,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
     zIndex: 2,

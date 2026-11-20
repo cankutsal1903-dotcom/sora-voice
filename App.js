@@ -4172,16 +4172,16 @@ const GiftSheet = memo(function GiftSheet({
                   >
                     {active ? (
                       <View style={[styles.roomGiftCheckBadge, { backgroundColor: accent }]}>
-                        <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+                        <Ionicons name="checkmark" size={9} color="#FFFFFF" />
                       </View>
                     ) : null}
-                    <View style={{ marginBottom: 7 }}>
+                    <View style={{ marginBottom: 6, marginTop: 2 }}>
                       <SoraGiftArtwork
                         giftId={gift.id}
                         giftName={gift.name}
                         fallbackIcon={gift.icon}
                         fallbackColor={gift.color}
-                        size={70}
+                        size={62}
                       />
                     </View>
                     <Text numberOfLines={1} style={styles.giftName}>
@@ -4846,24 +4846,31 @@ const WalletSheet = memo(function WalletSheet({
           >
             <Text style={styles.kicker}>KREDİ CÜZDANI</Text>
             <LinearGradient
-              colors={["#111820", "#1D2E43"]}
+              colors={["#0D1829", "#1B3154"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
               style={styles.walletBalanceCard}
             >
-              <View>
+              <View style={{ flex: 1, paddingRight: 12 }}>
                 <Text style={styles.walletBalanceLabel}>
                   KULLANILABİLİR BAKİYE
                 </Text>
-                <Text style={styles.walletBalanceAmount}>
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.72}
+                  style={styles.walletBalanceAmount}
+                >
                   {formatCredits(coins)} <Text style={styles.walletBalanceUnit}>kredi</Text>
                 </Text>
-                <Text style={styles.walletActivityTime}>
+                <Text style={styles.walletActivityTime} numberOfLines={1}>
                   {paidCoins > 0
                     ? `Promosyon ${formatCredits(promoCoins)} · Satın alınan ${formatCredits(paidCoins)}`
                     : `Toplam kredi: ${formatCredits(coins)}`}
                 </Text>
               </View>
               <View style={styles.walletBalanceIcon}>
-                <Ionicons name="diamond" size={28} color="#6AA8F5" />
+                <Ionicons name="diamond" size={26} color="#FDE68A" />
               </View>
             </LinearGradient>
             <Text style={styles.settingsCaption}>GÜNLÜK ÖDÜL</Text>
@@ -9994,7 +10001,7 @@ function ProfileEditor({
             onChangeText={setBio}
             placeholder="Seni tanıtan kısa bir not"
             placeholderTextColor={COLORS.muted}
-            style={styles.sheetInput}
+            style={[styles.sheetInput, styles.profileEditorBioInput]}
             maxLength={180}
             multiline
           />
@@ -13679,6 +13686,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginBottom: 18,
   },
+  profileEditorBioInput: {
+    height: undefined,
+    minHeight: 92,
+    paddingTop: 12,
+    paddingBottom: 12,
+    textAlignVertical: "top",
+  },
   sheetCategories: {
     flexDirection: "row",
     gap: 7,
@@ -14687,14 +14701,16 @@ const styles = StyleSheet.create({
   },
   dailyRewardAmount: { color: COLORS.text, fontSize: 13, fontWeight: "900" },
   walletBalanceCard: {
-    minHeight: 130,
-    padding: 20,
+    minHeight: 124,
+    padding: 18,
     borderRadius: 22,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 25,
+    marginBottom: 22,
     backgroundColor: COLORS.text,
+    borderWidth: 1,
+    borderColor: "rgba(253,230,138,0.22)",
   },
   walletBalanceLabel: {
     color: "rgba(255,255,255,0.60)",
@@ -19169,11 +19185,11 @@ const styles = StyleSheet.create({
   },
   roomGiftCheckBadge: {
     position: "absolute",
-    top: 6,
-    right: 6,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    top: 5,
+    right: 5,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
     zIndex: 2,
