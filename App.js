@@ -4433,22 +4433,28 @@ const SpeakingRing = memo(function SpeakingRing({
   );
 });
 
-/* Oda kucultuldugunde ekranda duran, tasinabilir yuvarlak oda balonu. */
+/* Oda kucultuldugunde ekranda duran, tasinabilir yuvarlak oda balonu + canli konusmaci & hizli mikrofon. */
 const RoomMiniBubble = memo(function RoomMiniBubble({
   room,
+  miniState = null,
+  onToggleMic,
   onExpand,
   onLeave,
 }) {
   const insets = useSafeAreaInsets();
   const drag = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const lastPosition = useRef({ x: 0, y: 0 });
+  const micOn = Boolean(miniState?.micOn);
+  const canToggleMic = Boolean(miniState?.canToggleMic && onToggleMic);
+  const speakingName = String(miniState?.speakingName || "").trim();
+  const unreadCount = Math.max(0, Number(miniState?.unreadCount) || 0);
   const clampBubbleOffset = useCallback(
     (rawX, rawY) => {
       const { width, height } = Dimensions.get("window");
-      const minX = -Math.max(0, width - 88);
+      const minX = -Math.max(0, width - 116);
       const maxX = 4;
-      const minY = -Math.max(0, height - (insets.bottom + 96) - (insets.top + 72));
-      const maxY = 24;
+      const minY = -Math.max(0, height - (insets.bottom + 112) - (insets.top + 72));
+      const maxY = 20;
       return {
         x: Math.min(maxX, Math.max(minX, rawX)),
         y: Math.min(maxY, Math.max(minY, rawY)),
@@ -4490,34 +4496,89 @@ const RoomMiniBubble = memo(function RoomMiniBubble({
         },
       ]}
     >
+      <View style={styles.roomBubbleHead}>
+        <Pressable
+          onPress={onExpand}
+          style={styles.roomBubbleAvatar}
+          accessibilityRole="button"
+          accessibilityLabel="Odaya dön"
+        >
+          <View
+            style={[
+              styles.roomBubbleInner,
+              { backgroundColor: resolveRoomBrand(room).accent },
+              speakingName && styles.roomBubbleInnerSpeaking,
+            ]}
+          >
+            {room.hostAvatarUrl ? (
+              <Image
+                source={{ uri: room.hostAvatarUrl }}
+                style={styles.roomBubbleImage}
+              />
+            ) : (
+              <Text style={styles.roomBubbleInitial}>
+                {room.initials || room.host?.charAt(0) || "S"}
+              </Text>
+            )}
+          </View>
+          <View
+            style={[
+              styles.roomBubbleLive,
+              speakingName && styles.roomBubbleLiveSpeaking,
+            ]}
+          >
+            <LivePulse size={5} color={speakingName ? "#FFFFFF" : "#11131A"} />
+          </View>
+        </Pressable>
+        <Pressable
+          onPress={onLeave}
+          style={styles.roomBubbleClose}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel="Odadan çık"
+        >
+          <Ionicons name="close" size={12} color="#FFFFFF" />
+        </Pressable>
+        {unreadCount > 0 ? (
+          <View style={styles.roomBubbleUnread}>
+            <Text style={styles.roomBubbleUnreadText}>
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </Text>
+          </View>
+        ) : null}
+        {canToggleMic ? (
+          <Pressable
+            onPress={onToggleMic}
+            style={({ pressed }) => [
+              styles.roomBubbleMic,
+              micOn ? styles.roomBubbleMicOn : styles.roomBubbleMicOff,
+              pressed && { transform: [{ scale: 0.9 }] },
+            ]}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={micOn ? "Mikrofonu kapat" : "Mikrofonu aç"}
+          >
+            <Ionicons
+              name={micOn ? "mic" : "mic-off"}
+              size={12}
+              color="#FFFFFF"
+            />
+          </Pressable>
+        ) : null}
+      </View>
       <Pressable
         onPress={onExpand}
-        style={styles.roomBubbleAvatar}
+        style={[
+          styles.roomBubbleCaption,
+          speakingName && styles.roomBubbleCaptionSpeaking,
+        ]}
         accessibilityRole="button"
-        accessibilityLabel="Odaya dön"
+        accessibilityLabel="Odayı büyüt"
       >
-        <View
-          style={[
-            styles.roomBubbleInner,
-            { backgroundColor: resolveRoomBrand(room).accent },
-          ]}
-        >
-          <Text style={styles.roomBubbleInitial}>
-            {room.initials || room.host?.charAt(0) || "S"}
-          </Text>
-        </View>
-        <View style={styles.roomBubbleLive}>
-          <LivePulse size={5} color="#11131A" />
-        </View>
-      </Pressable>
-      <Pressable
-        onPress={onLeave}
-        style={styles.roomBubbleClose}
-        hitSlop={6}
-        accessibilityRole="button"
-        accessibilityLabel="Odadan çık"
-      >
-        <Ionicons name="close" size={12} color="#FFFFFF" />
+        {speakingName ? <AudioBars color="#4ADE80" compact /> : null}
+        <Text numberOfLines={1} style={styles.roomBubbleCaptionText}>
+          {speakingName || room.title || "Yayında"}
+        </Text>
       </Pressable>
     </Animated.View>
   );
@@ -6165,6 +6226,8 @@ function Room({
   onOpenEvent,
   openGiftNonce = 0,
   minimized = false,
+  onMiniStateChange,
+  quickMicToggleRef,
 }) {
   const insets = useSafeAreaInsets();
   useEffect(() => {
@@ -7051,13 +7114,14 @@ function Room({
   useEffect(() => {
     if (!messages.length) return;
     const seen = seenMessageIdsRef.current;
+    const shouldCountUnread = !chatNearBottomRef.current || minimized;
     let incomingCount = 0;
     for (let i = 0; i < messages.length; i += 1) {
       const m = messages[i];
       if (!m?.id || seen.has(m.id)) continue;
       seen.add(m.id);
       if (
-        !chatNearBottomRef.current &&
+        shouldCountUnread &&
         !m.system &&
         !m.announcement &&
         (!userId || m.userId !== userId)
@@ -7066,13 +7130,20 @@ function Room({
       }
     }
     if (seen.size > 300) {
-      const keep = new Set(messages.map((m) => m?.id).filter(Boolean));
-      seenMessageIdsRef.current = keep;
+      seenMessageIdsRef.current = new Set(
+        messages.slice(-300).map((m) => m?.id).filter(Boolean),
+      );
     }
     if (incomingCount > 0) {
       setUnreadChatCount((curr) => Math.min(99, curr + incomingCount));
     }
-  }, [messages, userId]);
+  }, [messages, minimized, userId]);
+
+  useEffect(() => {
+    if (!minimized && chatNearBottomRef.current) {
+      setUnreadChatCount((curr) => (curr > 0 ? 0 : curr));
+    }
+  }, [minimized]);
 
   useEffect(() => {
     const userMessages = messages.filter((m) => m && !m.system && !m.announcement);
@@ -7773,7 +7844,7 @@ function Room({
       }
       messageGuard.record(cleanMessage);
       setMessages((current) => [
-        ...current,
+        ...current.slice(-149),
         {
           id: String(Date.now()),
           userId,
@@ -8655,6 +8726,26 @@ function Room({
       openParticipantMenu(target);
     }
   }, [focusedSpeaker, handleOwnSeatPress, openParticipantMenu, userId]);
+
+  useEffect(() => {
+    if (!quickMicToggleRef) return undefined;
+    quickMicToggleRef.current = toggleMicrophone;
+    return () => {
+      if (quickMicToggleRef.current === toggleMicrophone) {
+        quickMicToggleRef.current = null;
+      }
+    };
+  }, [quickMicToggleRef, toggleMicrophone]);
+
+  const focusedSpeakerName = focusedSpeaker?.participant?.name || "";
+  useEffect(() => {
+    onMiniStateChange?.({
+      micOn,
+      canToggleMic: iAmSeated,
+      speakingName: focusedSpeakerName,
+      unreadCount: unreadChatCount,
+    });
+  }, [focusedSpeakerName, iAmSeated, micOn, onMiniStateChange, unreadChatCount]);
 
   const handleChatScroll = useCallback((event) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
@@ -10307,6 +10398,26 @@ function AppContent() {
     }
   }, []);
   const [roomMinimized, setRoomMinimized] = useState(false);
+  const [roomMiniState, setRoomMiniState] = useState({
+    micOn: false,
+    canToggleMic: false,
+    speakingName: "",
+    unreadCount: 0,
+  });
+  const roomQuickMicToggleRef = useRef(null);
+  const handleMiniRoomToggleMic = useCallback(() => {
+    roomQuickMicToggleRef.current?.();
+  }, []);
+  useEffect(() => {
+    if (!room) {
+      setRoomMiniState({
+        micOn: false,
+        canToggleMic: false,
+        speakingName: "",
+        unreadCount: 0,
+      });
+    }
+  }, [room]);
   const [passwordPromptRoom, setPasswordPromptRoom] = useState(null);
   const [passwordPromptError, setPasswordPromptError] = useState(null);
   const [passwordPromptBusy, setPasswordPromptBusy] = useState(false);
@@ -12280,11 +12391,15 @@ function AppContent() {
               onMinimize={() => setRoomMinimized(true)}
               onEditProfile={handleOpenProfileEditor}
               minimized={roomMinimized}
+              onMiniStateChange={setRoomMiniState}
+              quickMicToggleRef={roomQuickMicToggleRef}
             />
           </View>
           {roomMinimized ? (
             <RoomMiniBubble
               room={room}
+              miniState={roomMiniState}
+              onToggleMic={handleMiniRoomToggleMic}
               onExpand={() => setRoomMinimized(false)}
               onLeave={leaveCurrentRoom}
             />
@@ -17398,10 +17513,17 @@ const styles = StyleSheet.create({
   },
   roomBubble: {
     position: "absolute",
-    right: 16,
-    width: 56,
-    height: 56,
+    right: 14,
+    width: 92,
+    alignItems: "center",
     zIndex: 60,
+  },
+  roomBubbleHead: {
+    width: 58,
+    height: 58,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
   },
   roomBubbleAvatar: {
     width: 56,
@@ -17415,6 +17537,7 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
     borderWidth: 2,
     borderColor: "rgba(255,255,255,0.9)",
     shadowColor: "#000000",
@@ -17422,6 +17545,14 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 8,
+  },
+  roomBubbleInnerSpeaking: {
+    borderColor: "#4ADE80",
+    borderWidth: 2.5,
+  },
+  roomBubbleImage: {
+    width: "100%",
+    height: "100%",
   },
   roomBubbleInitial: { color: "#11131A", fontSize: 20, fontWeight: "900" },
   roomBubbleLive: {
@@ -17437,6 +17568,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#FFFFFF",
   },
+  roomBubbleLiveSpeaking: {
+    backgroundColor: "#16A34A",
+  },
   roomBubbleClose: {
     position: "absolute",
     top: -4,
@@ -17449,6 +17583,67 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(217,79,79,0.95)",
     borderWidth: 2,
     borderColor: "#FFFFFF",
+  },
+  roomBubbleUnread: {
+    position: "absolute",
+    top: -5,
+    right: -5,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EF4444",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+  },
+  roomBubbleUnreadText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  roomBubbleMic: {
+    position: "absolute",
+    bottom: -4,
+    left: -6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+    elevation: 4,
+  },
+  roomBubbleMicOn: {
+    backgroundColor: "#16A34A",
+  },
+  roomBubbleMicOff: {
+    backgroundColor: "#334155",
+  },
+  roomBubbleCaption: {
+    marginTop: 4,
+    maxWidth: 94,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "rgba(15,23,42,0.88)",
+    borderWidth: 1,
+    borderColor: "rgba(148,163,184,0.32)",
+  },
+  roomBubbleCaptionSpeaking: {
+    borderColor: "rgba(74,222,128,0.65)",
+    backgroundColor: "rgba(15,35,28,0.92)",
+  },
+  roomBubbleCaptionText: {
+    color: "#F8FAFC",
+    fontSize: 10,
+    fontWeight: "800",
+    flexShrink: 1,
   },
   participantSheetHead: {
     flexDirection: "row",
