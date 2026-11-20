@@ -1120,22 +1120,19 @@ const Discover = memo(function Discover({
             ]}
           >
             <LinearGradient
-              colors={[...featuredRoomBrand.colors, "#0E1726"]}
+              colors={[...featuredRoomBrand.colors, "#0C1628"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.featureCardModern}
             >
-              <View style={styles.featureGlowOne} />
-              <View style={styles.featureGlowTwo} />
               <FloatingGlow
-                color="rgba(120,192,255,0.24)"
-                size={164}
-                style={{ top: -44, right: -34 }}
+                color="rgba(120,192,255,0.18)"
+                size={156}
+                style={{ top: -48, right: -38 }}
               />
-              <ShimmerSweep duration={4600} color="rgba(255,255,255,0.14)" />
               <View style={styles.featureTop}>
                 <View style={styles.featureLivePill}>
-                  <LivePulse size={6} />
+                  <LivePulse size={6} color="#4ADE80" />
                   <Text style={styles.featureLiveLabel}>ŞİMDİ CANLI</Text>
                 </View>
                 <View style={styles.featureCategoryPill}>
@@ -1164,8 +1161,9 @@ const Discover = memo(function Discover({
                         featuredRoom.initials?.charAt(0) ||
                         featuredRoom.host.charAt(0)
                       }
+                      uri={featuredRoom.hostAvatarUrl}
                       color={featuredRoomBrand.accent}
-                      size={30}
+                      size={32}
                     />
                     <View>
                       <Text style={styles.featureHostLabel}>SUNAN</Text>
@@ -1458,20 +1456,21 @@ const RoomCard = memo(function RoomCard({
           ]}
         >
           <LinearGradient
-            colors={[...roomBrand.colors, "#111820"]}
+            colors={[...roomBrand.colors, "#0C1628"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
             style={styles.roomArtwork}
           >
             <View
               style={[styles.roomArtworkOrb, { backgroundColor: roomBrand.accent }]}
             />
-            <View style={styles.roomArtworkRing} />
             <View style={styles.roomArtworkTop}>
               <View style={styles.roomArtworkLive}>
-                <LivePulse size={5} color={COLORS.primary} />
+                <LivePulse size={5} color="#4ADE80" />
                 <Text style={styles.roomArtworkLiveText}>CANLI</Text>
               </View>
               <View style={styles.roomArtworkCount}>
-                <Ionicons name="people" size={12} color="#FFFFFF" />
+                <Ionicons name="headset" size={11} color="#DBEAFE" />
                 <Text style={styles.roomArtworkCountText}>
                   {room.listeners}
                 </Text>
@@ -1481,7 +1480,7 @@ const RoomCard = memo(function RoomCard({
               <Text style={styles.roomArtworkInitial}>
                 {room.initials || room.title?.charAt(0) || "S"}
               </Text>
-              <AudioBars color="rgba(255,255,255,0.78)" compact />
+              <AudioBars color="rgba(255,255,255,0.82)" compact />
             </View>
             <Text style={styles.roomArtworkTitle} numberOfLines={2}>
               {room.passwordProtected ? (
@@ -1495,6 +1494,7 @@ const RoomCard = memo(function RoomCard({
             <View style={styles.roomHostRow}>
               <Avatar
                 label={room.host?.charAt(0) || "S"}
+                uri={room.hostAvatarUrl}
                 color={roomBrand.accent}
                 size={25}
               />
@@ -3716,19 +3716,12 @@ const BottomTabButton = memo(function BottomTabButton({
               styles.tabActivePill,
               { opacity: glowAnim, transform: [{ scaleX: pillScale }] },
             ]}
-          >
-            <LinearGradient
-              colors={["#2F80ED", "#1C5FB8"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.tabActivePillFill}
-            />
-          </Animated.View>
+          />
           <Animated.View style={{ transform: [{ translateY: iconLift }] }}>
             <Ionicons
               name={selected ? activeIcon : icon}
               size={20}
-              color={selected ? "#FFFFFF" : COLORS.muted}
+              color={selected ? COLORS.primary : COLORS.muted}
             />
           </Animated.View>
         </View>
@@ -16318,25 +16311,25 @@ const styles = StyleSheet.create({
     padding: 18,
     position: "relative",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(147,197,253,0.22)",
   },
   featureTitle: {
     color: "#FFFFFF",
     fontSize: 22,
-    letterSpacing: -0.8,
+    letterSpacing: -0.7,
     fontWeight: "900",
     marginBottom: 6,
     maxWidth: "100%",
   },
   featureSubtitle: {
-    color: "#EDF3FA",
+    color: "rgba(237,243,250,0.88)",
     fontSize: 14,
-    lineHeight: 19,
+    lineHeight: 20,
     maxWidth: "100%",
   },
   featureListenerText: {
-    color: "rgba(255,255,255,0.78)",
-    fontSize: 11,
+    color: "rgba(219,234,254,0.84)",
+    fontSize: 12,
     fontWeight: "800",
     marginTop: 10,
   },
@@ -16357,17 +16350,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   categoryChip: {
-    minHeight: 44,
+    minHeight: 40,
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
-    borderRadius: 15,
+    gap: 6,
+    borderRadius: 14,
     paddingHorizontal: 14,
     backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: "rgba(203,218,236,0.85)",
   },
-  categoryText: { color: COLORS.muted, fontSize: 13, fontWeight: "800" },
+  categoryText: { color: COLORS.textSecondary, fontSize: 13, fontWeight: "700" },
   listCount: { color: COLORS.muted, fontSize: 13, lineHeight: 18 },
   roomList: { gap: 13 },
   discoverListHeading: {
@@ -16387,33 +16380,37 @@ const styles = StyleSheet.create({
   roomGridItem: { width: "48.2%" },
   roomCard: {
     borderRadius: 22,
-    backgroundColor: COLORS.surfaceRaised,
+    backgroundColor: COLORS.surface,
     padding: 7,
     borderWidth: 1,
-    borderColor: COLORS.lineSoft,
+    borderColor: "rgba(203,218,236,0.78)",
     position: "relative",
-    ...ELEVATION.card,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
-  roomCardPressed: { opacity: 0.82, transform: [{ scale: 0.987 }] },
+  roomCardPressed: { opacity: 0.9, transform: [{ scale: 0.985 }] },
   roomCardMain: { flex: 1 },
   roomArtwork: {
     width: "100%",
-    height: 138,
-    borderRadius: 17,
+    height: 136,
+    borderRadius: 16,
     overflow: "hidden",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
+    borderColor: "rgba(255,255,255,0.14)",
   },
   roomArtworkOrb: {
     position: "absolute",
-    width: 155,
-    height: 155,
-    borderRadius: 78,
-    right: -59,
-    bottom: -54,
-    opacity: 0.57,
+    width: 148,
+    height: 148,
+    borderRadius: 74,
+    right: -56,
+    bottom: -56,
+    opacity: 0.28,
   },
   roomArtworkRing: {
     position: "absolute",
@@ -16421,15 +16418,15 @@ const styles = StyleSheet.create({
     height: 123,
     borderRadius: 62,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.24)",
+    borderColor: "rgba(255,255,255,0.14)",
     top: 20,
     right: -22,
   },
   roomArtworkTop: {
     position: "absolute",
-    top: 9,
-    left: 9,
-    right: 9,
+    top: 8,
+    left: 8,
+    right: 8,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -16439,27 +16436,31 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    borderRadius: 7,
-    backgroundColor: "rgba(13,17,25,0.65)",
+    paddingHorizontal: 7,
+    paddingVertical: 3.5,
+    borderRadius: 8,
+    backgroundColor: "rgba(10,18,34,0.72)",
+    borderWidth: 1,
+    borderColor: "rgba(74,222,128,0.28)",
   },
   roomArtworkLiveText: {
-    color: COLORS.primary,
-    fontSize: 8,
+    color: "#86EFAC",
+    fontSize: 9.5,
     fontWeight: "900",
-    letterSpacing: 0.7,
+    letterSpacing: 0.6,
   },
   roomArtworkCount: {
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    borderRadius: 7,
-    backgroundColor: "rgba(13,17,25,0.65)",
+    paddingHorizontal: 7,
+    paddingVertical: 3.5,
+    borderRadius: 8,
+    backgroundColor: "rgba(10,18,34,0.72)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
   },
-  roomArtworkCountText: { color: "#FFFFFF", fontSize: 9, fontWeight: "900" },
+  roomArtworkCountText: { color: "#FFFFFF", fontSize: 10.5, fontWeight: "800" },
   roomArtworkMonogram: { alignItems: "center", marginBottom: 13 },
   roomArtworkInitial: {
     color: "rgba(255,255,255,0.91)",
@@ -16539,9 +16540,9 @@ const styles = StyleSheet.create({
   },
   roomCategory: {
     color: COLORS.textSecondary,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "700",
-    marginTop: 6,
+    marginTop: 5,
     marginLeft: 1,
   },
   roomJoinIcon: {
@@ -16572,18 +16573,18 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     paddingHorizontal: 12,
-    paddingTop: 7,
+    paddingTop: 6,
     paddingBottom: 8,
-    backgroundColor: "rgba(255,255,255,0.98)",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: "rgba(255,255,255,0.97)",
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
     borderTopWidth: 1,
-    borderTopColor: "rgba(47,128,237,0.12)",
-    shadowColor: "#1C5FB8",
-    shadowOpacity: 0.14,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: -4 },
-    elevation: 16,
+    borderTopColor: "rgba(203,218,236,0.75)",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: -3 },
+    elevation: 5,
   },
   tabRow: {
     flexDirection: "row",
@@ -16594,8 +16595,8 @@ const styles = StyleSheet.create({
   tabItem: {
     flex: 1,
     minWidth: 0,
-    minHeight: 52,
-    paddingVertical: 4,
+    minHeight: 50,
+    paddingVertical: 3,
     paddingHorizontal: 4,
     borderRadius: 16,
     alignItems: "center",
@@ -16608,7 +16609,7 @@ const styles = StyleSheet.create({
   },
   tabIconWrap: {
     width: 52,
-    height: 30,
+    height: 29,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -16619,11 +16620,9 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     borderRadius: 15,
-    shadowColor: "#2F80ED",
-    shadowOpacity: 0.45,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 5,
+    backgroundColor: "rgba(47,128,237,0.13)",
+    borderWidth: 1,
+    borderColor: "rgba(47,128,237,0.22)",
   },
   tabActivePillFill: {
     flex: 1,
@@ -16637,14 +16636,14 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     color: COLORS.muted,
-    fontSize: 10.5,
+    fontSize: 11,
     lineHeight: 14,
     fontWeight: "700",
-    marginTop: 3,
+    marginTop: 4,
     textAlign: "center",
   },
   tabLabelActive: {
-    color: COLORS.primaryDark,
+    color: COLORS.primary,
     fontWeight: "900",
   },
   profileCover: {
