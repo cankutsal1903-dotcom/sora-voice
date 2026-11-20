@@ -2565,22 +2565,46 @@ const Profile = memo(function Profile({
   const openDailyMissions = useCallback(() => setMissionsOpen(true), []);
   const actions = useMemo(
     () => [
-      [
-        "flame-outline",
-        missionClaimable > 0
-          ? `Görevler & Giriş Serisi · ${missionClaimable} ödül hazır`
-          : "Görevler & 7 Günlük Seri",
-        openDailyMissions,
-      ],
-      [
-        "gift-outline",
-        dailyRewardClaimed
-          ? "Günlük ödül alındı"
-          : `Günlük ödül · +${formatCredits(DAILY_REWARD_AMOUNT)}`,
-        dailyRewardClaimed ? onOpenWallet : onClaimDailyReward,
-      ],
-      ["shield-checkmark-outline", "Güvenlik merkezi", openSafetyCenter],
-      ["settings-outline", "Ayarlar", onOpenSettings],
+      {
+        key: "missions",
+        icon: "flame",
+        iconColor: "#EA580C",
+        iconBg: "rgba(234,88,12,0.12)",
+        title: "Görevler & 7 Günlük Seri",
+        badge: missionClaimable > 0 ? `${missionClaimable} ÖDÜL` : null,
+        badgeColor: "#EA580C",
+        badgeBg: "rgba(234,88,12,0.12)",
+        action: openDailyMissions,
+      },
+      {
+        key: "daily",
+        icon: dailyRewardClaimed ? "checkmark-circle" : "gift",
+        iconColor: dailyRewardClaimed ? COLORS.success : COLORS.warning,
+        iconBg: dailyRewardClaimed ? COLORS.successSoft : COLORS.warningSoft,
+        title: dailyRewardClaimed ? "Günlük ödül alındı" : "Günlük ödülünü al",
+        badge: dailyRewardClaimed ? null : `+${formatCredits(DAILY_REWARD_AMOUNT)}`,
+        badgeColor: "#B45309",
+        badgeBg: COLORS.goldSoft,
+        action: dailyRewardClaimed ? onOpenWallet : onClaimDailyReward,
+      },
+      {
+        key: "safety",
+        icon: "shield-checkmark",
+        iconColor: COLORS.violet,
+        iconBg: COLORS.violetSoft,
+        title: "Güvenlik merkezi",
+        badge: null,
+        action: openSafetyCenter,
+      },
+      {
+        key: "settings",
+        icon: "settings",
+        iconColor: COLORS.primary,
+        iconBg: COLORS.primarySoft,
+        title: "Ayarlar",
+        badge: null,
+        action: onOpenSettings,
+      },
     ],
     [
       dailyRewardClaimed,
@@ -2767,7 +2791,7 @@ const Profile = memo(function Profile({
             >
               <LinearGradient
                 pointerEvents="none"
-                colors={["rgba(47,128,237,0.10)", "rgba(255,255,255,0)", "rgba(246,200,110,0.10)"]}
+                colors={["rgba(47,128,237,0.06)", "rgba(255,255,255,0)", "rgba(96,165,250,0.07)"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.profileHomeIdentityTint}
@@ -2829,42 +2853,46 @@ const Profile = memo(function Profile({
           <View style={styles.profileBannerRow}>
             <Pressable
               onPress={onEdit}
-              style={styles.profileBannerButton}
+              style={({ pressed }) => [
+                styles.profileBannerButton,
+                styles.profileBannerLight,
+                pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 },
+              ]}
               accessibilityRole="button"
               accessibilityLabel="Profilini kişiselleştir"
             >
-              <LinearGradient
-                colors={["#246BC7", "#6AA8F8"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.profileBanner}
-              >
-                <ShimmerSweep width={200} bandWidth={60} borderRadius={20} delay={1800} />
-                <View style={styles.profileBannerCopy}>
-                  <Text style={styles.profileBannerTitle}>Profilini düzenle</Text>
-                  <Text style={styles.profileBannerCaption}>Görünümünü kişiselleştir</Text>
-                </View>
-                <Ionicons name="color-palette-outline" size={29} color="#FFFFFF" />
-              </LinearGradient>
+              <View style={styles.profileBannerCopy}>
+                <Text style={styles.profileBannerTitleLight}>Profilini düzenle</Text>
+                <Text style={styles.profileBannerCaptionLight}>Çerçeve & tema</Text>
+              </View>
+              <View style={styles.profileBannerLightIcon}>
+                <Ionicons name="color-palette" size={21} color={COLORS.primary} />
+              </View>
             </Pressable>
             <Pressable
               onPress={onOpenWallet}
-              style={styles.profileBannerButton}
+              style={({ pressed }) => [
+                styles.profileBannerButton,
+                pressed && { transform: [{ scale: 0.98 }], opacity: 0.92 },
+              ]}
               accessibilityRole="button"
               accessibilityLabel="Cüzdanı aç"
             >
               <LinearGradient
-                colors={["#111820", "#1D2E43"]}
+                colors={["#0D1829", "#1B3154"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.profileBanner}
               >
-                <ShimmerSweep width={200} bandWidth={60} borderRadius={20} delay={3100} />
                 <View style={styles.profileBannerCopy}>
                   <Text style={styles.profileBannerTitle}>Cüzdan</Text>
-                  <Text style={styles.profileBannerCaption}>Bakiyeni yönet</Text>
+                  <Text numberOfLines={1} style={styles.profileBannerBalance}>
+                    {formatCredits(coins)} kredi
+                  </Text>
                 </View>
-                <Ionicons name="wallet-outline" size={29} color="#9FC7FF" />
+                <View style={styles.profileBannerDarkIcon}>
+                  <Ionicons name="wallet" size={20} color="#FDE68A" />
+                </View>
               </LinearGradient>
             </Pressable>
           </View>
@@ -2872,18 +2900,29 @@ const Profile = memo(function Profile({
 
         <Text style={styles.pfSection}>HESABIN</Text>
         <View style={styles.pfMenu}>
-          {actions.map(([icon, title, action]) => (
+          {actions.map((item, idx) => (
             <Pressable
-              key={title}
+              key={item.key}
               accessibilityRole="button"
-              accessibilityLabel={title}
-              onPress={action}
-              style={styles.pfMenuRow}
+              accessibilityLabel={item.title}
+              onPress={item.action}
+              style={({ pressed }) => [
+                styles.pfMenuRow,
+                idx === actions.length - 1 && { borderBottomWidth: 0 },
+                pressed && styles.pfMenuRowPressed,
+              ]}
             >
-              <View style={styles.pfMenuIcon}>
-                <Ionicons name={icon} size={19} color={COLORS.primary} />
+              <View style={[styles.pfMenuIcon, { backgroundColor: item.iconBg }]}>
+                <Ionicons name={item.icon} size={18} color={item.iconColor} />
               </View>
-              <Text style={styles.pfMenuTitle}>{title}</Text>
+              <Text style={styles.pfMenuTitle} numberOfLines={1}>{item.title}</Text>
+              {item.badge ? (
+                <View style={[styles.pfMenuBadge, { backgroundColor: item.badgeBg }]}>
+                  <Text style={[styles.pfMenuBadgeText, { color: item.badgeColor }]}>
+                    {item.badge}
+                  </Text>
+                </View>
+              ) : null}
               <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
             </Pressable>
           ))}
@@ -4385,29 +4424,38 @@ const SelfRoomSheet = memo(function SelfRoomSheet({
 /* Konusan kisinin profil cercevesinden yayilan ses dalgasi. */
 const SpeakingRing = memo(function SpeakingRing({
   size = 64,
-  color = COLORS.primary,
+  color = "#38BDF8",
 }) {
+  const reducedMotion = useReducedMotion();
   const pulse = useRef(new Animated.Value(0)).current;
   useEffect(() => {
+    if (reducedMotion) {
+      pulse.setValue(0.25);
+      return undefined;
+    }
     const loop = Animated.loop(
       Animated.timing(pulse, {
         toValue: 1,
-        duration: 1300,
-        easing: Easing.out(Easing.ease),
+        duration: 1200,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
     );
     loop.start();
     return () => loop.stop();
-  }, [pulse]);
-  const scale = pulse.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.45],
-  });
-  const opacity = pulse.interpolate({
-    inputRange: [0, 0.7, 1],
-    outputRange: [0.7, 0.25, 0],
-  });
+  }, [pulse, reducedMotion]);
+  const scale = reducedMotion
+    ? 1.08
+    : pulse.interpolate({
+        inputRange: [0, 1],
+        outputRange: [1, 1.26],
+      });
+  const opacity = reducedMotion
+    ? 0.72
+    : pulse.interpolate({
+        inputRange: [0, 0.55, 1],
+        outputRange: [0.85, 0.36, 0],
+      });
   return (
     <Animated.View
       pointerEvents="none"
@@ -4417,6 +4465,7 @@ const SpeakingRing = memo(function SpeakingRing({
           width: size,
           height: size,
           borderRadius: size / 2,
+          borderWidth: 2.2,
           borderColor: color,
           opacity,
           transform: [{ scale }],
@@ -8870,7 +8919,7 @@ function Room({
       >
         <View style={styles.roomAvatarWrap}>
           {participant.isSpeaking ? (
-            <SpeakingRing size={seatedAvatarSize + 14} color={COLORS.primary} />
+            <SpeakingRing size={seatedAvatarSize + 10} color="#38BDF8" />
           ) : null}
           <ProfileFrame
             appearance={seatFrameAppearance}
@@ -8887,6 +8936,7 @@ function Room({
                 isHostSeat && { width: seatedAvatarSize, height: seatedAvatarSize, borderRadius: seatedAvatarSize / 2 },
                 participant.role === "host" && styles.roomSpeakerAvatarHost,
                 participant.microphoneEnabled && styles.roomSpeakerAvatarActive,
+                participant.isSpeaking && styles.roomSpeakerAvatarSpeaking,
                 seatFrameAppearance?.asset && { borderWidth: 0 },
               ]}
             >
@@ -16996,14 +17046,14 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(47,128,237,0.13)",
   },
   roomEmptySeatLabel: {
-    color: "#C6D9F4",
-    fontSize: 10,
+    color: "#D3E3FA",
+    fontSize: 11,
     fontWeight: "800",
     overflow: "hidden",
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
-    backgroundColor: "rgba(47,128,237,0.16)",
+    backgroundColor: "rgba(47,128,237,0.18)",
   },
   roomSpeakerSlotHost: {
     backgroundColor: "rgba(47,128,237,0.045)",
@@ -17311,6 +17361,10 @@ const styles = StyleSheet.create({
     borderColor: "rgba(118,175,255,0.42)",
   },
   roomSpeakerAvatarActive: { borderColor: COLORS.primary },
+  roomSpeakerAvatarSpeaking: {
+    borderColor: "#4ADE80",
+    borderWidth: 2.5,
+  },
   roomSpeakerInitial: { color: "#FFFFFF", fontSize: 20, fontWeight: "900" },
   roomMicOnBadge: {
     position: "absolute",
@@ -17337,10 +17391,13 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.18)",
   },
   roomSpeakerName: {
-    color: "#F1F2EE",
-    fontSize: 11,
-    fontWeight: "700",
+    color: "#F8FAFC",
+    fontSize: 12,
+    fontWeight: "800",
     maxWidth: "100%",
+    textShadowColor: "rgba(4,9,20,0.65)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 
   roomEmptySeat: {
@@ -17349,14 +17406,9 @@ const styles = StyleSheet.create({
     borderRadius: 33,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(37,62,98,0.75)",
+    backgroundColor: "rgba(20,38,70,0.72)",
     borderWidth: 1.5,
-    borderColor: "rgba(118,175,255,0.3)",
-    shadowColor: "#2F80ED",
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
+    borderColor: "rgba(147,197,253,0.28)",
   },
   roomHandBtn: {
     flexDirection: "row",
@@ -17740,21 +17792,22 @@ const styles = StyleSheet.create({
   },
   profileHomeIdentity: {
     flex: 1,
-    minHeight: 104,
+    minHeight: 102,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    padding: 14,
-    borderRadius: 24,
+    paddingHorizontal: 14,
+    paddingVertical: 15,
+    borderRadius: 22,
     backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: "rgba(47,128,237,0.16)",
+    borderColor: "rgba(203,218,236,0.85)",
     overflow: "hidden",
-    shadowColor: "#1C5FB8",
-    shadowOpacity: 0.12,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 5,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
   profileHomePressed: { opacity: 0.82 },
   profileHomeAvatarWrap: { position: "relative" },
@@ -17799,22 +17852,63 @@ const styles = StyleSheet.create({
   profileMetric: { flex: 1, alignItems: "center", paddingVertical: 7 },
   profileMetricNumber: { color: COLORS.text, fontSize: 20, fontWeight: "900" },
   profileMetricLabel: { color: COLORS.muted, fontSize: 10, fontWeight: "700", marginTop: 2 },
-  profileBannerRow: { flexDirection: "row", gap: 10, marginTop: 13 },
+  profileBannerRow: { flexDirection: "row", gap: 10, marginTop: 12 },
   profileBannerButton: { flex: 1 },
-  profileBanner: {
-    minHeight: 86,
+  profileBannerLight: {
+    minHeight: 72,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 5,
-    paddingHorizontal: 12,
+    gap: 8,
+    paddingHorizontal: 13,
     paddingVertical: 12,
-    borderRadius: 17,
+    borderRadius: 18,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: "rgba(203,218,236,0.88)",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  profileBannerLightIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    backgroundColor: COLORS.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  profileBannerTitleLight: { color: COLORS.text, fontSize: 13.5, fontWeight: "900" },
+  profileBannerCaptionLight: { color: COLORS.textSecondary, fontSize: 11, fontWeight: "700", marginTop: 2 },
+  profileBanner: {
+    minHeight: 72,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    paddingHorizontal: 13,
+    paddingVertical: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(147,197,253,0.22)",
     overflow: "hidden",
   },
+  profileBannerDarkIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    backgroundColor: "rgba(253,230,138,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(253,230,138,0.26)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   profileBannerCopy: { flex: 1 },
-  profileBannerTitle: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
-  profileBannerCaption: { color: "rgba(255,255,255,0.78)", fontSize: 10, fontWeight: "700", marginTop: 4 },
+  profileBannerTitle: { color: "#FFFFFF", fontSize: 13.5, fontWeight: "900" },
+  profileBannerCaption: { color: "rgba(255,255,255,0.78)", fontSize: 11, fontWeight: "700", marginTop: 2 },
+  profileBannerBalance: { color: "#FDE68A", fontSize: 12, fontWeight: "900", marginTop: 2 },
   profileLevelSummary: {
     flexDirection: "row",
     alignItems: "center",
@@ -18388,7 +18482,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: "rgba(203,218,236,0.82)",
     overflow: "hidden",
   },
   pfMenuRow: {
@@ -18396,19 +18490,32 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     paddingHorizontal: 14,
-    paddingVertical: 11,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.lineSoft,
   },
+  pfMenuRowPressed: {
+    backgroundColor: COLORS.surfaceRaised,
+  },
   pfMenuIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: COLORS.surfaceRaised,
   },
   pfMenuTitle: { flex: 1, color: COLORS.text, fontSize: 14, fontWeight: "800" },
+  pfMenuBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 999,
+  },
+  pfMenuBadgeText: {
+    fontSize: 10.5,
+    fontWeight: "900",
+    letterSpacing: 0.3,
+  },
 
   /* ══ Oda: bütünleşik sohbet, alt bar ve oda sahibi kontrolleri ═════ */
   roomTitleLine: { flexDirection: "row", alignItems: "center", gap: 7 },
@@ -18608,27 +18715,32 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 6,
   },
-  messageList: { gap: 6, paddingBottom: 4 },
+  messageList: { gap: 7, paddingBottom: 4 },
   messageRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   messageBubble: {
     flexDirection: "row",
     alignItems: "flex-start",
     maxWidth: "88%",
     paddingHorizontal: 11,
-    paddingVertical: 6,
-    borderRadius: 14,
-    backgroundColor: "rgba(6,11,22,0.42)",
-  },
-  messageBubbleSystem: { backgroundColor: "rgba(47,128,237,0.13)" },
-  messageBubbleAnnouncement: {
-    backgroundColor: "rgba(47,128,237,0.2)",
+    paddingVertical: 7,
+    borderRadius: 15,
+    backgroundColor: "rgba(10,18,34,0.58)",
     borderWidth: 1,
-    borderColor: "rgba(118,175,255,0.28)",
+    borderColor: "rgba(148,184,238,0.14)",
+  },
+  messageBubbleSystem: {
+    backgroundColor: "rgba(47,128,237,0.16)",
+    borderColor: "rgba(147,197,253,0.18)",
+  },
+  messageBubbleAnnouncement: {
+    backgroundColor: "rgba(37,99,235,0.22)",
+    borderWidth: 1,
+    borderColor: "rgba(147,197,253,0.34)",
   },
   messageAnnouncementIcon: { marginTop: 3, marginRight: 6 },
-  messageText: { flexShrink: 1, color: "#DCE5F0", fontSize: 13, lineHeight: 19 },
-  systemMessage: { color: "#A9C3E4", fontStyle: "normal", fontSize: 12, lineHeight: 18 },
-  announcementMessage: { color: "#E6F0FF", fontWeight: "700" },
+  messageText: { flexShrink: 1, color: "#EAF1FA", fontSize: 13.5, lineHeight: 19.5 },
+  systemMessage: { color: "#B8D0EC", fontStyle: "normal", fontSize: 12.5, lineHeight: 18 },
+  announcementMessage: { color: "#F1F7FF", fontWeight: "800" },
   messageReportButton: {
     width: 24,
     height: 24,
@@ -19120,7 +19232,7 @@ const styles = StyleSheet.create({
     marginRight: 7,
   },
   messageBubbleGift: {
-    borderColor: "rgba(99,179,255,0.38)",
-    backgroundColor: "rgba(23,46,84,0.78)",
+    borderColor: "rgba(250,204,21,0.36)",
+    backgroundColor: "rgba(28,38,68,0.82)",
   },
 });
