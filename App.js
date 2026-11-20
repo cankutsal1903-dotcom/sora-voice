@@ -751,6 +751,7 @@ const Discover = memo(function Discover({
   profile,
   favoriteRoomIds,
   recentRoomIds,
+  followedUserIds = [],
   notificationCount,
   currentUserId,
   events = [],
@@ -836,6 +837,14 @@ const Discover = memo(function Discover({
     },
     [onToggleFavorite],
   );
+
+  const followedLiveRooms = useMemo(() => {
+    if (!Array.isArray(followedUserIds) || followedUserIds.length === 0) return [];
+    const followedSet = new Set(followedUserIds);
+    return rooms
+      .filter((item) => item?.hostId && followedSet.has(item.hostId))
+      .sort((a, b) => (Number(b.listeners) || 0) - (Number(a.listeners) || 0));
+  }, [followedUserIds, rooms]);
 
   const featuredRoom = useMemo(
     () =>
@@ -1029,6 +1038,69 @@ const Discover = memo(function Discover({
               style={{ marginTop: 2, marginBottom: 12 }}
             />
           </Reveal>
+        ) : null}
+
+        {followedLiveRooms.length > 0 ? (
+          <View style={styles.followedLiveSection}>
+            <View style={styles.followedLiveHeader}>
+              <View style={styles.followedLiveTitleRow}>
+                <LivePulse size={7} color="#22C55E" />
+                <Text style={styles.followedLiveHeading}>Takip ettiklerin yayında</Text>
+              </View>
+              <View style={styles.followedLiveCountBadge}>
+                <Text style={styles.followedLiveCountText}>{followedLiveRooms.length}</Text>
+              </View>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.followedLiveRow}
+            >
+              {followedLiveRooms.map((liveRoom) => (
+                <Pressable
+                  key={liveRoom.id}
+                  onPress={() => handleOpenRoom(liveRoom)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${liveRoom.host} canlı odasına katıl`}
+                  style={({ pressed }) => [
+                    styles.followedLiveCard,
+                    pressed && { transform: [{ scale: 0.96 }], opacity: 0.9 },
+                  ]}
+                >
+                  <LinearGradient
+                    colors={["#22C55E", "#38BDF8", "#2F80ED"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.followedLiveRing}
+                  >
+                    <View style={styles.followedLiveAvatarInner}>
+                      <Avatar
+                        initials={liveRoom.initials || (liveRoom.host || "S").charAt(0).toUpperCase()}
+                        uri={liveRoom.hostAvatarUrl}
+                        color={liveRoom.accent || COLORS.primary}
+                        size={42}
+                      />
+                    </View>
+                    <View style={styles.followedLiveTag}>
+                      <Text style={styles.followedLiveTagText}>CANLI</Text>
+                    </View>
+                  </LinearGradient>
+                  <Text numberOfLines={1} style={styles.followedLiveHost}>
+                    {liveRoom.host}
+                  </Text>
+                  <Text numberOfLines={1} style={styles.followedLiveRoomTitle}>
+                    {liveRoom.title}
+                  </Text>
+                  <View style={styles.followedLiveListeners}>
+                    <Ionicons name="headset" size={10} color={COLORS.primary} />
+                    <Text style={styles.followedLiveListenersText}>
+                      {Math.max(1, Number(liveRoom.listeners) || 1)}
+                    </Text>
+                  </View>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
         ) : null}
 
         <Reveal delay={50}>
@@ -6120,6 +6192,8 @@ function Room({
   const [pkCreateOpen, setPkCreateOpen] = useState(false);
   const activePkRef = useRef(null);
   activePkRef.current = activePk;
+  const partyStateRef = useRef({ poll: null, timer: null, pk: null });
+  partyStateRef.current = { poll: activePoll, timer: activeTimer, pk: activePk };
   const ownGiftSpentRef = useRef(ownGiftSpent);
   ownGiftSpentRef.current = ownGiftSpent;
   const [floatingReactions, setFloatingReactions] = useState([]);
@@ -6535,6 +6609,7 @@ function Room({
   useEffect(() => {
     if (!room.persisted || !supabase || !chatAccessReady) return undefined;
     let active = true;
+    const syncReplyTimers = [];
     const channel = supabase
       .channel(`room-messages-${room.id}`, {
         config: { broadcast: { self: false } },
@@ -6631,6 +6706,86 @@ function Room({
         },
       )
       .on(
+        "broadcast",
+        { event: "room_party_sync_req" },
+        ({ payload }) => {
+          if (!active || !payload?.requesterId || payload.requesterId === userId) return;
+          const now = Date.now();
+          const snap = partyStateRef.current;
+          const hasValidTimer = snap.timer && (!snap.timer.endsAt || snap.timer.endsAt > now);
+          const hasValidPk = snap.pk && (!snap.pk.endsAt || snap.pk.endsAt > now);
+          if (!snap.poll && !hasValidTimer && !hasValidPk) return;
+          const delayMs =
+            room.hostId && room.hostId === userId
+              ? 40
+              : 180 + Math.floor(Math.random() * 280);
+          const t = setTimeout(() => {
+            if (!active || roomRealtimeChannelRef.current !== channel) return;
+            const latest = partyStateRef.current;
+            const tNow = Date.now();
+            const validTimer =
+              latest.timer && (!latest.timer.endsAt || latest.timer.endsAt > tNow)
+                ? latest.timer
+                : null;
+            const validPk =
+              latest.pk && (!latest.pk.endsAt || latest.pk.endsAt > tNow)
+                ? latest.pk
+                : null;
+            if (!latest.poll && !validTimer && !validPk) return;
+            channel
+              .send({
+                type: "broadcast",
+                event: "room_party_sync_state",
+                payload: {
+                  targetId: payload.requesterId,
+                  poll: latest.poll || null,
+                  timer: validTimer,
+                  pk: validPk,
+                },
+              })
+              .catch(() => undefined);
+          }, delayMs);
+          syncReplyTimers.push(t);
+        },
+      )
+      .on(
+        "broadcast",
+        { event: "room_party_sync_state" },
+        ({ payload }) => {
+          if (!active || !payload) return;
+          if (payload.targetId && userId && payload.targetId !== userId) return;
+          const now = Date.now();
+          if (payload.poll) {
+            setActivePoll((curr) => {
+              if (!curr) return payload.poll;
+              if (curr.id === payload.poll.id) {
+                return {
+                  ...curr,
+                  votes: { ...(payload.poll.votes || {}), ...(curr.votes || {}) },
+                };
+              }
+              return curr;
+            });
+          }
+          if (payload.timer && (!payload.timer.endsAt || payload.timer.endsAt > now)) {
+            setActiveTimer((curr) => curr || payload.timer);
+          }
+          if (payload.pk && (!payload.pk.endsAt || payload.pk.endsAt > now)) {
+            setActivePk((curr) => {
+              if (!curr) return payload.pk;
+              if (curr.id === payload.pk.id) {
+                return {
+                  ...curr,
+                  leftScore: Math.max(curr.leftScore || 0, Number(payload.pk.leftScore || 0)),
+                  rightScore: Math.max(curr.rightScore || 0, Number(payload.pk.rightScore || 0)),
+                };
+              }
+              return curr;
+            });
+          }
+        },
+      )
+      .on(
         "postgres_changes",
         {
           event: "INSERT",
@@ -6690,6 +6845,14 @@ function Room({
         if (!active) return;
         if (status === "SUBSCRIBED") {
           setChatRealtimeStatus("live");
+          // Sonradan katılan veya yeniden bağlanan kullanıcı aktif Anket/Sayaç/PK durumunu alır
+          channel
+            .send({
+              type: "broadcast",
+              event: "room_party_sync_req",
+              payload: { requesterId: userId || `guest-${Date.now()}` },
+            })
+            .catch(() => undefined);
           if (entranceSentRoomRef.current !== room.id) {
             entranceSentRoomRef.current = room.id;
             const liveProfile = profileRef.current;
@@ -6737,6 +6900,7 @@ function Room({
     roomRealtimeChannelRef.current = channel;
     return () => {
       active = false;
+      syncReplyTimers.forEach((timerId) => clearTimeout(timerId));
       if (roomRealtimeChannelRef.current === channel) {
         roomRealtimeChannelRef.current = null;
       }
@@ -11725,6 +11889,7 @@ function AppContent() {
             profile={profile}
             favoriteRoomIds={favoriteRoomIds}
             recentRoomIds={recentRoomIds}
+            followedUserIds={followedUserIds}
             notificationCount={notifications.length}
             currentUserId={authSession?.user?.id}
             events={soraEvents}
@@ -11752,6 +11917,8 @@ function AppContent() {
               currentUserId={authSession?.user?.id}
               profile={profile}
               initialFamily={myFamily}
+              rooms={rooms}
+              onOpenRoom={openRoom}
               coins={walletBalance}
               coinBlastEvent={activeTab === "community" ? (coinBlastQueue[0] || null) : null}
               onReserveGiftSpend={reserveOptimisticGiftSpend}
@@ -15629,6 +15796,121 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: 0.9,
     marginTop: 1,
+  },
+  followedLiveSection: {
+    marginTop: 2,
+    marginBottom: 14,
+  },
+  followedLiveHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 9,
+  },
+  followedLiveTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+  followedLiveHeading: {
+    color: COLORS.text,
+    fontSize: 13,
+    fontWeight: "900",
+    letterSpacing: -0.2,
+  },
+  followedLiveCountBadge: {
+    minWidth: 22,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    backgroundColor: "rgba(34,197,94,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(34,197,94,0.32)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  followedLiveCountText: {
+    color: "#15803D",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  followedLiveRow: {
+    gap: 10,
+    paddingRight: 8,
+  },
+  followedLiveCard: {
+    width: 102,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 18,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.lineSoft,
+    alignItems: "center",
+    gap: 4,
+    ...ELEVATION.card,
+  },
+  followedLiveRing: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+    position: "relative",
+  },
+  followedLiveAvatarInner: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: COLORS.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  followedLiveTag: {
+    position: "absolute",
+    bottom: -5,
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+    backgroundColor: "#16A34A",
+    borderWidth: 1.5,
+    borderColor: COLORS.surface,
+  },
+  followedLiveTagText: {
+    color: "#FFFFFF",
+    fontSize: 7.5,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+  },
+  followedLiveHost: {
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: "800",
+    marginTop: 2,
+    maxWidth: "100%",
+  },
+  followedLiveRoomTitle: {
+    color: COLORS.textSecondary,
+    fontSize: 10,
+    fontWeight: "600",
+    maxWidth: "100%",
+  },
+  followedLiveListeners: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    marginTop: 1,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: COLORS.primarySoft,
+  },
+  followedLiveListenersText: {
+    color: COLORS.primary,
+    fontSize: 10,
+    fontWeight: "800",
   },
   featurePressable: { marginTop: 3 },
   featureCardModern: {

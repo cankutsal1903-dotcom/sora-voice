@@ -51,6 +51,7 @@ import { KeyboardSafeView, useKeyboardInset } from "../ui/useKeyboardInset";
 import { SoraGiftEffect } from "../ui/SoraGiftEffect";
 import { CoinBlastEffect } from "../ui/CoinBlastEffect";
 import { ShimmerSweep } from "../ui/SoraFx";
+import { LivePulse } from "../ui/Motion";
 import { SoraWealthBadge } from "../ui/SoraWealthTier";
 import { useGiftSpentMap } from "../data/wealthStore";
 
@@ -427,6 +428,8 @@ export const CommunityScreen = memo(function CommunityScreen({
   currentUserId,
   profile,
   initialFamily = null,
+  rooms = [],
+  onOpenRoom,
   coins = 0,
   coinBlastEvent = null,
   onReserveGiftSpend,
@@ -1511,6 +1514,19 @@ export const CommunityScreen = memo(function CommunityScreen({
   }, [familyMembers]);
   memberByIdRef.current = memberById;
 
+  const familyLiveRooms = useMemo(() => {
+    if (!myFamily?.id || !Array.isArray(rooms) || rooms.length === 0) return [];
+    const memberIds = new Set();
+    if (myFamily.ownerId) memberIds.add(myFamily.ownerId);
+    for (const m of familyMembers) {
+      if (m?.userId) memberIds.add(m.userId);
+    }
+    if (memberIds.size === 0) return [];
+    return rooms
+      .filter((r) => r?.hostId && memberIds.has(r.hostId))
+      .sort((a, b) => (Number(b.listeners) || 0) - (Number(a.listeners) || 0));
+  }, [familyMembers, myFamily?.id, myFamily?.ownerId, rooms]);
+
   const chatParticipantIds = useMemo(() => {
     const ids = [];
     if (currentUserId) ids.push(currentUserId);
@@ -1644,6 +1660,64 @@ export const CommunityScreen = memo(function CommunityScreen({
               <Text style={styles.giftHeaderPillText}>Hediye</Text>
             </Pressable>
           </View>
+
+          {familyLiveRooms.length > 0 && onOpenRoom ? (
+            <View style={styles.familyLiveWrap}>
+              {familyLiveRooms.slice(0, 2).map((liveRoom) => {
+                const member = liveRoom.hostId ? memberById.get(liveRoom.hostId) : null;
+                return (
+                  <Pressable
+                    key={liveRoom.id}
+                    onPress={() => onOpenRoom(liveRoom)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${liveRoom.title} canlı aile odasına katıl`}
+                    style={({ pressed }) => [
+                      styles.familyLiveBar,
+                      pressed && { transform: [{ scale: 0.985 }], opacity: 0.92 },
+                    ]}
+                  >
+                    <LinearGradient
+                      colors={["#0F213E", "#183766", "#13294B"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[StyleSheet.absoluteFill, { borderRadius: 14 }]}
+                    />
+                    <View style={styles.familyLiveAvatarBox}>
+                      <MemberAvatar
+                        uri={liveRoom.hostAvatarUrl || member?.avatarUrl || null}
+                        name={liveRoom.host || member?.name || "Aile"}
+                        color={liveRoom.accent || member?.color || COLORS.primary}
+                        size={34}
+                      />
+                      <View style={styles.familyLiveDotWrap}>
+                        <LivePulse size={7} color="#22C55E" />
+                      </View>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.familyLiveTopRow}>
+                        <Text style={styles.familyLiveBadgeText}>AİLE YAYINDA</Text>
+                        <Text style={styles.familyLiveCountText}>
+                          · {Math.max(1, Number(liveRoom.listeners) || 1)} kişi
+                        </Text>
+                      </View>
+                      <Text numberOfLines={1} style={styles.familyLiveTitle}>
+                        {liveRoom.title}
+                      </Text>
+                    </View>
+                    <LinearGradient
+                      colors={["#22C55E", "#16A34A"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.familyLiveJoinBtn}
+                    >
+                      <Ionicons name="headset" size={13} color="#FFFFFF" />
+                      <Text style={styles.familyLiveJoinText}>Katıl</Text>
+                    </LinearGradient>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
 
           {messagesError ? (
             <Pressable
@@ -2624,6 +2698,72 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+  },
+  familyLiveWrap: {
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 2,
+    gap: 6,
+  },
+  familyLiveBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(34,197,94,0.34)",
+    overflow: "hidden",
+  },
+  familyLiveAvatarBox: {
+    position: "relative",
+  },
+  familyLiveDotWrap: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+    width: 13,
+    height: 13,
+    borderRadius: 6.5,
+    backgroundColor: "#0F213E",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  familyLiveTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  familyLiveBadgeText: {
+    color: "#4ADE80",
+    fontSize: 9.5,
+    fontWeight: "900",
+    letterSpacing: 0.7,
+  },
+  familyLiveCountText: {
+    color: "rgba(219,234,254,0.78)",
+    fontSize: 10.5,
+    fontWeight: "700",
+  },
+  familyLiveTitle: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "800",
+    marginTop: 1,
+  },
+  familyLiveJoinBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 11,
+    paddingVertical: 6.5,
+    borderRadius: 10,
+  },
+  familyLiveJoinText: {
+    color: "#FFFFFF",
+    fontSize: 11.5,
+    fontWeight: "900",
   },
   xpStripLabels: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   xpStripTitle: { color: COLORS.text, fontSize: 11, fontWeight: "800" },
