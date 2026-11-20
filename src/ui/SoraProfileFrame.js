@@ -526,18 +526,19 @@ export const ProfileFrame = memo(function ProfileFrame({
           <View
             style={[
               StyleSheet.absoluteFill,
-              { borderRadius: auraD / 2, backgroundColor: appearance.glowColor, opacity: 0.45 },
+              { borderRadius: auraD / 2, backgroundColor: appearance.glowColor, opacity: 0.16 },
             ]}
           />
           <View
             style={{
               position: "absolute",
-              left: auraD * 0.09,
-              top: auraD * 0.09,
-              width: auraD * 0.82,
-              height: auraD * 0.82,
-              borderRadius: auraD * 0.41,
+              left: auraD * 0.12,
+              top: auraD * 0.12,
+              width: auraD * 0.76,
+              height: auraD * 0.76,
+              borderRadius: auraD * 0.38,
               backgroundColor: appearance.glowColor,
+              opacity: 0.28,
             }}
           />
         </Animated.View>

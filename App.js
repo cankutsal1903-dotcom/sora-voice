@@ -813,7 +813,7 @@ function Discover({
           <EventBannerCarousel
             events={events}
             onOpenEvent={onOpenEvent}
-            style={{ marginTop: 4, marginBottom: 14 }}
+            style={{ marginHorizontal: -18, marginTop: 4, marginBottom: 14 }}
           />
         ) : null}
         <LinearGradient
@@ -857,7 +857,7 @@ function Discover({
             accessibilityLabel="Yeni sesli oda aç"
             style={({ pressed }) => [
               styles.discoverEmptyButton,
-              { paddingHorizontal: 0, overflow: "hidden" },
+              { overflow: "hidden" },
               pressed && { transform: [{ scale: 0.97 }], opacity: 0.92 },
             ]}
             onPress={onCreate}
@@ -970,7 +970,7 @@ function Discover({
             <EventBannerCarousel
               events={events}
               onOpenEvent={onOpenEvent}
-              style={{ marginTop: 2, marginBottom: 14 }}
+              style={{ marginHorizontal: -18, marginTop: 2, marginBottom: 14 }}
             />
           </Reveal>
         ) : null}
@@ -2979,6 +2979,7 @@ function Profile({
       </ScrollView>
       <ProfileDetailSheet
         visible={profileDetailsOpen}
+        userId={userId}
         profile={profile}
         isSelf
         onEdit={onEdit}

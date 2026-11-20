@@ -119,5 +119,9 @@ export const useGiftSpentMap = (userIds = []) => {
     requestGiftSpent(key ? key.split(",") : []);
     return () => listeners.delete(fn);
   }, [key]);
-  return spentCache;
+  const snapshot = {};
+  spentCache.forEach((value, id) => {
+    snapshot[id] = value;
+  });
+  return snapshot;
 };

@@ -1708,7 +1708,7 @@ const styles = StyleSheet.create({
     borderRadius: 130,
     top: -150,
     alignSelf: "center",
-    opacity: 0.6,
+    opacity: 0.24,
   },
   sheetHandle: {
     alignSelf: "center",
