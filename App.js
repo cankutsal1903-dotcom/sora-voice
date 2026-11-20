@@ -2888,7 +2888,7 @@ function Profile({
                       ]}
                     >
                       <View style={{ marginBottom: 4, position: "relative" }}>
-                        <SoraLevelCrest level={tier.minLevel} size={50} locked={!unlocked} />
+                        <SoraLevelCrest level={tier.minLevel} size={44} locked={!unlocked} />
                         {!unlocked ? (
                           <View style={styles.pfBadgeLock}>
                             <Ionicons name="lock-closed" size={10} color="#FFFFFF" />
@@ -2914,20 +2914,21 @@ function Profile({
 
         <Text style={styles.pfSection}>ETKİNLİK ROZETLERİ</Text>
         <View style={styles.pfBadgeGridStack}>
-          {[badges.slice(0, 2), badges.slice(2, 4)].map((row, rowIdx) => (
-            <View key={`ach-row-${rowIdx}`} style={styles.pfBadgeRow}>
+          {[badges.slice(0, 4)].map((row, rowIdx) => (
+            <View key={`ach-row-${rowIdx}`} style={[styles.pfBadgeRow, { gap: 8 }]}>
               {row.map((badge) => (
                 <View
                   key={badge.id}
                   style={[
                     styles.pfBadge,
+                    { paddingVertical: 10, paddingHorizontal: 4, borderRadius: 16 },
                     badge.unlocked && { borderColor: `${badge.tint}55` },
                   ]}
                 >
-                  <View style={styles.pfBadgeMedal}>
+                  <View style={[styles.pfBadgeMedal, { width: 46, height: 46 }]}>
                     <SoraAchievementBadge
                       badgeId={badge.id}
-                      size={54}
+                      size={42}
                       locked={!badge.unlocked}
                     />
                     {!badge.unlocked ? (
@@ -3140,7 +3141,7 @@ function ProfileDetailSheet({
               colors={COLORS.gradients.dark}
               style={StyleSheet.absoluteFill}
             />
-            <View style={[styles.profileDetailOrb, { backgroundColor: `${color}55` }]} />
+            <View style={[styles.profileDetailOrb, { backgroundColor: `${color}22` }]} />
             <FloatingGlow
               color="rgba(82,165,255,0.26)"
               size={168}
@@ -11820,7 +11821,7 @@ const styles = StyleSheet.create({
     height: 160,
     borderRadius: 80,
     backgroundColor: COLORS.primary,
-    opacity: 0.18,
+    opacity: 0.09,
     top: -60,
     right: -30,
   },
@@ -11832,7 +11833,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     bottom: -20,
     right: 50,
-    opacity: 0.28,
+    opacity: 0.12,
   },
   featureContent: { flex: 1, justifyContent: "space-between" },
   liveText: {
@@ -14922,7 +14923,7 @@ const styles = StyleSheet.create({
     width: 220,
     height: 220,
     borderRadius: 110,
-    backgroundColor: "rgba(47,128,237,0.12)",
+    backgroundColor: "rgba(47,128,237,0.06)",
     top: -100,
     right: -84,
   },
@@ -15108,17 +15109,17 @@ const styles = StyleSheet.create({
   },
   featurePressable: { marginTop: 3 },
   featureCardModern: {
-    minHeight: 210,
+    minHeight: 184,
     overflow: "hidden",
-    borderRadius: 26,
-    padding: 20,
+    borderRadius: 24,
+    padding: 18,
     position: "relative",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
   },
   featureTitle: {
     color: "#FFFFFF",
-    fontSize: 25,
+    fontSize: 22,
     letterSpacing: -0.8,
     fontWeight: "900",
     marginBottom: 6,
@@ -15194,7 +15195,7 @@ const styles = StyleSheet.create({
   roomCardMain: { flex: 1 },
   roomArtwork: {
     width: "100%",
-    height: 166,
+    height: 138,
     borderRadius: 17,
     overflow: "hidden",
     justifyContent: "center",
@@ -15259,7 +15260,7 @@ const styles = StyleSheet.create({
   roomArtworkMonogram: { alignItems: "center", marginBottom: 13 },
   roomArtworkInitial: {
     color: "rgba(255,255,255,0.91)",
-    fontSize: 37,
+    fontSize: 30,
     fontWeight: "900",
     letterSpacing: -1,
   },
@@ -16963,8 +16964,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 1.4,
-    marginTop: 26,
-    marginBottom: 10,
+    marginTop: 20,
+    marginBottom: 9,
   },
   pfBadgeGridStack: {
     gap: 10,
@@ -16978,9 +16979,9 @@ const styles = StyleSheet.create({
     minWidth: 0,
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 6,
-    paddingVertical: 14,
-    paddingHorizontal: 8,
+    gap: 4,
+    paddingVertical: 11,
+    paddingHorizontal: 6,
     borderRadius: 18,
     backgroundColor: COLORS.surface,
     borderWidth: 1,
@@ -17113,13 +17114,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingVertical: 11,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.lineSoft,
   },
   pfMenuIcon: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",

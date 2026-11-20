@@ -1504,7 +1504,7 @@ const styles = StyleSheet.create({
     borderRadius: 90,
     top: -90,
     right: -60,
-    opacity: 0.22,
+    opacity: 0.1,
   },
   cardGlowSmall: {
     position: "absolute",
@@ -1513,7 +1513,7 @@ const styles = StyleSheet.create({
     borderRadius: 55,
     bottom: -70,
     left: -40,
-    opacity: 0.16,
+    opacity: 0.07,
   },
   cardTopLine: {
     position: "absolute",
@@ -1708,7 +1708,7 @@ const styles = StyleSheet.create({
     borderRadius: 130,
     top: -150,
     alignSelf: "center",
-    opacity: 0.24,
+    opacity: 0.1,
   },
   sheetHandle: {
     alignSelf: "center",

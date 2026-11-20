@@ -709,7 +709,7 @@ const BannerCard = memo(function BannerCard({ event, width, floatValue, pulseVal
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
-      <View pointerEvents="none" style={[styles.bannerOrbLarge, { backgroundColor: withAlpha(event.accent, 0.26) }]} />
+      <View pointerEvents="none" style={[styles.bannerOrbLarge, { backgroundColor: withAlpha(event.accent, 0.12) }]} />
       <View pointerEvents="none" style={styles.bannerOrbSmall} />
       <View pointerEvents="none" style={styles.bannerRing} />
       <LinearGradient
@@ -722,7 +722,7 @@ const BannerCard = memo(function BannerCard({ event, width, floatValue, pulseVal
 
       <View style={styles.bannerArtWrap} pointerEvents="none">
         <Animated.View
-          style={[styles.bannerArtGlow, { backgroundColor: withAlpha(event.accent, 0.42), transform: [{ scale: glowScale }] }]}
+          style={[styles.bannerArtGlow, { backgroundColor: withAlpha(event.accent, 0.16), transform: [{ scale: glowScale }] }]}
         />
         <Animated.View style={{ transform: [{ translateY }, { rotate }] }}>
           <EventArtwork event={event} size={78} />
@@ -1315,7 +1315,7 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
                 end={{ x: 0, y: 1 }}
                 style={StyleSheet.absoluteFill}
               />
-              <View pointerEvents="none" style={[styles.heroOrbA, { backgroundColor: withAlpha(ev.accent, 0.22) }]} />
+              <View pointerEvents="none" style={[styles.heroOrbA, { backgroundColor: withAlpha(ev.accent, 0.1) }]} />
               <View pointerEvents="none" style={styles.heroOrbB} />
 
               <View style={styles.grabber} />
@@ -1340,7 +1340,7 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
                 </View>
                 <View style={styles.heroArt} pointerEvents="none">
                   <Animated.View
-                    style={[styles.heroArtGlow, { backgroundColor: withAlpha(ev.accent, 0.36), transform: [{ scale: artGlow }] }]}
+                    style={[styles.heroArtGlow, { backgroundColor: withAlpha(ev.accent, 0.16), transform: [{ scale: artGlow }] }]}
                   />
                   <Animated.View style={{ transform: [{ translateY: artY }] }}>
                     <EventArtwork event={ev} size={74} />

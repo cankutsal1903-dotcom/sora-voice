@@ -2459,7 +2459,7 @@ const styles = StyleSheet.create({
   progressTrack: {
     height: 7,
     borderRadius: 4,
-    backgroundColor: COLORS.raised,
+    backgroundColor: "rgba(47,128,237,0.14)",
     overflow: "hidden",
     marginTop: 5,
   },

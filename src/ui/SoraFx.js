@@ -80,6 +80,9 @@ export const FloatingGlow = memo(function FloatingGlow({
   }, [anim, duration, reducedMotion]);
   const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -drift] });
   const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
+  // Sert kenarlı tek daire yerine iç içe, düşük opaklıklı halkalar:
+  // RN'de blur olmadığı için yumuşak bir ışıma etkisi verir.
+  const layers = [1, 0.8, 0.6, 0.4];
   return (
     <Animated.View
       pointerEvents="none"
@@ -88,13 +91,27 @@ export const FloatingGlow = memo(function FloatingGlow({
           position: "absolute",
           width: size,
           height: size,
-          borderRadius: size / 2,
-          backgroundColor: color,
+          alignItems: "center",
+          justifyContent: "center",
           transform: [{ translateY }, { scale }],
         },
         style,
       ]}
-    />
+    >
+      {layers.map((f) => (
+        <View
+          key={f}
+          style={{
+            position: "absolute",
+            width: size * f,
+            height: size * f,
+            borderRadius: (size * f) / 2,
+            backgroundColor: color,
+            opacity: 0.3,
+          }}
+        />
+      ))}
+    </Animated.View>
   );
 });
 
