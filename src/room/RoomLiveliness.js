@@ -625,6 +625,7 @@ function DieFace({ value, rolling }) {
 
 export const RoomMiniGamesSheet = memo(function RoomMiniGamesSheet({
   visible,
+  initialTab = "dice",
   participants = [],
   actorName = "Sora kullanıcısı",
   onBroadcastGame,
@@ -632,7 +633,7 @@ export const RoomMiniGamesSheet = memo(function RoomMiniGamesSheet({
   onDismiss,
 }) {
   const insets = useSafeAreaInsets();
-  const [tab, setTab] = useState("dice"); // "dice" | "truth_dare" | "wheel"
+  const [tab, setTab] = useState(initialTab || "dice"); // "dice" | "truth_dare" | "wheel"
   // Zar state
   const [diceCount, setDiceCount] = useState(2);
   const [diceValues, setDiceValues] = useState([6, 4]);
@@ -658,6 +659,9 @@ export const RoomMiniGamesSheet = memo(function RoomMiniGamesSheet({
   }, []);
 
   useEffect(() => {
+    if (visible && initialTab) {
+      setTab(initialTab);
+    }
     if (!visible) {
       clearTimers();
       setDiceRolling(false);
@@ -665,7 +669,7 @@ export const RoomMiniGamesSheet = memo(function RoomMiniGamesSheet({
       setSharedFeedback(false);
     }
     return clearTimers;
-  }, [clearTimers, visible]);
+  }, [clearTimers, initialTab, visible]);
 
   const activeNames = useMemo(() => {
     const names = participants
@@ -1029,6 +1033,273 @@ export const RoomMiniGamesSheet = memo(function RoomMiniGamesSheet({
               </Pressable>
             ) : null}
           </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+});
+
+// ── 6) Alt Bar Üstü Hızlı Tepki Çubuğu (😊 tuşuna basınca açılır) ─────────────
+export const RoomReactionBar = memo(function RoomReactionBar({
+  visible = false,
+  bottomOffset = 66,
+  onSendReaction,
+  onDismiss,
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+  const autoCloseRef = useRef(null);
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
+
+  const scheduleAutoClose = useCallback(() => {
+    clearTimeout(autoCloseRef.current);
+    autoCloseRef.current = setTimeout(() => onDismissRef.current?.(), 3400);
+  }, []);
+
+  useEffect(() => {
+    if (!visible) {
+      clearTimeout(autoCloseRef.current);
+      anim.setValue(0);
+      return undefined;
+    }
+    Animated.spring(anim, {
+      toValue: 1,
+      friction: 7,
+      tension: 120,
+      useNativeDriver: true,
+    }).start();
+    scheduleAutoClose();
+    return () => clearTimeout(autoCloseRef.current);
+  }, [anim, scheduleAutoClose, visible]);
+
+  if (!visible) return null;
+
+  const translateY = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [14, 0],
+  });
+  const scale = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.92, 1],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        styles.reactionBarWrap,
+        {
+          bottom: bottomOffset,
+          opacity: anim,
+          transform: [{ translateY }, { scale }],
+        },
+      ]}
+    >
+      <View style={styles.reactionBarCard}>
+        {QUICK_REACTIONS.map((item) => (
+          <Pressable
+            key={item.id}
+            onPress={() => {
+              onSendReaction?.(item.id);
+              scheduleAutoClose();
+            }}
+            style={({ pressed }) => [
+              styles.reactionBarItem,
+              pressed && styles.reactionTrayItemPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={`${item.label} tepkisi gönder`}
+          >
+            <Text style={styles.reactionBarEmoji}>{item.emoji}</Text>
+          </Pressable>
+        ))}
+        <Pressable
+          onPress={onDismiss}
+          style={styles.reactionBarClose}
+          accessibilityRole="button"
+          accessibilityLabel="Tepki çubuğunu kapat"
+        >
+          <Ionicons name="close" size={15} color="#A6BEE0" />
+        </Pressable>
+      </View>
+    </Animated.View>
+  );
+});
+
+// ── 7) 4 Kareli Oda Araçları & Parti Çekmecesi (⊞) ───────────────────────────
+export const RoomToolsSheet = memo(function RoomToolsSheet({
+  visible = false,
+  hasEvents = false,
+  musicPlaying = false,
+  requestCount = 0,
+  onSelectGame,
+  onOpenEvents,
+  onOpenMusic,
+  onOpenSettings,
+  onClearChat,
+  onDismiss,
+}) {
+  const insets = useSafeAreaInsets();
+
+  const partyItems = [
+    {
+      id: "dice",
+      label: "Şans Zarı",
+      icon: "dice",
+      colors: ["#F59E0B", "#B45309"],
+      iconColor: "#FFFBEB",
+      onPress: () => {
+        onDismiss?.();
+        onSelectGame?.("dice");
+      },
+    },
+    {
+      id: "truth_dare",
+      label: "Doğruluk",
+      icon: "flame",
+      colors: ["#F43F5E", "#9F1239"],
+      iconColor: "#FFF1F2",
+      onPress: () => {
+        onDismiss?.();
+        onSelectGame?.("truth_dare");
+      },
+    },
+    {
+      id: "wheel",
+      label: "Şans Çarkı",
+      icon: "aperture",
+      colors: ["#8B5CF6", "#5B21B6"],
+      iconColor: "#F5F3FF",
+      onPress: () => {
+        onDismiss?.();
+        onSelectGame?.("wheel");
+      },
+    },
+    ...(hasEvents
+      ? [
+          {
+            id: "events",
+            label: "Etkinlikler",
+            icon: "trophy",
+            colors: ["#3B82F6", "#1D4ED8"],
+            iconColor: "#FEF08A",
+            badgeText: "CANLI",
+            onPress: () => {
+              onDismiss?.();
+              onOpenEvents?.();
+            },
+          },
+        ]
+      : []),
+  ];
+
+  const utilityItems = [
+    {
+      id: "music",
+      label: "Müzik",
+      icon: musicPlaying ? "musical-notes" : "musical-notes-outline",
+      active: musicPlaying,
+      iconColor: musicPlaying ? "#7CC4FF" : "#DCE8FA",
+      onPress: () => {
+        onDismiss?.();
+        onOpenMusic?.();
+      },
+    },
+    {
+      id: "settings",
+      label: "Ayarlar",
+      icon: "settings-outline",
+      iconColor: "#DCE8FA",
+      count: requestCount,
+      onPress: () => {
+        onDismiss?.();
+        onOpenSettings?.();
+      },
+    },
+    {
+      id: "clear",
+      label: "Temizle",
+      icon: "sparkles-outline",
+      iconColor: "#DCE8FA",
+      onPress: () => {
+        onClearChat?.();
+        onDismiss?.();
+      },
+    },
+  ];
+
+  return (
+    <Modal transparent visible={visible} animationType="slide" onRequestClose={onDismiss}>
+      <View style={styles.sheetOverlay}>
+        <Pressable style={styles.sheetDismiss} onPress={onDismiss} accessibilityLabel="Kapat" />
+        <View style={[styles.toolsSheetCard, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
+          <View style={styles.sheetHandle} />
+
+          <Text style={styles.toolsSectionTitle}>Parti</Text>
+          <View style={styles.toolsGrid}>
+            {partyItems.map((item) => (
+              <Pressable
+                key={item.id}
+                onPress={item.onPress}
+                style={({ pressed }) => [styles.toolsCell, pressed && styles.toolsCellPressed]}
+                accessibilityRole="button"
+                accessibilityLabel={item.label}
+              >
+                <View style={styles.toolsOrbWrap}>
+                  <LinearGradient
+                    colors={item.colors}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.toolsOrbParty}
+                  >
+                    <Ionicons name={item.icon} size={25} color={item.iconColor} />
+                  </LinearGradient>
+                  {item.badgeText ? (
+                    <View style={styles.toolsHotBadge}>
+                      <Text style={styles.toolsHotBadgeText}>{item.badgeText}</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text style={styles.toolsLabel} numberOfLines={1}>
+                  {item.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={[styles.toolsSectionTitle, { marginTop: 18 }]}>Araçlar</Text>
+          <View style={styles.toolsGrid}>
+            {utilityItems.map((item) => (
+              <Pressable
+                key={item.id}
+                onPress={item.onPress}
+                style={({ pressed }) => [styles.toolsCell, pressed && styles.toolsCellPressed]}
+                accessibilityRole="button"
+                accessibilityLabel={item.label}
+              >
+                <View style={styles.toolsOrbWrap}>
+                  <View
+                    style={[
+                      styles.toolsOrbUtil,
+                      item.active && styles.toolsOrbUtilActive,
+                    ]}
+                  >
+                    <Ionicons name={item.icon} size={24} color={item.iconColor} />
+                  </View>
+                  {item.active ? <View style={styles.toolsActiveDot} /> : null}
+                  {item.count > 0 ? (
+                    <View style={styles.toolsCountBadge}>
+                      <Text style={styles.toolsCountBadgeText}>
+                        {item.count > 9 ? "9+" : item.count}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text style={styles.toolsLabel} numberOfLines={1}>
+                  {item.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
       </View>
     </Modal>
@@ -1671,5 +1942,167 @@ const styles = StyleSheet.create({
     color: "#DBEAFE",
     fontSize: 12.5,
     fontWeight: "700",
+  },
+  reactionBarWrap: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    alignItems: "center",
+    zIndex: 38,
+    elevation: 14,
+  },
+  reactionBarCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "rgba(12, 21, 39, 0.96)",
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "rgba(124, 179, 255, 0.34)",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    gap: 2,
+    shadowColor: "#000000",
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 10,
+  },
+  reactionBarItem: {
+    width: 40,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reactionBarEmoji: {
+    fontSize: 22,
+  },
+  reactionBarClose: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    marginLeft: 4,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  toolsSheetCard: {
+    backgroundColor: "#111A2C",
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    borderTopWidth: 1,
+    borderColor: "rgba(124, 179, 255, 0.2)",
+    paddingHorizontal: 18,
+    paddingTop: 10,
+  },
+  toolsSectionTitle: {
+    color: "#C5D7F0",
+    fontSize: 13.5,
+    fontWeight: "800",
+    marginBottom: 14,
+    letterSpacing: 0.2,
+  },
+  toolsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  toolsCell: {
+    width: "25%",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  toolsCellPressed: {
+    transform: [{ scale: 0.92 }],
+    opacity: 0.85,
+  },
+  toolsOrbWrap: {
+    position: "relative",
+    width: 54,
+    height: 54,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  toolsOrbParty: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.24)",
+    shadowColor: "#000000",
+    shadowOpacity: 0.32,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  toolsOrbUtil: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  toolsOrbUtilActive: {
+    backgroundColor: "rgba(47,128,237,0.24)",
+    borderColor: "rgba(118,175,255,0.55)",
+  },
+  toolsHotBadge: {
+    position: "absolute",
+    top: -3,
+    right: -8,
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 8,
+    backgroundColor: "#FF5A36",
+    borderWidth: 1,
+    borderColor: "#111A2C",
+  },
+  toolsHotBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 0.3,
+  },
+  toolsActiveDot: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#34D399",
+    borderWidth: 2,
+    borderColor: "#111A2C",
+  },
+  toolsCountBadge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: "#EF4444",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "#111A2C",
+  },
+  toolsCountBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "900",
+  },
+  toolsLabel: {
+    marginTop: 7,
+    color: "#E4EEFC",
+    fontSize: 11.5,
+    fontWeight: "600",
+    textAlign: "center",
   },
 });

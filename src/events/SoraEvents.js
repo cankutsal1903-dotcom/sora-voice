@@ -876,9 +876,10 @@ export const RoomEventCard = memo(function RoomEventCard({
   const fade = useRef(new Animated.Value(1)).current;
   const mountedRef = useRef(true);
   const isStrip = variant === "strip";
+  const isPoster = variant === "poster";
 
-  const cardWidth = compact ? 116 : 156;
-  const cardHeight = isStrip ? 42 : compact ? 50 : 62;
+  const cardWidth = isPoster ? 68 : compact ? 116 : 156;
+  const cardHeight = isPoster ? 76 : isStrip ? 42 : compact ? 50 : 62;
 
   const shimmer = useLoopAnimation(!reducedMotion && count > 0, shimmerFactory);
   const glow = useLoopAnimation(!reducedMotion && count > 0, pulseFactory);
@@ -935,6 +936,70 @@ export const RoomEventCard = memo(function RoomEventCard({
   const shimmerX = shimmer.interpolate({ inputRange: [0, 1], outputRange: [-48, shimmerSpan + 24] });
   const glowOpacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.14, 0.34] });
   const glowScale = glow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.02] });
+
+  if (isPoster) {
+    return (
+      <Pressable
+        onPress={() => onOpenEvent?.(event)}
+        hitSlop={6}
+        accessibilityRole="button"
+        accessibilityLabel={`${event.title} etkinliğini aç`}
+        style={({ pressed }) => [styles.roomPosterWrap, style, pressed && styles.pressed]}
+      >
+        <View style={{ width: cardWidth, height: cardHeight }}>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.roomGlow,
+              { borderRadius: 14, backgroundColor: withAlpha(event.accent, 0.48), opacity: glowOpacity, transform: [{ scale: glowScale }] },
+            ]}
+          />
+          <Animated.View style={[styles.roomCard, styles.roomCardPoster, { opacity: fade }]}>
+            <LinearGradient colors={event.colors} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }} style={StyleSheet.absoluteFill} />
+            <LinearGradient
+              pointerEvents="none"
+              colors={["rgba(6,10,20,0.42)", "rgba(6,10,20,0.06)", "rgba(6,10,20,0.68)"]}
+              locations={[0, 0.48, 1]}
+              style={StyleSheet.absoluteFill}
+            />
+            {!reducedMotion ? (
+              <Animated.View pointerEvents="none" style={[styles.roomShimmer, { transform: [{ translateX: shimmerX }, { rotate: "18deg" }] }]}>
+                <LinearGradient
+                  colors={["rgba(255,255,255,0)", "rgba(255,255,255,0.42)", "rgba(255,255,255,0)"]}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={StyleSheet.absoluteFill}
+                />
+              </Animated.View>
+            ) : null}
+            <View style={styles.roomPosterTop}>
+              <Text style={styles.roomPosterTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.76}>
+                {event.short_title || event.title}
+              </Text>
+              <View style={[styles.roomPosterLiveDot, upcoming && styles.roomLiveDotUpcoming]} />
+            </View>
+            <View style={styles.roomPosterArt}>
+              <EventArtwork event={event} size={34} />
+            </View>
+            <View style={styles.roomPosterFooter}>
+              <Ionicons name="time" size={8.5} color={BRAND.goldLight} />
+              <EventTimerText event={event} variant="short" style={styles.roomPosterTimer} />
+            </View>
+          </Animated.View>
+        </View>
+        {count > 1 ? (
+          <View style={styles.roomPosterDots} pointerEvents="none">
+            {list.map((item, i) => (
+              <View
+                key={item.id}
+                style={[styles.roomPosterDot, i === safeIndex && styles.roomPosterDotActive]}
+              />
+            ))}
+          </View>
+        ) : null}
+      </Pressable>
+    );
+  }
 
   return (
     <Pressable
@@ -1691,6 +1756,81 @@ const styles = StyleSheet.create({
   roomStripDots: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  roomPosterWrap: {
+    alignItems: "center",
+    overflow: "visible",
+  },
+  roomCardPoster: {
+    borderRadius: 13,
+    borderWidth: 1.1,
+    borderColor: "rgba(255,255,255,0.3)",
+    justifyContent: "space-between",
+    paddingTop: 5,
+    paddingBottom: 4,
+    paddingHorizontal: 4,
+  },
+  roomPosterTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 2,
+    gap: 3,
+  },
+  roomPosterTitle: {
+    color: "#FFFFFF",
+    fontSize: 8.5,
+    fontWeight: "900",
+    textAlign: "center",
+    flexShrink: 1,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  roomPosterLiveDot: {
+    width: 4.5,
+    height: 4.5,
+    borderRadius: 2.25,
+    backgroundColor: BRAND.live,
+  },
+  roomPosterArt: {
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
+  },
+  roomPosterFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 7,
+    backgroundColor: "rgba(8,14,26,0.58)",
+    alignSelf: "center",
+    gap: 2,
+  },
+  roomPosterTimer: {
+    color: BRAND.goldLight,
+    fontSize: 8.5,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+  },
+  roomPosterDots: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+    marginTop: 4,
+  },
+  roomPosterDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.34)",
+  },
+  roomPosterDotActive: {
+    width: 9,
+    backgroundColor: "#FFFFFF",
   },
 
   // Sheet

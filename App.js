@@ -146,7 +146,8 @@ import {
   RoomEntranceBanner,
   RoomGameResultBanner,
   RoomMiniGamesSheet,
-  RoomQuickDock,
+  RoomReactionBar,
+  RoomToolsSheet,
 } from "./src/room/RoomLiveliness";
 import {
   configureNotificationChannel,
@@ -5775,7 +5776,7 @@ const RoomComposer = memo(function RoomComposer({
         value={value}
         onChangeText={handleChange}
         onSubmitEditing={handleSubmit}
-        placeholder="Bir şeyler yaz…"
+        placeholder="Mesaj yaz…"
         placeholderTextColor="#8193AA"
         accessibilityLabel="Oda mesajı"
         style={styles.roomInputField}
@@ -6027,6 +6028,9 @@ function Room({
   const [reportTarget, setReportTarget] = useState(null);
   const [giftOpen, setGiftOpen] = useState(false);
   const [gamesOpen, setGamesOpen] = useState(false);
+  const [gamesInitialTab, setGamesInitialTab] = useState("dice");
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [reactionTrayOpen, setReactionTrayOpen] = useState(false);
   const [floatingReactions, setFloatingReactions] = useState([]);
   const [entranceQueue, setEntranceQueue] = useState([]);
   const [activeGameEvent, setActiveGameEvent] = useState(null);
@@ -6609,8 +6613,21 @@ function Room({
     [profile?.name, showGameBanner, userId],
   );
 
-  const handleOpenGames = useCallback(() => setGamesOpen(true), []);
+  const handleOpenGames = useCallback((tabName = "dice") => {
+    setGamesInitialTab(typeof tabName === "string" ? tabName : "dice");
+    setGamesOpen(true);
+  }, []);
   const handleCloseGames = useCallback(() => setGamesOpen(false), []);
+  const handleToggleReactionTray = useCallback(() => {
+    setReactionTrayOpen((current) => !current);
+  }, []);
+  const handleCloseReactionTray = useCallback(() => setReactionTrayOpen(false), []);
+  const handleOpenTools = useCallback(() => {
+    setReactionTrayOpen(false);
+    setToolsOpen(true);
+  }, []);
+  const handleCloseTools = useCallback(() => setToolsOpen(false), []);
+  const handleClearRoomChat = useCallback(() => setMessages([]), []);
   const handleDismissGameBanner = useCallback(() => setActiveGameEvent(null), []);
 
   const refreshMembers = useCallback(() => {
@@ -8301,62 +8318,118 @@ function Room({
           )}
         </View>
 
-        <RoomQuickDock
-          inline
-          visible={!minimized && !roomKeyboard.visible && !giftOpen && !gamesOpen}
-          onSendReaction={handleSendQuickReaction}
-          onOpenGames={handleOpenGames}
-          leftSlot={
-            events.length > 0 ? (
-              <RoomEventCard
-                events={events}
-                onOpenEvent={onOpenEvent}
-                variant="strip"
+        <View style={styles.roomChatArea}>
+          <ScrollView
+            ref={chatScrollRef}
+            style={styles.roomChatScroll}
+            contentContainerStyle={styles.roomChatScrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            overScrollMode="never"
+            bounces={false}
+            onScroll={handleChatScroll}
+            scrollEventThrottle={64}
+            onContentSizeChange={handleChatContentSize}
+          >
+            {/* Sohbet: ayrı bir kutu değil, yalnızca burası aşağıya kayar */}
+            <View style={styles.roomChatFlow}>
+              {chatStatusText ? (
+                <Text style={styles.roomChatStatus}>{chatStatusText}</Text>
+              ) : null}
+              <RoomMessageList
+                messages={messages}
+                canReportBase={room.persisted}
+                userId={userId}
+                currentProfile={profile}
+                participantById={participantById}
+                onPressSender={handleMessageSenderPress}
+                onReport={handleReportMessage}
               />
-            ) : null
-          }
-        />
+            </View>
+          </ScrollView>
 
-        <ScrollView
-          ref={chatScrollRef}
-          style={styles.roomChatScroll}
-          contentContainerStyle={styles.roomChatScrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          overScrollMode="never"
-          bounces={false}
-          onScroll={handleChatScroll}
-          scrollEventThrottle={64}
-          onContentSizeChange={handleChatContentSize}
-        >
-          {/* Sohbet: ayrı bir kutu değil, yalnızca burası aşağıya kayar */}
-          <View style={styles.roomChatFlow}>
-            {chatStatusText ? (
-              <Text style={styles.roomChatStatus}>{chatStatusText}</Text>
-            ) : null}
-            <RoomMessageList
-              messages={messages}
-              canReportBase={room.persisted}
-              userId={userId}
-              currentProfile={profile}
-              participantById={participantById}
-              onPressSender={handleMessageSenderPress}
-              onReport={handleReportMessage}
+          {!minimized && !roomKeyboard.visible && !giftOpen && !gamesOpen && !toolsOpen && events.length > 0 ? (
+            <RoomEventCard
+              events={events}
+              onOpenEvent={onOpenEvent}
+              variant="poster"
+              style={styles.roomEventPosterAnchor}
             />
-          </View>
-        </ScrollView>
+          ) : null}
+        </View>
 
         <GiftComboButton
           combo={minimized || giftOpen ? null : roomCombo}
           coins={coins}
           onPress={handleRoomComboPress}
           onExpire={handleExpireRoomCombo}
-          bottomOffset={74}
+          bottomOffset={72}
         />
 
-        {/* Alt bar: mesaj yazma alanı + hemen yanında hediye + mikrofon + ses + müzik */}
+        <RoomReactionBar
+          visible={reactionTrayOpen && !minimized && !roomKeyboard.visible && !giftOpen && !gamesOpen && !toolsOpen}
+          bottomOffset={64}
+          onSendReaction={handleSendQuickReaction}
+          onDismiss={handleCloseReactionTray}
+        />
+
+        {/* Alt bar: mesaj yazma alanı + emoji + ses + mikrofon + hediye + 4 kareli araçlar */}
         <View style={styles.roomBottomBar}>
           <RoomComposer onSend={sendMessage} sending={messageSending} />
+          <Pressable
+            style={({ pressed }) => [
+              styles.roomBarButton,
+              reactionTrayOpen && styles.roomBarButtonActive,
+              pressed && { transform: [{ scale: 0.92 }] },
+            ]}
+            onPress={handleToggleReactionTray}
+            onLongPress={() => handleSendQuickReaction("heart")}
+            delayLongPress={220}
+            accessibilityRole="button"
+            accessibilityLabel="Hızlı emoji tepkileri"
+            accessibilityState={{ selected: reactionTrayOpen }}
+          >
+            <Ionicons
+              name={reactionTrayOpen ? "close" : "happy-outline"}
+              size={20}
+              color={reactionTrayOpen ? "#FFFFFF" : "#DBE8FB"}
+            />
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.roomBarButton,
+              !speakerOn && styles.roomBarButtonMuted,
+              pressed && { transform: [{ scale: 0.92 }] },
+            ]}
+            onPress={handleToggleSpeaker}
+            accessibilityRole="button"
+            accessibilityLabel={speakerOn ? "Oda sesini kapat" : "Oda sesini aç"}
+            accessibilityState={{ selected: speakerOn }}
+          >
+            <Ionicons
+              name={speakerOn ? "volume-high-outline" : "volume-mute-outline"}
+              size={20}
+              color={speakerOn ? "#DBE8FB" : "#F3A9AC"}
+            />
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.roomBarButton,
+              micOn && styles.roomBarButtonActive,
+              !micOn && handRaised && !iAmSeated && styles.roomBarButtonPending,
+              pressed && { transform: [{ scale: 0.92 }] },
+            ]}
+            onPress={toggleMicrophone}
+            accessibilityRole="button"
+            accessibilityLabel={micButtonLabel}
+            accessibilityState={{ selected: micOn }}
+          >
+            <Ionicons
+              name={micButtonIcon}
+              size={19}
+              color={micOn ? "#FFFFFF" : iAmSeated ? "#DBE8FB" : "#8FA6C4"}
+            />
+          </Pressable>
           <Pressable
             style={({ pressed }) => [
               styles.roomBarButton,
@@ -8369,54 +8442,31 @@ function Room({
             accessibilityLabel="Hediye gönder"
           >
             <LinearGradient
-              colors={["#52A5FF", "#2F80ED", "#7C3AED"]}
+              colors={["#52A5FF", "#7C3AED", "#EC4899"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={[StyleSheet.absoluteFill, { borderRadius: 21 }]}
+              style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
             />
             <Ionicons name="gift" size={19} color="#FFFFFF" />
           </Pressable>
           <Pressable
-            style={[
+            style={({ pressed }) => [
               styles.roomBarButton,
-              micOn && styles.roomBarButtonActive,
-              !micOn && handRaised && !iAmSeated && styles.roomBarButtonPending,
+              (toolsOpen || musicPlaying) && styles.roomBarButtonOn,
+              pressed && { transform: [{ scale: 0.92 }] },
             ]}
-            onPress={toggleMicrophone}
+            onPress={handleOpenTools}
             accessibilityRole="button"
-            accessibilityLabel={micButtonLabel}
-            accessibilityState={{ selected: micOn }}
+            accessibilityLabel="Oda araçları ve mini oyunlar"
           >
             <Ionicons
-              name={micButtonIcon}
-              size={20}
-              color={micOn ? "#FFFFFF" : iAmSeated ? "#DBE8FB" : "#8FA6C4"}
+              name="grid-outline"
+              size={18}
+              color={musicPlaying || toolsOpen ? "#93C5FD" : "#DBE8FB"}
             />
-          </Pressable>
-          <Pressable
-            style={[styles.roomBarButton, !speakerOn && styles.roomBarButtonMuted]}
-            onPress={handleToggleSpeaker}
-            accessibilityRole="button"
-            accessibilityLabel={speakerOn ? "Oda sesini kapat" : "Oda sesini aç"}
-            accessibilityState={{ selected: speakerOn }}
-          >
-            <Ionicons
-              name={speakerOn ? "volume-high" : "volume-mute"}
-              size={20}
-              color={speakerOn ? "#DBE8FB" : "#F3A9AC"}
-            />
-          </Pressable>
-          <Pressable
-            style={[styles.roomBarButton, musicPlaying && styles.roomBarButtonOn]}
-            onPress={() => setMenuSheet("music")}
-            accessibilityRole="button"
-            accessibilityLabel="Müzik"
-          >
-            <Ionicons
-              name={musicPlaying ? "musical-notes" : "musical-notes-outline"}
-              size={19}
-              color={musicPlaying ? COLORS.primaryLight : "#DBE8FB"}
-            />
+            {musicPlaying || (canModerate && micRequests.length > 0) ? (
+              <View style={styles.roomBarToolDot} />
+            ) : null}
           </Pressable>
         </View>
       </KeyboardSafeView>
@@ -8569,8 +8619,23 @@ function Room({
           setSelectedParticipant(null);
         }}
       />
+      <RoomToolsSheet
+        visible={toolsOpen}
+        hasEvents={events.length > 0}
+        musicPlaying={musicPlaying}
+        requestCount={canModerate ? micRequests.length : 0}
+        onSelectGame={handleOpenGames}
+        onOpenEvents={() => {
+          if (events[0]) onOpenEvent?.(events[0]);
+        }}
+        onOpenMusic={() => setMenuSheet("music")}
+        onOpenSettings={handleOpenSettings}
+        onClearChat={handleClearRoomChat}
+        onDismiss={handleCloseTools}
+      />
       <RoomMiniGamesSheet
         visible={gamesOpen}
+        initialTab={gamesInitialTab}
         participants={activeRoomParticipants}
         actorName={profile?.name || "Sora kullanıcısı"}
         onBroadcastGame={handleBroadcastMiniGame}
@@ -17261,6 +17326,17 @@ const styles = StyleSheet.create({
   profileWealthCardWrap: {
     marginTop: 12,
   },
+  roomChatArea: {
+    flex: 1,
+    position: "relative",
+  },
+  roomEventPosterAnchor: {
+    position: "absolute",
+    top: 6,
+    right: 12,
+    zIndex: 25,
+    elevation: 8,
+  },
   roomEventCardAnchor: {
     position: "absolute",
     right: 12,
@@ -17313,8 +17389,8 @@ const styles = StyleSheet.create({
   roomBottomBar: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
-    paddingHorizontal: 12,
+    gap: 6,
+    paddingHorizontal: 10,
     paddingTop: 8,
     paddingBottom: 10,
     backgroundColor: "rgba(9,14,25,0.94)",
@@ -17324,41 +17400,42 @@ const styles = StyleSheet.create({
   roomInputPill: {
     flex: 1,
     minWidth: 0,
-    height: 42,
+    height: 38,
     flexDirection: "row",
     alignItems: "center",
-    paddingLeft: 14,
+    paddingLeft: 12,
     paddingRight: 4,
-    borderRadius: 21,
-    backgroundColor: "rgba(255,255,255,0.07)",
+    borderRadius: 19,
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
+    borderColor: "rgba(255,255,255,0.08)",
   },
   roomInputField: {
     flex: 1,
     minWidth: 0,
-    height: 42,
+    height: 38,
     paddingVertical: 0,
     color: "#F3F5F1",
-    fontSize: 13,
+    fontSize: 12.5,
   },
   roomInputSend: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: COLORS.primary,
   },
   roomBarButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.07)",
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
+    borderColor: "rgba(255,255,255,0.08)",
+    position: "relative",
   },
   roomBarButtonActive: {
     backgroundColor: COLORS.primary,
@@ -17370,15 +17447,29 @@ const styles = StyleSheet.create({
   },
   roomBarButtonMuted: {
     backgroundColor: "rgba(227,102,108,0.12)",
-    borderColor: "rgba(227,102,108,0.2)",
+    borderColor: "rgba(227,102,108,0.22)",
   },
   roomBarButtonOn: {
-    backgroundColor: "rgba(47,128,237,0.2)",
-    borderColor: "rgba(118,175,255,0.35)",
+    backgroundColor: "rgba(47,128,237,0.22)",
+    borderColor: "rgba(118,175,255,0.4)",
   },
   roomBarGift: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "#3D7FE0",
-    borderColor: "rgba(156,198,255,0.45)",
+    borderColor: "rgba(220,190,255,0.5)",
+  },
+  roomBarToolDot: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: "#FF4D79",
+    borderWidth: 1,
+    borderColor: "#090E19",
   },
   profileStaffSection: {
     marginHorizontal: 18,
