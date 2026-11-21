@@ -337,7 +337,8 @@ export const BrandLaunch = memo(function BrandLaunch({
     <Animated.View
       style={[
         motionStyles.lightRoot,
-        { opacity: outro, transform: [{ scale: outroScale }] },
+        // Opacity solmaz: arkada koyu pencere zemini var, acik ekrandan acik ekrana dogrudan gecilir.
+        { transform: [{ scale: outroScale }] },
       ]}
     >
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
