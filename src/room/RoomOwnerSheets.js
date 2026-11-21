@@ -18,7 +18,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "../theme/colors";
 import { KeyboardSafeView } from "../ui/useKeyboardInset";
-import { DEFAULT_ROOM_ANNOUNCEMENT, ROOM_BAN_DURATIONS } from "./roomApi";
+import { COUPLE_SEAT_INDEX, DEFAULT_ROOM_ANNOUNCEMENT, ROOM_BAN_DURATIONS } from "./roomApi";
 
 export const ROOM_THEMES = [
   { id: "midnight", name: "Gece Safiri", colors: ["#142746", "#101A2B", "#0A101B"], accent: "#3B82F6" },
@@ -825,7 +825,7 @@ export function MicRequestsSheet({
 }) {
   const hasTargetSeat = targetSeatIndex !== null && targetSeatIndex !== undefined;
   const sheetTitle = hasTargetSeat
-    ? targetSeatIndex === 100
+    ? targetSeatIndex === COUPLE_SEAT_INDEX
       ? "Konuk Koltuğuna Davet"
       : `${targetSeatIndex}. Koltuğa Davet`
     : "Mikrofon İstekleri";
