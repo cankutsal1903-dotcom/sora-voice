@@ -934,38 +934,75 @@ const Discover = memo(function Discover({
             style={{ marginTop: 2, marginBottom: 12 }}
           />
         ) : null}
-        <View style={styles.discoverEmptyHero}>
-          <View style={styles.discoverEmptyArt}>
-            <SoraMark size={84} tone="light" animate />
-          </View>
-          <View style={styles.discoverEmptyCopy}>
-            <Text style={styles.discoverEmptyLabel}>SAHNE HAZIR</Text>
-            <Text style={styles.discoverEmptyTitle}>İlk sesi sen başlat</Text>
+        <Reveal distance={12}>
+          <View style={styles.discoverEmptyHero}>
+            <LinearGradient
+              colors={["#E6F1FF", "#F7FBFF", "#FFFFFF"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={styles.discoverEmptyStatus}>
+              <View style={styles.discoverEmptyStatusDot} />
+              <Text style={styles.discoverEmptyStatusText}>ŞU AN AÇIK ODA YOK</Text>
+            </View>
+            <View style={styles.discoverStage} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              <View style={styles.discoverStageHost}>
+                <SoraMark size={58} tone="light" animate />
+              </View>
+              <Text style={styles.discoverStageHostLabel}>Sen</Text>
+              {[0, 1].map((row) => (
+                <View key={`seat-row-${row}`} style={styles.discoverStageRow}>
+                  {[0, 1, 2, 3].map((seat) => (
+                    <View key={`seat-${row}-${seat}`} style={styles.discoverStageSeat}>
+                      <Ionicons name="add" size={16} color={COLORS.primaryLight} />
+                    </View>
+                  ))}
+                </View>
+              ))}
+            </View>
+            <Text style={styles.discoverEmptyTitle}>Sahne seni bekliyor</Text>
             <Text style={styles.discoverEmptyDescription}>
-              Şu anda açık oda yok. Bir oda aç, sohbet başladığında burada
-              görünsün.
+              Bir oda aç, koltuklar dolsun. Sohbet başlayınca odan burada
+              herkese görünür.
             </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Yeni sesli oda aç"
+              style={({ pressed }) => [
+                styles.discoverEmptyButton,
+                pressed && { transform: [{ scale: 0.97 }], opacity: 0.92 },
+              ]}
+              onPress={onCreate}
+            >
+              <LinearGradient
+                colors={["#52A5FF", "#2F80ED", "#1D5FBF"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <Ionicons name="mic" size={18} color={COLORS.primaryInk} />
+              <Text style={styles.discoverEmptyButtonText}>Oda aç</Text>
+            </Pressable>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Yeni sesli oda aç"
-            style={({ pressed }) => [
-              styles.discoverEmptyButton,
-              pressed && { transform: [{ scale: 0.97 }], opacity: 0.92 },
-            ]}
-            onPress={onCreate}
-          >
-            <Ionicons name="mic" size={18} color={COLORS.primaryInk} />
-            <Text style={styles.discoverEmptyButtonText}>Oda aç</Text>
-          </Pressable>
-        </View>
-        <View style={styles.discoverEmptyNote}>
-          <Ionicons name="headset-outline" size={18} color={COLORS.primary} />
-          <Text style={styles.discoverEmptyNoteText}>
-            Odaya herkes dinleyici olarak katılabilir. Konuşmak isteyenler
-            koltuğa geçer.
-          </Text>
-        </View>
+        </Reveal>
+        <Reveal delay={90} distance={10}>
+          <View style={styles.discoverSteps}>
+            {[
+              ["mic-outline", "Oda aç", "Konuyu sen seç"],
+              ["people-outline", "Koltuk dolsun", "Dinleyen katılır"],
+              ["gift-outline", "Sohbet et", "Hediyelerle coş"],
+            ].map(([icon, title, subtitle]) => (
+              <View key={title} style={styles.discoverStep}>
+                <View style={styles.discoverStepIcon}>
+                  <Ionicons name={icon} size={17} color={COLORS.primary} />
+                </View>
+                <Text numberOfLines={1} style={styles.discoverStepTitle}>{title}</Text>
+                <Text numberOfLines={1} style={styles.discoverStepSubtitle}>{subtitle}</Text>
+              </View>
+            ))}
+          </View>
+        </Reveal>
       </ScrollView>
     );
   }
@@ -14395,12 +14432,13 @@ const styles = StyleSheet.create({
     elevation: 7,
   },
   discoverEmptyHero: {
-    borderRadius: 24,
+    borderRadius: 28,
     paddingHorizontal: 22,
-    paddingTop: 26,
+    paddingTop: 18,
     paddingBottom: 22,
     alignItems: "center",
     backgroundColor: COLORS.surface,
+    overflow: "hidden",
     borderWidth: 1,
     borderColor: COLORS.lineSoft,
     shadowColor: "#1D3A66",
@@ -14409,23 +14447,106 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 3,
   },
-  discoverEmptyArt: {
-    width: 112,
-    height: 112,
-    borderRadius: 56,
+  discoverEmptyStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 100,
+    backgroundColor: "rgba(255,255,255,0.85)",
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  discoverEmptyStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.muted,
+  },
+  discoverEmptyStatusText: {
+    color: COLORS.mutedDark,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.2,
+  },
+  discoverStage: {
+    alignItems: "center",
+    marginTop: 18,
+    marginBottom: 20,
+  },
+  discoverStageHost: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.surface,
+    borderWidth: 2.5,
+    borderColor: COLORS.primary,
+    shadowColor: COLORS.primary,
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+  },
+  discoverStageHostLabel: {
+    marginTop: 7,
+    marginBottom: 14,
+    color: COLORS.primaryDark,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  discoverStageRow: {
+    flexDirection: "row",
+    gap: 14,
+    marginBottom: 10,
+  },
+  discoverStageSeat: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.9)",
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: "#B9D3F5",
+  },
+  discoverSteps: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 14,
+  },
+  discoverStep: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    borderRadius: 18,
+    alignItems: "center",
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.lineSoft,
+  },
+  discoverStepIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: COLORS.primarySoft,
-    marginBottom: 18,
+    marginBottom: 8,
   },
-  discoverEmptyCopy: { marginBottom: 20, alignItems: "center" },
-  discoverEmptyLabel: {
-    color: COLORS.primary,
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 1.5,
-    marginBottom: 6,
-    textAlign: "center",
+  discoverStepTitle: {
+    color: COLORS.text,
+    fontSize: 12.5,
+    fontWeight: "800",
+  },
+  discoverStepSubtitle: {
+    marginTop: 2,
+    color: COLORS.muted,
+    fontSize: 11,
+    fontWeight: "600",
   },
   discoverEmptyTitle: {
     color: COLORS.text,
@@ -14441,12 +14562,14 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     lineHeight: 20,
     textAlign: "center",
+    marginBottom: 20,
   },
   discoverEmptyButton: {
     alignSelf: "stretch",
     minHeight: 50,
     borderRadius: 16,
     backgroundColor: COLORS.primary,
+    overflow: "hidden",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -14456,19 +14579,6 @@ const styles = StyleSheet.create({
     color: COLORS.primaryInk,
     fontSize: 15,
     fontWeight: "900",
-  },
-  discoverEmptyNote: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    marginTop: 18,
-    paddingHorizontal: 6,
-  },
-  discoverEmptyNoteText: {
-    flex: 1,
-    color: COLORS.textSecondary,
-    fontSize: 12,
-    lineHeight: 18,
   },
   iconButton: {
     width: 42,
