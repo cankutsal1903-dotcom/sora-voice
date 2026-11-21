@@ -195,6 +195,7 @@ export const InboxScreen = memo(function InboxScreen({
     setMessages([]);
     setDraft("");
     setError("");
+    setStartingChat(false);
   }, [currentUserId]);
 
   useEffect(() => {
@@ -333,7 +334,10 @@ export const InboxScreen = memo(function InboxScreen({
 
     const rawHandle = String(pendingDirectChat?.handle || "").trim().replace(/^@+/, "");
     const targetUserId = pendingDirectChat?.userId || null;
-    if (!rawHandle && !targetUserId) return undefined;
+    if (!rawHandle && !targetUserId) {
+      setStartingChat(false);
+      return undefined;
+    }
 
     const existing = conversationsRef.current.find(
       (item) =>
@@ -341,6 +345,7 @@ export const InboxScreen = memo(function InboxScreen({
         (rawHandle && String(item.handle || "").replace(/^@+/, "").toLowerCase() === rawHandle.toLowerCase()),
     );
     if (existing) {
+      setStartingChat(false);
       setNewChatOpen(false);
       openConversation(existing);
       loadConversations({ silent: true });
@@ -348,6 +353,7 @@ export const InboxScreen = memo(function InboxScreen({
     }
 
     if (!rawHandle) {
+      setStartingChat(false);
       Alert.alert("Sohbet başlatılamadı", "Bu kullanıcının mesajlaşma adresi bulunamadı.");
       return undefined;
     }

@@ -962,14 +962,14 @@ const listHostPresence = async (request: Request) => {
   if (!visibleWanted.length) return json({ liveRoomIds: [] });
   const roomIds = visibleWanted.map((r) => String(r.roomId));
 
-  const twoMinAgoMs = Date.now() - 130_000;
-  const twoMinAgo = new Date(twoMinAgoMs).toISOString();
+  const activeWindowMs = Date.now() - 185_000;
+  const activeWindowIso = new Date(activeWindowMs).toISOString();
   const serverClient = createClient(supabaseUrl, supabaseServiceRoleKey);
   const { data: activeSessions } = await serverClient
     .from("voice_active_sessions")
     .select("room_id, user_id")
     .in("room_id", roomIds)
-    .gte("last_heartbeat_at", twoMinAgo);
+    .gte("last_heartbeat_at", activeWindowIso);
 
   if (Array.isArray(activeSessions)) {
     for (const s of activeSessions) {
@@ -992,11 +992,11 @@ const listHostPresence = async (request: Request) => {
     }
   }
 
-  // 3) Hiçbir aktif katılımcısı kalmayan ve 2 dakikadan eski hayalet odaları kapat
+  // 3) Hiçbir aktif katılımcısı kalmayan ve 3 dakikadan eski hayalet odaları kapat
   const emptyStaleIds = roomIds.filter((id) => {
     if (liveSet.has(id)) return false;
     const lastActiveMs = visibleMap.get(id) || 0;
-    return lastActiveMs > 0 && lastActiveMs < twoMinAgoMs;
+    return lastActiveMs > 0 && lastActiveMs < activeWindowMs;
   });
   if (emptyStaleIds.length) {
     await serverClient
@@ -1010,7 +1010,7 @@ const listHostPresence = async (request: Request) => {
       })
       .in("id", emptyStaleIds)
       .eq("state", "live")
-      .lt("last_active_at", twoMinAgo)
+      .lt("last_active_at", activeWindowIso)
       .then(() => undefined)
       .catch(() => undefined);
   }

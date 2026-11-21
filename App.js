@@ -3429,22 +3429,32 @@ function ProfileDetailSheet({
   targetUidRef.current = resolvedTargetId;
   const visibleRef = useRef(visible);
   visibleRef.current = visible;
+  const followCountsSeqRef = useRef(0);
   const handleFollowButtonPress = useCallback(async () => {
     if (!onToggleFollow) return;
     const uid = targetUidRef.current;
     const delta = isFollowing ? -1 : 1;
+    const seq = ++followCountsSeqRef.current;
     setFollowCounts((curr) =>
       curr ? { ...curr, followers: Math.max(0, (curr.followers || 0) + delta) } : curr,
     );
-    await Promise.resolve(onToggleFollow());
-    if (uid && visibleRef.current && targetUidRef.current === uid) {
-      getFollowCounts(uid)
-        .then((counts) => {
-          if (counts && visibleRef.current && targetUidRef.current === uid) {
-            setFollowCounts(counts);
-          }
-        })
-        .catch(() => undefined);
+    try {
+      await Promise.resolve(onToggleFollow());
+    } finally {
+      if (uid && visibleRef.current && targetUidRef.current === uid) {
+        getFollowCounts(uid)
+          .then((counts) => {
+            if (
+              counts &&
+              followCountsSeqRef.current === seq &&
+              visibleRef.current &&
+              targetUidRef.current === uid
+            ) {
+              setFollowCounts(counts);
+            }
+          })
+          .catch(() => undefined);
+      }
     }
   }, [isFollowing, onToggleFollow]);
 
@@ -6958,6 +6968,7 @@ function Room({
     startWithMicrophone: initialMicrophoneOn,
   });
   const [roomClosedRemotely, setRoomClosedRemotely] = useState(false);
+  const leavingRoomRef = useRef(false);
   const hostAutoReviveAttemptedRef = useRef(false);
   const isRoomUnavailableError =
     liveVoice.status === "error" &&
@@ -6965,6 +6976,7 @@ function Room({
   const showClosedRoomState =
     !isHost && room.persisted && (roomClosedRemotely || isRoomUnavailableError);
   const retryVoiceConnection = async () => {
+    if (leavingRoomRef.current) return;
     setRoomClosedRemotely(false);
     if (isHost && room.persisted && onHostPresenceChange) {
       try {
@@ -6975,6 +6987,7 @@ function Room({
         return;
       }
     }
+    if (leavingRoomRef.current) return;
     liveVoice.reconnect();
   };
   useEffect(() => {
@@ -6988,6 +7001,7 @@ function Room({
       isHost &&
       room.persisted &&
       isRoomUnavailableError &&
+      !leavingRoomRef.current &&
       !hostAutoReviveAttemptedRef.current
     ) {
       hostAutoReviveAttemptedRef.current = true;
@@ -7527,13 +7541,16 @@ function Room({
           filter: `id=eq.${room.id}`,
         },
         (payload) => {
+          if (!active) return;
           setChatLocked(Boolean(payload.new.chat_locked));
           setRoomLocked(Boolean(payload.new.room_locked));
           const nextDetails = roomDetailsFromRow(payload.new);
           if (nextDetails) setRoomDetails((current) => ({ ...current, ...nextDetails }));
           if (payload.new?.state && payload.new.state !== "live") {
             if (isHost && onHostPresenceChange) {
-              onHostPresenceChange(room.id, true).catch(() => undefined);
+              if (!leavingRoomRef.current) {
+                onHostPresenceChange(room.id, true).catch(() => undefined);
+              }
             } else if (voiceStatusRef.current !== "connected") {
               setRoomClosedRemotely(true);
               onRoomClosed?.(room.id);
@@ -7552,7 +7569,9 @@ function Room({
           filter: `id=eq.${room.id}`,
         },
         () => {
+          if (!active) return;
           if (!isHost) {
+            voiceDisconnectRef.current?.().catch(() => undefined);
             setRoomClosedRemotely(true);
             onRoomClosed?.(room.id);
           }
@@ -7935,9 +7954,11 @@ function Room({
   }, [canModerate, liveVoice.participantCount, liveVoice.status, minimized, refreshMembers, room.persisted]);
 
   const voiceStatusRef = useRef(liveVoice.status);
+  const voiceDisconnectRef = useRef(liveVoice.disconnect);
   const retryVoiceConnectionRef = useRef(retryVoiceConnection);
   const roomClosedRemotelyRef = useRef(showClosedRoomState);
   const removedByModeratorRef = useRef(Boolean(liveVoice.removedByModerator));
+  voiceDisconnectRef.current = liveVoice.disconnect;
   retryVoiceConnectionRef.current = retryVoiceConnection;
   roomClosedRemotelyRef.current = showClosedRoomState;
   useEffect(() => {
@@ -7950,6 +7971,7 @@ function Room({
     const subscription = AppState.addEventListener("change", (nextState) => {
       if (
         nextState === "active" &&
+        !leavingRoomRef.current &&
         !removedByModeratorRef.current &&
         !roomClosedRemotelyRef.current &&
         ["error", "disconnected"].includes(voiceStatusRef.current)
@@ -7962,8 +7984,10 @@ function Room({
 
   useEffect(() => {
     if (!isHost || !room.persisted || !onHostPresenceChange) return undefined;
-    const setPresence = (isActive) =>
+    const setPresence = (isActive) => {
+      if (leavingRoomRef.current) return;
       onHostPresenceChange(room.id, isActive).catch(() => undefined);
+    };
     setPresence(true);
     const heartbeat = setInterval(() => setPresence(true), 20_000);
     // Uygulama arka plana alındığında veya oda küçültüldüğünde oda keşfette kalır;
@@ -8315,6 +8339,7 @@ function Room({
   }, [liveVoice.setMicrophoneEnabled, runSeatAction]);
 
   const leaveRoom = async () => {
+    leavingRoomRef.current = true;
     await Promise.allSettled([
       liveVoice.disconnect(),
       room.persisted ? leaveRoomMembership(room.id) : Promise.resolve(),
@@ -8694,12 +8719,10 @@ function Room({
     const target = profileParticipant || selectedParticipant;
     if (!target) return;
     if (target.userId === room.hostId) {
-      onToggleFollowHost?.();
-      return;
+      return onToggleFollowHost?.();
     }
     if (target.userId && supabase && onToggleFollowUser) {
-      onToggleFollowUser(target.userId);
-      return;
+      return onToggleFollowUser(target.userId);
     }
     setFollowedParticipantNames((current) => {
       const name = target.name;
@@ -12427,8 +12450,10 @@ function AppContent() {
   const setHostRoomPresence = useCallback(
     async (roomId, isActive) => {
       if (!supabase || !authSession?.user) return;
+      if (isActive && openRoomIdRef.current !== roomId) return;
       const updatedRoom = await setRemoteRoomPresence(roomId, isActive);
       if (!updatedRoom) return;
+      if (isActive && openRoomIdRef.current !== roomId) return;
       setOwnHostedRoom(updatedRoom);
       setRooms((currentRooms) =>
         isActive
