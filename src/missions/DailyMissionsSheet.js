@@ -228,47 +228,54 @@ export const DailyMissionsSheet = memo(function DailyMissionsSheet({
                 </Text>
               </View>
 
-              <View style={styles.daysRow}>
-                {streakRewards.map((amt, idx) => {
-                  const day = idx + 1;
-                  const done = day <= streakDay;
-                  const isTodayTarget = !streakClaimed && day === nextStreakDay;
-                  const isGrand = day === 7;
-                  return (
-                    <View
-                      key={day}
-                      style={[
-                        styles.dayBox,
-                        done && styles.dayBoxDone,
-                        isTodayTarget && styles.dayBoxCurrent,
-                        isGrand && styles.dayBoxGrand,
-                      ]}
-                    >
-                      <Text style={styles.dayNum}>{day}.G</Text>
-                      {done ? (
-                        <Ionicons name="checkmark-circle" size={15} color="#4ADE80" />
-                      ) : isGrand ? (
-                        <MaterialCommunityIcons name="treasure-chest" size={15} color="#FDE047" />
-                      ) : (
-                        <Ionicons
-                          name="diamond"
-                          size={12}
-                          color={isTodayTarget ? "#FDE047" : "#93C5FD"}
-                        />
-                      )}
-                      <Text
-                        style={[
-                          styles.dayReward,
-                          isGrand && { color: "#FDE047" },
-                          done && { color: "#86EFAC" },
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {fmtShort(amt)}
-                      </Text>
-                    </View>
-                  );
-                })}
+              <View style={styles.daysGrid}>
+                {[streakRewards.slice(0, 4), streakRewards.slice(4, 7)].map((rowItems, rowIdx) => (
+                  <View key={rowIdx} style={styles.daysRow}>
+                    {rowItems.map((amt, colIdx) => {
+                      const day = rowIdx === 0 ? colIdx + 1 : colIdx + 5;
+                      const done = day <= streakDay;
+                      const isTodayTarget = !streakClaimed && day === nextStreakDay;
+                      const isGrand = day === 7;
+                      return (
+                        <View
+                          key={day}
+                          style={[
+                            styles.dayBox,
+                            isGrand && styles.dayBoxWide,
+                            done && styles.dayBoxDone,
+                            isTodayTarget && styles.dayBoxCurrent,
+                            isGrand && styles.dayBoxGrand,
+                          ]}
+                        >
+                          <Text style={styles.dayNum} numberOfLines={1}>
+                            {day}. Gün
+                          </Text>
+                          {done ? (
+                            <Ionicons name="checkmark-circle" size={16} color="#4ADE80" />
+                          ) : isGrand ? (
+                            <MaterialCommunityIcons name="treasure-chest" size={17} color="#FDE047" />
+                          ) : (
+                            <Ionicons
+                              name="diamond"
+                              size={13}
+                              color={isTodayTarget ? "#FDE047" : "#93C5FD"}
+                            />
+                          )}
+                          <Text
+                            style={[
+                              styles.dayReward,
+                              isGrand && { color: "#FDE047" },
+                              done && { color: "#86EFAC" },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {fmtShort(amt)}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                ))}
               </View>
 
               <Pressable
@@ -482,21 +489,29 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 9,
   },
+  daysGrid: {
+    gap: 6,
+    marginBottom: 12,
+  },
   daysRow: {
     flexDirection: "row",
-    gap: 4,
-    marginBottom: 12,
+    gap: 6,
   },
   dayBox: {
     flex: 1,
     alignItems: "center",
-    paddingVertical: 7,
-    paddingHorizontal: 2,
-    borderRadius: 11,
+    justifyContent: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: 12,
     backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
     gap: 3,
+  },
+  dayBoxWide: {
+    flex: 1.45,
+    backgroundColor: "rgba(251,191,36,0.10)",
   },
   dayBoxDone: {
     backgroundColor: "rgba(34,197,94,0.14)",
@@ -510,13 +525,13 @@ const styles = StyleSheet.create({
     borderColor: "rgba(253,224,71,0.5)",
   },
   dayNum: {
-    color: "#9BB4D6",
-    fontSize: 9.5,
+    color: "#B4CAE6",
+    fontSize: 10.5,
     fontWeight: "800",
   },
   dayReward: {
     color: "#E2EEFF",
-    fontSize: 9.5,
+    fontSize: 10.5,
     fontWeight: "900",
   },
   streakCta: {

@@ -344,18 +344,18 @@ const formatScheduledDate = (date) => TR_SCHEDULED_DATE_FMT.format(date);
 const INITIAL_ROOMS = [
   {
     id: "night",
-    title: "Gece Vardiyasi",
+    title: "Gece Vardiyası",
     category: "Gece",
     listeners: 128,
     host: "Ece",
     initials: "E",
     colors: ["#345D9C", "#172B49"],
     accent: "#8BB8F5",
-    description: "Uykusu kaçanlar için sakin bir köşe.",
+    description: "Uykusu kaçanlar için sakin bir köşe.",
   },
   {
     id: "music",
-    title: "Bir Sarki Birak",
+    title: "Bir Şarkı Bırak",
     category: "Muzik",
     listeners: 86,
     host: "Baran",
@@ -366,36 +366,36 @@ const INITIAL_ROOMS = [
   },
   {
     id: "talk",
-    title: "Gunluk Muhabbet",
+    title: "Günlük Muhabbet",
     category: "Sohbet",
     listeners: 54,
     host: "Duru",
     initials: "D",
     colors: ["#2B6095", "#203C60"],
     accent: "#A6C9F5",
-    description: "Gunun nasil gecti?",
+    description: "Günün nasıl geçti?",
   },
   {
     id: "game",
-    title: "Okey Masasi",
+    title: "Okey Masası",
     category: "Oyun",
     listeners: 41,
     host: "Mert",
     initials: "M",
     colors: ["#405F8D", "#1D3455"],
     accent: "#9ABCF0",
-    description: "Dorduncu aranıyor.",
+    description: "Dördüncü aranıyor.",
   },
   {
     id: "ideas",
-    title: "Fikir Kulubu",
+    title: "Fikir Kulübü",
     category: "Sohbet",
     listeners: 27,
     host: "Selin",
     initials: "S",
     colors: ["#4D72B5", "#203E70"],
     accent: "#A4CCFF",
-    description: "Bugunun sorusu: Mutluluk ne?",
+    description: "Bugünün sorusu: Mutluluk ne?",
   },
 ];
 
@@ -852,15 +852,26 @@ const Discover = memo(function Discover({
       .sort((a, b) => (Number(b.listeners) || 0) - (Number(a.listeners) || 0));
   }, [followedUserIds, rooms]);
 
-  const featuredRoom = useMemo(
-    () =>
-      rooms.find((room) => favoriteRoomIds.includes(room.id)) ||
-      rooms.find((room) => recentRoomIds.includes(room.id)) ||
-      rooms[0],
-    [favoriteRoomIds, recentRoomIds, rooms],
-  );
-  const featuredRoomBrand = resolveRoomBrand(featuredRoom);
-  if (!featuredRoom) {
+  const hasActiveFilter =
+    category !== "Tumu" || Boolean(normalizedQuery) || favoritesOnly;
+
+  const handleResetFilters = useCallback(() => {
+    setCategory("Tumu");
+    setQuery("");
+    setFavoritesOnly(false);
+  }, []);
+
+  const featuredRoom = useMemo(() => {
+    const pool = hasActiveFilter ? visibleRooms : rooms;
+    if (!pool.length) return null;
+    return (
+      pool.find((room) => favoriteRoomIds.includes(room.id)) ||
+      pool.find((room) => recentRoomIds.includes(room.id)) ||
+      pool[0]
+    );
+  }, [favoriteRoomIds, hasActiveFilter, recentRoomIds, rooms, visibleRooms]);
+  const featuredRoomBrand = resolveRoomBrand(featuredRoom || rooms[0]);
+  if (!rooms.length) {
     return (
       <ScrollView
         key="empty"
@@ -1109,6 +1120,7 @@ const Discover = memo(function Discover({
           </View>
         ) : null}
 
+        {featuredRoom ? (
         <Reveal delay={50}>
           <Pressable
             onPress={() => handleOpenRoom(featuredRoom)}
@@ -1189,6 +1201,7 @@ const Discover = memo(function Discover({
             </LinearGradient>
           </Pressable>
         </Reveal>
+        ) : null}
 
         <Text style={styles.sectionTitle}>İlgini çeken sohbetler</Text>
         <FlatList
@@ -1280,6 +1293,20 @@ const Discover = memo(function Discover({
             <Text style={styles.emptyDescription}>
               Farklı bir kategori veya arama deneyebilirsin.
             </Text>
+            {hasActiveFilter ? (
+              <Pressable
+                onPress={handleResetFilters}
+                style={({ pressed }) => [
+                  styles.emptyResetButton,
+                  pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Filtreleri temizle"
+              >
+                <Ionicons name="refresh-outline" size={15} color={COLORS.primary} />
+                <Text style={styles.emptyResetButtonText}>Filtreleri temizle</Text>
+              </Pressable>
+            ) : null}
           </View>
         )}
       </ScrollView>
@@ -4864,15 +4891,29 @@ const WalletSheet = memo(function WalletSheet({
                   {formatCredits(coins)} <Text style={styles.walletBalanceUnit}>kredi</Text>
                 </Text>
                 <Text style={styles.walletActivityTime} numberOfLines={1}>
-                  {paidCoins > 0
-                    ? `Promosyon ${formatCredits(promoCoins)} · Satın alınan ${formatCredits(paidCoins)}`
-                    : `Toplam kredi: ${formatCredits(coins)}`}
+                  Toplam kullanılabilir bakiye
                 </Text>
               </View>
               <View style={styles.walletBalanceIcon}>
                 <Ionicons name="diamond" size={26} color="#FDE68A" />
               </View>
             </LinearGradient>
+            {(promoCoins > 0 || paidCoins > 0) ? (
+              <View style={styles.walletBucketRow}>
+                <View style={styles.walletBucketCard}>
+                  <Text style={styles.walletBucketLabel}>PROMOSYON</Text>
+                  <Text style={styles.walletBucketValue} numberOfLines={1}>
+                    {formatCredits(promoCoins)} kredi
+                  </Text>
+                </View>
+                <View style={styles.walletBucketCard}>
+                  <Text style={styles.walletBucketLabel}>SATIN ALINAN</Text>
+                  <Text style={styles.walletBucketValue} numberOfLines={1}>
+                    {formatCredits(paidCoins)} kredi
+                  </Text>
+                </View>
+              </View>
+            ) : null}
             <Text style={styles.settingsCaption}>GÜNLÜK ÖDÜL</Text>
             <View style={styles.walletRewardRow}>
               <View
@@ -5704,7 +5745,7 @@ function CreateRoomSheet({ visible, onDismiss, onCreate }) {
               <Ionicons name="close" size={20} color={COLORS.text} />
             </Pressable>
             <Text style={styles.kicker}>YENİ SESLİ ODA</Text>
-            <Text style={styles.sheetTitle}>Bir oda aç.</Text>
+            <Text style={styles.sheetTitle}>Yeni oda aç</Text>
             <Text style={styles.fieldLabel}>KATEGORİ</Text>
             <View style={styles.sheetCategories}>
               {CATEGORIES.slice(1).map((item) => (
@@ -5742,7 +5783,7 @@ function CreateRoomSheet({ visible, onDismiss, onCreate }) {
               onChangeText={setDescription}
               placeholder="Odanın konusunu anlat"
               placeholderTextColor={COLORS.muted}
-              style={styles.sheetInput}
+              style={[styles.sheetInput, styles.profileEditorBioInput, { minHeight: 74 }]}
               maxLength={90}
               multiline
             />
@@ -5775,14 +5816,14 @@ function ScheduleRoomSheet({ visible, onDismiss, onSchedule }) {
   const schedule = () => {
     const cleanTitle = title.trim();
     if (!cleanTitle) {
-      Alert.alert("Oda adi gerekli", "Planlamak icin odana bir ad ver.");
+      Alert.alert("Oda adı gerekli", "Planlamak için odana bir ad ver.");
       return;
     }
     const scheduledDate = parseScheduledDate(startsAt);
     if (!scheduledDate) {
       Alert.alert(
-        "Gecerli bir zaman gir",
-        "Bugun 21:30, Yarin 18:00 veya 07.11.2026 21:30 bicimlerinden birini kullan.",
+        "Geçerli bir zaman gir",
+        "Bugün 21:30, Yarın 18:00 veya 07.11.2026 21:30 biçimlerinden birini kullan.",
       );
       return;
     }
@@ -9928,9 +9969,9 @@ function ProfileEditor({
           <Pressable onPress={onDismiss} style={styles.sheetClose}>
             <Ionicons name="close" size={20} color={COLORS.text} />
           </Pressable>
-          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 12 }}>
           <Text style={styles.kicker}>PROFİLİN</Text>
-          <Text style={styles.sheetTitle}>Kendini göster.</Text>
+          <Text style={styles.sheetTitle}>Profilini düzenle</Text>
           <View style={styles.avatarEditRow}>
             <Pressable
               onPress={pickAvatar}
@@ -9940,7 +9981,7 @@ function ProfileEditor({
             >
               <ProfileFrame
                 appearance={editorFrameAppearance}
-                size={editorFrameAppearance ? 58 : 72}
+                size={72}
                 padMode="tight"
                 overlay={
                   <View style={[styles.avatarEditBadge, { zIndex: 20, elevation: 8 }]}>
@@ -9956,7 +9997,7 @@ function ProfileEditor({
                   label={(name || profile.name || "S").charAt(0).toUpperCase()}
                   color={profile.color}
                   uri={avatarUrl}
-                  size={editorFrameAppearance ? 58 : 72}
+                  size={72}
                   circle
                 />
               </ProfileFrame>
@@ -10145,13 +10186,15 @@ function ProfileEditor({
             </>
           ) : null}
           <PrestigeStylePicker giftSpent={giftSpent} />
-          <Pressable onPress={save}>
-            <LinearGradient colors={BRAND_GRADIENT} style={styles.createSubmit}>
-              <Text style={styles.createSubmitText}>Değişiklikleri kaydet</Text>
-              <Ionicons name="checkmark" size={20} color={COLORS.primaryInk} />
-            </LinearGradient>
-          </Pressable>
           </ScrollView>
+          <View style={styles.sheetStickyFooter}>
+            <Pressable onPress={save}>
+              <LinearGradient colors={BRAND_GRADIENT} style={styles.createSubmit}>
+                <Text style={styles.createSubmitText}>Değişiklikleri kaydet</Text>
+                <Ionicons name="checkmark" size={20} color={COLORS.primaryInk} />
+              </LinearGradient>
+            </Pressable>
+          </View>
         </View>
       </KeyboardSafeView>
     </Modal>
@@ -10195,13 +10238,18 @@ const AppSettingsSheet = memo(function AppSettingsSheet({
     >
       <View style={styles.modalOverlay}>
         <Pressable style={styles.modalDismiss} onPress={onDismiss} />
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { maxHeight: "84%" }]}>
           <View style={styles.sheetHandle} />
-          <Pressable onPress={onDismiss} style={styles.sheetClose}>
-            <Ionicons name="close" size={20} color={COLORS.text} />
-          </Pressable>
-          <Text style={styles.kicker}>TERCİHLER</Text>
-          <Text style={styles.sheetTitle}>Ayarların.</Text>
+          <View style={styles.settingsSheetHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.kicker}>TERCİHLER</Text>
+              <Text style={[styles.sheetTitle, { marginBottom: 4 }]}>Ayarlar</Text>
+            </View>
+            <Pressable onPress={onDismiss} style={styles.settingsHeaderClose} accessibilityLabel="Kapat">
+              <Ionicons name="close" size={20} color={COLORS.text} />
+            </Pressable>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
           <Text style={styles.settingsCaption}>
             BİLDİRİMLER, GİZLİLİK VE SES
           </Text>
@@ -10238,7 +10286,7 @@ const AppSettingsSheet = memo(function AppSettingsSheet({
                 value={settings[option.key]}
                 pointerEvents="none"
                 trackColor={{ false: "#4C5E73", true: "#2F80ED" }}
-                thumbColor={settings[option.key] ? COLORS.primary : "#D8DAE5"}
+                thumbColor={settings[option.key] ? "#FFFFFF" : "#E2E8F0"}
               />
             </Pressable>
           ))}
@@ -10277,6 +10325,7 @@ const AppSettingsSheet = memo(function AppSettingsSheet({
             </View>
             <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
           </Pressable>
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -18047,11 +18096,12 @@ const styles = StyleSheet.create({
   profileDetailNameRow: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
-    gap: 8,
+    flexWrap: "nowrap",
+    gap: 7,
   },
-  profileDetailName: { color: COLORS.text, fontSize: 22, fontWeight: "900", flexShrink: 1 },
+  profileDetailName: { color: COLORS.text, fontSize: 21, fontWeight: "900", flexShrink: 1 },
   profileLevelInlinePill: {
+    flexShrink: 0,
     paddingHorizontal: 9,
     paddingVertical: 3,
     borderRadius: 999,
@@ -19280,5 +19330,71 @@ const styles = StyleSheet.create({
   messageBubbleGift: {
     borderColor: "rgba(250,204,21,0.36)",
     backgroundColor: "rgba(28,38,68,0.82)",
+  },
+  emptyResetButton: {
+    marginTop: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 12,
+    backgroundColor: COLORS.primarySoft,
+    borderWidth: 1,
+    borderColor: "rgba(47,128,237,0.26)",
+  },
+  emptyResetButtonText: {
+    color: COLORS.primary,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  walletBucketRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: -12,
+    marginBottom: 18,
+  },
+  walletBucketCard: {
+    flex: 1,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: COLORS.surfaceRaised,
+    borderWidth: 1,
+    borderColor: "rgba(203,218,236,0.8)",
+  },
+  walletBucketLabel: {
+    color: COLORS.muted,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.7,
+  },
+  walletBucketValue: {
+    color: COLORS.text,
+    fontSize: 13.5,
+    fontWeight: "900",
+    marginTop: 3,
+  },
+  sheetStickyFooter: {
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.lineSoft,
+  },
+  settingsSheetHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+    marginBottom: 4,
+  },
+  settingsHeaderClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.surfaceRaised,
+    borderWidth: 1,
+    borderColor: COLORS.lineSoft,
   },
 });

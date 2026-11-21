@@ -453,7 +453,7 @@ export const InboxScreen = memo(function InboxScreen({ currentUserId, profile })
         <View style={styles.pageHeader}>
           <View>
             <Text style={styles.eyebrow}>SORA · MESAJLAR</Text>
-            <Text style={styles.pageTitle}>Sohbetlerin.</Text>
+            <Text style={styles.pageTitle}>Mesajlar</Text>
           </View>
           <Pressable
             onPress={() => setNewChatOpen(true)}
@@ -529,7 +529,7 @@ export const InboxScreen = memo(function InboxScreen({ currentUserId, profile })
                   />
                   <View style={styles.conversationCopy}>
                     <View style={styles.conversationTop}>
-                      <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <View style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 6 }}>
                         <Text numberOfLines={1} style={styles.conversationName}>
                           {conversation.name}
                         </Text>
@@ -537,7 +537,7 @@ export const InboxScreen = memo(function InboxScreen({ currentUserId, profile })
                           <SoraWealthBadge spent={partnerSpent} size="sm" animated={false} />
                         ) : null}
                       </View>
-                      <Text style={styles.conversationTime}>
+                      <Text numberOfLines={1} style={styles.conversationTime}>
                         {formatMessageTime(conversation.lastMessageAt)}
                       </Text>
                     </View>
@@ -566,7 +566,7 @@ export const InboxScreen = memo(function InboxScreen({ currentUserId, profile })
               <View style={styles.sheetHeader}>
                 <View>
                   <Text style={styles.eyebrow}>YENİ SOHBET</Text>
-                  <Text style={styles.sheetTitle}>Birini bul.</Text>
+                  <Text style={styles.sheetTitle}>Yeni sohbet</Text>
                 </View>
                 <Pressable onPress={() => setNewChatOpen(false)} style={styles.headerButton}>
                   <Ionicons name="close" size={21} color={COLORS.text} />
@@ -727,7 +727,7 @@ const styles = StyleSheet.create({
   conversationCopy: { flex: 1, minWidth: 0 },
   conversationTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
   conversationName: { flexShrink: 1, color: COLORS.text, fontSize: 15, fontWeight: "900" },
-  conversationTime: { color: COLORS.muted, fontSize: 11, fontWeight: "700" },
+  conversationTime: { flexShrink: 0, color: COLORS.muted, fontSize: 11, fontWeight: "700" },
   conversationMessage: { color: COLORS.textSecondary, fontSize: 13, lineHeight: 18, marginTop: 4 },
   conversationHandle: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
   chatHeader: {

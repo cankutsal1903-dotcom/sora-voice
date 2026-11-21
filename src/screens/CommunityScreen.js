@@ -1625,10 +1625,17 @@ export const CommunityScreen = memo(function CommunityScreen({
           </LinearGradient>
 
           <View style={styles.xpStrip}>
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
               <View style={styles.xpStripLabels}>
-                <Text style={styles.xpStripTitle}>{myProgress?.currentTitle}</Text>
-                <Text style={styles.xpStripValue}>
+                <View style={styles.xpStripTopRow}>
+                  <Text style={styles.xpStripTitle} numberOfLines={1}>
+                    {myProgress?.currentTitle}
+                  </Text>
+                  <Text style={styles.xpStripPercent}>
+                    %{Math.min(100, Math.round((myProgress?.ratio || 0) * 100))}
+                  </Text>
+                </View>
+                <Text style={styles.xpStripValue} numberOfLines={1}>
                   {formatCredits(myProgress?.gainedInLevel || 0)} / {formatCredits(myProgress?.stepRequiredXp || 100000)} XP
                 </Text>
               </View>
@@ -2209,15 +2216,25 @@ export const CommunityScreen = memo(function CommunityScreen({
                     onPress={() => setDetailTab("levels")}
                     style={[styles.detailTabBtn, detailTab === "levels" && styles.detailTabBtnActive]}
                   >
-                    <Text style={[styles.detailTabText, detailTab === "levels" && styles.detailTabTextActive]}>
-                      Seviye ve Ödüller
+                    <Text
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.84}
+                      style={[styles.detailTabText, detailTab === "levels" && styles.detailTabTextActive]}
+                    >
+                      Seviyeler
                     </Text>
                   </Pressable>
                   <Pressable
                     onPress={() => setDetailTab("members")}
                     style={[styles.detailTabBtn, detailTab === "members" && styles.detailTabBtnActive]}
                   >
-                    <Text style={[styles.detailTabText, detailTab === "members" && styles.detailTabTextActive]}>
+                    <Text
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.84}
+                      style={[styles.detailTabText, detailTab === "members" && styles.detailTabTextActive]}
+                    >
                       Üyeler ({detailData.members.length})
                     </Text>
                   </Pressable>
@@ -2226,7 +2243,12 @@ export const CommunityScreen = memo(function CommunityScreen({
                       onPress={() => setDetailTab("edit")}
                       style={[styles.detailTabBtn, detailTab === "edit" && styles.detailTabBtnActive]}
                     >
-                      <Text style={[styles.detailTabText, detailTab === "edit" && styles.detailTabTextActive]}>
+                      <Text
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.84}
+                        style={[styles.detailTabText, detailTab === "edit" && styles.detailTabTextActive]}
+                      >
                         Düzenle
                       </Text>
                     </Pressable>
@@ -2242,10 +2264,15 @@ export const CommunityScreen = memo(function CommunityScreen({
                     <View style={{ gap: 12 }}>
                       <View style={styles.levelHeroCard}>
                         <View style={styles.xpStripLabels}>
-                          <Text style={styles.levelHeroTitle}>
-                            Sv. {detailData.family.level} · {detailProgress?.currentTitle}
-                          </Text>
-                          <Text style={styles.xpStripValue}>
+                          <View style={styles.xpStripTopRow}>
+                            <Text style={styles.levelHeroTitle} numberOfLines={1}>
+                              Sv. {detailData.family.level} · {detailProgress?.currentTitle}
+                            </Text>
+                            <Text style={styles.xpStripPercent}>
+                              %{Math.min(100, Math.round((detailProgress?.ratio || 0) * 100))}
+                            </Text>
+                          </View>
+                          <Text style={styles.xpStripValue} numberOfLines={1}>
                             {formatCredits(detailProgress?.gainedInLevel || 0)} / {formatCredits(detailProgress?.stepRequiredXp || 100000)} XP
                           </Text>
                         </View>
@@ -2304,7 +2331,7 @@ export const CommunityScreen = memo(function CommunityScreen({
                                 Sv. {cfg.level}
                               </Text>
                             </View>
-                            <View style={{ flex: 1 }}>
+                            <View style={{ flex: 1, minWidth: 0 }}>
                               <Text style={styles.tierTitle}>
                                 {cfg.title} · {formatCredits(cfg.minXp)} XP
                               </Text>
@@ -2777,9 +2804,11 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: "900",
   },
-  xpStripLabels: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  xpStripTitle: { color: COLORS.text, fontSize: 12, fontWeight: "800" },
-  xpStripValue: { color: COLORS.textSecondary, fontSize: 11, fontWeight: "800" },
+  xpStripLabels: { gap: 2 },
+  xpStripTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  xpStripTitle: { flex: 1, color: COLORS.text, fontSize: 12, fontWeight: "800" },
+  xpStripPercent: { color: COLORS.primary, fontSize: 10.5, fontWeight: "900", flexShrink: 0 },
+  xpStripValue: { color: COLORS.textSecondary, fontSize: 10.5, fontWeight: "700" },
   progressTrack: {
     height: 7,
     borderRadius: 4,
@@ -3234,13 +3263,14 @@ const styles = StyleSheet.create({
   },
   detailTabBtn: {
     flex: 1,
-    minHeight: 34,
+    minHeight: 38,
+    paddingHorizontal: 6,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
   detailTabBtnActive: { backgroundColor: COLORS.primarySoft },
-  detailTabText: { color: COLORS.muted, fontSize: 11, fontWeight: "800" },
+  detailTabText: { color: COLORS.muted, fontSize: 11.5, fontWeight: "800", textAlign: "center" },
   detailTabTextActive: { color: COLORS.primary, fontWeight: "900" },
   levelHeroCard: {
     padding: 14,
@@ -3249,12 +3279,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.line,
   },
-  levelHeroTitle: { color: COLORS.text, fontSize: 14, fontWeight: "900" },
+  levelHeroTitle: { flex: 1, color: COLORS.text, fontSize: 14, fontWeight: "900" },
   levelHeroSub: { color: COLORS.textSecondary, fontSize: 11, marginTop: 7, lineHeight: 16 },
   levelHeroVolume: { color: COLORS.muted, fontSize: 10, fontWeight: "700", marginTop: 4 },
   syncRewardBtn: {
     marginTop: 10,
-    minHeight: 36,
+    minHeight: 38,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 11,
     backgroundColor: COLORS.primarySoft,
     flexDirection: "row",
@@ -3262,7 +3294,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 6,
   },
-  syncRewardBtnText: { color: COLORS.primary, fontSize: 11, fontWeight: "900" },
+  syncRewardBtnText: { flexShrink: 1, color: COLORS.primary, fontSize: 11.5, fontWeight: "900", textAlign: "center" },
   ruleCard: {
     padding: 12,
     borderRadius: 15,
