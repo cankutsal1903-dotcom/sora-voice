@@ -476,17 +476,6 @@ export const claimDailyReward = async () => {
   return data?.[0] || { balance: 0, claimed: false };
 };
 
-export const spendWalletCredit = async ({ amount, description, metadata = {} }) => {
-  const client = requireClient();
-  const { data, error } = await client.rpc("spend_wallet_credit", {
-    p_amount: amount,
-    p_description: description,
-    p_metadata: metadata,
-  });
-  throwIfError(error);
-  return data?.[0] || { balance: 0 };
-};
-
 const mapBankTransferRequest = (request) => ({
   id: request.id,
   referenceCode: request.reference_code,

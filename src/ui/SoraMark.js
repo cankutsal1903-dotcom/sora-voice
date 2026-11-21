@@ -1,6 +1,7 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import { Animated, Easing, View } from "react-native";
 import Svg, { Defs, Ellipse, LinearGradient, Path, Rect, Stop } from "react-native-svg";
+import { useReducedMotion } from "./Motion";
 
 /**
  * Sora logo isareti (mikrofon + yorunge), viewBox 0 0 120 120.
@@ -33,7 +34,9 @@ const orbitPoint = (theta) => {
 
 const range = (n) => Array.from({ length: n + 1 }, (_, i) => i / n);
 
-function SoraMarkBase({ size = 120, animate = false, tone = "dark", accessibilityLabel = "Sora sesli sohbet logosu" }) {
+function SoraMarkBase({ size = 120, animate: animateProp = false, tone = "dark", accessibilityLabel = "Sora sesli sohbet logosu" }) {
+  const reducedMotion = useReducedMotion();
+  const animate = animateProp && !reducedMotion;
   const k = size / 120;
   const colors = TONES[tone] || TONES.dark;
   const [clocks] = useState(() => ({ bars: new Animated.Value(0), orbit: new Animated.Value(0) }));

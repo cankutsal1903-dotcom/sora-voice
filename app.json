@@ -73,7 +73,8 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/sora-logo-blue.png",
         "backgroundColor": "#060D18"
-      }
+      },
+      "allowBackup": false
     },
     "ios": {
       "bundleIdentifier": "com.arescan.soravoice",

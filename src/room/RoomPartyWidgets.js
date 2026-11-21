@@ -265,9 +265,14 @@ export const LuckyPacketCreateSheet = memo(function LuckyPacketCreateSheet({
   const [note, setNote] = useState("Herkese bol şans!");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  // Ayni acilista tekrar denemeler ayni ID'yi kullanir; sunucu ikinci paketi acmaz.
+  const requestIdRef = useRef(null);
 
   useEffect(() => {
-    if (visible) setErr(null);
+    if (visible) {
+      setErr(null);
+      requestIdRef.current = makeUuid();
+    }
   }, [visible]);
 
   const handleSubmit = async () => {
@@ -285,7 +290,7 @@ export const LuckyPacketCreateSheet = memo(function LuckyPacketCreateSheet({
         p_slots: slots,
         p_message: note.trim() || "Şanslı Paket!",
         p_duration_seconds: 90,
-        p_request_id: makeUuid(),
+        p_request_id: requestIdRef.current || makeUuid(),
       });
       if (error) throw error;
       playSfx("fanfare");

@@ -224,7 +224,7 @@ export function AuthScreen() {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.hero}>
-              <View style={styles.logo}><SoraMark size={96} /></View>
+              <View style={styles.logo}><SoraMark size={96} tone="light" /></View>
               <Text style={styles.kicker}>SORA HESABI</Text>
               <Text style={styles.title}>{isRegistering ? "Sesinle yerini al." : "Sohbete geri dön."}</Text>
               <Text style={styles.subtitle}>{subtitle}</Text>

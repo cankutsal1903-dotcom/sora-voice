@@ -344,7 +344,7 @@ export const BrandLaunch = memo(function BrandLaunch({
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
       <View style={motionStyles.lightCenter}>
         <Animated.View style={{ opacity: intro, transform: [{ scale: markScale }] }}>
-          <SoraMark size={112} tone="light" animate={!reducedMotion} />
+          <SoraMark size={112} tone="light" animate />
         </Animated.View>
         <Animated.Text
           style={[
