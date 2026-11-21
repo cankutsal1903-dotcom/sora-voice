@@ -195,6 +195,7 @@ import { AudioBars, BrandLaunch, LivePulse, Reveal, useReducedMotion } from "./s
 import { installGlobalErrorReporting } from "./src/observability/errorReporting";
 import { InboxScreen } from "./src/screens/InboxScreen";
 import { CommunityScreen, prefetchFamilyChat } from "./src/screens/CommunityScreen";
+import { GlobalLeaderboardSheet } from "./src/screens/GlobalLeaderboardSheet";
 import { COLORS as APP_COLORS } from "./src/theme/colors";
 import {
   DEFAULT_GIFT_CATALOG,
@@ -825,6 +826,7 @@ const Discover = memo(function Discover({
   events = [],
   onOpenEvent,
   onOpenNotifications,
+  onOpenLeaderboard,
   onOpenRoom,
   onCreate,
   onToggleFavorite,
@@ -943,15 +945,28 @@ const Discover = memo(function Discover({
       >
         <View style={styles.topBar}>
           <View style={styles.discoverHeadingCopy}>
-            <Text style={styles.discoverEyebrow}>SORA · SESLİ SOHBET</Text>
-            <Text style={styles.discoverHeading}>Keşfet</Text>
+            <Text numberOfLines={1} style={styles.discoverEyebrow}>SORA · SESLİ SOHBET</Text>
+            <Text numberOfLines={1} style={styles.discoverHeading}>Keşfet</Text>
           </View>
-          <IconButton
-            icon="notifications-outline"
-            accessibilityLabel="Bildirimleri aç"
-            badge={notificationCount > 0}
-            onPress={onOpenNotifications}
-          />
+          <View style={styles.topActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Global Liderlik Podyumu"
+              onPress={onOpenLeaderboard}
+              style={({ pressed }) => [
+                styles.discoverTrophyButton,
+                pressed && { transform: [{ scale: 0.94 }], opacity: 0.9 },
+              ]}
+            >
+              <Ionicons name="trophy" size={19} color="#D97706" />
+            </Pressable>
+            <IconButton
+              icon="notifications-outline"
+              accessibilityLabel="Bildirimleri aç"
+              badge={notificationCount > 0}
+              onPress={onOpenNotifications}
+            />
+          </View>
         </View>
         {events.length > 0 ? (
           <EventBannerCarousel
@@ -1047,8 +1062,8 @@ const Discover = memo(function Discover({
         <Reveal distance={10}>
           <View style={styles.topBar}>
             <View style={styles.discoverHeadingCopy}>
-              <Text style={styles.discoverEyebrow}>SORA · SESLİ SOHBET</Text>
-              <Text style={styles.discoverHeading}>Keşfet</Text>
+              <Text numberOfLines={1} style={styles.discoverEyebrow}>SORA · SESLİ SOHBET</Text>
+              <Text numberOfLines={1} style={styles.discoverHeading}>Keşfet</Text>
             </View>
             <View style={styles.topActions}>
               <IconButton
@@ -1056,6 +1071,17 @@ const Discover = memo(function Discover({
                 accessibilityLabel={searching ? "Oda aramayı kapat" : "Oda ara"}
                 onPress={handleToggleSearch}
               />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Global Liderlik Podyumu"
+                onPress={onOpenLeaderboard}
+                style={({ pressed }) => [
+                  styles.discoverTrophyButton,
+                  pressed && { transform: [{ scale: 0.94 }], opacity: 0.9 },
+                ]}
+              >
+                <Ionicons name="trophy" size={19} color="#D97706" />
+              </Pressable>
               <IconButton
                 icon="notifications-outline"
                 accessibilityLabel="Bildirimleri aç"
@@ -3323,6 +3349,8 @@ function ProfileDetailSheet({
   onShare,
   onOpenLevel,
   onToggleFollow,
+  onMessage = null,
+  onOpenFamily = null,
   onBlock,
   onReport,
   liveRoom = null,
@@ -3334,9 +3362,14 @@ function ProfileDetailSheet({
   const [remoteProfile, setRemoteProfile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [detailTab, setDetailTab] = useState("profile");
+  const [followCounts, setFollowCounts] = useState(null);
+  const [targetFamily, setTargetFamily] = useState(null);
+  const [detailWealthOpen, setDetailWealthOpen] = useState(false);
+
+  const resolvedTargetId = userId || profile?.id || profile?.userId || null;
 
   useEffect(() => {
-    if (!visible || !userId || profile?.handle) {
+    if (!visible || !userId || (isSelf && profile?.handle)) {
       setRemoteProfile(null);
       return undefined;
     }
@@ -3355,37 +3388,50 @@ function ProfileDetailSheet({
     return () => {
       active = false;
     };
-  }, [profile?.handle, userId, visible]);
+  }, [isSelf, profile?.handle, userId, visible]);
 
   useEffect(() => {
     if (visible) setDetailTab("profile");
   }, [visible]);
 
-  const [followCounts, setFollowCounts] = useState(null);
-  const [detailWealthOpen, setDetailWealthOpen] = useState(false);
   useEffect(() => {
-    if (!visible || !isSelf || !supabase) return undefined;
+    if (!visible || !supabase) {
+      setFollowCounts(null);
+      setTargetFamily(null);
+      return undefined;
+    }
     let active = true;
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        const selfId = data?.session?.user?.id;
-        return selfId ? getFollowCounts(selfId) : null;
-      })
-      .then((counts) => {
-        if (active && counts) setFollowCounts(counts);
-      })
-      .catch(() => undefined);
+    const loadSummary = async () => {
+      let uid = resolvedTargetId;
+      if (!uid && isSelf) {
+        const { data } = await supabase.auth.getSession();
+        uid = data?.session?.user?.id || null;
+      }
+      if (!uid || !active) return;
+      const [countsRes, familyRes] = await Promise.all([
+        getFollowCounts(uid).catch(() => null),
+        getMyFamily(uid).catch(() => null),
+      ]);
+      if (!active) return;
+      setFollowCounts(countsRes);
+      setTargetFamily(familyRes);
+    };
+    setFollowCounts(null);
+    setTargetFamily(null);
+    loadSummary().catch(() => undefined);
     return () => {
       active = false;
     };
-  }, [isSelf, visible]);
+  }, [isFollowing, isSelf, resolvedTargetId, visible]);
 
-  const person = remoteProfile || profile || {};
+  const person = remoteProfile
+    ? { ...(profile || {}), ...remoteProfile }
+    : (profile || {});
   const targetUserId = userId || person.id || person.userId || null;
   const targetGiftSpent = useGiftSpent(targetUserId) || 0;
   const name = person.name || person.display_name || "Sora kullanıcısı";
-  const handle = person.handle ? `@${person.handle.replace(/^@+/, "")}` : "Sora kullanıcısı";
+  const rawHandle = person.handle ? String(person.handle).replace(/^@+/, "") : "";
+  const handle = rawHandle ? `@${rawHandle}` : "Sora kullanıcısı";
   const color = person.color || person.avatar_color || COLORS.primaryLight;
   const personLevel = Math.max(1, Math.floor(Number(person.userLevel || person.user_level || 1)));
   const personXp = Math.max(0, Math.floor(Number(person.userXp || person.user_xp || 0)));
@@ -3402,6 +3448,8 @@ function ProfileDetailSheet({
         : profile?.seat !== null && profile?.seat !== undefined
           ? "Mikrofonda"
           : "Dinleyici";
+  const canDirectMessage = Boolean(!isSelf && onMessage && (rawHandle || targetUserId));
+  const showStickyActions = Boolean(!isSelf && (onToggleFollow || onMessage));
 
   return (
     <Modal
@@ -3414,7 +3462,7 @@ function ProfileDetailSheet({
         <StatusBar barStyle="light-content" backgroundColor="#111820" />
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + (showStickyActions ? 94 : 24) }}
         >
           <View
             style={[
@@ -3480,12 +3528,12 @@ function ProfileDetailSheet({
             <View
               style={[
                 styles.profileDetailCoverBottom,
-                frameAppearance && { left: 16, bottom: -18 },
+                frameAppearance && { left: 16, bottom: -16 },
               ]}
             >
               <ProfileFrame
                 appearance={frameAppearance}
-                size={frameAppearance ? 66 : 80}
+                size={frameAppearance ? 62 : 72}
                 padMode="tight"
                 style={
                   frameAppearance
@@ -3497,7 +3545,7 @@ function ProfileDetailSheet({
                   label={name.charAt(0).toUpperCase()}
                   color={color}
                   uri={person.avatarUrl || person.avatar_url || null}
-                  size={frameAppearance ? 66 : 80}
+                  size={frameAppearance ? 62 : 72}
                   bordered={!frameAppearance}
                   circle
                 />
@@ -3514,7 +3562,7 @@ function ProfileDetailSheet({
           <View
             style={[
               styles.profileDetailIdentity,
-              frameAppearance && { paddingTop: 38 },
+              frameAppearance && { paddingTop: 32 },
               themeAppearance?.background
                 ? { backgroundColor: themeAppearance.background }
                 : null,
@@ -3524,7 +3572,7 @@ function ProfileDetailSheet({
               <Text style={styles.profileDetailName} numberOfLines={1}>
                 {name}
               </Text>
-              <SoraLevelCrest level={personLevel} size={28} />
+              <SoraLevelCrest level={personLevel} size={26} />
               <View style={styles.profileLevelInlinePill}>
                 <Text style={styles.profileLevelInlineText}>Sv. {personLevel}</Text>
               </View>
@@ -3541,18 +3589,74 @@ function ProfileDetailSheet({
               {handle}
               {person.publicId ? ` · ID: ${person.publicId}` : ""}
             </Text>
-            {isSelf ? (
-              <View style={styles.profileFollowRow}>
-                <View style={styles.profileFollowItem}>
-                  <Text style={styles.profileFollowNumber}>{followCounts?.following ?? "–"}</Text>
-                  <Text style={styles.profileFollowLabel}>Takip</Text>
-                </View>
-                <View style={styles.profileFollowDivider} />
-                <View style={styles.profileFollowItem}>
-                  <Text style={styles.profileFollowNumber}>{followCounts?.followers ?? "–"}</Text>
-                  <Text style={styles.profileFollowLabel}>Takipçi</Text>
-                </View>
+            <View style={styles.profileSummaryMetrics}>
+              <View style={styles.profileSummaryMetricItem}>
+                <Text style={styles.profileSummaryMetricValue}>
+                  {followCounts ? followCounts.followers : "–"}
+                </Text>
+                <Text style={styles.profileSummaryMetricLabel}>Takipçi</Text>
               </View>
+              <View style={styles.profileSummaryMetricDivider} />
+              <View style={styles.profileSummaryMetricItem}>
+                <Text style={styles.profileSummaryMetricValue}>
+                  {followCounts ? followCounts.following : "–"}
+                </Text>
+                <Text style={styles.profileSummaryMetricLabel}>Takip</Text>
+              </View>
+              <View style={styles.profileSummaryMetricDivider} />
+              <Pressable
+                onPress={() => setDetailWealthOpen(true)}
+                style={styles.profileSummaryMetricItem}
+                accessibilityRole="button"
+                accessibilityLabel="Cömertlik detayını aç"
+              >
+                <Text style={[styles.profileSummaryMetricValue, { color: COLORS.primary }]}>
+                  {targetGiftSpent > 0 ? formatCreditsCompact(targetGiftSpent) : "0"}
+                </Text>
+                <Text style={styles.profileSummaryMetricLabel}>Cömertlik</Text>
+              </Pressable>
+            </View>
+            {targetFamily ? (
+              <Pressable
+                disabled={!onOpenFamily}
+                onPress={() => onOpenFamily?.(targetFamily.id)}
+                accessibilityRole={onOpenFamily ? "button" : "summary"}
+                accessibilityLabel={`${targetFamily.name} ailesini görüntüle`}
+                style={({ pressed }) => [
+                  styles.profileDetailFamilyCard,
+                  pressed && onOpenFamily && { opacity: 0.86, transform: [{ scale: 0.99 }] },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.profileDetailFamilyAvatar,
+                    { backgroundColor: targetFamily.colors?.[0] || COLORS.primary },
+                  ]}
+                >
+                  {targetFamily.avatarUrl ? (
+                    <Image source={{ uri: targetFamily.avatarUrl }} style={StyleSheet.absoluteFill} />
+                  ) : (
+                    <Ionicons name={targetFamily.icon || "people"} size={17} color="#FFFFFF" />
+                  )}
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <View style={styles.profileDetailFamilyTopLine}>
+                    <Text numberOfLines={1} style={styles.profileDetailFamilyName}>
+                      {targetFamily.name}
+                    </Text>
+                    <View style={styles.profileDetailFamilyPill}>
+                      <Text style={styles.profileDetailFamilyPillText}>Sv. {targetFamily.level}</Text>
+                    </View>
+                  </View>
+                  <Text numberOfLines={1} style={styles.profileDetailFamilyMeta}>
+                    Aile · {targetFamily.memberCount || 1} üye
+                    {targetFamily.familyCode ? ` · ID: ${targetFamily.familyCode}` : ""}
+                  </Text>
+                </View>
+                {onOpenFamily ? (
+                  <Ionicons name="chevron-forward" size={17} color={COLORS.muted} />
+                ) : null}
+              </Pressable>
             ) : null}
             {roomContext ? (
               <View style={styles.profileDetailRoleRow}>
@@ -3696,20 +3800,6 @@ function ProfileDetailSheet({
           )}
           {!isSelf ? (
             <View style={styles.profileDetailActions}>
-              <Pressable
-                onPress={onToggleFollow}
-                style={styles.profileDetailFollowButton}
-                accessibilityRole="button"
-              >
-                <Ionicons
-                  name={isFollowing ? "heart-dislike-outline" : "heart-outline"}
-                  size={18}
-                  color="#FFFFFF"
-                />
-                <Text style={styles.profileDetailFollowText}>
-                  {isFollowing ? "Takipten çık" : "Takip et"}
-                </Text>
-              </Pressable>
               <View style={styles.profileDetailSafetyActions}>
                 <Pressable onPress={onReport} style={styles.profileDetailSafetyButton}>
                   <Ionicons name="flag-outline" size={17} color={COLORS.danger} />
@@ -3759,6 +3849,66 @@ function ProfileDetailSheet({
             </View>
           ) : null}
         </ScrollView>
+        {showStickyActions ? (
+          <View
+            style={[
+              styles.profileDetailStickyBar,
+              { paddingBottom: Math.max(insets.bottom, 12) },
+            ]}
+          >
+            {onToggleFollow ? (
+              <Pressable
+                onPress={onToggleFollow}
+                style={({ pressed }) => [
+                  styles.profileDetailFollowButton,
+                  isFollowing && styles.profileDetailFollowingButton,
+                  pressed && { opacity: 0.9, transform: [{ scale: 0.985 }] },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={isFollowing ? "Takipten çık" : "Takip et"}
+              >
+                <Ionicons
+                  name={isFollowing ? "checkmark-circle-outline" : "person-add-outline"}
+                  size={18}
+                  color={isFollowing ? COLORS.text : "#FFFFFF"}
+                />
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.profileDetailFollowText,
+                    isFollowing && { color: COLORS.text },
+                  ]}
+                >
+                  {isFollowing ? "Takiptesin" : "Takip et"}
+                </Text>
+              </Pressable>
+            ) : null}
+            {onMessage ? (
+              <Pressable
+                disabled={!canDirectMessage || (loading && !rawHandle)}
+                onPress={() =>
+                  onMessage({
+                    handle: rawHandle,
+                    userId: targetUserId,
+                    name,
+                  })
+                }
+                style={({ pressed }) => [
+                  styles.profileDetailMessageButton,
+                  (!canDirectMessage || (loading && !rawHandle)) && { opacity: 0.55 },
+                  pressed && { opacity: 0.9, transform: [{ scale: 0.985 }] },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`${name} ile mesajlaş`}
+              >
+                <Ionicons name="chatbubble-ellipses-outline" size={18} color="#FFFFFF" />
+                <Text numberOfLines={1} style={styles.profileDetailMessageText}>
+                  Mesaj Yaz
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
         <WealthTierLadderSheet
           visible={detailWealthOpen}
           spent={targetGiftSpent}
@@ -6513,6 +6663,8 @@ function Room({
   minimized = false,
   onMiniStateChange,
   quickMicToggleRef,
+  onStartDirectMessage = null,
+  onOpenFamily = null,
 }) {
   const insets = useSafeAreaInsets();
   const { width: roomViewportWidth } = useWindowDimensions();
@@ -9941,6 +10093,26 @@ function Room({
         isFollowing={selectedIsFollowing}
         canBlock={Boolean(!selfProfileOpen && room.persisted && profileParticipant?.userId)}
         onToggleFollow={handleSelectedFollow}
+        onMessage={
+          onStartDirectMessage
+            ? (target) => {
+                setSelfProfileOpen(false);
+                setProfileParticipant(null);
+                setSelectedParticipant(null);
+                onStartDirectMessage(target);
+              }
+            : null
+        }
+        onOpenFamily={
+          onOpenFamily
+            ? (familyId) => {
+                setSelfProfileOpen(false);
+                setProfileParticipant(null);
+                setSelectedParticipant(null);
+                onOpenFamily(familyId);
+              }
+            : null
+        }
         onBlock={handleSelectedBlock}
         onReport={handleSelectedReport}
         staffActions={selfProfileOpen ? [] : staffActionsFor(profileParticipant)}
@@ -10792,6 +10964,9 @@ function AppContent() {
   const [activeSanction, setActiveSanction] = useState(null);
   const [inspectedUserId, setInspectedUserId] = useState(null);
   const [inspectedReportTarget, setInspectedReportTarget] = useState(null);
+  const [globalLeaderboardOpen, setGlobalLeaderboardOpen] = useState(false);
+  const [pendingDirectChat, setPendingDirectChat] = useState(null);
+  const [pendingFamilyRequest, setPendingFamilyRequest] = useState(null);
   const pendingGiftSpendRef = useRef(0);
   const triggerCoinBlast = useCallback(({ reward, multiplier = 0 }) => {
     const cleanReward = Math.max(0, Math.round(Number(reward) || 0));
@@ -12466,6 +12641,54 @@ function AppContent() {
     () => setNotificationsOpen(true),
     [],
   );
+  const handleOpenLeaderboard = useCallback(
+    () => setGlobalLeaderboardOpen(true),
+    [],
+  );
+  const handleCloseLeaderboard = useCallback(
+    () => setGlobalLeaderboardOpen(false),
+    [],
+  );
+  const handleStartDirectMessage = useCallback(
+    (target) => {
+      if (!target?.handle && !target?.userId) return;
+      setInspectedUserId(null);
+      setGlobalLeaderboardOpen(false);
+      if (openRoomIdRef.current) {
+        setRoomMinimized(true);
+      }
+      handleSelectTab("inbox");
+      setPendingDirectChat({
+        requestId: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        handle: target.handle || "",
+        userId: target.userId || null,
+        name: target.name || "",
+      });
+    },
+    [handleSelectTab],
+  );
+  const handleConsumePendingDirectChat = useCallback((requestId) => {
+    setPendingDirectChat((current) => (current?.requestId === requestId ? null : current));
+  }, []);
+  const handleOpenFamilyById = useCallback(
+    (familyId) => {
+      if (!familyId) return;
+      setGlobalLeaderboardOpen(false);
+      setInspectedUserId(null);
+      if (openRoomIdRef.current) {
+        setRoomMinimized(true);
+      }
+      handleSelectTab("community");
+      setPendingFamilyRequest({
+        requestId: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        familyId,
+      });
+    },
+    [handleSelectTab],
+  );
+  const handleConsumePendingFamily = useCallback((requestId) => {
+    setPendingFamilyRequest((current) => (current?.requestId === requestId ? null : current));
+  }, []);
   const handleOpenCreate = async () => {
     if (supabase && authSession?.user) {
       try {
@@ -12807,6 +13030,7 @@ function AppContent() {
             events={soraEvents}
             onOpenEvent={setActiveEvent}
             onOpenNotifications={handleOpenNotifications}
+            onOpenLeaderboard={handleOpenLeaderboard}
             onOpenRoom={openRoom}
             onCreate={handleOpenCreate}
             onToggleFavorite={toggleFavorite}
@@ -12822,6 +13046,8 @@ function AppContent() {
               profile={profile}
               rooms={rooms}
               onOpenRoom={openRoom}
+              pendingDirectChat={pendingDirectChat}
+              onConsumePendingDirectChat={handleConsumePendingDirectChat}
             />
           </View>
         ) : null}
@@ -12847,6 +13073,8 @@ function AppContent() {
               onBalanceRefresh={refreshWalletData}
               onFamilyChange={setMyFamily}
               onOpenUserProfile={setInspectedUserId}
+              pendingFamilyRequest={pendingFamilyRequest}
+              onConsumePendingFamily={handleConsumePendingFamily}
             />
           </View>
         ) : null}
@@ -12916,6 +13144,8 @@ function AppContent() {
               minimized={roomMinimized}
               onMiniStateChange={setRoomMiniState}
               quickMicToggleRef={roomQuickMicToggleRef}
+              onStartDirectMessage={handleStartDirectMessage}
+              onOpenFamily={handleOpenFamilyById}
             />
           </View>
           {roomMinimized ? (
@@ -12947,6 +13177,8 @@ function AppContent() {
           inspectedUserId !== authSession.user.id,
         )}
         onToggleFollow={() => inspectedUserId && toggleFollowUser(inspectedUserId)}
+        onMessage={handleStartDirectMessage}
+        onOpenFamily={handleOpenFamilyById}
         onBlock={() => {
           const targetId = inspectedUserId;
           if (!targetId) return;
@@ -13145,6 +13377,17 @@ function AppContent() {
         serverActivity={serverActivityNotifications}
         onDismiss={handleCloseNotifications}
         onClear={clearNotifications}
+      />
+      <GlobalLeaderboardSheet
+        visible={globalLeaderboardOpen}
+        currentUserId={authSession?.user?.id || null}
+        myFamilyId={myFamily?.id || null}
+        onSelectUser={(uid) => {
+          setGlobalLeaderboardOpen(false);
+          setTimeout(() => setInspectedUserId(uid), 220);
+        }}
+        onSelectFamily={handleOpenFamilyById}
+        onDismiss={handleCloseLeaderboard}
       />
       <DailyMissionsSheet
         visible={missionsFromNotifOpen}
@@ -16527,6 +16770,21 @@ const styles = StyleSheet.create({
     letterSpacing: -0.8,
     lineHeight: 30,
   },
+  discoverTrophyButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#FFFBEB",
+    borderWidth: 1,
+    borderColor: "rgba(217,119,6,0.28)",
+    shadowColor: "#D97706",
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
   discoverCreateButton: {
     width: 42,
     height: 42,
@@ -18419,9 +18677,9 @@ const styles = StyleSheet.create({
   },
   profileDetailScreen: { flex: 1, backgroundColor: COLORS.background },
   profileDetailCover: {
-    height: 284,
-    paddingHorizontal: 18,
-    paddingBottom: 24,
+    height: 218,
+    paddingHorizontal: 16,
+    paddingBottom: 20,
     justifyContent: "space-between",
     overflow: "visible",
     zIndex: 2,
@@ -18429,11 +18687,11 @@ const styles = StyleSheet.create({
   },
   profileDetailOrb: {
     position: "absolute",
-    width: 290,
-    height: 290,
-    borderRadius: 145,
-    right: -112,
-    top: -110,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    right: -102,
+    top: -104,
   },
   profileDetailTopRow: {
     flexDirection: "row",
@@ -18443,16 +18701,16 @@ const styles = StyleSheet.create({
   profileDetailTopActions: { flexDirection: "row", alignItems: "center", gap: 9 },
   profileDetailBrand: {
     position: "absolute",
-    left: 24,
-    top: 112,
+    left: 22,
+    top: 76,
     flexDirection: "row",
     alignItems: "center",
-    gap: 11,
+    gap: 10,
     opacity: 0.72,
   },
   profileDetailBrandTitle: {
     color: "rgba(255,255,255,0.32)",
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: "900",
     letterSpacing: 4,
   },
@@ -18473,9 +18731,9 @@ const styles = StyleSheet.create({
   },
   profileDetailCoverBottom: {
     position: "absolute",
-    left: 20,
-    right: 20,
-    bottom: -18,
+    left: 18,
+    right: 18,
+    bottom: -16,
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
@@ -18483,7 +18741,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   profileDetailAvatarRing: {
-    padding: 5,
+    padding: 4,
     borderRadius: 999,
     backgroundColor: COLORS.surface,
     borderWidth: 1,
@@ -18493,20 +18751,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 24,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    marginBottom: 20,
     borderRadius: 999,
     backgroundColor: COLORS.primary,
   },
   profileDetailStatusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#FFFFFF" },
   profileDetailStatusText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
   profileDetailIdentity: {
-    marginHorizontal: 12,
+    marginHorizontal: 14,
     marginTop: -3,
-    paddingHorizontal: 20,
-    paddingTop: 32,
-    paddingBottom: 18,
+    paddingHorizontal: 16,
+    paddingTop: 28,
+    paddingBottom: 16,
     borderRadius: 22,
     backgroundColor: COLORS.surface,
     borderWidth: 1,
@@ -18614,17 +18872,136 @@ const styles = StyleSheet.create({
   profileDetailInfoCopy: { flex: 1 },
   profileDetailInfoTitle: { color: COLORS.text, fontSize: 14, fontWeight: "800" },
   profileDetailInfoCaption: { color: COLORS.muted, fontSize: 12, marginTop: 3 },
-  profileDetailActions: { marginHorizontal: 16, marginTop: 14, gap: 9 },
+  profileSummaryMetrics: {
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 16,
+    backgroundColor: COLORS.surfaceSoft,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  profileSummaryMetricItem: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  profileSummaryMetricValue: {
+    color: COLORS.text,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  profileSummaryMetricLabel: {
+    color: COLORS.muted,
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  profileSummaryMetricDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: COLORS.line,
+  },
+  profileDetailFamilyCard: {
+    marginTop: 10,
+    minHeight: 56,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 15,
+    backgroundColor: COLORS.surfaceSoft,
+    borderWidth: 1,
+    borderColor: "rgba(47,128,237,0.16)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  profileDetailFamilyAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  profileDetailFamilyTopLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  profileDetailFamilyName: {
+    color: COLORS.text,
+    fontSize: 13.5,
+    fontWeight: "900",
+    flexShrink: 1,
+  },
+  profileDetailFamilyPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: "rgba(47,128,237,0.12)",
+  },
+  profileDetailFamilyPillText: {
+    color: COLORS.primary,
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  profileDetailFamilyMeta: {
+    color: COLORS.muted,
+    fontSize: 11.5,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  profileDetailActions: { marginHorizontal: 16, marginTop: 12, gap: 9 },
+  profileDetailStickyBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    backgroundColor: COLORS.surface,
+    borderTopWidth: 1,
+    borderColor: COLORS.line,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 10,
+  },
   profileDetailFollowButton: {
+    flex: 1,
     minHeight: 48,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 7,
     borderRadius: 15,
     backgroundColor: COLORS.primary,
+    paddingHorizontal: 12,
+  },
+  profileDetailFollowingButton: {
+    backgroundColor: COLORS.surfaceSoft,
+    borderWidth: 1,
+    borderColor: COLORS.line,
   },
   profileDetailFollowText: { color: "#FFFFFF", fontSize: 14, fontWeight: "900" },
+  profileDetailMessageButton: {
+    flex: 1,
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    borderRadius: 15,
+    backgroundColor: "#142238",
+    paddingHorizontal: 12,
+  },
+  profileDetailMessageText: { color: "#FFFFFF", fontSize: 14, fontWeight: "900" },
   profileDetailSafetyActions: { flexDirection: "row", gap: 9 },
   profileDetailSafetyButton: {
     flex: 1,

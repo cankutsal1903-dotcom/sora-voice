@@ -143,6 +143,8 @@ export const InboxScreen = memo(function InboxScreen({
   profile,
   rooms = [],
   onOpenRoom = null,
+  pendingDirectChat = null,
+  onConsumePendingDirectChat = null,
 }) {
   resetInboxCachesIfUserChanged(currentUserId);
   const insets = useSafeAreaInsets();
@@ -172,6 +174,16 @@ export const InboxScreen = memo(function InboxScreen({
   const [startingChat, setStartingChat] = useState(false);
   const selectedConversationIdRef = useRef(null);
   selectedConversationIdRef.current = selectedConversation?.id || null;
+  const handledDirectChatReqRef = useRef(null);
+  const conversationsRef = useRef(conversations);
+  conversationsRef.current = conversations;
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (keyboard.visible && selectedConversation) {
@@ -265,12 +277,74 @@ export const InboxScreen = memo(function InboxScreen({
   );
   const giftSpentMap = useGiftSpentMap(partnerUserIds);
 
-  const openConversation = (conversation) => {
+  const openConversation = useCallback((conversation) => {
     setSelectedConversation(conversation);
     setMessages(cachedDirectMessages.get(conversation?.id) || []);
     setDraft("");
     setError("");
-  };
+  }, []);
+
+  useEffect(() => {
+    const reqId = pendingDirectChat?.requestId;
+    if (!reqId || !currentUserId || handledDirectChatReqRef.current === reqId) return undefined;
+    handledDirectChatReqRef.current = reqId;
+    onConsumePendingDirectChat?.(reqId);
+
+    const rawHandle = String(pendingDirectChat?.handle || "").trim().replace(/^@+/, "");
+    const targetUserId = pendingDirectChat?.userId || null;
+    if (!rawHandle && !targetUserId) return undefined;
+
+    const existing = conversationsRef.current.find(
+      (item) =>
+        (targetUserId && item.otherUserId === targetUserId) ||
+        (rawHandle && String(item.handle || "").replace(/^@+/, "").toLowerCase() === rawHandle.toLowerCase()),
+    );
+    if (existing) {
+      setNewChatOpen(false);
+      openConversation(existing);
+      loadConversations({ silent: true });
+      return undefined;
+    }
+
+    if (!rawHandle) {
+      Alert.alert("Sohbet başlatılamadı", "Bu kullanıcının mesajlaşma adresi bulunamadı.");
+      return undefined;
+    }
+
+    setNewChatOpen(false);
+    setStartingChat(true);
+    startDirectConversation(rawHandle)
+      .then(async (conversationId) => {
+        if (!isMountedRef.current) return;
+        const nextConversations = await listDirectConversations();
+        if (!isMountedRef.current) return;
+        cachedInboxUserId = currentUserId;
+        cachedInboxConversations = nextConversations;
+        setConversations(nextConversations);
+        const found =
+          nextConversations.find((item) => item.id === conversationId) ||
+          nextConversations.find(
+            (item) =>
+              (targetUserId && item.otherUserId === targetUserId) ||
+              String(item.handle || "").replace(/^@+/, "").toLowerCase() === rawHandle.toLowerCase(),
+          );
+        if (found) {
+          openConversation(found);
+        } else {
+          Alert.alert("Sohbet başlatılamadı", "Konuşma listesi yenilenemedi. Lütfen tekrar dene.");
+        }
+      })
+      .catch((startError) => {
+        if (isMountedRef.current) {
+          Alert.alert("Sohbet başlatılamadı", friendlyError(startError));
+        }
+      })
+      .finally(() => {
+        if (isMountedRef.current) setStartingChat(false);
+      });
+
+    return undefined;
+  }, [currentUserId, loadConversations, onConsumePendingDirectChat, openConversation, pendingDirectChat]);
 
   const createConversation = async () => {
     const handle = newHandle.trim().replace(/^@+/, "");

@@ -443,6 +443,8 @@ export const CommunityScreen = memo(function CommunityScreen({
   onBalanceRefresh,
   onFamilyChange,
   onOpenUserProfile,
+  pendingFamilyRequest = null,
+  onConsumePendingFamily = null,
 }) {
   resetFamilyCachesIfUserChanged(currentUserId);
   const insets = useSafeAreaInsets();
@@ -1028,7 +1030,17 @@ export const CommunityScreen = memo(function CommunityScreen({
     } finally {
       setDetailLoading(false);
     }
-  }, [currentUserId, myFamily?.id]);
+  }, [currentUserId, discoverModalOpen, myFamily?.id]);
+
+  const handledFamilyReqRef = useRef(null);
+  useEffect(() => {
+    const reqId = pendingFamilyRequest?.requestId;
+    const targetFamilyId = pendingFamilyRequest?.familyId;
+    if (!reqId || !targetFamilyId || handledFamilyReqRef.current === reqId) return;
+    handledFamilyReqRef.current = reqId;
+    onConsumePendingFamily?.(reqId);
+    openFamilyDetail(targetFamilyId, "levels");
+  }, [onConsumePendingFamily, openFamilyDetail, pendingFamilyRequest]);
 
   const closeFamilyDetail = useCallback(() => {
     setSelectedFamilyId(null);

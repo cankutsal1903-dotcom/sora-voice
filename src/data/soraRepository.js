@@ -379,7 +379,18 @@ export const getPublicProfile = async (userId) => {
 };
 
 export const getFollowCounts = async (userId) => {
+  if (!userId) return { following: 0, followers: 0 };
   const client = requireClient();
+  const { data, error } = await client.rpc("get_profile_follow_counts", { p_user_id: userId });
+  if (!error) {
+    const row = Array.isArray(data) ? data[0] : data;
+    if (row) {
+      return {
+        following: Math.max(0, Number(row.following_count) || 0),
+        followers: Math.max(0, Number(row.followers_count) || 0),
+      };
+    }
+  }
   const [following, followers] = await Promise.all([
     client.from("follows").select("following_id", { count: "exact", head: true }).eq("follower_id", userId),
     client.from("follows").select("follower_id", { count: "exact", head: true }).eq("following_id", userId),
@@ -1455,4 +1466,38 @@ export const activateProfileItem = async (itemId) => {
   const client = requireClient();
   const { error } = await client.rpc("activate_profile_item", { p_item_id: itemId });
   throwIfError(error);
+};
+
+export const getGlobalLeaderboard = async (limit = 50) => {
+  const client = requireClient();
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 100));
+  const { data, error } = await client.rpc("get_global_leaderboard", { p_limit: safeLimit });
+  throwIfError(error);
+  const grouped = {
+    mostGenerous: [],
+    activeFamilies: [],
+    topLevels: [],
+  };
+  for (const row of Array.isArray(data) ? data : []) {
+    const entry = {
+      category: row.category,
+      rank: Number(row.rank_no) || 0,
+      entityType: row.entity_type === "family" ? "family" : "profile",
+      entityId: row.entity_id,
+      name: row.display_name || (row.entity_type === "family" ? "Sora Ailesi" : "Sora kullanıcısı"),
+      handle: row.handle || null,
+      avatarUrl: row.avatar_url || null,
+      color: row.avatar_color || "#2F80ED",
+      familyIcon: row.family_icon || "people",
+      score: Math.max(0, Number(row.score) || 0),
+      secondaryScore: Math.max(0, Number(row.secondary_score) || 0),
+      level: Math.max(1, Number(row.level) || 1),
+      wealthLevel: Math.max(0, Number(row.wealth_level) || 0),
+      memberCount: row.member_count == null ? null : Math.max(0, Number(row.member_count) || 0),
+    };
+    if (entry.category === "most_generous") grouped.mostGenerous.push(entry);
+    else if (entry.category === "active_families") grouped.activeFamilies.push(entry);
+    else if (entry.category === "top_levels") grouped.topLevels.push(entry);
+  }
+  return grouped;
 };
