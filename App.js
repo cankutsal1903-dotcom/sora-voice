@@ -426,6 +426,10 @@ const resolveRoomBrand = (room = {}) => {
 };
 
 const GIFT_CATALOG = DEFAULT_GIFT_CATALOG;
+// Sunucudaki sora_today_tr() ile ayni gun (Europe/Istanbul).
+// shortcut: Turkiye sabit UTC+3 (2016'dan beri yaz saati yok); kural degisirse Intl ile hesapla.
+const soraTodayTr = () => new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
 const createRequestUuid = () => {
   return globalThis.crypto?.randomUUID?.() || `xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`.replace(/[xy]/g, (c) => {
     const r = Math.floor(Math.random() * 16);
@@ -9376,7 +9380,7 @@ function AppContent() {
         setPaidWalletBalance(wallet.paid_balance || 0);
         setDailyRewardClaimed(
           wallet.last_daily_reward_at ===
-            new Date().toISOString().slice(0, 10),
+            soraTodayTr(),
         );
       }
       if (transactionsRes.status === "fulfilled" && Array.isArray(transactionsRes.value)) {
@@ -9946,7 +9950,7 @@ function AppContent() {
     setPromoWalletBalance(wallet.promo_balance || 0);
     setPaidWalletBalance(wallet.paid_balance || 0);
     setDailyRewardClaimed(
-      wallet.last_daily_reward_at === new Date().toISOString().slice(0, 10),
+      wallet.last_daily_reward_at === soraTodayTr(),
     );
     setWalletActivities(
       transactions.map((transaction) => ({
