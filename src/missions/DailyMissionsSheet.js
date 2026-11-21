@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -42,6 +42,10 @@ const broadcastStatus = (next) => {
     } catch {}
   });
 };
+
+export function resetDailyMissionsCache() {
+  broadcastStatus(null);
+}
 
 export async function refreshDailyMissionsStatus() {
   if (!supabase) return null;
@@ -114,10 +118,24 @@ export const DailyMissionsSheet = memo(function DailyMissionsSheet({
   const [loading, setLoading] = useState(false);
   const [busyKey, setBusyKey] = useState(null);
   const [toast, setToast] = useState(null);
+  const mountedRef = useRef(true);
+  const toastTimerRef = useRef(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     const next = await refreshDailyMissionsStatus();
+    if (!mountedRef.current) return;
     if (next) setStatus(next);
     setLoading(false);
   }, []);
@@ -125,6 +143,10 @@ export const DailyMissionsSheet = memo(function DailyMissionsSheet({
   useEffect(() => {
     if (!visible) {
       setToast(null);
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = null;
+      }
       return;
     }
     load();
@@ -132,8 +154,12 @@ export const DailyMissionsSheet = memo(function DailyMissionsSheet({
 
   const showToast = useCallback((text) => {
     setToast(text);
-    setTimeout(() => {
-      setToast((curr) => (curr === text ? null : curr));
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => {
+      toastTimerRef.current = null;
+      if (mountedRef.current) {
+        setToast((curr) => (curr === text ? null : curr));
+      }
     }, 2600);
   }, []);
 

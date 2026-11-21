@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   Image,
   Modal,
   Platform,
@@ -143,6 +144,7 @@ export const InboxScreen = memo(function InboxScreen({
   profile,
   rooms = [],
   onOpenRoom = null,
+  active = true,
   pendingDirectChat = null,
   onConsumePendingDirectChat = null,
 }) {
@@ -172,8 +174,11 @@ export const InboxScreen = memo(function InboxScreen({
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [newHandle, setNewHandle] = useState("");
   const [startingChat, setStartingChat] = useState(false);
+  const [messageRetryNonce, setMessageRetryNonce] = useState(0);
   const selectedConversationIdRef = useRef(null);
   selectedConversationIdRef.current = selectedConversation?.id || null;
+  const currentUserIdRef = useRef(currentUserId);
+  currentUserIdRef.current = currentUserId;
   const handledDirectChatReqRef = useRef(null);
   const conversationsRef = useRef(conversations);
   conversationsRef.current = conversations;
@@ -186,6 +191,13 @@ export const InboxScreen = memo(function InboxScreen({
   }, []);
 
   useEffect(() => {
+    setSelectedConversation(null);
+    setMessages([]);
+    setDraft("");
+    setError("");
+  }, [currentUserId]);
+
+  useEffect(() => {
     if (keyboard.visible && selectedConversation) {
       const timer = setTimeout(() => {
         chatScrollRef.current?.scrollToEnd?.({ animated: true });
@@ -196,7 +208,8 @@ export const InboxScreen = memo(function InboxScreen({
   }, [keyboard.visible, selectedConversation]);
 
   const loadConversations = useCallback(async ({ silent = false } = {}) => {
-    if (!currentUserId) return;
+    const requestUserId = currentUserId;
+    if (!requestUserId) return;
     if (!silent) setLoading(true);
     setError("");
     try {
@@ -206,16 +219,22 @@ export const InboxScreen = memo(function InboxScreen({
       } catch (firstError) {
         if (!isNetworkError(firstError)) throw firstError;
         await new Promise((resolve) => setTimeout(resolve, 750));
+        if (currentUserIdRef.current !== requestUserId) return;
         nextConversations = await listDirectConversations();
       }
-      cachedInboxUserId = currentUserId;
+      if (!isMountedRef.current || currentUserIdRef.current !== requestUserId) return;
+      cachedInboxUserId = requestUserId;
       cachedInboxConversations = nextConversations;
       setConversations(nextConversations);
       setSelectedConversation((current) => current ? nextConversations.find((item) => item.id === current.id) || current : current);
     } catch (loadError) {
-      setError(friendlyError(loadError));
+      if (isMountedRef.current && currentUserIdRef.current === requestUserId) {
+        setError(friendlyError(loadError));
+      }
     } finally {
-      if (!silent) setLoading(false);
+      if (!silent && isMountedRef.current && currentUserIdRef.current === requestUserId) {
+        setLoading(false);
+      }
     }
   }, [currentUserId]);
 
@@ -236,8 +255,21 @@ export const InboxScreen = memo(function InboxScreen({
     setError("");
     listDirectMessages({ conversationId: convId, currentUserId })
       .then((nextMessages) => {
-        cachedDirectMessages.set(convId, nextMessages);
-        if (active) setMessages(nextMessages);
+        if (!active || currentUserIdRef.current !== currentUserId) return;
+        setMessages((current) => {
+          const byId = new Map();
+          for (const item of nextMessages) {
+            if (item?.id) byId.set(item.id, item);
+          }
+          for (const item of current) {
+            if (item?.id && !byId.has(item.id)) byId.set(item.id, item);
+          }
+          const merged = [...byId.values()].sort(
+            (a, b) => (Date.parse(a?.createdAt || 0) || 0) - (Date.parse(b?.createdAt || 0) || 0),
+          );
+          cachedDirectMessages.set(convId, merged);
+          return merged;
+        });
       })
       .catch((loadError) => { if (active && !cachedMsgs) setError(friendlyError(loadError)); })
       .finally(() => { if (active && showSpinner) setMessagesLoading(false); });
@@ -260,7 +292,16 @@ export const InboxScreen = memo(function InboxScreen({
       },
     });
     return () => { active = false; unsubscribe(); };
-  }, [currentUserId, loadConversations, profile?.name, selectedConversation?.id, selectedConversation?.name]);
+  }, [currentUserId, loadConversations, messageRetryNonce, profile?.name, selectedConversation?.id, selectedConversation?.name]);
+
+  useEffect(() => {
+    if (!active || !selectedConversation) return undefined;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      setSelectedConversation(null);
+      return true;
+    });
+    return () => sub.remove();
+  }, [active, selectedConversation]);
 
   const visibleConversations = useMemo(() => {
     const cleanQuery = query.trim().toLocaleLowerCase("tr-TR");
@@ -296,7 +337,7 @@ export const InboxScreen = memo(function InboxScreen({
 
     const existing = conversationsRef.current.find(
       (item) =>
-        (targetUserId && item.otherUserId === targetUserId) ||
+        (targetUserId && (item.userId === targetUserId || item.otherUserId === targetUserId)) ||
         (rawHandle && String(item.handle || "").replace(/^@+/, "").toLowerCase() === rawHandle.toLowerCase()),
     );
     if (existing) {
@@ -325,7 +366,7 @@ export const InboxScreen = memo(function InboxScreen({
           nextConversations.find((item) => item.id === conversationId) ||
           nextConversations.find(
             (item) =>
-              (targetUserId && item.otherUserId === targetUserId) ||
+              (targetUserId && (item.userId === targetUserId || item.otherUserId === targetUserId)) ||
               String(item.handle || "").replace(/^@+/, "").toLowerCase() === rawHandle.toLowerCase(),
           );
         if (found) {
@@ -453,7 +494,10 @@ export const InboxScreen = memo(function InboxScreen({
         ) : null}
         {error ? (
           <Pressable
-            onPress={() => openConversation(selectedConversation)}
+            onPress={() => {
+              setError("");
+              setMessageRetryNonce((n) => n + 1);
+            }}
             style={styles.errorBanner}
           >
             <Ionicons name="alert-circle-outline" size={17} color={COLORS.danger} />

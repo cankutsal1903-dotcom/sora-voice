@@ -299,7 +299,7 @@ export const sendRoomMessage = async ({ roomId, userId, text }) => {
     .insert({ room_id: roomId, sender_id: userId, body: text })
     .select("id, body, kind, metadata, created_at, sender_id, sender_name, sender_avatar_url, sender_avatar_color")
     .single();
-  if (error) {
+  if (error && (error.code === "42703" || String(error.message || "").includes("does not exist"))) {
     const legacy = await client
       .from("room_messages")
       .insert({ room_id: roomId, sender_id: userId, body: text })
@@ -307,6 +307,8 @@ export const sendRoomMessage = async ({ roomId, userId, text }) => {
       .single();
     throwIfError(legacy.error);
     data = legacy.data;
+  } else {
+    throwIfError(error);
   }
   return {
     id: data.id,
@@ -691,10 +693,10 @@ export const listDirectMessages = async ({ conversationId, currentUserId }) => {
     .from("direct_messages")
     .select("id, conversation_id, sender_id, body, created_at, profiles!direct_messages_sender_id_fkey(display_name)")
     .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: false })
     .limit(200);
   throwIfError(error);
-  return (data || []).map((message) => ({
+  return (data || []).reverse().map((message) => ({
     id: message.id,
     conversationId: message.conversation_id,
     userId: message.sender_id,
@@ -1189,20 +1191,21 @@ export const sendFamilyGift = async ({
   });
   throwIfError(error);
   const row = Array.isArray(data) ? data[0] : data;
+  const toOptNum = (v) => (v != null && Number.isFinite(Number(v)) ? Number(v) : null);
   return {
     messageId: row?.message_id || null,
     messageBody: row?.message_body || "",
     messageMetadata: row?.message_metadata || {},
     createdAt: row?.created_at || new Date().toISOString(),
-    balance: typeof row?.balance === "number" ? row.balance : null,
-    promoBalance: typeof row?.promo_balance === "number" ? row.promo_balance : null,
-    paidBalance: typeof row?.paid_balance === "number" ? row.paid_balance : null,
+    balance: toOptNum(row?.balance),
+    promoBalance: toOptNum(row?.promo_balance),
+    paidBalance: toOptNum(row?.paid_balance),
     giftName: row?.gift_name || "Hediye",
     totalCost: Number(row?.total_cost) || 0,
     awardedXp: Number(row?.awarded_xp) || 0,
-    familyXp: row?.family_xp != null ? Number(row.family_xp) : null,
-    familyLevel: typeof row?.family_level === "number" ? row.family_level : null,
-    giftCoinsTotal: row?.gift_coins_total != null ? Number(row.gift_coins_total) : null,
+    familyXp: toOptNum(row?.family_xp),
+    familyLevel: toOptNum(row?.family_level),
+    giftCoinsTotal: toOptNum(row?.gift_coins_total),
   };
 };
 

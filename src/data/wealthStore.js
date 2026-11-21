@@ -8,6 +8,8 @@ const listeners = new Set();
 let columnSupported = null; // null: bilinmiyor, true/false: test edildi
 let pendingIds = new Set();
 let flushTimer = null;
+const retryCounts = new Map();
+const MAX_RETRIES = 3;
 
 const emitChanged = (changedIds) => {
   if (!changedIds || changedIds.size === 0) return;
@@ -44,19 +46,45 @@ const flush = async () => {
   const ids = [...pendingIds];
   pendingIds = new Set();
   if (!ids.length || !supabase || columnSupported === false) return;
+  const batch = ids.slice(0, 80);
+  const overflow = ids.slice(80);
+  if (overflow.length > 0) {
+    overflow.forEach((id) => pendingIds.add(id));
+    if (!flushTimer) flushTimer = setTimeout(flush, 60);
+  }
+  const requeueFailed = (failedBatch) => {
+    let any = false;
+    for (let i = 0; i < failedBatch.length; i += 1) {
+      const id = failedBatch[i];
+      if (!spentCache.has(id)) {
+        const tries = (retryCounts.get(id) || 0) + 1;
+        if (tries <= MAX_RETRIES) {
+          retryCounts.set(id, tries);
+          pendingIds.add(id);
+          any = true;
+        }
+      }
+    }
+    if (any && !flushTimer) {
+      flushTimer = setTimeout(flush, 2500);
+    }
+  };
   try {
     const { data, error } = await supabase
       .from("profiles")
       .select("id, gift_spent_total")
-      .in("id", ids.slice(0, 80));
+      .in("id", batch);
     if (error) {
       if (String(error.message || "").includes("gift_spent_total") || error.code === "42703") {
         columnSupported = false;
+      } else {
+        requeueFailed(batch);
       }
       return;
     }
     columnSupported = true;
     const changed = new Set();
+    batch.forEach((id) => retryCounts.delete(id));
     (data || []).forEach((row) => {
       if (!row?.id) return;
       const next = Math.max(0, Number(row.gift_spent_total) || 0);
@@ -67,7 +95,7 @@ const flush = async () => {
     });
     emitChanged(changed);
   } catch {
-    // ağ hatası: daha sonra tekrar denenir
+    requeueFailed(batch);
   }
 };
 

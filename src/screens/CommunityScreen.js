@@ -544,6 +544,13 @@ export const CommunityScreen = memo(function CommunityScreen({
     () => families.find((item) => item.joined) || null,
     [families],
   );
+  const currentUserIdRef = useRef(currentUserId);
+  currentUserIdRef.current = currentUserId;
+  const activeFamilyIdRef = useRef(myFamily?.id || null);
+  activeFamilyIdRef.current = myFamily?.id || null;
+  const detailReqSeqRef = useRef(0);
+  const selectedFamilyIdRef = useRef(selectedFamilyId);
+  selectedFamilyIdRef.current = selectedFamilyId;
   useEffect(() => {
     playedGiftIdsRef.current.clear();
     setGiftEffect(null);
@@ -571,18 +578,22 @@ export const CommunityScreen = memo(function CommunityScreen({
   }, [myFamily, onFamilyChange]);
 
   const loadFamilies = useCallback(async ({ silent = false } = {}) => {
-    if (!currentUserId) return;
+    const requestUserId = currentUserId;
+    if (!requestUserId) return;
     if (!silent) setLoading(true);
     setError("");
     try {
-      const rows = await listFamilies(currentUserId);
-      cachedFamiliesUserId = currentUserId;
+      const rows = await listFamilies(requestUserId);
+      if (currentUserIdRef.current !== requestUserId) return;
+      cachedFamiliesUserId = requestUserId;
       cachedFamiliesList = rows;
       setFamilies(rows);
     } catch (loadErr) {
-      setError(describeFamilyError(loadErr));
+      if (currentUserIdRef.current === requestUserId) {
+        setError(describeFamilyError(loadErr));
+      }
     } finally {
-      if (!silent) setLoading(false);
+      if (!silent && currentUserIdRef.current === requestUserId) setLoading(false);
     }
   }, [currentUserId]);
 
@@ -627,8 +638,10 @@ export const CommunityScreen = memo(function CommunityScreen({
     setMessagesError("");
 
     // Üye listesini sohbeti bekletmeden paralel yükle (tek hafif sorgu)
+    const requestUserId = currentUserId;
     listFamilyMembersLite(communityId)
       .then((members) => {
+        if (currentUserIdRef.current !== requestUserId || activeFamilyIdRef.current !== communityId) return;
         if (Array.isArray(members)) {
           familyMembersCache.set(communityId, members);
           setFamilyMembers(members);
@@ -637,15 +650,32 @@ export const CommunityScreen = memo(function CommunityScreen({
       .catch(() => undefined);
 
     try {
-      const rows = await listFamilyMessages({ communityId, currentUserId, limit: 50 });
-      familyMessagesCache.set(communityId, rows);
-      setMessages(rows);
+      const rows = await listFamilyMessages({ communityId, currentUserId: requestUserId, limit: 50 });
+      if (currentUserIdRef.current !== requestUserId || activeFamilyIdRef.current !== communityId) return;
+      setMessages((prev) => {
+        const byId = new Map();
+        for (const item of rows) {
+          if (item?.id) byId.set(item.id, item);
+        }
+        for (const item of prev) {
+          if (item?.id && item.communityId === communityId && !byId.has(item.id)) {
+            byId.set(item.id, item);
+          }
+        }
+        const merged = [...byId.values()].sort(
+          (a, b) => (Date.parse(a?.createdAt || 0) || 0) - (Date.parse(b?.createdAt || 0) || 0),
+        );
+        familyMessagesCache.set(communityId, merged);
+        return merged;
+      });
     } catch (msgErr) {
-      if (!cachedMsgs) {
+      if (!cachedMsgs && currentUserIdRef.current === requestUserId && activeFamilyIdRef.current === communityId) {
         setMessagesError(describeFamilyError(msgErr, "Aile sohbeti yüklenemedi."));
       }
     } finally {
-      if (showSpinner) setMessagesLoading(false);
+      if (showSpinner && currentUserIdRef.current === requestUserId && activeFamilyIdRef.current === communityId) {
+        setMessagesLoading(false);
+      }
     }
   }, [currentUserId]);
 
@@ -829,7 +859,7 @@ export const CommunityScreen = memo(function CommunityScreen({
       });
       settled = true;
       onSettleGiftSpend?.(totalCost, result.balance);
-      onGiftSpent?.(Number(result.giftCost || result.gift_cost || totalCost));
+      onGiftSpent?.(Number(result.totalCost || result.giftCost || result.gift_cost || totalCost));
       playGiftEffect({
         ...gift,
         name: result.giftName || gift.name,
@@ -1005,32 +1035,47 @@ export const CommunityScreen = memo(function CommunityScreen({
 
   const openFamilyDetail = useCallback(async (familyId, initialTab = "levels") => {
     if (!familyId) return;
+    const reqSeq = ++detailReqSeqRef.current;
+    const requestUserId = currentUserId;
     if (discoverModalOpen) {
       setDiscoverModalOpen(false);
       await new Promise((resolve) => setTimeout(resolve, 300));
+      if (detailReqSeqRef.current !== reqSeq) return;
     }
     setSelectedFamilyId(familyId);
+    selectedFamilyIdRef.current = familyId;
     setDetailTab(initialTab);
     setDetailLoading(true);
     setDetailError("");
     try {
-      const data = await getFamilyDetails(familyId, currentUserId);
+      const data = await getFamilyDetails(familyId, requestUserId);
+      if (
+        detailReqSeqRef.current !== reqSeq ||
+        selectedFamilyIdRef.current !== familyId ||
+        currentUserIdRef.current !== requestUserId
+      ) {
+        return;
+      }
       setDetailData(data);
       if (data?.family) {
         setEditName(data.family.name || "");
         setEditDescription(data.family.description || "");
         setEditAvatarAsset(null);
         setEditClearAvatar(false);
-        if (data.family.id === myFamily?.id && data.members) {
+        if (data.family.id === activeFamilyIdRef.current && data.members) {
           setFamilyMembers(data.members);
         }
       }
     } catch (err) {
-      setDetailError(describeFamilyError(err));
+      if (detailReqSeqRef.current === reqSeq && selectedFamilyIdRef.current === familyId) {
+        setDetailError(describeFamilyError(err));
+      }
     } finally {
-      setDetailLoading(false);
+      if (detailReqSeqRef.current === reqSeq) {
+        setDetailLoading(false);
+      }
     }
-  }, [currentUserId, discoverModalOpen, myFamily?.id]);
+  }, [currentUserId, discoverModalOpen]);
 
   const handledFamilyReqRef = useRef(null);
   useEffect(() => {
@@ -1043,9 +1088,12 @@ export const CommunityScreen = memo(function CommunityScreen({
   }, [onConsumePendingFamily, openFamilyDetail, pendingFamilyRequest]);
 
   const closeFamilyDetail = useCallback(() => {
+    detailReqSeqRef.current += 1;
+    selectedFamilyIdRef.current = null;
     setSelectedFamilyId(null);
     setDetailData(null);
     setDetailError("");
+    setDetailLoading(false);
   }, []);
 
   const normalizedDigits = useMemo(

@@ -114,6 +114,7 @@ const authStorage = {
       // Cihaz SecureStore'a yazamıyor; yedeğe düş
     }
     if (!storedInSecure) {
+      await deleteChunksFromSecureStore(key).catch(() => undefined);
       try {
         await AsyncStorage.setItem(FALLBACK_PREFIX + key, value);
       } catch {

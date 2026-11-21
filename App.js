@@ -166,6 +166,7 @@ import {
 import {
   DailyMissionsSheet,
   bumpMissionProgress,
+  resetDailyMissionsCache,
   useDailyMissionsBadge,
 } from "./src/missions/DailyMissionsSheet";
 import {
@@ -7124,26 +7125,37 @@ function Room({
 
   useEffect(() => {
     let active = true;
+    let retryTimer = null;
     setMessagesReady(false);
     setChatAccessReady(!room.persisted);
     setChatRealtimeStatus(room.persisted ? "connecting" : "local");
     setMessages(initialMessages);
-    const prepareMembership = room.persisted
-      ? joinRoomMembership(room.id)
-      : Promise.resolve();
-    prepareMembership
-      .then(() => {
-        if (!active) return;
-        setChatAccessReady(true);
-      })
-      .catch(() => {
-        if (active) setChatRealtimeStatus("error");
-      })
-      .finally(() => {
-        if (active) setMessagesReady(true);
-      });
+    const attemptJoin = (canRetry) => {
+      const prepareMembership = room.persisted
+        ? joinRoomMembership(room.id)
+        : Promise.resolve();
+      prepareMembership
+        .then(() => {
+          if (!active) return;
+          setChatAccessReady(true);
+        })
+        .catch(() => {
+          if (!active) return;
+          setChatRealtimeStatus("error");
+          if (canRetry && room.persisted) {
+            retryTimer = setTimeout(() => {
+              if (active) attemptJoin(false);
+            }, 2500);
+          }
+        })
+        .finally(() => {
+          if (active) setMessagesReady(true);
+        });
+    };
+    attemptJoin(true);
     return () => {
       active = false;
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, [initialMessages, room.id, room.persisted]);
 
@@ -7821,10 +7833,18 @@ function Room({
       ?.catch?.(() => undefined);
   }, []);
 
+  const activeRoomIdRef = useRef(room.id);
+  activeRoomIdRef.current = room.id;
+
   const refreshMembers = useCallback(() => {
     if (!room.persisted) return Promise.resolve();
-    return listRoomMembers(room.id)
-      .then((members) => setRoomMembers(members))
+    const targetRoomId = room.id;
+    return listRoomMembers(targetRoomId)
+      .then((members) => {
+        if (activeRoomIdRef.current === targetRoomId) {
+          setRoomMembers(members);
+        }
+      })
       .catch(() => undefined);
   }, [room.id, room.persisted]);
 
@@ -7837,15 +7857,21 @@ function Room({
 
   const voiceStatusRef = useRef(liveVoice.status);
   const voiceReconnectRef = useRef(liveVoice.reconnect);
+  const removedByModeratorRef = useRef(Boolean(liveVoice.removedByModerator));
   useEffect(() => {
     voiceStatusRef.current = liveVoice.status;
     voiceReconnectRef.current = liveVoice.reconnect;
-  }, [liveVoice.reconnect, liveVoice.status]);
+    removedByModeratorRef.current = Boolean(liveVoice.removedByModerator);
+  }, [liveVoice.reconnect, liveVoice.removedByModerator, liveVoice.status]);
 
   useEffect(() => {
     // Uygulama arka plana alınıp öne geldiğinde bağlantı koptuysa sessizce yeniden bağlan.
     const subscription = AppState.addEventListener("change", (nextState) => {
-      if (nextState === "active" && ["error", "disconnected"].includes(voiceStatusRef.current)) {
+      if (
+        nextState === "active" &&
+        !removedByModeratorRef.current &&
+        ["error", "disconnected"].includes(voiceStatusRef.current)
+      ) {
         voiceReconnectRef.current?.();
       }
     });
@@ -8261,11 +8287,16 @@ function Room({
       }
       if (room.persisted && userId) {
         if (!chatAccessReady) {
-          Alert.alert(
-            "Sohbet hazırlanıyor",
-            "Oda bağlantısının kurulmasını bekle.",
-          );
-          return false;
+          try {
+            await joinRoomMembership(room.id);
+            setChatAccessReady(true);
+          } catch {
+            Alert.alert(
+              "Sohbet hazırlanıyor",
+              "Oda bağlantısı kurulamadı. Bağlantını kontrol edip tekrar dene.",
+            );
+            return false;
+          }
         }
         const pendingId = `pending-${Date.now()}`;
         const pendingMessage = {
@@ -10959,6 +10990,16 @@ function AppContent() {
   const [room, setRoom] = useState(null);
   const openRoomIdRef = useRef(null);
   openRoomIdRef.current = room?.id || null;
+  const openRoomPersistedRef = useRef(false);
+  openRoomPersistedRef.current = Boolean(room?.persisted);
+  const activeUserIdRef = useRef(null);
+  activeUserIdRef.current = authSession?.user?.id || null;
+  const openRoomSeqRef = useRef(0);
+  const openRoomRef = useRef(null);
+  const dailyRewardClaimingRef = useRef(false);
+  const followOpsQueueRef = useRef(new Map());
+  const followedUserIdsRef = useRef(followedUserIds);
+  followedUserIdsRef.current = followedUserIds;
   const [myFamily, setMyFamily] = useState(null);
   const [ownHostedRoom, setOwnHostedRoom] = useState(null);
   const [activeSanction, setActiveSanction] = useState(null);
@@ -11201,18 +11242,32 @@ function AppContent() {
     if (!user) {
       if (isSupabaseConfigured && previousUserIdRef.current) {
         previousUserIdRef.current = null;
+        openRoomSeqRef.current += 1;
+        pendingGiftSpendRef.current = 0;
+        dailyRewardClaimingRef.current = false;
+        followOpsQueueRef.current.clear();
+        resetDailyMissionsCache();
         setRoom(null);
         setRoomMinimized(false);
         setOwnHostedRoom(null);
         setProfile(DEFAULT_PROFILE);
         setWalletBalance(SEEDED_WALLET_BALANCE);
+        walletBalanceRef.current = SEEDED_WALLET_BALANCE;
         setPromoWalletBalance(0);
         setPaidWalletBalance(0);
         setWalletActivities([]);
         setDailyRewardClaimed(false);
         setMyFamily(null);
         setMountedTabs({ discover: true });
+        setActiveTab("discover");
         setFollowedUserIds([]);
+        setNotifications([]);
+        AsyncStorage.removeItem(NOTIFICATIONS_KEY).catch(() => undefined);
+        setNotificationsOpen(false);
+        setMissionsFromNotifOpen(false);
+        setGlobalLeaderboardOpen(false);
+        setPendingDirectChat(null);
+        setPendingFamilyRequest(null);
         setActiveSanction(null);
         setInspectedUserId(null);
         setInspectedReportTarget(null);
@@ -11221,6 +11276,11 @@ function AppContent() {
     }
     const switchedUser = previousUserIdRef.current !== user.id;
     previousUserIdRef.current = user.id;
+    if (switchedUser) {
+      resetDailyMissionsCache();
+      pendingGiftSpendRef.current = 0;
+      followOpsQueueRef.current.clear();
+    }
     const metadata = user.user_metadata || {};
     const fallbackName = user.email?.split("@")[0] || "Sora kullanıcısı";
     // Google/Apple gibi saglayicilar adi full_name veya name alaninda dondurur.
@@ -11297,33 +11357,46 @@ function AppContent() {
         await deactivateStaleHostedRooms(user.id, null).catch(() => undefined);
       }
       const [
-        liveRooms,
-        plannedRooms,
-        follows,
-        wallet,
-        transactions,
-        hostedRoom,
-      ] = await Promise.all([
+        liveRoomsRes,
+        plannedRoomsRes,
+        followsRes,
+        walletRes,
+        transactionsRes,
+        hostedRoomRes,
+      ] = await Promise.allSettled([
         listRooms("live"),
         listRooms("scheduled"),
         listFollowedUserIds(user.id),
         getWallet(),
         listWalletTransactions(),
-        getHostedRoom(user.id).catch(() => null),
+        getHostedRoom(user.id),
       ]);
-      if (!active) return;
-      setOwnHostedRoom(hostedRoom || null);
-      setRooms([...liveRooms, ...SEEDED_ROOMS]);
-      setScheduledRooms([...plannedRooms, ...SEEDED_SCHEDULED_ROOMS]);
-      setFollowedUserIds(follows);
-      setWalletBalance(wallet.balance);
-      setPromoWalletBalance(wallet.promo_balance || 0);
-      setPaidWalletBalance(wallet.paid_balance || 0);
-      setDailyRewardClaimed(
-        wallet.last_daily_reward_at ===
-          new Date().toISOString().slice(0, 10),
-      );
-      setWalletActivities(transactions.map(formatTransaction));
+      if (!active || activeUserIdRef.current !== user.id) return;
+      if (hostedRoomRes.status === "fulfilled") {
+        setOwnHostedRoom(hostedRoomRes.value || null);
+      }
+      if (liveRoomsRes.status === "fulfilled" && Array.isArray(liveRoomsRes.value)) {
+        setRooms([...liveRoomsRes.value, ...SEEDED_ROOMS]);
+      }
+      if (plannedRoomsRes.status === "fulfilled" && Array.isArray(plannedRoomsRes.value)) {
+        setScheduledRooms([...plannedRoomsRes.value, ...SEEDED_SCHEDULED_ROOMS]);
+      }
+      if (followsRes.status === "fulfilled" && Array.isArray(followsRes.value)) {
+        setFollowedUserIds(followsRes.value);
+      }
+      if (walletRes.status === "fulfilled" && walletRes.value) {
+        const wallet = walletRes.value;
+        applyAuthoritativeWalletBalance(wallet.balance);
+        setPromoWalletBalance(wallet.promo_balance || 0);
+        setPaidWalletBalance(wallet.paid_balance || 0);
+        setDailyRewardClaimed(
+          wallet.last_daily_reward_at ===
+            new Date().toISOString().slice(0, 10),
+        );
+      }
+      if (transactionsRes.status === "fulfilled" && Array.isArray(transactionsRes.value)) {
+        setWalletActivities(transactionsRes.value.map(formatTransaction));
+      }
     })().catch(() => undefined);
     return () => {
       active = false;
@@ -11845,10 +11918,11 @@ function AppContent() {
 
   const syncUserLevelAndNotify = useCallback(
     async ({ showFeedback = false } = {}) => {
-      if (!supabase || !authSession?.user) return null;
+      const requestUserId = authSession?.user?.id;
+      if (!supabase || !requestUserId) return null;
       try {
         const res = await syncMyUserLevel();
-        if (!res) return null;
+        if (!res || activeUserIdRef.current !== requestUserId) return null;
         setProfile((current) => ({
           ...current,
           userLevel: res.userLevel,
@@ -11856,9 +11930,13 @@ function AppContent() {
         }));
         if (res.newlyAwardedCoins > 0) {
           if (typeof res.balance === "number") {
-            setWalletBalance(res.balance);
+            applyAuthoritativeWalletBalance(res.balance);
           } else {
-            setWalletBalance((val) => val + res.newlyAwardedCoins);
+            setWalletBalance((val) => {
+              const next = val + res.newlyAwardedCoins;
+              walletBalanceRef.current = next;
+              return next;
+            });
           }
           if (typeof res.promoBalance === "number") {
             setPromoWalletBalance(res.promoBalance);
@@ -11889,13 +11967,13 @@ function AppContent() {
         }
         return res;
       } catch {
-        if (showFeedback) {
+        if (showFeedback && activeUserIdRef.current === requestUserId) {
           Alert.alert("Seviye yenilenemedi", "Bağlantını kontrol edip tekrar dene.");
         }
         return null;
       }
     },
-    [authSession?.user],
+    [applyAuthoritativeWalletBalance, authSession?.user?.id],
   );
 
   useEffect(() => {
@@ -11904,12 +11982,15 @@ function AppContent() {
   }, [authSession?.user?.id, syncUserLevelAndNotify]);
 
   const refreshWalletData = async () => {
-    if (!supabase || !authSession?.user) return;
+    const requestUserId = authSession?.user?.id;
+    if (!supabase || !requestUserId) return;
     await syncUserLevelAndNotify().catch(() => undefined);
+    if (activeUserIdRef.current !== requestUserId) return;
     const [wallet, transactions] = await Promise.all([
       getWallet(),
       listWalletTransactions(),
     ]);
+    if (activeUserIdRef.current !== requestUserId) return;
     applyAuthoritativeWalletBalance(wallet.balance);
     setPromoWalletBalance(wallet.promo_balance || 0);
     setPaidWalletBalance(wallet.paid_balance || 0);
@@ -11936,7 +12017,8 @@ function AppContent() {
   };
 
   const sendGift = async ({ gift, recipient, quantity = 1, roomId, requestId }) => {
-    if (!supabase || !authSession?.user) {
+    const requestUserId = authSession?.user?.id;
+    if (!supabase || !requestUserId) {
       Alert.alert("Giriş gerekli", "Hediye göndermek için hesabınla giriş yap.");
       return false;
     }
@@ -11962,10 +12044,14 @@ function AppContent() {
         requestId: requestKey,
       });
       if (!result) throw new Error("Gift response missing");
+      if (activeUserIdRef.current !== requestUserId) {
+        settled = true;
+        return result;
+      }
       const qtyPrefix = cleanQty > 1 ? `${cleanQty}x ` : "";
       settled = true;
       settleOptimisticGiftSpend(totalCost, result.balance);
-      addLocalGiftSpent(authSession.user.id, Number(result.gift_cost || totalCost));
+      addLocalGiftSpent(requestUserId, Number(result.gift_cost || totalCost));
       setPromoWalletBalance(result.promo_balance || 0);
       setPaidWalletBalance(result.paid_balance || 0);
       setWalletActivities((items) => [{
@@ -11973,8 +12059,9 @@ function AppContent() {
         text: `${recipient.name} kişisine ${qtyPrefix}${gift.name}`, amount: -result.gift_cost,
         time: "Şimdi",
       }, ...items]);
-      if (recipient.userId === authSession.user.id) {
+      if (recipient.userId === requestUserId) {
         const blast = await claimSelfGiftBlast(requestKey).catch(() => null);
+        if (activeUserIdRef.current !== requestUserId) return result;
         const reward = Number(blast?.reward_amount || 0);
         if (blast?.balance !== null && blast?.balance !== undefined) {
           applyAuthoritativeWalletBalance(Number(blast.balance));
@@ -11998,6 +12085,10 @@ function AppContent() {
       refreshWalletData().catch(() => undefined);
       return result;
     } catch (error) {
+      if (activeUserIdRef.current !== requestUserId) {
+        settled = true;
+        return false;
+      }
       if (!settled) {
         settled = true;
         rollbackOptimisticGiftSpend(totalCost);
@@ -12008,6 +12099,7 @@ function AppContent() {
           ? "Alıcı artık bu odada değil. Oda listesini yenileyip tekrar dene."
           : "Bağlantı hatası oluştu. Bakiye düşürülmedi; tekrar deneyebilirsin.");
       getWallet().then((wallet) => {
+        if (activeUserIdRef.current !== requestUserId) return;
         applyAuthoritativeWalletBalance(wallet.balance);
         setPromoWalletBalance(wallet.promo_balance || 0);
         setPaidWalletBalance(wallet.paid_balance || 0);
@@ -12017,6 +12109,7 @@ function AppContent() {
   };
 
   const claimDailyReward = async () => {
+    if (dailyRewardClaimingRef.current) return;
     if (dailyRewardClaimed) {
       Alert.alert(
         "Ödül zaten alındı",
@@ -12024,9 +12117,12 @@ function AppContent() {
       );
       return;
     }
-    if (supabase && authSession?.user) {
+    const requestUserId = authSession?.user?.id;
+    if (supabase && requestUserId) {
+      dailyRewardClaimingRef.current = true;
       try {
         const wallet = await claimRemoteDailyReward();
+        if (activeUserIdRef.current !== requestUserId) return;
         if (!wallet.claimed) {
           setDailyRewardClaimed(true);
           Alert.alert(
@@ -12036,7 +12132,7 @@ function AppContent() {
           return;
         }
         setDailyRewardClaimed(true);
-        setWalletBalance(wallet.balance);
+        applyAuthoritativeWalletBalance(wallet.balance);
         setPromoWalletBalance((value) =>
           wallet.promo_balance > 0 ? wallet.promo_balance : value + DAILY_REWARD_AMOUNT,
         );
@@ -12063,7 +12159,11 @@ function AppContent() {
         });
         refreshWalletData().catch(() => undefined);
       } catch {
-        Alert.alert("Ödül alınamadı", "Bağlantını kontrol edip tekrar dene.");
+        if (activeUserIdRef.current === requestUserId) {
+          Alert.alert("Ödül alınamadı", "Bağlantını kontrol edip tekrar dene.");
+        }
+      } finally {
+        dailyRewardClaimingRef.current = false;
       }
       return;
     }
@@ -12143,24 +12243,30 @@ function AppContent() {
       return;
     }
 
-    if (room?.id === nextRoom.id) {
+    if (openRoomIdRef.current === nextRoom.id) {
       setRoomMinimized(false);
       return;
     }
 
+    const reqSeq = ++openRoomSeqRef.current;
+    const requestUserId = activeUserIdRef.current;
+
     // Odayı ekranda açmadan önce sunucuda üyelik, ban ve şifre denetimini yap.
     // Bağlantı veya yetki hatasında kapalı davran; aksi halde token çağrısına
     // kadar hatalı bir oda ekranı kısa süreliğine görünebiliyordu.
-    if (!skipPasswordCheck && nextRoom.persisted && room?.id !== nextRoom.id) {
+    let joinedPersisted = false;
+    if (!skipPasswordCheck && nextRoom.persisted && openRoomIdRef.current !== nextRoom.id) {
       try {
-        if (authSession?.user?.id && nextRoom.hostId === authSession.user.id) {
+        if (requestUserId && nextRoom.hostId === requestUserId) {
           // Kendi odası pasif durumdaysa yeniden canlı yap; içeride zaten birileri varsa sayacı sıfırlama.
           await setRemoteRoomPresence(nextRoom.id, true, {
             resetListeners: nextRoom.state !== "live",
           }).catch(() => undefined);
         }
         await joinRoomWithPassword(nextRoom.id, null);
+        joinedPersisted = true;
       } catch (error) {
+        if (openRoomSeqRef.current !== reqSeq) return;
         const message = String(error?.message || "");
         if (message.includes("Room password required")) {
           setPasswordPromptError(null);
@@ -12172,8 +12278,19 @@ function AppContent() {
       }
     }
 
-    if (room?.persisted && room.id !== nextRoom.id) {
-      leaveRoomMembership(room.id).catch(() => undefined);
+    if (
+      openRoomSeqRef.current !== reqSeq ||
+      (requestUserId && activeUserIdRef.current !== requestUserId)
+    ) {
+      if (joinedPersisted && nextRoom.id !== openRoomIdRef.current) {
+        leaveRoomMembership(nextRoom.id).catch(() => undefined);
+      }
+      return;
+    }
+
+    const previousRoomId = openRoomIdRef.current;
+    if (openRoomPersistedRef.current && previousRoomId && previousRoomId !== nextRoom.id) {
+      leaveRoomMembership(previousRoomId).catch(() => undefined);
     }
 
     console.warn("[room-entry] open requested", Boolean(nextRoom.id));
@@ -12184,19 +12301,20 @@ function AppContent() {
     });
     setRoomMinimized(false);
 
-    const currentRecentRooms = Array.isArray(recentRoomIds)
-      ? recentRoomIds
-      : [];
-    const nextRecentRooms = [
-      nextRoom.id,
-      ...currentRecentRooms.filter((roomId) => roomId !== nextRoom.id),
-    ].slice(0, 8);
-    setRecentRoomIds(nextRecentRooms);
-    AsyncStorage.setItem(
-      RECENT_ROOMS_KEY,
-      JSON.stringify(nextRecentRooms),
-    ).catch((error) => console.warn("Recent room history save failed", error));
+    setRecentRoomIds((prevRecent) => {
+      const currentRecentRooms = Array.isArray(prevRecent) ? prevRecent : [];
+      const nextRecentRooms = [
+        nextRoom.id,
+        ...currentRecentRooms.filter((roomId) => roomId !== nextRoom.id),
+      ].slice(0, 8);
+      AsyncStorage.setItem(
+        RECENT_ROOMS_KEY,
+        JSON.stringify(nextRecentRooms),
+      ).catch((error) => console.warn("Recent room history save failed", error));
+      return nextRecentRooms;
+    });
   };
+  openRoomRef.current = openRoom;
 
   const setHostRoomPresence = useCallback(
     async (roomId, isActive) => {
@@ -12258,7 +12376,7 @@ function AppContent() {
       try {
         const nextRoom = await getRoom(roomId);
         if (!active || nextRoom.state !== "live") return;
-        openRoom(nextRoom);
+        openRoomRef.current?.(nextRoom);
       } catch {
         if (active)
           Alert.alert(
@@ -12361,37 +12479,53 @@ function AppContent() {
 
   const toggleFollowUser = useCallback(
     async (targetUserId) => {
-      if (
-        !targetUserId ||
-        !authSession?.user ||
-        targetUserId === authSession.user.id
-      )
+      const requestUserId = activeUserIdRef.current;
+      if (!targetUserId || !requestUserId || targetUserId === requestUserId) {
         return;
-      const currentlyFollowing = followedUserIds.includes(targetUserId);
-      setFollowedUserIds((currentIds) =>
-        currentlyFollowing
-          ? currentIds.filter((id) => id !== targetUserId)
-          : [...currentIds, targetUserId],
-      );
-      try {
-        await setFollowing({
-          userId: authSession.user.id,
-          targetUserId,
-          following: !currentlyFollowing,
-        });
-      } catch {
-        setFollowedUserIds((currentIds) =>
-          currentlyFollowing
-            ? [...currentIds, targetUserId]
-            : currentIds.filter((id) => id !== targetUserId),
-        );
-        Alert.alert(
-          "Takip değiştirilemedi",
-          "Bağlantını kontrol edip tekrar dene.",
-        );
       }
+      const nextFollowing = !followedUserIdsRef.current.includes(targetUserId);
+      setFollowedUserIds((currentIds) => {
+        const next = nextFollowing
+          ? (currentIds.includes(targetUserId) ? currentIds : [...currentIds, targetUserId])
+          : currentIds.filter((id) => id !== targetUserId);
+        followedUserIdsRef.current = next;
+        return next;
+      });
+      const prevOp = followOpsQueueRef.current.get(targetUserId) || Promise.resolve();
+      const op = prevOp
+        .catch(() => undefined)
+        .then(async () => {
+          if (activeUserIdRef.current !== requestUserId) return;
+          try {
+            await setFollowing({
+              userId: requestUserId,
+              targetUserId,
+              following: nextFollowing,
+            });
+          } catch {
+            if (activeUserIdRef.current !== requestUserId) return;
+            setFollowedUserIds((currentIds) => {
+              const reverted = nextFollowing
+                ? currentIds.filter((id) => id !== targetUserId)
+                : (currentIds.includes(targetUserId) ? currentIds : [...currentIds, targetUserId]);
+              followedUserIdsRef.current = reverted;
+              return reverted;
+            });
+            Alert.alert(
+              "Takip değiştirilemedi",
+              "Bağlantını kontrol edip tekrar dene.",
+            );
+          }
+        })
+        .finally(() => {
+          if (followOpsQueueRef.current.get(targetUserId) === op) {
+            followOpsQueueRef.current.delete(targetUserId);
+          }
+        });
+      followOpsQueueRef.current.set(targetUserId, op);
+      await op;
     },
-    [authSession?.user, followedUserIds],
+    [],
   );
 
   const toggleFollowHost = async () => {
@@ -12793,7 +12927,7 @@ function AppContent() {
         (payload) => {
           const next = payload?.new;
           if (!next) return;
-          if (typeof next.balance === "number") setWalletBalance(next.balance);
+          if (typeof next.balance === "number") applyAuthoritativeWalletBalance(next.balance);
           if (typeof next.promo_balance === "number") setPromoWalletBalance(next.promo_balance);
           if (typeof next.paid_balance === "number") setPaidWalletBalance(next.paid_balance);
         },
@@ -13046,6 +13180,7 @@ function AppContent() {
               profile={profile}
               rooms={rooms}
               onOpenRoom={openRoom}
+              active={activeTab === "inbox" && (!room || roomMinimized)}
               pendingDirectChat={pendingDirectChat}
               onConsumePendingDirectChat={handleConsumePendingDirectChat}
             />
@@ -13117,6 +13252,7 @@ function AppContent() {
             ]}
           >
             <Room
+              key={room.id}
               room={room}
               profile={profile}
               userId={authSession?.user?.id}

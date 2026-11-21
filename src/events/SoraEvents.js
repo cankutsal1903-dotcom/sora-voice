@@ -503,21 +503,17 @@ async function fetchLeaderboard(eventId) {
   const cached = leaderboardCache.get(eventId);
   if (cached && Date.now() - cached.fetchedAt < LEADERBOARD_CACHE_TTL_MS) return cached.rows;
   if (!supabase) return [];
-  let rows = [];
-  try {
-    const { data, error } = await supabase.rpc("get_event_leaderboard", {
-      p_event_id: eventId,
-      p_limit: LEADERBOARD_LIMIT,
-    });
-    if (!error && Array.isArray(data)) {
-      rows = data
-        .map(normalizeLeaderboardRow)
-        .filter(Boolean)
-        .sort((a, b) => a.rank - b.rank);
-    }
-  } catch {
-    rows = [];
+  const { data, error } = await supabase.rpc("get_event_leaderboard", {
+    p_event_id: eventId,
+    p_limit: LEADERBOARD_LIMIT,
+  });
+  if (error) {
+    throw error;
   }
+  const rows = (Array.isArray(data) ? data : [])
+    .map(normalizeLeaderboardRow)
+    .filter(Boolean)
+    .sort((a, b) => a.rank - b.rank);
   leaderboardCache.set(eventId, { rows, fetchedAt: Date.now() });
   return rows;
 }
@@ -1117,26 +1113,38 @@ export const RoomEventCard = memo(function RoomEventCard({
 // ---------------------------------------------------------------------------
 
 function useEventLeaderboard(eventId, enabled) {
-  const [state, setState] = useState({ rows: [], loading: false });
+  const [state, setState] = useState({ rows: [], loading: false, error: false });
+  const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     if (!enabled || !eventId) return undefined;
     let cancelled = false;
     const cached = leaderboardCache.get(eventId);
-    setState({ rows: cached ? cached.rows : [], loading: !cached });
+    setState({ rows: cached ? cached.rows : [], loading: !cached, error: false });
     fetchLeaderboard(eventId)
       .then((rows) => {
-        if (!cancelled) setState({ rows, loading: false });
+        if (!cancelled) setState({ rows, loading: false, error: false });
       })
       .catch(() => {
-        if (!cancelled) setState({ rows: [], loading: false });
+        if (!cancelled) {
+          setState((prev) => ({
+            rows: cached ? cached.rows : prev.rows,
+            loading: false,
+            error: !cached,
+          }));
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, [eventId, enabled]);
+  }, [eventId, enabled, retryNonce]);
 
-  return state;
+  const retry = useCallback(() => {
+    if (eventId) leaderboardCache.delete(eventId);
+    setRetryNonce((n) => n + 1);
+  }, [eventId]);
+
+  return { ...state, retry };
 }
 
 const EventAvatar = memo(function EventAvatar({ name, url, color, size = 40, ringColor }) {
@@ -1282,7 +1290,7 @@ const LeaderboardRow = memo(function LeaderboardRow({ row, unit, isMe, accent })
 });
 
 const LeaderboardSection = memo(function LeaderboardSection({ event, enabled, currentUserId }) {
-  const { rows, loading } = useEventLeaderboard(event.id, enabled);
+  const { rows, loading, error, retry } = useEventLeaderboard(event.id, enabled);
   const accent = event.colors[1] || BRAND.blueBright;
   const me = currentUserId ? String(currentUserId) : null;
   const showPodium = rows.length >= 3;
@@ -1303,6 +1311,14 @@ const LeaderboardSection = memo(function LeaderboardSection({ event, enabled, cu
           <ActivityIndicator color={BRAND.blueBright} />
           <Text style={styles.lbLoadingText}>Sıralama yükleniyor…</Text>
         </View>
+      ) : error && rows.length === 0 ? (
+        <Pressable onPress={retry} accessibilityRole="button" style={styles.emptyBox}>
+          <View style={[styles.emptyIcon, { backgroundColor: withAlpha(BRAND.blueBright, 0.14) }]}>
+            <Ionicons name="cloud-offline-outline" size={26} color={BRAND.blue} />
+          </View>
+          <Text style={styles.emptyTitle}>Sıralama şu an yüklenemedi</Text>
+          <Text style={styles.emptySub}>Tekrar denemek için dokun.</Text>
+        </Pressable>
       ) : rows.length === 0 ? (
         <View style={styles.emptyBox}>
           <View style={[styles.emptyIcon, { backgroundColor: withAlpha(event.accent, 0.16) }]}>
