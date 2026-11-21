@@ -275,6 +275,15 @@ export const AudioBars = memo(function AudioBars({
   );
 });
 
+// Yumusak parilti: ust uste konmus, giderek acilan halkalar (sert kenarli disk yok).
+const SOFT_GLOW_BOX = 280;
+const GLOW_LAYERS = [
+  { size: 260, color: "rgba(47,128,237,0.05)" },
+  { size: 210, color: "rgba(47,128,237,0.07)" },
+  { size: 160, color: "rgba(78,150,255,0.10)" },
+  { size: 110, color: "rgba(120,177,255,0.12)" },
+];
+
 export const BrandLaunch = memo(function BrandLaunch({
   waiting = false,
   closing = false,
@@ -402,18 +411,36 @@ export const BrandLaunch = memo(function BrandLaunch({
       >
         <View style={motionStyles.logoStage}>
           <Animated.View
+            pointerEvents="none"
             style={[
-              motionStyles.launchGlow,
+              motionStyles.glowStack,
               { opacity: glowOpacity, transform: [{ scale: glowScale }] },
             ]}
-          />
+          >
+            {GLOW_LAYERS.map((layer) => (
+              <View
+                key={`glow-${layer.size}`}
+                style={[
+                  motionStyles.glowLayer,
+                  {
+                    width: layer.size,
+                    height: layer.size,
+                    borderRadius: layer.size / 2,
+                    backgroundColor: layer.color,
+                    left: (SOFT_GLOW_BOX - layer.size) / 2,
+                    top: (SOFT_GLOW_BOX - layer.size) / 2,
+                  },
+                ]}
+              />
+            ))}
+          </Animated.View>
           <Animated.View
             style={{
               opacity: intro,
               transform: [{ scale: introScale }, { translateY: introTranslate }],
             }}
           >
-            <SoraMark size={112} />
+            <SoraMark size={124} />
           </Animated.View>
         </View>
 
@@ -478,16 +505,17 @@ const motionStyles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
   },
-  launchGlow: {
+  glowStack: {
     position: "absolute",
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: "rgba(47,128,237,0.24)",
+    width: SOFT_GLOW_BOX,
+    height: SOFT_GLOW_BOX,
+  },
+  glowLayer: {
+    position: "absolute",
   },
   logoStage: {
-    width: 200,
-    height: 200,
+    width: SOFT_GLOW_BOX,
+    height: SOFT_GLOW_BOX,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 14,
