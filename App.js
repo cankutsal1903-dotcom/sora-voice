@@ -948,18 +948,16 @@ const Discover = memo(function Discover({
             </View>
             <View style={styles.discoverStage} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
               <View style={styles.discoverStageHost}>
-                <SoraMark size={58} tone="light" animate />
+                <SoraMark size={52} tone="light" animate />
               </View>
               <Text style={styles.discoverStageHostLabel}>Sen</Text>
-              {[0, 1].map((row) => (
-                <View key={`seat-row-${row}`} style={styles.discoverStageRow}>
-                  {[0, 1, 2, 3].map((seat) => (
-                    <View key={`seat-${row}-${seat}`} style={styles.discoverStageSeat}>
-                      <Ionicons name="add" size={16} color={COLORS.primaryLight} />
-                    </View>
-                  ))}
-                </View>
-              ))}
+              <View style={styles.discoverStageRow}>
+                {[0, 1, 2, 3, 4, 5].map((seat) => (
+                  <View key={`seat-${seat}`} style={styles.discoverStageSeat}>
+                    <Ionicons name="add" size={15} color={COLORS.primaryLight} />
+                  </View>
+                ))}
+              </View>
             </View>
             <Text style={styles.discoverEmptyTitle}>Sahne seni bekliyor</Text>
             <Text style={styles.discoverEmptyDescription}>
@@ -14434,8 +14432,8 @@ const styles = StyleSheet.create({
   discoverEmptyHero: {
     borderRadius: 28,
     paddingHorizontal: 22,
-    paddingTop: 18,
-    paddingBottom: 22,
+    paddingTop: 16,
+    paddingBottom: 20,
     alignItems: "center",
     backgroundColor: COLORS.surface,
     overflow: "hidden",
@@ -14472,13 +14470,13 @@ const styles = StyleSheet.create({
   },
   discoverStage: {
     alignItems: "center",
-    marginTop: 18,
-    marginBottom: 20,
+    marginTop: 14,
+    marginBottom: 16,
   },
   discoverStageHost: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: COLORS.surface,
@@ -14491,21 +14489,20 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   discoverStageHostLabel: {
-    marginTop: 7,
-    marginBottom: 14,
+    marginTop: 6,
+    marginBottom: 12,
     color: COLORS.primaryDark,
     fontSize: 12,
     fontWeight: "800",
   },
   discoverStageRow: {
     flexDirection: "row",
-    gap: 14,
-    marginBottom: 10,
+    gap: 10,
   },
   discoverStageSeat: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.9)",
