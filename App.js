@@ -2826,7 +2826,7 @@ const Profile = memo(function Profile({
               <ShimmerSweep width={360} bandWidth={80} color="rgba(255,255,255,0.55)" borderRadius={24} delay={2600} />
               <ProfileFrame
                 appearance={homeFrameAppearance}
-                size={homeFrameAppearance ? 54 : 62}
+                size={60}
                 padMode="tight"
                 style={styles.profileHomeAvatarWrap}
               >
@@ -4032,12 +4032,24 @@ const GiftSheet = memo(function GiftSheet({
       (cat) => cat.key === "all" || present.has(cat.key),
     );
   }, [gifts]);
+  const effectiveCategory = useMemo(
+    () =>
+      availableCategories.some((cat) => cat.key === category)
+        ? category
+        : "all",
+    [availableCategories, category],
+  );
+  useEffect(() => {
+    if (effectiveCategory !== category) {
+      setCategory(effectiveCategory);
+    }
+  }, [effectiveCategory, category]);
   const visibleGifts = useMemo(
     () =>
-      category === "all"
+      effectiveCategory === "all"
         ? gifts
-        : gifts.filter((item) => item?.category === category),
-    [gifts, category],
+        : gifts.filter((item) => item?.category === effectiveCategory),
+    [gifts, effectiveCategory],
   );
   useEffect(() => {
     const justOpened = visible && !wasVisibleRef.current;
@@ -4064,7 +4076,7 @@ const GiftSheet = memo(function GiftSheet({
     }
   }, [visible, recipients, gifts]);
   useEffect(() => {
-    if (!visible || !visibleGifts.length) return;
+    if (!visible) return;
     setSelectedGiftId((prev) =>
       visibleGifts.some((item) => item.id === prev)
         ? prev
@@ -4080,9 +4092,8 @@ const GiftSheet = memo(function GiftSheet({
     () =>
       visibleGifts.find((item) => item.id === selectedGiftId)
       || visibleGifts[0]
-      || gifts[0]
       || null,
-    [visibleGifts, gifts, selectedGiftId],
+    [visibleGifts, selectedGiftId],
   );
   const handlePressSend = () => {
     if (!selectedGift) return;
@@ -4199,7 +4210,7 @@ const GiftSheet = memo(function GiftSheet({
               style={{ flexGrow: 0, flexShrink: 0 }}
             >
               {availableCategories.map((cat) => {
-                const active = category === cat.key;
+                const active = effectiveCategory === cat.key;
                 return (
                   <Pressable
                     key={cat.key}

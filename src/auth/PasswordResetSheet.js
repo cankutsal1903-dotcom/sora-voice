@@ -53,12 +53,12 @@ export function PasswordResetSheet({ visible, onDismiss, onUpdatePassword }) {
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <View style={styles.icon}><Ionicons name="key-outline" size={24} color="#FFFFFF" /></View>
             <Text style={styles.kicker}>GÜVENLİK DOĞRULAMASI</Text>
-            <Text style={styles.title}>Yeni parolanı belirle.</Text>
+            <Text style={styles.title}>Yeni parolanı belirle</Text>
             <Text style={styles.subtitle}>Bu bağlantı ile hesabının parolasını güvenle yenileyebilirsin.</Text>
             <Text style={styles.label}>YENİ PAROLA</Text>
-            <TextInput value={password} onChangeText={setPassword} secureTextEntry placeholder="En az 6 karakter" placeholderTextColor="#8190A2" style={styles.input} />
+            <TextInput value={password} onChangeText={setPassword} secureTextEntry placeholder="En az 6 karakter" placeholderTextColor="#5C7088" style={styles.input} />
             <Text style={styles.label}>YENİ PAROLA TEKRAR</Text>
-            <TextInput value={confirmation} onChangeText={setConfirmation} secureTextEntry placeholder="Parolanı tekrar yaz" placeholderTextColor="#8190A2" style={styles.input} />
+            <TextInput value={confirmation} onChangeText={setConfirmation} secureTextEntry placeholder="Parolanı tekrar yaz" placeholderTextColor="#5C7088" style={styles.input} />
             {error ? <Text style={styles.error}>{error}</Text> : null}
             <Pressable disabled={submitting} onPress={submit} style={[styles.submit, submitting && styles.disabled]}>
               <Text style={styles.submitText}>{submitting ? "Kaydediliyor" : "Parolayı güncelle"}</Text>

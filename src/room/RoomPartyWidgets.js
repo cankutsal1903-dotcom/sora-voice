@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "../auth/supabase";
 import { playSfx } from "../audio/SoraSfx";
 import { SoraWealthBadge } from "../ui/SoraWealthTier";
+import { KeyboardSafeView } from "../ui/useKeyboardInset";
 
 const TR_NUM_FMT = new Intl.NumberFormat("tr-TR");
 const fmtNum = (v) =>
@@ -293,7 +294,7 @@ export const LuckyPacketCreateSheet = memo(function LuckyPacketCreateSheet({
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onDismiss}>
-      <View style={styles.overlay}>
+      <KeyboardSafeView style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onDismiss} />
         <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
           <View style={styles.handle} />
@@ -304,71 +305,77 @@ export const LuckyPacketCreateSheet = memo(function LuckyPacketCreateSheet({
                 Odadakiler 90 sn içinde rastgele kredi kapar · Kalan tutar iade edilir
               </Text>
             </View>
-            <Pressable onPress={onDismiss} style={styles.closeBtn}>
+            <Pressable onPress={onDismiss} hitSlop={8} style={styles.closeBtn}>
               <Ionicons name="close" size={18} color="#DCE8FA" />
             </Pressable>
           </View>
 
-          <Text style={styles.fieldLabel}>TOPLAM KREDİ HAVUZU (Bakiye: {fmtShort(coins)})</Text>
-          <View style={styles.chipRow}>
-            {LUCKY_AMOUNTS.map((v) => (
-              <Pressable
-                key={v}
-                onPress={() => setAmount(v)}
-                style={[styles.choiceChip, amount === v && styles.choiceChipGold]}
-              >
-                <Text style={[styles.choiceChipText, amount === v && styles.choiceChipTextDark]}>
-                  {fmtShort(v)}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <Text style={[styles.fieldLabel, { marginTop: 14 }]}>KİŞİ SAYISI</Text>
-          <View style={styles.chipRow}>
-            {LUCKY_SLOTS.map((s) => (
-              <Pressable
-                key={s}
-                onPress={() => setSlots(s)}
-                style={[styles.choiceChip, slots === s && styles.choiceChipActive]}
-              >
-                <Text style={[styles.choiceChipText, slots === s && { color: "#FFFFFF" }]}>
-                  {s} kişi
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <Text style={[styles.fieldLabel, { marginTop: 14 }]}>PAKET MESAJI</Text>
-          <TextInput
-            value={note}
-            onChangeText={setNote}
-            maxLength={60}
-            placeholder="Şanslı Paket!"
-            placeholderTextColor="#7087A8"
-            style={styles.input}
-          />
-
-          {err ? <Text style={styles.errText}>{err}</Text> : null}
-
-          <Pressable
-            disabled={busy}
-            onPress={handleSubmit}
-            style={({ pressed }) => [styles.redCta, pressed && styles.pressed, busy && { opacity: 0.65 }]}
+          <ScrollView
+            style={styles.scroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            {busy ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <>
-                <MaterialCommunityIcons name="gift" size={18} color="#FEF08A" />
-                <Text style={styles.redCtaText}>
-                  {fmtNum(amount)} Kredilik Paket Bırak
-                </Text>
-              </>
-            )}
-          </Pressable>
+            <Text style={styles.fieldLabel}>TOPLAM KREDİ HAVUZU (Bakiye: {fmtShort(coins)})</Text>
+            <View style={styles.chipRow}>
+              {LUCKY_AMOUNTS.map((v) => (
+                <Pressable
+                  key={v}
+                  onPress={() => setAmount(v)}
+                  style={[styles.choiceChip, amount === v && styles.choiceChipGold]}
+                >
+                  <Text style={[styles.choiceChipText, amount === v && styles.choiceChipTextDark]}>
+                    {fmtShort(v)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={[styles.fieldLabel, { marginTop: 14 }]}>KİŞİ SAYISI</Text>
+            <View style={styles.chipRow}>
+              {LUCKY_SLOTS.map((s) => (
+                <Pressable
+                  key={s}
+                  onPress={() => setSlots(s)}
+                  style={[styles.choiceChip, slots === s && styles.choiceChipActive]}
+                >
+                  <Text style={[styles.choiceChipText, slots === s && { color: "#FFFFFF" }]}>
+                    {s} kişi
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={[styles.fieldLabel, { marginTop: 14 }]}>PAKET MESAJI</Text>
+            <TextInput
+              value={note}
+              onChangeText={setNote}
+              maxLength={60}
+              placeholder="Şanslı Paket!"
+              placeholderTextColor="#7087A8"
+              style={styles.input}
+            />
+
+            {err ? <Text style={styles.errText}>{err}</Text> : null}
+
+            <Pressable
+              disabled={busy}
+              onPress={handleSubmit}
+              style={({ pressed }) => [styles.redCta, pressed && styles.pressed, busy && { opacity: 0.65 }]}
+            >
+              {busy ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <>
+                  <MaterialCommunityIcons name="gift" size={18} color="#FEF08A" />
+                  <Text style={styles.redCtaText}>
+                    {fmtNum(amount)} Kredilik Paket Bırak
+                  </Text>
+                </>
+              )}
+            </Pressable>
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardSafeView>
     </Modal>
   );
 });
@@ -605,7 +612,7 @@ export const RoomPollCreateSheet = memo(function RoomPollCreateSheet({
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onDismiss}>
-      <View style={styles.overlay}>
+      <KeyboardSafeView style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onDismiss} />
         <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
           <View style={styles.handle} />
@@ -614,45 +621,51 @@ export const RoomPollCreateSheet = memo(function RoomPollCreateSheet({
               <Text style={styles.title}>Canlı Oylama Başlat</Text>
               <Text style={styles.subtitle}>Odadaki herkes anında oy verebilir</Text>
             </View>
-            <Pressable onPress={onDismiss} style={styles.closeBtn}>
+            <Pressable onPress={onDismiss} hitSlop={8} style={styles.closeBtn}>
               <Ionicons name="close" size={18} color="#DCE8FA" />
             </Pressable>
           </View>
 
-          <View style={styles.presetRow}>
-            {POLL_PRESETS.map((p, i) => (
-              <Pressable key={i} onPress={() => applyPreset(p)} style={styles.presetPill}>
-                <Text style={styles.presetText} numberOfLines={1}>
-                  {p.q}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <Text style={styles.fieldLabel}>SORU</Text>
-          <TextInput
-            value={question}
-            onChangeText={setQuestion}
-            maxLength={90}
-            placeholder="Örn: Sonraki etkinlik ne olsun?"
-            placeholderTextColor="#7087A8"
-            style={styles.input}
-          />
-          <Text style={[styles.fieldLabel, { marginTop: 10 }]}>SEÇENEKLER (EN AZ 2)</Text>
-          <TextInput value={opt1} onChangeText={setOpt1} maxLength={40} placeholder="1. Seçenek" placeholderTextColor="#7087A8" style={styles.input} />
-          <TextInput value={opt2} onChangeText={setOpt2} maxLength={40} placeholder="2. Seçenek" placeholderTextColor="#7087A8" style={[styles.input, { marginTop: 6 }]} />
-          <TextInput value={opt3} onChangeText={setOpt3} maxLength={40} placeholder="3. Seçenek (isteğe bağlı)" placeholderTextColor="#7087A8" style={[styles.input, { marginTop: 6 }]} />
-
-          <Pressable
-            disabled={!valid}
-            onPress={handleStart}
-            style={[styles.blueCta, !valid && { opacity: 0.45 }]}
+          <ScrollView
+            style={styles.scroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            <Ionicons name="stats-chart" size={17} color="#FFFFFF" />
-            <Text style={styles.blueCtaText}>Oylamayı Başlat</Text>
-          </Pressable>
+            <View style={styles.presetRow}>
+              {POLL_PRESETS.map((p, i) => (
+                <Pressable key={i} onPress={() => applyPreset(p)} style={styles.presetPill}>
+                  <Text style={styles.presetText} numberOfLines={1}>
+                    {p.q}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.fieldLabel}>SORU</Text>
+            <TextInput
+              value={question}
+              onChangeText={setQuestion}
+              maxLength={90}
+              placeholder="Örn: Sonraki etkinlik ne olsun?"
+              placeholderTextColor="#7087A8"
+              style={styles.input}
+            />
+            <Text style={[styles.fieldLabel, { marginTop: 10 }]}>SEÇENEKLER (EN AZ 2)</Text>
+            <TextInput value={opt1} onChangeText={setOpt1} maxLength={40} placeholder="1. Seçenek" placeholderTextColor="#7087A8" style={styles.input} />
+            <TextInput value={opt2} onChangeText={setOpt2} maxLength={40} placeholder="2. Seçenek" placeholderTextColor="#7087A8" style={[styles.input, { marginTop: 6 }]} />
+            <TextInput value={opt3} onChangeText={setOpt3} maxLength={40} placeholder="3. Seçenek (isteğe bağlı)" placeholderTextColor="#7087A8" style={[styles.input, { marginTop: 6 }]} />
+
+            <Pressable
+              disabled={!valid}
+              onPress={handleStart}
+              style={[styles.blueCta, !valid && { opacity: 0.45 }]}
+            >
+              <Ionicons name="stats-chart" size={17} color="#FFFFFF" />
+              <Text style={styles.blueCtaText}>Oylamayı Başlat</Text>
+            </Pressable>
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardSafeView>
     </Modal>
   );
 });
@@ -729,7 +742,7 @@ export const RoomTimerCreateSheet = memo(function RoomTimerCreateSheet({
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onDismiss}>
-      <View style={styles.overlay}>
+      <KeyboardSafeView style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onDismiss} />
         <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
           <View style={styles.handle} />
@@ -738,42 +751,48 @@ export const RoomTimerCreateSheet = memo(function RoomTimerCreateSheet({
               <Text style={styles.title}>Geri Sayım Sayacı</Text>
               <Text style={styles.subtitle}>Süre odadaki herkeste senkronize görünür</Text>
             </View>
-            <Pressable onPress={onDismiss} style={styles.closeBtn}>
+            <Pressable onPress={onDismiss} hitSlop={8} style={styles.closeBtn}>
               <Ionicons name="close" size={18} color="#DCE8FA" />
             </Pressable>
           </View>
 
-          <Text style={styles.fieldLabel}>SÜRE SEÇ</Text>
-          <View style={styles.chipRow}>
-            {TIMER_OPTIONS.map((o) => (
-              <Pressable
-                key={o.sec}
-                onPress={() => setSec(o.sec)}
-                style={[styles.choiceChip, sec === o.sec && styles.choiceChipActive]}
-              >
-                <Text style={[styles.choiceChipText, sec === o.sec && { color: "#FFFFFF" }]}>
-                  {o.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+          <ScrollView
+            style={styles.scroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={styles.fieldLabel}>SÜRE SEÇ</Text>
+            <View style={styles.chipRow}>
+              {TIMER_OPTIONS.map((o) => (
+                <Pressable
+                  key={o.sec}
+                  onPress={() => setSec(o.sec)}
+                  style={[styles.choiceChip, sec === o.sec && styles.choiceChipActive]}
+                >
+                  <Text style={[styles.choiceChipText, sec === o.sec && { color: "#FFFFFF" }]}>
+                    {o.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
 
-          <Text style={[styles.fieldLabel, { marginTop: 14 }]}>BAŞLIK</Text>
-          <TextInput
-            value={label}
-            onChangeText={setLabel}
-            maxLength={24}
-            placeholder="Konuşma Süresi"
-            placeholderTextColor="#7087A8"
-            style={styles.input}
-          />
+            <Text style={[styles.fieldLabel, { marginTop: 14 }]}>BAŞLIK</Text>
+            <TextInput
+              value={label}
+              onChangeText={setLabel}
+              maxLength={24}
+              placeholder="Konuşma Süresi"
+              placeholderTextColor="#7087A8"
+              style={styles.input}
+            />
 
-          <Pressable onPress={handleGo} style={styles.blueCta}>
-            <Ionicons name="hourglass" size={17} color="#FFFFFF" />
-            <Text style={styles.blueCtaText}>Sayacı Başlat</Text>
-          </Pressable>
+            <Pressable onPress={handleGo} style={styles.blueCta}>
+              <Ionicons name="hourglass" size={17} color="#FFFFFF" />
+              <Text style={styles.blueCtaText}>Sayacı Başlat</Text>
+            </Pressable>
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardSafeView>
     </Modal>
   );
 });
@@ -912,7 +931,7 @@ export const RoomPkCreateSheet = memo(function RoomPkCreateSheet({
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onDismiss}>
-      <View style={styles.overlay}>
+      <KeyboardSafeView style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onDismiss} />
         <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
           <View style={styles.handle} />
@@ -923,57 +942,63 @@ export const RoomPkCreateSheet = memo(function RoomPkCreateSheet({
                 Süre boyunca gönderilen hediyeler tarafların puanına eklenir
               </Text>
             </View>
-            <Pressable onPress={onDismiss} style={styles.closeBtn}>
+            <Pressable onPress={onDismiss} hitSlop={8} style={styles.closeBtn}>
               <Ionicons name="close" size={18} color="#DCE8FA" />
             </Pressable>
           </View>
 
-          <Text style={styles.fieldLabel}>MAVİ TARAF</Text>
-          <TextInput
-            value={leftName}
-            onChangeText={(t) => {
-              setLeftName(t);
-              setLeftId(null);
-            }}
-            maxLength={22}
-            style={styles.input}
-          />
-          <Text style={[styles.fieldLabel, { marginTop: 10 }]}>KIRMIZI TARAF</Text>
-          <TextInput
-            value={rightName}
-            onChangeText={(t) => {
-              setRightName(t);
-              setRightId(null);
-            }}
-            maxLength={22}
-            style={styles.input}
-          />
+          <ScrollView
+            style={styles.scroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={styles.fieldLabel}>MAVİ TARAF</Text>
+            <TextInput
+              value={leftName}
+              onChangeText={(t) => {
+                setLeftName(t);
+                setLeftId(null);
+              }}
+              maxLength={22}
+              style={styles.input}
+            />
+            <Text style={[styles.fieldLabel, { marginTop: 10 }]}>KIRMIZI TARAF</Text>
+            <TextInput
+              value={rightName}
+              onChangeText={(t) => {
+                setRightName(t);
+                setRightId(null);
+              }}
+              maxLength={22}
+              style={styles.input}
+            />
 
-          <Text style={[styles.fieldLabel, { marginTop: 12 }]}>KAPIŞMA SÜRESİ</Text>
-          <View style={styles.chipRow}>
-            {[
-              { sec: 120, label: "2 dk" },
-              { sec: 180, label: "3 dk" },
-              { sec: 300, label: "5 dk" },
-            ].map((o) => (
-              <Pressable
-                key={o.sec}
-                onPress={() => setDurationSec(o.sec)}
-                style={[styles.choiceChip, durationSec === o.sec && styles.choiceChipActive]}
-              >
-                <Text style={[styles.choiceChipText, durationSec === o.sec && { color: "#FFFFFF" }]}>
-                  {o.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+            <Text style={[styles.fieldLabel, { marginTop: 12 }]}>KAPIŞMA SÜRESİ</Text>
+            <View style={styles.chipRow}>
+              {[
+                { sec: 120, label: "2 dk" },
+                { sec: 180, label: "3 dk" },
+                { sec: 300, label: "5 dk" },
+              ].map((o) => (
+                <Pressable
+                  key={o.sec}
+                  onPress={() => setDurationSec(o.sec)}
+                  style={[styles.choiceChip, durationSec === o.sec && styles.choiceChipActive]}
+                >
+                  <Text style={[styles.choiceChipText, durationSec === o.sec && { color: "#FFFFFF" }]}>
+                    {o.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
 
-          <Pressable onPress={handleStart} style={styles.pkCta}>
-            <MaterialCommunityIcons name="sword-cross" size={18} color="#FFFFFF" />
-            <Text style={styles.blueCtaText}>PK Başlat!</Text>
-          </Pressable>
+            <Pressable onPress={handleStart} style={styles.pkCta}>
+              <MaterialCommunityIcons name="sword-cross" size={18} color="#FFFFFF" />
+              <Text style={styles.blueCtaText}>PK Başlat!</Text>
+            </Pressable>
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardSafeView>
     </Modal>
   );
 });
