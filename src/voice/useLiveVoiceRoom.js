@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AppState } from "react-native";
 import { AudioPresets, DisconnectReason, Room, RoomEvent } from "livekit-client";
 import { supabase } from "../auth/supabase";
 import { loadAgoraModule } from "./loadAgoraModule";
@@ -131,6 +132,8 @@ export function useLiveVoiceRoom({
   startWithMicrophoneRef.current = Boolean(startWithMicrophone);
 
   const [state, setState] = useState(initialState);
+  const statusRef = useRef(state.status);
+  statusRef.current = state.status;
   const [connectionAttempt, setConnectionAttempt] = useState(0);
   const tokenServerUrl = process.env.EXPO_PUBLIC_TOKEN_SERVER_URL?.replace(/\/$/, "");
   const enabled = Boolean(tokenServerUrl);
@@ -1049,8 +1052,15 @@ export function useLiveVoiceRoom({
             : error instanceof Error
               ? error.message
               : "Ses bağlantısı kurulamadı.";
+          const nonRetryableMessage =
+            friendlyMessage.includes("Room is unavailable") ||
+            friendlyMessage.includes("Room access is restricted") ||
+            friendlyMessage.includes("You were removed") ||
+            friendlyMessage.includes("Room ban active") ||
+            friendlyMessage.includes("Room is locked") ||
+            friendlyMessage.includes("Room password required");
           const nonRetryableHttp =
-            httpStatus === 401 || httpStatus === 403 || httpStatus === 404;
+            httpStatus === 401 || httpStatus === 403 || httpStatus === 404 || nonRetryableMessage;
           if (
             nonRetryableHttp ||
             !scheduleAutoRetry(friendlyMessage, attemptedProvider)
@@ -1089,6 +1099,19 @@ export function useLiveVoiceRoom({
     tokenServerUrl,
     userId,
   ]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (
+        nextState === "active" &&
+        statusRef.current === "connected" &&
+        !intentionalDisconnectRef.current
+      ) {
+        sendHeartbeat({ ended: false });
+      }
+    });
+    return () => subscription.remove();
+  }, [sendHeartbeat]);
 
   const setMicrophoneEnabled = useCallback(
     async (nextEnabled) => {

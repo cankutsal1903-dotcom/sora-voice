@@ -579,7 +579,12 @@ function useCountdownMs(target, variant = "long") {
         if (active) setNow(current);
         return;
       }
-      const needsSeconds = variant === "short" ? rem <= 3_600_000 : rem < 86_400_000;
+      const needsSeconds =
+        variant === "seconds"
+          ? true
+          : variant === "short"
+            ? rem <= 3_600_000
+            : rem < 86_400_000;
       const delay = needsSeconds
         ? 1000
         : Math.min(60_000, Math.max(1000, (rem % 60_000) + 120));
@@ -1188,7 +1193,7 @@ const EventAvatar = memo(function EventAvatar({ name, url, color, size = 40, rin
 
 const CountdownBoxes = memo(function CountdownBoxes({ event }) {
   const upcoming = event.startsAtMs > Date.now();
-  const remaining = useCountdownMs(upcoming ? event.startsAtMs : event.endsAtMs);
+  const remaining = useCountdownMs(upcoming ? event.startsAtMs : event.endsAtMs, "seconds");
   const { days, hours, minutes, seconds } = splitDuration(remaining);
   const ended = remaining <= 0;
   const parts = [

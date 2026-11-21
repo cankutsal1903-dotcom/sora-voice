@@ -352,14 +352,27 @@ export const InboxScreen = memo(function InboxScreen({
       return undefined;
     }
 
+    const requestUserId = currentUserId;
     setNewChatOpen(false);
     setStartingChat(true);
     startDirectConversation(rawHandle)
       .then(async (conversationId) => {
-        if (!isMountedRef.current) return;
+        if (
+          !isMountedRef.current ||
+          handledDirectChatReqRef.current !== reqId ||
+          currentUserIdRef.current !== requestUserId
+        ) {
+          return;
+        }
         const nextConversations = await listDirectConversations();
-        if (!isMountedRef.current) return;
-        cachedInboxUserId = currentUserId;
+        if (
+          !isMountedRef.current ||
+          handledDirectChatReqRef.current !== reqId ||
+          currentUserIdRef.current !== requestUserId
+        ) {
+          return;
+        }
+        cachedInboxUserId = requestUserId;
         cachedInboxConversations = nextConversations;
         setConversations(nextConversations);
         const found =
@@ -376,12 +389,22 @@ export const InboxScreen = memo(function InboxScreen({
         }
       })
       .catch((startError) => {
-        if (isMountedRef.current) {
+        if (
+          isMountedRef.current &&
+          handledDirectChatReqRef.current === reqId &&
+          currentUserIdRef.current === requestUserId
+        ) {
           Alert.alert("Sohbet başlatılamadı", friendlyError(startError));
         }
       })
       .finally(() => {
-        if (isMountedRef.current) setStartingChat(false);
+        if (
+          isMountedRef.current &&
+          handledDirectChatReqRef.current === reqId &&
+          currentUserIdRef.current === requestUserId
+        ) {
+          setStartingChat(false);
+        }
       });
 
     return undefined;

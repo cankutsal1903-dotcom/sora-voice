@@ -3423,7 +3423,30 @@ function ProfileDetailSheet({
     return () => {
       active = false;
     };
-  }, [isFollowing, isSelf, resolvedTargetId, visible]);
+  }, [isSelf, resolvedTargetId, visible]);
+
+  const targetUidRef = useRef(resolvedTargetId);
+  targetUidRef.current = resolvedTargetId;
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
+  const handleFollowButtonPress = useCallback(async () => {
+    if (!onToggleFollow) return;
+    const uid = targetUidRef.current;
+    const delta = isFollowing ? -1 : 1;
+    setFollowCounts((curr) =>
+      curr ? { ...curr, followers: Math.max(0, (curr.followers || 0) + delta) } : curr,
+    );
+    await Promise.resolve(onToggleFollow());
+    if (uid && visibleRef.current && targetUidRef.current === uid) {
+      getFollowCounts(uid)
+        .then((counts) => {
+          if (counts && visibleRef.current && targetUidRef.current === uid) {
+            setFollowCounts(counts);
+          }
+        })
+        .catch(() => undefined);
+    }
+  }, [isFollowing, onToggleFollow]);
 
   const person = remoteProfile
     ? { ...(profile || {}), ...remoteProfile }
@@ -3859,7 +3882,7 @@ function ProfileDetailSheet({
           >
             {onToggleFollow ? (
               <Pressable
-                onPress={onToggleFollow}
+                onPress={handleFollowButtonPress}
                 style={({ pressed }) => [
                   styles.profileDetailFollowButton,
                   isFollowing && styles.profileDetailFollowingButton,
@@ -6654,6 +6677,7 @@ function Room({
   onToggleFollowHost,
   onToggleFollowUser,
   onHostPresenceChange,
+  onRoomClosed,
   onMinimize,
   onEditProfile,
   userFamilyLevel = 0,
@@ -6933,7 +6957,15 @@ function Room({
     accessToken,
     startWithMicrophone: initialMicrophoneOn,
   });
+  const [roomClosedRemotely, setRoomClosedRemotely] = useState(false);
+  const hostAutoReviveAttemptedRef = useRef(false);
+  const isRoomUnavailableError =
+    liveVoice.status === "error" &&
+    String(liveVoice.error || "").includes("Room is unavailable");
+  const showClosedRoomState =
+    !isHost && room.persisted && (roomClosedRemotely || isRoomUnavailableError);
   const retryVoiceConnection = async () => {
+    setRoomClosedRemotely(false);
     if (isHost && room.persisted && onHostPresenceChange) {
       try {
         await onHostPresenceChange(room.id, true);
@@ -6945,6 +6977,28 @@ function Room({
     }
     liveVoice.reconnect();
   };
+  useEffect(() => {
+    if (liveVoice.status === "connected") {
+      hostAutoReviveAttemptedRef.current = false;
+      setRoomClosedRemotely(false);
+    }
+  }, [liveVoice.status]);
+  useEffect(() => {
+    if (
+      isHost &&
+      room.persisted &&
+      isRoomUnavailableError &&
+      !hostAutoReviveAttemptedRef.current
+    ) {
+      hostAutoReviveAttemptedRef.current = true;
+      retryVoiceConnection();
+    }
+  }, [isHost, isRoomUnavailableError, room.id, room.persisted]);
+  useEffect(() => {
+    if (showClosedRoomState) {
+      onRoomClosed?.(room.id);
+    }
+  }, [onRoomClosed, room.id, showClosedRoomState]);
   const [roomMembers, setRoomMembers] = useState([]);
   const [blockedUserIds, setBlockedUserIds] = useState([]);
   const myMember = roomMembers.find((member) => member.userId === userId);
@@ -7477,6 +7531,31 @@ function Room({
           setRoomLocked(Boolean(payload.new.room_locked));
           const nextDetails = roomDetailsFromRow(payload.new);
           if (nextDetails) setRoomDetails((current) => ({ ...current, ...nextDetails }));
+          if (payload.new?.state && payload.new.state !== "live") {
+            if (isHost && onHostPresenceChange) {
+              onHostPresenceChange(room.id, true).catch(() => undefined);
+            } else if (voiceStatusRef.current !== "connected") {
+              setRoomClosedRemotely(true);
+              onRoomClosed?.(room.id);
+            }
+          } else if (payload.new?.state === "live") {
+            setRoomClosedRemotely(false);
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "rooms",
+          filter: `id=eq.${room.id}`,
+        },
+        () => {
+          if (!isHost) {
+            setRoomClosedRemotely(true);
+            onRoomClosed?.(room.id);
+          }
         },
       )
       .subscribe((status) => {
@@ -7856,23 +7935,26 @@ function Room({
   }, [canModerate, liveVoice.participantCount, liveVoice.status, minimized, refreshMembers, room.persisted]);
 
   const voiceStatusRef = useRef(liveVoice.status);
-  const voiceReconnectRef = useRef(liveVoice.reconnect);
+  const retryVoiceConnectionRef = useRef(retryVoiceConnection);
+  const roomClosedRemotelyRef = useRef(showClosedRoomState);
   const removedByModeratorRef = useRef(Boolean(liveVoice.removedByModerator));
+  retryVoiceConnectionRef.current = retryVoiceConnection;
+  roomClosedRemotelyRef.current = showClosedRoomState;
   useEffect(() => {
     voiceStatusRef.current = liveVoice.status;
-    voiceReconnectRef.current = liveVoice.reconnect;
     removedByModeratorRef.current = Boolean(liveVoice.removedByModerator);
-  }, [liveVoice.reconnect, liveVoice.removedByModerator, liveVoice.status]);
+  }, [liveVoice.removedByModerator, liveVoice.status]);
 
   useEffect(() => {
-    // Uygulama arka plana alınıp öne geldiğinde bağlantı koptuysa sessizce yeniden bağlan.
+    // Uygulama arka plana alınıp öne geldiğinde bağlantı koptuysa oda sahipliğiyle uyumlu şekilde yeniden bağlan.
     const subscription = AppState.addEventListener("change", (nextState) => {
       if (
         nextState === "active" &&
         !removedByModeratorRef.current &&
+        !roomClosedRemotelyRef.current &&
         ["error", "disconnected"].includes(voiceStatusRef.current)
       ) {
-        voiceReconnectRef.current?.();
+        retryVoiceConnectionRef.current?.();
       }
     });
     return () => subscription.remove();
@@ -9542,8 +9624,9 @@ function Room({
             </View>
             <View style={styles.roomHeaderSubRow}>
               <Text style={styles.roomHeaderCaption} numberOfLines={1}>
-                {formatCategoryLabel(room.category)} · {Math.max(1, liveVoice.participantCount, activeRoomParticipants.length)} kişi
-                {musicPlaying ? " · müzik" : ""}
+                {showClosedRoomState
+                  ? `${formatCategoryLabel(room.category)} · Kapalı`
+                  : `${formatCategoryLabel(room.category)} · ${Math.max(1, liveVoice.participantCount, activeRoomParticipants.length)} kişi${musicPlaying ? " · müzik" : ""}`}
               </Text>
               {!isHost && room.hostId ? (
                 <Pressable
@@ -9591,7 +9674,7 @@ function Room({
           </Pressable>
         </View>
 
-        {liveVoice.status === "error" ? (
+        {liveVoice.status === "error" && !showClosedRoomState ? (
           <View style={styles.roomConnectionNotice}>
             <Ionicons name="alert-circle-outline" size={14} color="#A9BEDB" />
             <Text style={styles.roomConnectionText}>{voiceErrorText}</Text>
@@ -9659,26 +9742,53 @@ function Room({
         {/* Sahne sabit kalır; klavye açıkken sohbet ve yazma çubuğunun kapanmaması için geçici gizlenir */}
         {!roomKeyboard.visible ? (
           <View style={styles.roomSurface}>
-          {/* Sahne: oda sahibi (+ çift koltuğu) + 4'erli sıralar */}
-          <View style={styles.roomStage}>
-            <LinearGradient
-              colors={["rgba(47,128,237,0.16)", "rgba(82,104,174,0.035)", "rgba(47,128,237,0)"]}
-              locations={[0, 0.48, 1]}
-              style={styles.roomStageGlow}
-              pointerEvents="none"
-            />
-            <View style={styles.roomHostSeatRow}>
-              {renderStageSeat(hostStageParticipant, 0, "host")}
-              {roomDetails.coupleSeat
-                ? renderStageSeat(seatedByIndex.get(COUPLE_SEAT_INDEX) || null, COUPLE_SEAT_INDEX, "couple")
-                : null}
+          {/* Sahne: oda kapalıysa boş koltuklar yerine temiz çıkış kartı göster */}
+          {showClosedRoomState ? (
+            <View style={styles.roomClosedCard}>
+              <View style={styles.roomClosedIconWrap}>
+                <Ionicons name="radio-outline" size={26} color="#93C5FD" />
+              </View>
+              <Text style={styles.roomClosedTitle}>Bu oda şu an kapalı</Text>
+              <Text style={styles.roomClosedSubtitle}>
+                Oda sona erdiği için ses yayını kapatıldı.
+              </Text>
+              <View style={styles.roomClosedActions}>
+                <Pressable
+                  style={styles.roomClosedPrimaryBtn}
+                  onPress={leaveRoom}
+                >
+                  <Text style={styles.roomClosedPrimaryText}>Keşfet'e dön</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.roomClosedSecondaryBtn}
+                  onPress={retryVoiceConnection}
+                >
+                  <Ionicons name="refresh" size={14} color="#BFD9FF" />
+                  <Text style={styles.roomClosedSecondaryText}>Tekrar kontrol et</Text>
+                </Pressable>
+              </View>
             </View>
-            <View style={[styles.roomSpeakerGrid, compactStage && styles.roomSpeakerGridCompact]}>
-              {regularSeatRows.flat().map(({ index, participant }) =>
-                renderStageSeat(participant, index),
-              )}
+          ) : (
+            <View style={styles.roomStage}>
+              <LinearGradient
+                colors={["rgba(47,128,237,0.16)", "rgba(82,104,174,0.035)", "rgba(47,128,237,0)"]}
+                locations={[0, 0.48, 1]}
+                style={styles.roomStageGlow}
+                pointerEvents="none"
+              />
+              <View style={styles.roomHostSeatRow}>
+                {renderStageSeat(hostStageParticipant, 0, "host")}
+                {roomDetails.coupleSeat
+                  ? renderStageSeat(seatedByIndex.get(COUPLE_SEAT_INDEX) || null, COUPLE_SEAT_INDEX, "couple")
+                  : null}
+              </View>
+              <View style={[styles.roomSpeakerGrid, compactStage && styles.roomSpeakerGridCompact]}>
+                {regularSeatRows.flat().map(({ index, participant }) =>
+                  renderStageSeat(participant, index),
+                )}
+              </View>
             </View>
-          </View>
+          )}
 
           {/* Odadakiler */}
           {audienceParticipants.length > 0 && !roomKeyboard.visible && (
@@ -10997,9 +11107,11 @@ function AppContent() {
   const activeUserIdRef = useRef(null);
   activeUserIdRef.current = authSession?.user?.id || null;
   const openRoomSeqRef = useRef(0);
+  const openingRoomIdRef = useRef(null);
   const openRoomRef = useRef(null);
   const dailyRewardClaimingRef = useRef(false);
   const followOpsQueueRef = useRef(new Map());
+  const followBaseStateRef = useRef(new Map());
   const followedUserIdsRef = useRef(followedUserIds);
   followedUserIdsRef.current = followedUserIds;
   const [myFamily, setMyFamily] = useState(null);
@@ -11245,9 +11357,11 @@ function AppContent() {
       if (isSupabaseConfigured && previousUserIdRef.current) {
         previousUserIdRef.current = null;
         openRoomSeqRef.current += 1;
+        openingRoomIdRef.current = null;
         pendingGiftSpendRef.current = 0;
         dailyRewardClaimingRef.current = false;
         followOpsQueueRef.current.clear();
+        followBaseStateRef.current.clear();
         resetDailyMissionsCache();
         setRoom(null);
         setRoomMinimized(false);
@@ -11281,7 +11395,9 @@ function AppContent() {
     if (switchedUser) {
       resetDailyMissionsCache();
       pendingGiftSpendRef.current = 0;
+      openingRoomIdRef.current = null;
       followOpsQueueRef.current.clear();
+      followBaseStateRef.current.clear();
     }
     const metadata = user.user_metadata || {};
     const fallbackName = user.email?.split("@")[0] || "Sora kullanıcısı";
@@ -12215,9 +12331,13 @@ function AppContent() {
       setRoomMinimized(false);
       return;
     }
+    if (!skipPasswordCheck && openingRoomIdRef.current === nextRoom.id) {
+      return;
+    }
 
     const reqSeq = ++openRoomSeqRef.current;
     const requestUserId = activeUserIdRef.current;
+    openingRoomIdRef.current = nextRoom.id;
 
     // Odayı ekranda açmadan önce sunucuda üyelik, ban ve şifre denetimini yap.
     // Bağlantı veya yetki hatasında kapalı davran; aksi halde token çağrısına
@@ -12234,12 +12354,25 @@ function AppContent() {
         await joinRoomWithPassword(nextRoom.id, null);
         joinedPersisted = true;
       } catch (error) {
+        if (openRoomSeqRef.current === reqSeq) openingRoomIdRef.current = null;
         if (openRoomSeqRef.current !== reqSeq) return;
         const message = String(error?.message || "");
         if (message.includes("Room password required")) {
           setPasswordPromptError(null);
           setPasswordPromptRoom(nextRoom);
           return;
+        }
+        if (message.includes("Room is unavailable")) {
+          setRooms((currentRooms) =>
+            currentRooms.filter((item) => item.id !== nextRoom.id),
+          );
+          listRooms("live")
+            .then((liveRooms) => {
+              if (activeUserIdRef.current === requestUserId) {
+                setRooms([...liveRooms, ...SEEDED_ROOMS]);
+              }
+            })
+            .catch(() => undefined);
         }
         Alert.alert("Odaya girilemiyor", describeRoomError(error));
         return;
@@ -12250,7 +12383,11 @@ function AppContent() {
       openRoomSeqRef.current !== reqSeq ||
       (requestUserId && activeUserIdRef.current !== requestUserId)
     ) {
-      if (joinedPersisted && nextRoom.id !== openRoomIdRef.current) {
+      if (
+        joinedPersisted &&
+        nextRoom.id !== openRoomIdRef.current &&
+        nextRoom.id !== openingRoomIdRef.current
+      ) {
         leaveRoomMembership(nextRoom.id).catch(() => undefined);
       }
       return;
@@ -12262,6 +12399,9 @@ function AppContent() {
     }
 
     console.warn("[room-entry] open requested", Boolean(nextRoom.id));
+    openingRoomIdRef.current = null;
+    openRoomIdRef.current = nextRoom.id;
+    openRoomPersistedRef.current = Boolean(nextRoom.persisted);
     setRoom(nextRoom);
     setRoomPreferences({
       microphoneEnabled: !appSettings.autoJoinMuted,
@@ -12288,7 +12428,8 @@ function AppContent() {
     async (roomId, isActive) => {
       if (!supabase || !authSession?.user) return;
       const updatedRoom = await setRemoteRoomPresence(roomId, isActive);
-      if (updatedRoom) setOwnHostedRoom(updatedRoom);
+      if (!updatedRoom) return;
+      setOwnHostedRoom(updatedRoom);
       setRooms((currentRooms) =>
         isActive
           ? [updatedRoom, ...currentRooms.filter((item) => item.id !== roomId)]
@@ -12300,6 +12441,13 @@ function AppContent() {
     },
     [authSession?.user],
   );
+
+  const handleClosedRoomPrune = useCallback((closedRoomId) => {
+    if (!closedRoomId) return;
+    setRooms((currentRooms) =>
+      currentRooms.filter((item) => item.id !== closedRoomId),
+    );
+  }, []);
 
   useEffect(() => {
     console.warn(
@@ -12330,7 +12478,7 @@ function AppContent() {
           inFlight = false;
           if (active && pendingAgain) {
             pendingAgain = false;
-            debounceTimer = setTimeout(runRefresh, 1800);
+            scheduleRefresh();
           }
         });
     };
@@ -12393,6 +12541,8 @@ function AppContent() {
 
   const leaveCurrentRoom = () => {
     const leavingRoom = room;
+    openRoomIdRef.current = null;
+    openRoomPersistedRef.current = false;
     setRoomMinimized(false);
     setRoom(null);
     if (leavingRoom?.id) {
@@ -12476,14 +12626,17 @@ function AppContent() {
       if (!targetUserId || !requestUserId || targetUserId === requestUserId) {
         return;
       }
-      const nextFollowing = !followedUserIdsRef.current.includes(targetUserId);
-      setFollowedUserIds((currentIds) => {
-        const next = nextFollowing
-          ? (currentIds.includes(targetUserId) ? currentIds : [...currentIds, targetUserId])
-          : currentIds.filter((id) => id !== targetUserId);
-        followedUserIdsRef.current = next;
-        return next;
-      });
+      const wasFollowing = followedUserIdsRef.current.includes(targetUserId);
+      if (!followBaseStateRef.current.has(targetUserId)) {
+        followBaseStateRef.current.set(targetUserId, wasFollowing);
+      }
+      const nextFollowing = !wasFollowing;
+      const optimisticIds = nextFollowing
+        ? (wasFollowing ? followedUserIdsRef.current : [...followedUserIdsRef.current, targetUserId])
+        : followedUserIdsRef.current.filter((id) => id !== targetUserId);
+      followedUserIdsRef.current = optimisticIds;
+      setFollowedUserIds(optimisticIds);
+
       const prevOp = followOpsQueueRef.current.get(targetUserId) || Promise.resolve();
       const op = prevOp
         .catch(() => undefined)
@@ -12495,24 +12648,31 @@ function AppContent() {
               targetUserId,
               following: nextFollowing,
             });
+            if (activeUserIdRef.current === requestUserId) {
+              followBaseStateRef.current.set(targetUserId, nextFollowing);
+            }
           } catch {
             if (activeUserIdRef.current !== requestUserId) return;
-            setFollowedUserIds((currentIds) => {
-              const reverted = nextFollowing
-                ? currentIds.filter((id) => id !== targetUserId)
-                : (currentIds.includes(targetUserId) ? currentIds : [...currentIds, targetUserId]);
-              followedUserIdsRef.current = reverted;
-              return reverted;
-            });
-            Alert.alert(
-              "Takip değiştirilemedi",
-              "Bağlantını kontrol edip tekrar dene.",
-            );
+            if (followOpsQueueRef.current.get(targetUserId) === op) {
+              const confirmed = Boolean(followBaseStateRef.current.get(targetUserId));
+              setFollowedUserIds((currentIds) => {
+                const synced = confirmed
+                  ? (currentIds.includes(targetUserId) ? currentIds : [...currentIds, targetUserId])
+                  : currentIds.filter((id) => id !== targetUserId);
+                followedUserIdsRef.current = synced;
+                return synced;
+              });
+              Alert.alert(
+                "Takip değiştirilemedi",
+                "Bağlantını kontrol edip tekrar dene.",
+              );
+            }
           }
         })
         .finally(() => {
           if (followOpsQueueRef.current.get(targetUserId) === op) {
             followOpsQueueRef.current.delete(targetUserId);
+            followBaseStateRef.current.delete(targetUserId);
           }
         });
       followOpsQueueRef.current.set(targetUserId, op);
@@ -13268,6 +13428,7 @@ function AppContent() {
               initialSpeakerOn={roomPreferences.speakerEnabled}
               initialMicrophoneOn={roomPreferences.microphoneEnabled}
               onHostPresenceChange={setHostRoomPresence}
+              onRoomClosed={handleClosedRoomPrune}
               onMinimize={() => setRoomMinimized(true)}
               onEditProfile={handleOpenProfileEditor}
               minimized={roomMinimized}
@@ -17842,6 +18003,74 @@ const styles = StyleSheet.create({
   roomConnectionText: {
     color: "#A9BEDB",
     fontSize: 9,
+    fontWeight: "600",
+  },
+  roomClosedCard: {
+    marginHorizontal: 20,
+    marginVertical: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+    borderRadius: 22,
+    backgroundColor: "rgba(18, 28, 48, 0.88)",
+    borderWidth: 1,
+    borderColor: "rgba(147, 197, 253, 0.22)",
+    alignItems: "center",
+    gap: 8,
+  },
+  roomClosedIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "rgba(47, 128, 237, 0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(147, 197, 253, 0.26)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  roomClosedTitle: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  roomClosedSubtitle: {
+    color: "#A9BEDB",
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 18,
+  },
+  roomClosedActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 10,
+  },
+  roomClosedPrimaryBtn: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  roomClosedPrimaryText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  roomClosedSecondaryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(191,217,255,0.22)",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  roomClosedSecondaryText: {
+    color: "#BFD9FF",
+    fontSize: 12,
     fontWeight: "600",
   },
   roomComposerDock: {
