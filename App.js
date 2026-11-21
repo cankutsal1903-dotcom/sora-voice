@@ -971,33 +971,9 @@ const Discover = memo(function Discover({
             style={{ marginTop: 2, marginBottom: 12 }}
           />
         ) : null}
-        <LinearGradient
-          colors={["#101B2E", "#193052", "#0E1726"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.discoverEmptyHero}
-        >
-          <View style={styles.discoverEmptyGlow} />
-          <FloatingGlow
-            color="rgba(82,165,255,0.28)"
-            size={180}
-            style={{ top: -48, right: -42 }}
-          />
-          <ShimmerSweep duration={4400} color="rgba(255,255,255,0.14)" />
+        <View style={styles.discoverEmptyHero}>
           <View style={styles.discoverEmptyArt}>
-            <View style={styles.discoverEmptySeat}>
-              <Ionicons name="mic-outline" size={25} color={COLORS.primary} />
-            </View>
-            <View
-              style={[styles.discoverEmptySeat, styles.discoverEmptySeatSide]}
-            >
-              <Ionicons name="add" size={22} color={COLORS.textSecondary} />
-            </View>
-            <View
-              style={[styles.discoverEmptySeat, styles.discoverEmptySeatSide]}
-            >
-              <Ionicons name="add" size={22} color={COLORS.textSecondary} />
-            </View>
+            <SoraMark size={84} tone="light" animate />
           </View>
           <View style={styles.discoverEmptyCopy}>
             <Text style={styles.discoverEmptyLabel}>SAHNE HAZIR</Text>
@@ -1012,29 +988,14 @@ const Discover = memo(function Discover({
             accessibilityLabel="Yeni sesli oda aç"
             style={({ pressed }) => [
               styles.discoverEmptyButton,
-              { overflow: "hidden" },
               pressed && { transform: [{ scale: 0.97 }], opacity: 0.92 },
             ]}
             onPress={onCreate}
           >
-            <LinearGradient
-              colors={["#52A5FF", "#2F80ED", "#1E62C6"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[
-                StyleSheet.absoluteFill,
-                { borderRadius: 15 },
-              ]}
-            />
-            <ShimmerSweep duration={3400} color="rgba(255,255,255,0.28)" />
+            <Ionicons name="mic" size={18} color={COLORS.primaryInk} />
             <Text style={styles.discoverEmptyButtonText}>Oda aç</Text>
-            <Ionicons
-              name="arrow-forward"
-              size={20}
-              color={COLORS.primaryInk}
-            />
           </Pressable>
-        </LinearGradient>
+        </View>
         <View style={styles.discoverEmptyNote}>
           <Ionicons name="headset-outline" size={18} color={COLORS.primary} />
           <Text style={styles.discoverEmptyNoteText}>
@@ -1176,7 +1137,7 @@ const Discover = memo(function Discover({
                   >
                     <View style={styles.followedLiveAvatarInner}>
                       <Avatar
-                        initials={liveRoom.initials || (liveRoom.host || "S").charAt(0).toUpperCase()}
+                        label={liveRoom.initials || (liveRoom.host || "S").charAt(0).toUpperCase()}
                         uri={liveRoom.hostAvatarUrl}
                         color={liveRoom.accent || COLORS.primary}
                         size={42}
@@ -17110,78 +17071,62 @@ const styles = StyleSheet.create({
     elevation: 7,
   },
   discoverEmptyHero: {
-    minHeight: 256,
     borderRadius: 24,
-    padding: 18,
-    overflow: "hidden",
+    paddingHorizontal: 22,
+    paddingTop: 26,
+    paddingBottom: 22,
+    alignItems: "center",
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.13)",
-    justifyContent: "flex-end",
-  },
-  discoverEmptyGlow: {
-    position: "absolute",
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: "rgba(47,128,237,0.06)",
-    top: -100,
-    right: -84,
+    borderColor: COLORS.lineSoft,
+    shadowColor: "#1D3A66",
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
   },
   discoverEmptyArt: {
-    flexDirection: "row",
-    justifyContent: "center",
+    width: 112,
+    height: 112,
+    borderRadius: 56,
     alignItems: "center",
-    gap: 10,
+    justifyContent: "center",
+    backgroundColor: COLORS.primarySoft,
     marginBottom: 18,
   },
-  discoverEmptySeat: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(47,128,237,0.14)",
-    borderWidth: 2,
-    borderColor: "rgba(47,128,237,0.45)",
-    transform: [{ rotate: "-5deg" }],
-  },
-  discoverEmptySeatSide: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "rgba(255,255,255,0.10)",
-    borderColor: "rgba(255,255,255,0.20)",
-    transform: [{ rotate: "5deg" }],
-  },
-  discoverEmptyCopy: { marginBottom: 15 },
+  discoverEmptyCopy: { marginBottom: 20, alignItems: "center" },
   discoverEmptyLabel: {
     color: COLORS.primary,
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 1.5,
-    marginBottom: 5,
+    marginBottom: 6,
+    textAlign: "center",
   },
   discoverEmptyTitle: {
-    color: "#F3F7FC",
-    fontSize: 24,
-    lineHeight: 29,
+    color: COLORS.text,
+    fontSize: 22,
+    lineHeight: 28,
     fontWeight: "900",
-    letterSpacing: -0.7,
-    marginBottom: 5,
+    letterSpacing: -0.5,
+    marginBottom: 6,
+    textAlign: "center",
   },
   discoverEmptyDescription: {
-    color: "rgba(255,255,255,0.74)",
-    fontSize: 13,
-    lineHeight: 19,
+    color: COLORS.textSecondary,
+    fontSize: 13.5,
+    lineHeight: 20,
+    textAlign: "center",
   },
   discoverEmptyButton: {
+    alignSelf: "stretch",
     minHeight: 50,
     borderRadius: 16,
     backgroundColor: COLORS.primary,
-    paddingHorizontal: 17,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "center",
+    gap: 8,
   },
   discoverEmptyButtonText: {
     color: COLORS.primaryInk,
