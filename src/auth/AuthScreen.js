@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Alert, Image, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { KeyboardSafeView } from "../ui/useKeyboardInset";
+import { SoraMark } from "../ui/SoraMark";
 import {
   AUTH_CALLBACK_URL,
   isHandleAvailable,
@@ -18,7 +19,6 @@ import {
 } from "../security/legalLinks";
 import { COLORS } from "../theme/colors";
 
-const SORA_LOGO = require("../../assets/images/sora-logo-blue.png");
 const BRAND = COLORS.primary;
 
 const cleanHandle = (value) => value.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
@@ -224,7 +224,7 @@ export function AuthScreen() {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.hero}>
-              <Image source={SORA_LOGO} style={styles.logo} accessibilityLabel="Sora logosu" />
+              <View style={styles.logo}><SoraMark size={96} /></View>
               <Text style={styles.kicker}>SORA HESABI</Text>
               <Text style={styles.title}>{isRegistering ? "Sesinle yerini al." : "Sohbete geri dön."}</Text>
               <Text style={styles.subtitle}>{subtitle}</Text>
@@ -379,10 +379,7 @@ const styles = StyleSheet.create({
   logo: {
     width: 96,
     height: 96,
-    borderRadius: 30,
     marginBottom: 14,
-    borderWidth: 1,
-    borderColor: "rgba(47,128,237,0.22)",
   },
   kicker: {
     color: BRAND,

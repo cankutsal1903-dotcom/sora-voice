@@ -193,6 +193,7 @@ import {
   scheduleReminder,
 } from "./src/notifications/localReminders";
 import { AudioBars, BrandLaunch, LivePulse, Reveal, useReducedMotion } from "./src/ui/Motion";
+import { SoraMark } from "./src/ui/SoraMark";
 import { installGlobalErrorReporting } from "./src/observability/errorReporting";
 import { InboxScreen } from "./src/screens/InboxScreen";
 import { CommunityScreen, prefetchFamilyChat } from "./src/screens/CommunityScreen";
@@ -280,7 +281,6 @@ const ELEVATION = {
   },
 };
 
-const SORA_LOGO = require("./assets/images/sora-logo-blue.png");
 
 installGlobalErrorReporting();
 
@@ -754,12 +754,7 @@ function Onboarding({ visible, onComplete }) {
           <Reveal key={slide.id || slideIndex} style={styles.onboardingContent}>
             <View style={styles.onboardingIcon}>
               {slideIndex === 0 ? (
-                <Image
-                  source={SORA_LOGO}
-                  style={styles.onboardingLogo}
-                  fadeDuration={0}
-                  accessibilityLabel="Sora logosu"
-                />
+                <SoraMark size={92} />
               ) : (
                 <Ionicons name={slide.icon} size={46} color={COLORS.primary} />
               )}
@@ -13212,7 +13207,6 @@ function AppContent() {
   if (brandLaunchVisible || (isSupabaseConfigured && authSession === undefined))
     return (
       <BrandLaunch
-        logoSource={SORA_LOGO}
         waiting={isSupabaseConfigured && authSession === undefined}
         closing={brandLaunchClosing}
       />

@@ -3,7 +3,6 @@ import {
   AccessibilityInfo,
   Animated,
   Easing,
-  Image,
   StatusBar,
   StyleSheet,
   Text,
@@ -11,6 +10,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { COLORS } from "../theme/colors";
+import { SoraMark } from "./SoraMark";
 
 const BRAND_BLUE = COLORS.primary;
 const BRAND_BLUE_LIGHT = COLORS.primaryLight;
@@ -276,47 +276,32 @@ export const AudioBars = memo(function AudioBars({
 });
 
 export const BrandLaunch = memo(function BrandLaunch({
-  logoSource,
   waiting = false,
   closing = false,
 }) {
   const intro = useRef(new Animated.Value(0)).current;
   const textIntro = useRef(new Animated.Value(0)).current;
   const outro = useRef(new Animated.Value(1)).current;
-  const orbit = useRef(new Animated.Value(0)).current;
-  const waveA = useRef(new Animated.Value(0)).current;
-  const waveB = useRef(new Animated.Value(0)).current;
+  const breathe = useRef(new Animated.Value(0)).current;
   const shimmer = useRef(new Animated.Value(0)).current;
 
-  const orbitRotate = useRef(
-    orbit.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] }),
-  ).current;
-  const innerOrbitRotate = useRef(
-    orbit.interpolate({ inputRange: [0, 1], outputRange: ["360deg", "0deg"] }),
-  ).current;
   const introScale = useRef(
-    intro.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }),
+    intro.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }),
   ).current;
   const introTranslate = useRef(
-    intro.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }),
+    intro.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }),
   ).current;
   const textTranslate = useRef(
-    textIntro.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }),
+    textIntro.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }),
+  ).current;
+  const glowScale = useRef(
+    breathe.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1.08] }),
+  ).current;
+  const glowOpacity = useRef(
+    breathe.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0.85] }),
   ).current;
   const outroScale = useRef(
-    outro.interpolate({ inputRange: [0, 1], outputRange: [1.035, 1] }),
-  ).current;
-  const waveAScale = useRef(
-    waveA.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.72] }),
-  ).current;
-  const waveAOpacity = useRef(
-    waveA.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 0.42, 0] }),
-  ).current;
-  const waveBScale = useRef(
-    waveB.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.72] }),
-  ).current;
-  const waveBOpacity = useRef(
-    waveB.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 0.34, 0] }),
+    outro.interpolate({ inputRange: [0, 1], outputRange: [1.02, 1] }),
   ).current;
   const shimmerTranslate = useRef(
     shimmer.interpolate({ inputRange: [0, 1], outputRange: [-56, 152] }),
@@ -328,54 +313,42 @@ export const BrandLaunch = memo(function BrandLaunch({
     if (reducedMotion) {
       intro.setValue(1);
       textIntro.setValue(1);
-      orbit.setValue(0.12);
+      breathe.setValue(0.5);
       shimmer.setValue(0.45);
       return undefined;
     }
     const entrance = Animated.parallel([
       Animated.spring(intro, {
         toValue: 1,
-        damping: 15,
-        stiffness: 120,
-        mass: 0.9,
+        damping: 18,
+        stiffness: 110,
+        mass: 1,
         useNativeDriver: true,
       }),
       Animated.timing(textIntro, {
         toValue: 1,
-        duration: 620,
-        delay: 150,
+        duration: 520,
+        delay: 260,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
     ]);
-    const rotation = Animated.loop(
-      Animated.timing(orbit, {
-        toValue: 1,
-        duration: 11000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    );
-    const pulseA = Animated.loop(
-      Animated.timing(waveA, {
-        toValue: 1,
-        duration: 2400,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    );
-    let pulseB = null;
-    const waveDelay = setTimeout(() => {
-      pulseB = Animated.loop(
-        Animated.timing(waveB, {
+    const breathing = Animated.loop(
+      Animated.sequence([
+        Animated.timing(breathe, {
           toValue: 1,
-          duration: 2400,
-          easing: Easing.out(Easing.cubic),
+          duration: 1700,
+          easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
-      );
-      pulseB.start();
-    }, 1200);
+        Animated.timing(breathe, {
+          toValue: 0,
+          duration: 1700,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
     const sweep = Animated.loop(
       Animated.timing(shimmer, {
         toValue: 1,
@@ -385,18 +358,14 @@ export const BrandLaunch = memo(function BrandLaunch({
       }),
     );
     entrance.start();
-    rotation.start();
-    pulseA.start();
+    breathing.start();
     sweep.start();
     return () => {
-      clearTimeout(waveDelay);
       entrance.stop();
-      rotation.stop();
-      pulseA.stop();
-      pulseB?.stop();
+      breathing.stop();
       sweep.stop();
     };
-  }, [intro, orbit, reducedMotion, shimmer, textIntro, waveA, waveB]);
+  }, [breathe, intro, reducedMotion, shimmer, textIntro]);
 
   useEffect(() => {
     if (!closing) return undefined;
@@ -427,77 +396,24 @@ export const BrandLaunch = memo(function BrandLaunch({
         backgroundColor="transparent"
       />
       <LinearGradient
-        colors={["#030711", "#081428", "#0D203E", "#040913"]}
-        locations={[0, 0.42, 0.74, 1]}
+        colors={["#040A16", "#081529", "#040A16"]}
+        locations={[0, 0.5, 1]}
         style={motionStyles.launch}
       >
-        <View style={motionStyles.auroraTop} />
-        <View style={motionStyles.auroraBottom} />
-        <View style={motionStyles.launchGlow} />
-
-        <View style={motionStyles.stageCenter}>
+        <View style={motionStyles.logoStage}>
           <Animated.View
             style={[
-              motionStyles.sonicWave,
-              {
-                opacity: waveAOpacity,
-                transform: [{ scale: waveAScale }],
-              },
+              motionStyles.launchGlow,
+              { opacity: glowOpacity, transform: [{ scale: glowScale }] },
             ]}
           />
-          <Animated.View
-            style={[
-              motionStyles.sonicWave,
-              {
-                opacity: waveBOpacity,
-                transform: [{ scale: waveBScale }],
-              },
-            ]}
-          />
-          <Animated.View
-            style={[
-              motionStyles.orbitOuter,
-              { transform: [{ rotate: orbitRotate }] },
-            ]}
-          >
-            <View style={motionStyles.orbitSparkPrimary} />
-            <View style={motionStyles.orbitSparkSecondary} />
-          </Animated.View>
-          <Animated.View
-            style={[
-              motionStyles.orbitInner,
-              { transform: [{ rotate: innerOrbitRotate }] },
-            ]}
-          >
-            <View style={motionStyles.orbitInnerDot} />
-          </Animated.View>
-
           <Animated.View
             style={{
               opacity: intro,
               transform: [{ scale: introScale }, { translateY: introTranslate }],
             }}
           >
-            <LinearGradient
-              colors={[
-                "rgba(156,210,255,0.68)",
-                "rgba(47,128,237,0.22)",
-                "rgba(120,177,255,0.52)",
-              ]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={motionStyles.logoRim}
-            >
-              <View style={motionStyles.logoShell}>
-                <Image
-                  source={logoSource}
-                  style={motionStyles.logo}
-                  resizeMode="contain"
-                  fadeDuration={0}
-                  accessibilityLabel="Sora sesli sohbet logosu"
-                />
-              </View>
-            </LinearGradient>
+            <SoraMark size={112} />
           </Animated.View>
         </View>
 
@@ -562,108 +478,20 @@ const motionStyles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
   },
-  auroraTop: {
-    position: "absolute",
-    top: -110,
-    right: -70,
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-    backgroundColor: "rgba(47,128,237,0.16)",
-  },
-  auroraBottom: {
-    position: "absolute",
-    bottom: -120,
-    left: -80,
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-    backgroundColor: "rgba(86,180,255,0.09)",
-  },
   launchGlow: {
     position: "absolute",
-    width: 310,
-    height: 310,
-    borderRadius: 155,
-    backgroundColor: "rgba(47,128,237,0.14)",
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: "rgba(47,128,237,0.24)",
   },
-  stageCenter: {
-    width: 276,
-    height: 276,
+  logoStage: {
+    width: 200,
+    height: 200,
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: 14,
   },
-  sonicWave: {
-    position: "absolute",
-    width: 154,
-    height: 154,
-    borderRadius: 77,
-    borderWidth: 1.5,
-    borderColor: "rgba(120,185,255,0.55)",
-  },
-  orbitOuter: {
-    position: "absolute",
-    width: 268,
-    height: 268,
-    borderRadius: 134,
-    borderWidth: 1,
-    borderColor: "rgba(96,165,250,0.2)",
-  },
-  orbitInner: {
-    position: "absolute",
-    width: 204,
-    height: 204,
-    borderRadius: 102,
-    borderWidth: 1,
-    borderColor: "rgba(148,197,255,0.14)",
-  },
-  orbitSparkPrimary: {
-    position: "absolute",
-    top: 28,
-    right: 30,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#63B0FF",
-    shadowColor: "#63B0FF",
-    shadowOpacity: 0.9,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  orbitSparkSecondary: {
-    position: "absolute",
-    bottom: 34,
-    left: 26,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#A6D4FF",
-  },
-  orbitInnerDot: {
-    position: "absolute",
-    top: 16,
-    left: 34,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: BRAND_BLUE,
-  },
-  logoRim: {
-    padding: 2.5,
-    borderRadius: 42,
-    shadowColor: BRAND_BLUE_LIGHT,
-    shadowOpacity: 0.42,
-    shadowRadius: 26,
-    elevation: 18,
-  },
-  logoShell: {
-    width: 132,
-    height: 132,
-    borderRadius: 39.5,
-    overflow: "hidden",
-    backgroundColor: "#060D1A",
-  },
-  logo: { width: "100%", height: "100%" },
   brandCopy: {
     alignItems: "center",
     marginTop: 6,
