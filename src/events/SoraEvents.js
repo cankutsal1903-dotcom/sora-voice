@@ -563,23 +563,45 @@ export function useSoraEvents() {
 // 2) useEventCountdown
 // ---------------------------------------------------------------------------
 
-function useCountdownMs(target) {
+function useCountdownMs(target, variant = "long") {
   const targetMs = toMs(target);
   const valid = Number.isFinite(targetMs);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     if (!valid) return undefined;
+    let active = true;
+    let timerId = null;
+    const scheduleNext = () => {
+      const current = Date.now();
+      const rem = targetMs - current;
+      if (rem <= 0) {
+        if (active) setNow(current);
+        return;
+      }
+      const needsSeconds = variant === "short" ? rem <= 3_600_000 : rem < 86_400_000;
+      const delay = needsSeconds
+        ? 1000
+        : Math.min(60_000, Math.max(1000, (rem % 60_000) + 120));
+      timerId = setTimeout(() => {
+        if (!active) return;
+        setNow(Date.now());
+        scheduleNext();
+      }, delay);
+    };
     setNow(Date.now());
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [targetMs, valid]);
+    scheduleNext();
+    return () => {
+      active = false;
+      if (timerId) clearTimeout(timerId);
+    };
+  }, [targetMs, valid, variant]);
 
   return valid ? Math.max(0, targetMs - now) : 0;
 }
 
 export function useEventCountdown(endsAt, variant = "long") {
-  const remaining = useCountdownMs(endsAt);
+  const remaining = useCountdownMs(endsAt, variant);
   return formatCountdown(remaining, variant);
 }
 

@@ -180,7 +180,7 @@ const PodiumSlot = memo(function PodiumSlot({
           isSelf && { color: "#93C5FD" },
         ]}
       >
-        {isSelf ? `${item.name} (Sen)` : item.name}
+        {isSelf ? `${item.name} (${isFamily ? "Ailen" : "Sen"})` : item.name}
       </Text>
 
       <View
@@ -214,6 +214,10 @@ const PodiumSlot = memo(function PodiumSlot({
         {tabKey === "activeFamilies" ? (
           <Text numberOfLines={1} style={styles.podiumPedestalMeta}>
             Sv.{item.level} · {item.memberCount ?? 0} üye
+          </Text>
+        ) : tabKey === "topLevels" ? (
+          <Text numberOfLines={1} style={styles.podiumPedestalMeta}>
+            {fmtCompact(item.secondaryScore)} XP
           </Text>
         ) : (
           <Text numberOfLines={1} style={styles.podiumPedestalMeta}>
@@ -260,7 +264,7 @@ const LeaderboardRow = memo(function LeaderboardRow({
       <View style={styles.rowCopy}>
         <View style={styles.rowTitleLine}>
           <Text numberOfLines={1} style={[styles.rowName, isSelf && { color: "#BFDBFE" }]}>
-            {isSelf ? `${item.name} (Sen)` : item.name}
+            {isSelf ? `${item.name} (${isFamily ? "Ailen" : "Sen"})` : item.name}
           </Text>
           {tabKey === "mostGenerous" && item.score > 0 ? (
             <SoraWealthBadge spent={item.score} size="xs" animated={false} />
@@ -776,7 +780,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     textAlign: "center",
-    minHeight: 30,
+    minHeight: 20,
     lineHeight: 15,
     marginTop: 2,
   },

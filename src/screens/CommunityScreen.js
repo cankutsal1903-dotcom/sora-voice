@@ -546,6 +546,8 @@ export const CommunityScreen = memo(function CommunityScreen({
   );
   const currentUserIdRef = useRef(currentUserId);
   currentUserIdRef.current = currentUserId;
+  const profileRef = useRef(profile);
+  profileRef.current = profile;
   const activeFamilyIdRef = useRef(myFamily?.id || null);
   activeFamilyIdRef.current = myFamily?.id || null;
   const detailReqSeqRef = useRef(0);
@@ -602,10 +604,18 @@ export const CommunityScreen = memo(function CommunityScreen({
       (Array.isArray(cachedFamiliesList) && cachedFamiliesList.length > 0) || Boolean(initialFamily);
     loadFamilies({ silent: hasSeed });
     if (!currentUserId) return undefined;
+    let debounceTimer = null;
     const unsubscribe = subscribeToCommunities(() => {
-      loadFamilies({ silent: true });
+      if (debounceTimer) return;
+      debounceTimer = setTimeout(() => {
+        debounceTimer = null;
+        loadFamilies({ silent: true });
+      }, 1500);
     });
-    return unsubscribe;
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      unsubscribe();
+    };
   }, [currentUserId, loadFamilies]);
 
   useEffect(() => {
@@ -704,6 +714,7 @@ export const CommunityScreen = memo(function CommunityScreen({
         }
         const isOwn = incoming.userId === currentUserId;
         const known = incoming.userId ? memberByIdRef.current.get(incoming.userId) : null;
+        const currentProfile = profileRef.current;
         setMessages((prev) => {
           if (prev.some((item) => item.id === incoming.id)) return prev;
           const next = [
@@ -712,10 +723,10 @@ export const CommunityScreen = memo(function CommunityScreen({
               id: incoming.id,
               communityId: incoming.communityId,
               userId: incoming.userId,
-              senderName: isOwn ? (profile?.name || "Sen") : (known?.name || null),
-              senderHandle: isOwn ? (profile?.handle || "sora") : (known?.handle || "uye"),
-              senderColor: isOwn ? (profile?.color || COLORS.primary) : (known?.color || COLORS.primary),
-              senderAvatarUrl: isOwn ? (profile?.avatarUrl || null) : (known?.avatarUrl || null),
+              senderName: isOwn ? (currentProfile?.name || "Sen") : (known?.name || null),
+              senderHandle: isOwn ? (currentProfile?.handle || "sora") : (known?.handle || "uye"),
+              senderColor: isOwn ? (currentProfile?.color || COLORS.primary) : (known?.color || COLORS.primary),
+              senderAvatarUrl: isOwn ? (currentProfile?.avatarUrl || null) : (known?.avatarUrl || null),
               text: incoming.text,
               kind: incoming.kind || "text",
               metadata: incoming.metadata || {},
@@ -729,6 +740,7 @@ export const CommunityScreen = memo(function CommunityScreen({
         if (!isOwn && !known) {
           listFamilyMembersLite(communityId)
             .then((members) => {
+              if (activeFamilyIdRef.current !== communityId) return;
               if (Array.isArray(members)) {
                 familyMembersCache.set(communityId, members);
                 setFamilyMembers(members);
@@ -744,10 +756,6 @@ export const CommunityScreen = memo(function CommunityScreen({
     loadMessages,
     myFamily?.id,
     playGiftEffect,
-    profile?.avatarUrl,
-    profile?.color,
-    profile?.handle,
-    profile?.name,
   ]);
 
   // Hediye alıcıları: önce kullanıcının kendisi (profil fotoğrafıyla), ardından diğer aile üyeleri

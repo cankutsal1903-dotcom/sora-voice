@@ -24,7 +24,18 @@ let sfxEnabledCache = true;
 let sfxLoaded = false;
 const listeners = new Set();
 const lastPlayedAt = {};
-const activePlayers = new Set();
+const activePlayers = new Map(); // player -> timeoutId
+const MAX_CONCURRENT_SFX = 4;
+
+const releasePlayer = (player) => {
+  const timerId = activePlayers.get(player);
+  if (timerId) clearTimeout(timerId);
+  activePlayers.delete(player);
+  try {
+    player.pause?.();
+    player.remove?.();
+  } catch {}
+};
 
 const notify = () => {
   listeners.forEach((fn) => {
@@ -89,19 +100,17 @@ export function playSfx(name) {
   lastPlayedAt[name] = now;
 
   try {
+    while (activePlayers.size >= MAX_CONCURRENT_SFX) {
+      const oldest = activePlayers.keys().next().value;
+      if (!oldest) break;
+      releasePlayer(oldest);
+    }
     const player = createAudioPlayer(asset);
     player.volume = SFX_VOLUMES[name] ?? 0.5;
-    activePlayers.add(player);
-    player.play();
-
     const cleanupMs = name === "fanfare" ? 1300 : 850;
-    setTimeout(() => {
-      activePlayers.delete(player);
-      try {
-        player.pause?.();
-        player.remove?.();
-      } catch {}
-    }, cleanupMs);
+    const timerId = setTimeout(() => releasePlayer(player), cleanupMs);
+    activePlayers.set(player, timerId);
+    player.play();
   } catch {
     // Ses cihazı meşgulse sessizce geç
   }

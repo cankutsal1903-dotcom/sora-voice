@@ -6412,7 +6412,7 @@ const RoomComposer = memo(function RoomComposer({
         onChangeText={handleChange}
         onSubmitEditing={handleSubmit}
         placeholder="Mesaj yaz…"
-        placeholderTextColor="#8DA2BC"
+        placeholderTextColor="rgba(218,232,250,0.68)"
         accessibilityLabel="Oda mesajı"
         style={[styles.roomInputField, { height: barHeight }]}
         maxLength={160}
@@ -9542,7 +9542,7 @@ function Room({
             </View>
             <View style={styles.roomHeaderSubRow}>
               <Text style={styles.roomHeaderCaption} numberOfLines={1}>
-                {formatCategoryLabel(room.category)} · {Math.max(liveVoice.participantCount, activeRoomParticipants.length)} kişi
+                {formatCategoryLabel(room.category)} · {Math.max(1, liveVoice.participantCount, activeRoomParticipants.length)} kişi
                 {musicPlaying ? " · müzik" : ""}
               </Text>
               {!isHost && room.hostId ? (
@@ -9656,8 +9656,9 @@ function Room({
           <RoomPkBar pk={activePk} canEnd={canModerate} onEnd={handleEndPk} />
         ) : null}
 
-        {/* Sahne sabit kalır, yalnızca sohbet alanı dikey kayar */}
-        <View style={styles.roomSurface}>
+        {/* Sahne sabit kalır; klavye açıkken sohbet ve yazma çubuğunun kapanmaması için geçici gizlenir */}
+        {!roomKeyboard.visible ? (
+          <View style={styles.roomSurface}>
           {/* Sahne: oda sahibi (+ çift koltuğu) + 4'erli sıralar */}
           <View style={styles.roomStage}>
             <LinearGradient
@@ -9744,7 +9745,8 @@ function Room({
               </ScrollView>
             </View>
           )}
-        </View>
+          </View>
+        ) : null}
 
         <View style={styles.roomChatArea}>
           <RoomGiftStreamBanner
@@ -11407,55 +11409,44 @@ function AppContent() {
     const user = authSession?.user;
     if (!user || !supabase) return undefined;
     let active = true;
-    supabase
-      .from("profiles")
-      .select("handle, display_name, bio, avatar_color, avatar_url, user_level, user_xp")
-      .eq("id", user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!active || !data) return;
-        setProfile((current) => ({
-          ...current,
-          name: data.display_name || current.name || "Sora kullanıcısı",
-          handle:
-            data.handle ||
-            current.handle ||
-            `sora${String(user.id || "").slice(0, 6)}`,
-          bio: data.bio ?? "",
-          color: data.avatar_color || current.color || DEFAULT_PROFILE.color,
-          avatarUrl: data.avatar_url || null,
-          userLevel: Math.max(1, Number(data.user_level) || 1),
-          userXp: Math.max(0, Number(data.user_xp) || 0),
-        }));
-      })
-      .catch(() => undefined);
-    supabase
-      .from("profiles")
-      .select("active_frame_id, active_profile_theme_id")
-      .eq("id", user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (!active || error || !data) return;
-        setProfile((current) => ({
-          ...current,
-          activeFrameId: data.active_frame_id || null,
-          activeProfileThemeId: data.active_profile_theme_id || null,
-        }));
-      })
-      .catch(() => undefined);
-    supabase
-      .from("profiles")
-      .select("public_id")
-      .eq("id", user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (!active || error || !data?.public_id) return;
-        setProfile((current) => ({
-          ...current,
-          publicId: data.public_id,
-        }));
-      })
-      .catch(() => undefined);
+    (async () => {
+      let { data, error } = await supabase
+        .from("profiles")
+        .select(
+          "handle, display_name, bio, avatar_color, avatar_url, user_level, user_xp, active_frame_id, active_profile_theme_id, public_id, gift_spent_total",
+        )
+        .eq("id", user.id)
+        .maybeSingle();
+      if (error) {
+        const legacy = await supabase
+          .from("profiles")
+          .select("handle, display_name, bio, avatar_color, avatar_url, user_level, user_xp")
+          .eq("id", user.id)
+          .maybeSingle();
+        data = legacy.data || null;
+      }
+      if (!active || !data) return;
+      if (data.gift_spent_total != null) {
+        setKnownGiftSpent(user.id, Number(data.gift_spent_total) || 0);
+      }
+      setProfile((current) => ({
+        ...current,
+        name: data.display_name || current.name || "Sora kullanıcısı",
+        handle:
+          data.handle ||
+          current.handle ||
+          `sora${String(user.id || "").slice(0, 6)}`,
+        bio: data.bio ?? "",
+        color: data.avatar_color || current.color || DEFAULT_PROFILE.color,
+        avatarUrl: data.avatar_url || null,
+        userLevel: Math.max(1, Number(data.user_level) || 1),
+        userXp: Math.max(0, Number(data.user_xp) || 0),
+        activeFrameId: data.active_frame_id ?? current.activeFrameId ?? null,
+        activeProfileThemeId:
+          data.active_profile_theme_id ?? current.activeProfileThemeId ?? null,
+        publicId: data.public_id || current.publicId || null,
+      }));
+    })().catch(() => undefined);
     getMyFamily(user.id)
       .then((family) => {
         if (!active) return;
@@ -11472,95 +11463,72 @@ function AppContent() {
 
   useEffect(() => {
     let active = true;
+    const keys = [
+      FAVORITE_ROOMS_KEY,
+      RECENT_ROOMS_KEY,
+      NOTIFICATIONS_KEY,
+      REMINDER_ROOM_IDS_KEY,
+      APP_SETTINGS_KEY,
+      ONBOARDING_KEY,
+    ];
     if (!isSupabaseConfigured) {
-      AsyncStorage.getItem(USER_ROOMS_KEY)
-        .then((savedRooms) => {
-          if (!active || !savedRooms) return;
-          const parsedRooms = JSON.parse(savedRooms);
-          if (Array.isArray(parsedRooms))
-            setRooms([...parsedRooms, ...SEEDED_ROOMS]);
-        })
-        .catch(() => undefined);
+      keys.push(
+        USER_ROOMS_KEY,
+        PROFILE_KEY,
+        SCHEDULED_ROOMS_KEY,
+        WALLET_BALANCE_KEY,
+        DAILY_REWARD_KEY,
+      );
     }
-    AsyncStorage.getItem(FAVORITE_ROOMS_KEY)
-      .then((savedFavorites) => {
-        if (!active || !savedFavorites) return;
-        const parsedFavorites = JSON.parse(savedFavorites);
-        if (Array.isArray(parsedFavorites)) setFavoriteRoomIds(parsedFavorites);
-      })
-      .catch(() => undefined);
-    AsyncStorage.getItem(RECENT_ROOMS_KEY)
-      .then((savedRecentRooms) => {
-        if (!active || !savedRecentRooms) return;
-        const parsedRecentRooms = JSON.parse(savedRecentRooms);
-        if (Array.isArray(parsedRecentRooms))
-          setRecentRoomIds(parsedRecentRooms);
-      })
-      .catch(() => undefined);
-    AsyncStorage.getItem(NOTIFICATIONS_KEY)
-      .then((savedNotifications) => {
-        if (!active || !savedNotifications) return;
-        const parsedNotifications = JSON.parse(savedNotifications);
-        if (Array.isArray(parsedNotifications))
-          setNotifications(parsedNotifications);
-      })
-      .catch(() => undefined);
-    AsyncStorage.getItem(PROFILE_KEY)
-      .then((savedProfile) => {
-        if (!active || !savedProfile) return;
-        const parsedProfile = JSON.parse(savedProfile);
-        // Oturum acikken profil Supabase kullanici verisinden gelir; burada
-        // yerel kopyayi onun onune gecirme.
-        if (isSupabaseConfigured) return;
-        if (parsedProfile?.name && parsedProfile?.handle)
-          setProfile({ ...DEFAULT_PROFILE, ...parsedProfile });
-      })
-      .catch(() => undefined);
-    if (!isSupabaseConfigured) {
-      AsyncStorage.getItem(SCHEDULED_ROOMS_KEY)
-        .then((savedRooms) => {
-          if (!active || !savedRooms) return;
-          const parsedRooms = JSON.parse(savedRooms);
-          if (Array.isArray(parsedRooms))
-            setScheduledRooms([...parsedRooms, ...SEEDED_SCHEDULED_ROOMS]);
-        })
-        .catch(() => undefined);
-    }
-    AsyncStorage.getItem(REMINDER_ROOM_IDS_KEY)
-      .then((savedReminderIds) => {
-        if (!active || !savedReminderIds) return;
-        const parsedReminderIds = JSON.parse(savedReminderIds);
-        if (Array.isArray(parsedReminderIds))
-          setReminderRoomIds(parsedReminderIds);
-      })
-      .catch(() => undefined);
-    AsyncStorage.getItem(APP_SETTINGS_KEY)
-      .then((savedSettings) => {
-        if (!active || !savedSettings) return;
-        const parsedSettings = JSON.parse(savedSettings);
-        if (parsedSettings && typeof parsedSettings === "object")
-          setAppSettings({ ...DEFAULT_APP_SETTINGS, ...parsedSettings });
-      })
-      .catch(() => undefined);
-    if (!isSupabaseConfigured) {
-      AsyncStorage.getItem(WALLET_BALANCE_KEY)
-        .then((savedBalance) => {
-          if (!active || savedBalance === null) return;
-          const parsedBalance = Number(savedBalance);
-          if (Number.isFinite(parsedBalance) && parsedBalance >= 0)
-            setWalletBalance(parsedBalance);
-        })
-        .catch(() => undefined);
-      AsyncStorage.getItem(DAILY_REWARD_KEY)
-        .then((savedDate) => {
-          if (active && savedDate === new Date().toDateString())
+    const safeJson = (raw) => {
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    };
+    AsyncStorage.multiGet(keys)
+      .then((entries) => {
+        if (!active) return;
+        const map = new Map(entries);
+        const savedFavorites = safeJson(map.get(FAVORITE_ROOMS_KEY));
+        if (Array.isArray(savedFavorites)) setFavoriteRoomIds(savedFavorites);
+        const savedRecent = safeJson(map.get(RECENT_ROOMS_KEY));
+        if (Array.isArray(savedRecent)) setRecentRoomIds(savedRecent);
+        const savedNotifications = safeJson(map.get(NOTIFICATIONS_KEY));
+        if (Array.isArray(savedNotifications)) setNotifications(savedNotifications);
+        const savedReminders = safeJson(map.get(REMINDER_ROOM_IDS_KEY));
+        if (Array.isArray(savedReminders)) setReminderRoomIds(savedReminders);
+        const savedSettings = safeJson(map.get(APP_SETTINGS_KEY));
+        if (savedSettings && typeof savedSettings === "object") {
+          setAppSettings({ ...DEFAULT_APP_SETTINGS, ...savedSettings });
+        }
+        if (map.get(ONBOARDING_KEY) !== "true") {
+          setOnboardingOpen(true);
+        }
+        if (!isSupabaseConfigured) {
+          const savedRooms = safeJson(map.get(USER_ROOMS_KEY));
+          if (Array.isArray(savedRooms)) setRooms([...savedRooms, ...SEEDED_ROOMS]);
+          const savedProfile = safeJson(map.get(PROFILE_KEY));
+          if (savedProfile?.name && savedProfile?.handle) {
+            setProfile({ ...DEFAULT_PROFILE, ...savedProfile });
+          }
+          const savedScheduled = safeJson(map.get(SCHEDULED_ROOMS_KEY));
+          if (Array.isArray(savedScheduled)) {
+            setScheduledRooms([...savedScheduled, ...SEEDED_SCHEDULED_ROOMS]);
+          }
+          const savedBalanceRaw = map.get(WALLET_BALANCE_KEY);
+          if (savedBalanceRaw !== null && savedBalanceRaw !== undefined) {
+            const parsedBalance = Number(savedBalanceRaw);
+            if (Number.isFinite(parsedBalance) && parsedBalance >= 0) {
+              setWalletBalance(parsedBalance);
+            }
+          }
+          if (map.get(DAILY_REWARD_KEY) === new Date().toDateString()) {
             setDailyRewardClaimed(true);
-        })
-        .catch(() => undefined);
-    }
-    AsyncStorage.getItem(ONBOARDING_KEY)
-      .then((completed) => {
-        if (active && completed !== "true") setOnboardingOpen(true);
+          }
+        }
       })
       .catch(() => {
         if (active) setOnboardingOpen(true);
@@ -12342,23 +12310,48 @@ function AppContent() {
   useEffect(() => {
     if (!supabase || !authSession?.user) return undefined;
     let active = true;
-    const refreshLiveRooms = () =>
+    let debounceTimer = null;
+    let inFlight = false;
+    let pendingAgain = false;
+    const runRefresh = () => {
+      if (!active) return;
+      if (inFlight) {
+        pendingAgain = true;
+        return;
+      }
+      inFlight = true;
       listRooms("live")
         .then((liveRooms) => {
           if (!active) return;
           setRooms([...liveRooms, ...SEEDED_ROOMS]);
         })
-        .catch(() => undefined);
+        .catch(() => undefined)
+        .finally(() => {
+          inFlight = false;
+          if (active && pendingAgain) {
+            pendingAgain = false;
+            debounceTimer = setTimeout(runRefresh, 1800);
+          }
+        });
+    };
+    const scheduleRefresh = () => {
+      if (!active || debounceTimer) return;
+      debounceTimer = setTimeout(() => {
+        debounceTimer = null;
+        runRefresh();
+      }, 1800);
+    };
     const channel = supabase
       .channel("live-room-discovery")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "rooms" },
-        refreshLiveRooms,
+        scheduleRefresh,
       )
       .subscribe();
     return () => {
       active = false;
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
   }, [authSession?.user?.id]);
@@ -18838,11 +18831,11 @@ const styles = StyleSheet.create({
   profileDetailBrand: {
     position: "absolute",
     left: 22,
-    top: 76,
+    top: 88,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    opacity: 0.72,
+    opacity: 0.68,
   },
   profileDetailBrandTitle: {
     color: "rgba(255,255,255,0.32)",
@@ -19806,6 +19799,8 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
     color: "#F8FAFC",
     fontSize: 13,
+    textAlignVertical: "center",
+    includeFontPadding: false,
   },
   roomInputSend: {
     width: 30,
