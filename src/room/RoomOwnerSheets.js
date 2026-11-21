@@ -14,10 +14,23 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "../theme/colors";
 import { KeyboardSafeView } from "../ui/useKeyboardInset";
 import { DEFAULT_ROOM_ANNOUNCEMENT, ROOM_BAN_DURATIONS } from "./roomApi";
+
+export const ROOM_THEMES = [
+  { id: "midnight", name: "Gece Safiri", colors: ["#142746", "#101A2B", "#0A101B"], accent: "#3B82F6" },
+  { id: "royal_gold", name: "Altın Gece", colors: ["#2C2110", "#1B150E", "#0C0A08"], accent: "#F59E0B" },
+  { id: "nebula", name: "Mor Nebula", colors: ["#2A174D", "#181030", "#0B0818"], accent: "#A855F7" },
+  { id: "ruby", name: "Yakut Sahne", colors: ["#3D1426", "#220E19", "#0E070C"], accent: "#F43F5E" },
+  { id: "emerald", name: "Zümrüt", colors: ["#0F3029", "#0B1E1B", "#061010"], accent: "#10B981" },
+  { id: "aurora", name: "Kuzey Işığı", colors: ["#102F45", "#15203E", "#090E1B"], accent: "#06B6D4" },
+];
+
+export const getRoomTheme = (themeId) =>
+  ROOM_THEMES.find((t) => t.id === themeId) || ROOM_THEMES[0];
 
 // ── Ortak parçalar ────────────────────────────────────────────────────────
 function SheetFrame({ visible, title, subtitle, onDismiss, children, footer = null, scroll = true }) {
@@ -424,17 +437,20 @@ export function RoomSettingsEditorSheet({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [announcement, setAnnouncement] = useState("");
+  const [themeId, setThemeId] = useState("midnight");
   useEffect(() => {
     if (!visible) return;
     setTitle(details?.title || "");
     setDescription(details?.description || "");
     setAnnouncement(details?.announcement || DEFAULT_ROOM_ANNOUNCEMENT);
-  }, [details?.announcement, details?.description, details?.title, visible]);
+    setThemeId(details?.themeId || "midnight");
+  }, [details?.announcement, details?.description, details?.themeId, details?.title, visible]);
 
   const changed =
     title.trim() !== (details?.title || "") ||
     description.trim() !== (details?.description || "") ||
-    (announcement.trim() || DEFAULT_ROOM_ANNOUNCEMENT) !== (details?.announcement || DEFAULT_ROOM_ANNOUNCEMENT);
+    (announcement.trim() || DEFAULT_ROOM_ANNOUNCEMENT) !== (details?.announcement || DEFAULT_ROOM_ANNOUNCEMENT) ||
+    themeId !== (details?.themeId || "midnight");
 
   const requestStatus = backgroundRequest?.status;
   return (
@@ -454,6 +470,7 @@ export function RoomSettingsEditorSheet({
               title: title.trim(),
               description: description.trim(),
               announcement: announcement.trim() || DEFAULT_ROOM_ANNOUNCEMENT,
+              themeId,
             })
           }
         />
@@ -483,6 +500,47 @@ export function RoomSettingsEditorSheet({
 
       <Caption style={{ marginTop: 18 }}>GÖRÜNÜM VE MÜZİK</Caption>
       <View style={sheetStyles.sectionCard}>
+        <Text style={sheetStyles.themeSectionLabel}>ODA ATMOSFERİ</Text>
+        <View style={sheetStyles.themeGrid}>
+          {ROOM_THEMES.map((theme) => {
+            const selected = themeId === theme.id;
+            return (
+              <Pressable
+                key={theme.id}
+                onPress={() => setThemeId(theme.id)}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                style={[
+                  sheetStyles.themeCard,
+                  selected && { borderColor: theme.accent, backgroundColor: `${theme.accent}14` },
+                ]}
+              >
+                <LinearGradient
+                  colors={theme.colors}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={sheetStyles.themeSwatch}
+                >
+                  <View style={[sheetStyles.themeSwatchGlow, { backgroundColor: theme.accent }]} />
+                  {selected ? (
+                    <View style={[sheetStyles.themeCheck, { backgroundColor: theme.accent }]}>
+                      <Ionicons name="checkmark" size={11} color="#FFFFFF" />
+                    </View>
+                  ) : null}
+                </LinearGradient>
+                <Text
+                  numberOfLines={1}
+                  style={[sheetStyles.themeName, selected && { color: COLORS.text }]}
+                >
+                  {theme.name}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <View style={sheetStyles.sectionDivider} />
+
         <View style={sheetStyles.backgroundCard}>
           <View style={sheetStyles.backgroundPreview}>
             {backgroundUrl ? (
@@ -753,15 +811,35 @@ export function RoomAdminsSheet({ visible, participants, busyUserId, onToggleAdm
   );
 }
 
-// ── Mikrofon istekleri ────────────────────────────────────────────────────
-export function MicRequestsSheet({ visible, requests, busyUserId, onApprove, onReject, onDismiss }) {
+// ── Mikrofon istekleri ve boş koltuğa davet ───────────────────────────────
+export function MicRequestsSheet({
+  visible,
+  requests,
+  listeners = [],
+  targetSeatIndex = null,
+  busyUserId,
+  onApprove,
+  onReject,
+  onInviteListener,
+  onDismiss,
+}) {
+  const hasTargetSeat = targetSeatIndex !== null && targetSeatIndex !== undefined;
+  const sheetTitle = hasTargetSeat
+    ? targetSeatIndex === 100
+      ? "Konuk Koltuğuna Davet"
+      : `${targetSeatIndex}. Koltuğa Davet`
+    : "Mikrofon İstekleri";
+  const sheetSubtitle = hasTargetSeat
+    ? "Bekleyen istekleri onayla ya da odadaki bir dinleyiciyi doğrudan bu koltuğa al."
+    : "Onaylanan kişi ilk boş koltuğa oturur; istersen dinleyicileri doğrudan sahneye alabilirsin.";
   return (
     <SheetFrame
       visible={visible}
-      title="Mikrofon İstekleri"
-      subtitle="Onaylanan kişi ilk boş koltuğa oturur."
+      title={sheetTitle}
+      subtitle={sheetSubtitle}
       onDismiss={onDismiss}
     >
+      <Caption>BEKLEYEN İSTEKLER ({requests.length})</Caption>
       {requests.length ? (
         requests.map((person) => (
           <PersonRow
@@ -774,11 +852,38 @@ export function MicRequestsSheet({ visible, requests, busyUserId, onApprove, onR
           </PersonRow>
         ))
       ) : (
-        <View style={sheetStyles.emptyBox}>
-          <Ionicons name="hand-left-outline" size={26} color={COLORS.muted} />
+        <View style={[sheetStyles.emptyBox, { paddingVertical: 14 }]}>
+          <Ionicons name="hand-left-outline" size={22} color={COLORS.muted} />
           <Text style={sheetStyles.empty}>Bekleyen mikrofon isteği yok.</Text>
         </View>
       )}
+
+      {onInviteListener ? (
+        <>
+          <Caption style={{ marginTop: 18 }}>ODADAKİ DİNLEYİCİLER ({listeners.length})</Caption>
+          {listeners.length ? (
+            listeners.map((person) => (
+              <PersonRow
+                key={person.userId}
+                person={person}
+                caption={person.role === "moderator" ? "Yönetici · Dinleyici" : "Dinleyici"}
+              >
+                <SmallButton
+                  label="Sahneye al"
+                  primary
+                  disabled={busyUserId === person.userId}
+                  onPress={() => onInviteListener(person)}
+                />
+              </PersonRow>
+            ))
+          ) : (
+            <View style={[sheetStyles.emptyBox, { paddingVertical: 14 }]}>
+              <Ionicons name="people-outline" size={22} color={COLORS.muted} />
+              <Text style={sheetStyles.empty}>Şu an sahneye alınabilecek başka dinleyici yok.</Text>
+            </View>
+          )}
+        </>
+      ) : null}
     </SheetFrame>
   );
 }
@@ -1289,6 +1394,61 @@ const sheetStyles = StyleSheet.create({
     backgroundColor: COLORS.background,
     borderWidth: 1,
     borderColor: COLORS.lineSoft,
+  },
+  themeSectionLabel: {
+    color: COLORS.muted,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.1,
+    marginBottom: 9,
+  },
+  themeGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    rowGap: 8,
+  },
+  themeCard: {
+    width: "31.5%",
+    borderRadius: 13,
+    padding: 6,
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1.5,
+    borderColor: COLORS.lineSoft,
+  },
+  themeSwatch: {
+    width: "100%",
+    height: 36,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  themeSwatchGlow: {
+    position: "absolute",
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    opacity: 0.35,
+    top: -10,
+    right: -8,
+  },
+  themeCheck: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "#FFFFFF",
+  },
+  themeName: {
+    color: COLORS.textSecondary,
+    fontSize: 10.5,
+    fontWeight: "800",
+    textAlign: "center",
   },
   sectionDivider: {
     height: 1,

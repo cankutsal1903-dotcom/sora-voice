@@ -123,13 +123,14 @@ export const leaveRoomMembership = async (roomId) => {
   throwIfError(error);
 };
 
-export const updateRoomDetails = async ({ roomId, title, description, announcement }) => {
+export const updateRoomDetails = async ({ roomId, title, description, announcement, themeId }) => {
   const client = requireClient();
   const { data, error } = await client.rpc("update_room_details", {
     p_room_id: roomId,
     p_title: title ?? null,
     p_description: description ?? null,
     p_announcement: announcement ?? null,
+    p_theme_id: themeId ?? null,
   });
   throwIfError(error);
   return firstRow(data);

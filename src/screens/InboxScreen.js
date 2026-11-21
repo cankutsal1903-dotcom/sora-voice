@@ -138,11 +138,24 @@ function EmptyState({ icon, title, description, action, onAction }) {
   );
 }
 
-export const InboxScreen = memo(function InboxScreen({ currentUserId, profile }) {
+export const InboxScreen = memo(function InboxScreen({
+  currentUserId,
+  profile,
+  rooms = [],
+  onOpenRoom = null,
+}) {
   resetInboxCachesIfUserChanged(currentUserId);
   const insets = useSafeAreaInsets();
   const keyboard = useKeyboardInset();
   const chatScrollRef = useRef(null);
+  const liveRoomByUserId = useMemo(() => {
+    const map = new Map();
+    for (const r of rooms || []) {
+      if (!r?.id || r.state === "scheduled") continue;
+      if (r.hostId) map.set(r.hostId, r);
+    }
+    return map;
+  }, [rooms]);
   const [conversations, setConversations] = useState(
     () => (Array.isArray(cachedInboxConversations) ? cachedInboxConversations : []),
   );
@@ -314,6 +327,7 @@ export const InboxScreen = memo(function InboxScreen({ currentUserId, profile })
       selectedConversation.partnerId ||
       selectedConversation.userId;
     const partnerSpent = partnerId ? giftSpentMap[partnerId] || 0 : 0;
+    const partnerLiveRoom = partnerId ? liveRoomByUserId.get(partnerId) || null : null;
     return (
       <KeyboardSafeView style={styles.screen} iosOffset={insets.top}>
         <View style={styles.chatHeader}>
@@ -345,6 +359,24 @@ export const InboxScreen = memo(function InboxScreen({ currentUserId, profile })
             <Text style={styles.chatHeaderHandle}>@{selectedConversation.handle}</Text>
           </View>
         </View>
+        {partnerLiveRoom && onOpenRoom ? (
+          <Pressable
+            onPress={() => onOpenRoom(partnerLiveRoom)}
+            style={({ pressed }) => [
+              styles.livePartnerBar,
+              pressed && { opacity: 0.88 },
+            ]}
+          >
+            <View style={styles.livePartnerDot} />
+            <Text numberOfLines={1} style={styles.livePartnerText}>
+              Şu an canlı odada · {partnerLiveRoom.title}
+            </Text>
+            <View style={styles.livePartnerBtn}>
+              <Text style={styles.livePartnerBtnText}>Katıl</Text>
+              <Ionicons name="arrow-forward" size={12} color="#FFFFFF" />
+            </View>
+          </Pressable>
+        ) : null}
         {error ? (
           <Pressable
             onPress={() => openConversation(selectedConversation)}
@@ -513,6 +545,7 @@ export const InboxScreen = memo(function InboxScreen({ currentUserId, profile })
             const partnerId =
               conversation.otherUserId || conversation.partnerId || conversation.userId;
             const partnerSpent = partnerId ? giftSpentMap[partnerId] || 0 : 0;
+            const partnerLiveRoom = partnerId ? liveRoomByUserId.get(partnerId) || null : null;
             return (
               <Reveal key={conversation.id} delay={Math.min(index, 6) * 45} distance={10}>
                 <Pressable
@@ -535,6 +568,12 @@ export const InboxScreen = memo(function InboxScreen({ currentUserId, profile })
                         </Text>
                         {partnerSpent >= 1000000 ? (
                           <SoraWealthBadge spent={partnerSpent} size="sm" animated={false} />
+                        ) : null}
+                        {partnerLiveRoom ? (
+                          <View style={styles.liveInlineBadge}>
+                            <View style={styles.liveInlineDot} />
+                            <Text style={styles.liveInlineText}>Odada</Text>
+                          </View>
                         ) : null}
                       </View>
                       <Text numberOfLines={1} style={styles.conversationTime}>
@@ -825,4 +864,63 @@ const styles = StyleSheet.create({
   sheetHint: { color: COLORS.muted, fontSize: 11, lineHeight: 17, marginTop: 9, marginBottom: 18 },
   primaryAction: { minHeight: 50, borderRadius: 16, paddingHorizontal: 17, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, overflow: "hidden" },
   primaryActionText: { color: COLORS.primaryInk, fontSize: 13, fontWeight: "900" },
+  liveInlineBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 999,
+    backgroundColor: "rgba(22,163,74,0.13)",
+    borderWidth: 1,
+    borderColor: "rgba(34,197,94,0.34)",
+    flexShrink: 0,
+  },
+  liveInlineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#16A34A",
+  },
+  liveInlineText: {
+    color: "#15803D",
+    fontSize: 9.5,
+    fontWeight: "900",
+  },
+  livePartnerBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    backgroundColor: "rgba(22,163,74,0.10)",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(34,197,94,0.24)",
+  },
+  livePartnerDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#16A34A",
+  },
+  livePartnerText: {
+    flex: 1,
+    color: "#14532D",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  livePartnerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "#16A34A",
+  },
+  livePartnerBtnText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900",
+  },
 });

@@ -139,6 +139,7 @@ import {
   RoomPasswordPrompt,
   RoomSeatsSheet,
   RoomSettingsEditorSheet,
+  getRoomTheme,
   useRequestsFromMembers,
 } from "./src/room/RoomOwnerSheets";
 import { useRoomMusic } from "./src/room/useRoomMusic";
@@ -147,6 +148,7 @@ import {
   QUICK_REACTIONS,
   RoomEntranceBanner,
   RoomGameResultBanner,
+  RoomGiftStreamBanner,
   RoomMiniGamesSheet,
   RoomReactionBar,
   RoomToolsSheet,
@@ -552,13 +554,30 @@ const IconButton = memo(function IconButton({
 const NotificationCenter = memo(function NotificationCenter({
   visible,
   notifications,
+  actionableAlerts = [],
+  serverActivity = [],
   onDismiss,
   onClear,
 }) {
+  const combinedNotifications = useMemo(() => {
+    const base = Array.isArray(notifications) ? notifications : [];
+    const extra = Array.isArray(serverActivity) ? serverActivity : [];
+    const seen = new Set(base.map((item) => `${item.text}|${item.time}`));
+    const merged = [...base];
+    for (const item of extra) {
+      const key = `${item.text}|${item.time}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        merged.push(item);
+      }
+    }
+    return merged.slice(0, 30);
+  }, [notifications, serverActivity]);
+
   // Art arda gelen aynı bildirimleri tek satırda "×N" olarak grupla.
   const groupedNotifications = useMemo(() => {
     const out = [];
-    for (const item of notifications || []) {
+    for (const item of combinedNotifications) {
       const last = out[out.length - 1];
       if (last && last.text === item.text && last.icon === item.icon) {
         last.count += 1;
@@ -567,7 +586,8 @@ const NotificationCenter = memo(function NotificationCenter({
       }
     }
     return out;
-  }, [notifications]);
+  }, [combinedNotifications]);
+  const totalCount = actionableAlerts.length + notifications.length;
   return (
     <Modal
       transparent
@@ -582,9 +602,9 @@ const NotificationCenter = memo(function NotificationCenter({
             <View>
               <Text style={styles.notificationTitle}>Bildirimler</Text>
               <Text style={styles.notificationSubtitle}>
-                {notifications.length
-                  ? `${notifications.length} yeni gelişme var`
-                  : "Her şey yakalandı"}
+                {totalCount
+                  ? `${totalCount} yeni gelişme var`
+                  : "Her şey güncel"}
               </Text>
             </View>
             <Pressable onPress={notifications.length ? onClear : onDismiss}>
@@ -593,7 +613,49 @@ const NotificationCenter = memo(function NotificationCenter({
               </Text>
             </Pressable>
           </View>
-          {notifications.length ? (
+          {actionableAlerts.length > 0 ? (
+            <View style={styles.notifActionList}>
+              {actionableAlerts.map((alert) => (
+                <Pressable
+                  key={alert.id}
+                  onPress={() => {
+                    onDismiss?.();
+                    alert.onPress?.();
+                  }}
+                  style={({ pressed }) => [
+                    styles.notifActionCard,
+                    pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.notificationIcon,
+                      { backgroundColor: alert.color || COLORS.primary },
+                    ]}
+                  >
+                    <Ionicons name={alert.icon || "sparkles"} size={16} color="#fff" />
+                  </View>
+                  <View style={styles.notificationText}>
+                    <Text style={styles.notifActionTitle} numberOfLines={1}>
+                      {alert.title}
+                    </Text>
+                    <Text style={styles.notifActionSub} numberOfLines={1}>
+                      {alert.subtitle}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.notifActionCta,
+                      { backgroundColor: alert.ctaBg || COLORS.primary },
+                    ]}
+                  >
+                    <Text style={styles.notifActionCtaText}>{alert.ctaLabel || "Aç"}</Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+          {groupedNotifications.length ? (
             <FlatList
               data={groupedNotifications}
               keyExtractor={(item, index) => `${item.id}-${index}`}
@@ -624,7 +686,7 @@ const NotificationCenter = memo(function NotificationCenter({
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.notificationList}
             />
-          ) : (
+          ) : !actionableAlerts.length ? (
             <View style={styles.notificationEmpty}>
               <Ionicons
                 name="notifications-off-outline"
@@ -635,7 +697,7 @@ const NotificationCenter = memo(function NotificationCenter({
                 Yeni bildirimin yok.
               </Text>
             </View>
-          )}
+          ) : null}
         </View>
       </View>
     </Modal>
@@ -3263,6 +3325,8 @@ function ProfileDetailSheet({
   onToggleFollow,
   onBlock,
   onReport,
+  liveRoom = null,
+  onJoinLiveRoom = null,
   staffActions = [],
   onStaffAction,
 }) {
@@ -3495,6 +3559,29 @@ function ProfileDetailSheet({
                 <Ionicons name="mic-outline" size={16} color={COLORS.primary} />
                 <Text style={styles.profileDetailRoleText}>{roleLabel} · {roomContext.title}</Text>
               </View>
+            ) : null}
+            {!isSelf && liveRoom && onJoinLiveRoom && liveRoom.id !== roomContext?.id ? (
+              <Pressable
+                onPress={() => onJoinLiveRoom(liveRoom)}
+                style={({ pressed }) => [
+                  styles.profileLiveRoomBanner,
+                  pressed && { opacity: 0.9, transform: [{ scale: 0.985 }] },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`${liveRoom.title} canlı odasına katıl`}
+              >
+                <View style={styles.profileLiveDot} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.profileLiveKicker}>ŞU AN CANLI ODADA</Text>
+                  <Text numberOfLines={1} style={styles.profileLiveTitle}>
+                    {liveRoom.title}
+                  </Text>
+                </View>
+                <View style={styles.profileLiveCta}>
+                  <Text style={styles.profileLiveCtaText}>Katıl</Text>
+                  <Ionicons name="arrow-forward" size={13} color="#FFFFFF" />
+                </View>
+              </Pressable>
             ) : null}
           </View>
 
@@ -6376,6 +6463,7 @@ const roomDetailsFrom = (room) => ({
   seatCount: room.seatCount === 13 ? 13 : 9,
   coupleSeat: Boolean(room.coupleSeat),
   backgroundPath: room.backgroundPath || null,
+  themeId: room.themeId || room.theme_id || "midnight",
   musicState: room.musicState || null,
 });
 
@@ -6389,6 +6477,7 @@ const roomDetailsFromRow = (row) =>
         seatCount: row.seat_count === 13 ? 13 : 9,
         coupleSeat: Boolean(row.couple_seat),
         backgroundPath: row.background_path || null,
+        themeId: row.theme_id || "midnight",
         musicState: row.music_state || null,
       }
     : null;
@@ -6482,6 +6571,36 @@ function Room({
   const [roomGiftCatalog, setRoomGiftCatalog] = useState(GIFT_CATALOG);
   const [giftFlight, setGiftFlight] = useState(null);
   const [roomCombo, setRoomCombo] = useState(null);
+  const [giftStreamItem, setGiftStreamItem] = useState(null);
+  const [inviteSeatIndex, setInviteSeatIndex] = useState(null);
+  const [pinnedAnnouncementDismissed, setPinnedAnnouncementDismissed] = useState(false);
+  const pushGiftStreamBanner = useCallback(
+    ({ senderName, recipientName, giftId, giftName, giftIcon, giftColor, quantity = 1 }) => {
+      if (!giftName) return;
+      const now = Date.now();
+      const sig = `${senderName || ""}|${recipientName || ""}|${giftId || giftName}|${quantity}`;
+      setGiftStreamItem((prev) => {
+        const isComboHit = prev && prev.sig === sig && now - (prev.at || 0) < 5500;
+        return {
+          sig,
+          at: now,
+          triggerKey: `${now}-${Math.random().toString(36).slice(2, 6)}`,
+          senderName: senderName || "Bir kullanıcı",
+          recipientName: recipientName || "Oda",
+          giftId,
+          giftName,
+          giftIcon,
+          giftColor,
+          quantity: Math.max(1, Number(quantity) || 1),
+          comboCount: isComboHit ? (prev.comboCount || 1) + 1 : 1,
+        };
+      });
+    },
+    [],
+  );
+  const handleExpireGiftStream = useCallback((triggerKey) => {
+    setGiftStreamItem((prev) => (prev?.triggerKey === triggerKey ? null : prev));
+  }, []);
   const roomKeyboard = useKeyboardInset();
   const roomRealtimeChannelRef = useRef(null);
   const profileRef = useRef(profile);
@@ -6561,6 +6680,9 @@ function Room({
     entranceSentRoomRef.current = null;
     setGiftFlight(null);
     setRoomCombo(null);
+    setGiftStreamItem(null);
+    setInviteSeatIndex(null);
+    setPinnedAnnouncementDismissed(false);
     setFloatingReactions([]);
     setEntranceQueue([]);
     setActiveGameEvent(null);
@@ -7164,6 +7286,17 @@ function Room({
               quantity: Number(meta.quantity) || 1,
               eventId: row.id,
             });
+            if (row.sender_id !== userId) {
+              pushGiftStreamBanner({
+                senderName: row.sender_name || "Kullanıcı",
+                recipientName: meta.recipient_name || "Oda",
+                giftId: meta.gift_id,
+                giftName: meta.gift_name || "Hediye",
+                giftIcon: meta.gift_icon,
+                giftColor: meta.gift_color,
+                quantity: Number(meta.quantity) || 1,
+              });
+            }
           }
         },
       )
@@ -7654,6 +7787,15 @@ function Room({
           quantity: cleanQty,
           eventId: sent.message_id || requestId,
         });
+        pushGiftStreamBanner({
+          senderName: profile?.name || "Sen",
+          recipientName: recipient.isSelf ? "Kendine" : recipient.name,
+          giftId: gift.id,
+          giftName: sent.gift_name || gift.name,
+          giftIcon: gift.icon,
+          giftColor: gift.color,
+          quantity: cleanQty,
+        });
         if (sent.message_id) {
           setMessages((current) =>
             mergeRoomMessages(current, [
@@ -7686,7 +7828,7 @@ function Room({
         pendingRoomGiftSpendRef.current = Math.max(0, pendingRoomGiftSpendRef.current - reservedCost);
       }
     },
-    [onSendGift, playGiftEffect, profile?.avatarUrl, profile?.color, profile?.name, room.id, userId],
+    [onSendGift, playGiftEffect, profile?.avatarUrl, profile?.color, profile?.name, pushGiftStreamBanner, room.id, userId],
   );
 
   const handleSendGiftFromSheet = useCallback(
@@ -8091,6 +8233,7 @@ function Room({
       return;
     }
     if (isHost) {
+      setInviteSeatIndex(seatIndex);
       setMenuSheet("requests");
       return;
     }
@@ -8430,7 +8573,10 @@ function Room({
 
   const approveMicRequest = async (person) => {
     setStaffBusy(person.userId);
-    const result = await runSeatAction("assign", { targetUserId: person.userId });
+    const result = await runSeatAction("assign", {
+      targetUserId: person.userId,
+      seatIndex: inviteSeatIndex,
+    });
     setStaffBusy(null);
     if (result) {
       setRoomMembers((current) =>
@@ -8438,7 +8584,25 @@ function Room({
           member.userId === person.userId ? { ...member, handRaisedAt: null } : member,
         ),
       );
+      setInviteSeatIndex(null);
+      setMenuSheet(null);
       refreshMembers();
+    }
+  };
+
+  const inviteListenerToSeat = async (person) => {
+    setStaffBusy(person.userId);
+    const targetSeat = inviteSeatIndex;
+    const result = await runSeatAction("assign", {
+      targetUserId: person.userId,
+      seatIndex: targetSeat,
+    });
+    setStaffBusy(null);
+    if (result) {
+      setInviteSeatIndex(null);
+      setMenuSheet(null);
+      refreshMembers();
+      appendSystemMessage(`${person.name} sahneye alındı.`);
     }
   };
 
@@ -8523,8 +8687,20 @@ function Room({
   const saveRoomDetails = async (values) => {
     setSavingSettings(true);
     try {
+      const prevAnnouncement = roomDetails.announcement;
+      if (!room.persisted) {
+        setRoomDetails((current) => ({ ...current, ...values }));
+        if (values.announcement && values.announcement !== prevAnnouncement) {
+          setPinnedAnnouncementDismissed(false);
+        }
+        setMenuSheet(null);
+        return;
+      }
       const row = await updateRoomDetails({ roomId: room.id, ...values });
       applyRoomRow(row);
+      if (values.announcement && values.announcement !== prevAnnouncement) {
+        setPinnedAnnouncementDismissed(false);
+      }
       setMenuSheet(null);
     } catch (error) {
       Alert.alert("Kaydedilemedi", describeRoomError(error));
@@ -8763,7 +8939,10 @@ function Room({
     else if (key === "blockHost") openLater(handleBlockHost);
   };
 
-  const closeMenuSheet = useCallback(() => setMenuSheet(null), []);
+  const closeMenuSheet = useCallback(() => {
+    setInviteSeatIndex(null);
+    setMenuSheet(null);
+  }, []);
 
   const shareRoom = async () => {
     try {
@@ -9111,15 +9290,36 @@ function Room({
     );
   };
 
+  const activeRoomTheme = useMemo(
+    () => getRoomTheme(roomDetails.themeId),
+    [roomDetails.themeId],
+  );
+  const unseatedListeners = useMemo(() => {
+    const requestIds = new Set((micRequests || []).map((r) => r.userId));
+    return (roomMembers || []).filter(
+      (member) =>
+        member?.userId &&
+        member.userId !== userId &&
+        !isSeatedParticipant(member) &&
+        !requestIds.has(member.userId),
+    );
+  }, [micRequests, roomMembers, userId]);
+  const cleanAnnouncementText = String(roomDetails.announcement || "").trim();
+  const showPinnedAnnouncement =
+    !pinnedAnnouncementDismissed &&
+    cleanAnnouncementText.length > 0 &&
+    cleanAnnouncementText.toLowerCase() !== "hoşgeldin" &&
+    cleanAnnouncementText.toLowerCase() !== "hoş geldin";
+
   return (
     <View collapsable={false} style={styles.roomRootWrap}>
       <SafeAreaView style={styles.roomScreen}>
         <LinearGradient
-          colors={["#142746", "#101A2B", "#0A101B"]}
-        locations={[0, 0.4, 1]}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
+          colors={activeRoomTheme.colors}
+          locations={[0, 0.4, 1]}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
       {backgroundUrl ? (
         <>
           <Image
@@ -9364,6 +9564,25 @@ function Room({
         </View>
 
         <View style={styles.roomChatArea}>
+          <RoomGiftStreamBanner
+            item={minimized ? null : giftStreamItem}
+            onExpire={handleExpireGiftStream}
+          />
+          {!roomKeyboard.visible && showPinnedAnnouncement ? (
+            <View style={styles.roomPinnedAnnouncement}>
+              <Ionicons name="megaphone-outline" size={13} color="#FDE68A" />
+              <Text numberOfLines={2} style={styles.roomPinnedAnnouncementText}>
+                {cleanAnnouncementText}
+              </Text>
+              <Pressable
+                onPress={() => setPinnedAnnouncementDismissed(true)}
+                hitSlop={8}
+                accessibilityLabel="Duyuruyu gizle"
+              >
+                <Ionicons name="close" size={14} color="rgba(226,238,255,0.65)" />
+              </Pressable>
+            </View>
+          ) : null}
           {!roomKeyboard.visible && activePoll ? (
             <RoomPollBanner
               poll={activePoll}
@@ -9641,9 +9860,12 @@ function Room({
       <MicRequestsSheet
         visible={menuSheet === "requests"}
         requests={micRequests}
+        listeners={unseatedListeners}
+        targetSeatIndex={inviteSeatIndex}
         busyUserId={staffBusy}
         onApprove={approveMicRequest}
         onReject={rejectMicRequest}
+        onInviteListener={inviteListenerToSeat}
         onDismiss={closeMenuSheet}
       />
       <RoomLockSheet
@@ -10539,6 +10761,10 @@ function AppContent() {
   const [recentRoomIds, setRecentRoomIds] = useState([]);
   const [notifications, setNotifications] = useState(SEEDED_NOTIFICATIONS);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [missionsFromNotifOpen, setMissionsFromNotifOpen] = useState(false);
+  const { claimableCount: globalMissionClaimable } = useDailyMissionsBadge(
+    Boolean(authSession?.user?.id),
+  );
   const [profile, setProfile] = useState(DEFAULT_PROFILE);
   const [appSettings, setAppSettings] = useState(DEFAULT_APP_SETTINGS);
   const [walletBalance, setWalletBalance] = useState(SEEDED_WALLET_BALANCE);
@@ -12374,6 +12600,79 @@ function AppContent() {
     }
   }, [openRoom, room, rooms]);
 
+  const liveRoomByHostId = useMemo(() => {
+    const map = new Map();
+    for (const r of rooms || []) {
+      if (r?.id && r?.hostId && r.state !== "scheduled") map.set(r.hostId, r);
+    }
+    return map;
+  }, [rooms]);
+
+  const inspectedLiveRoom = useMemo(() => {
+    if (!inspectedUserId) return null;
+    const found = liveRoomByHostId.get(inspectedUserId) || null;
+    if (!found || (room?.id && found.id === room.id)) return null;
+    return found;
+  }, [inspectedUserId, liveRoomByHostId, room?.id]);
+
+  const actionableNotifications = useMemo(() => {
+    const list = [];
+    if (!dailyRewardClaimed) {
+      list.push({
+        id: "action-daily-reward",
+        icon: "gift",
+        color: "#F59E0B",
+        ctaBg: "#D97706",
+        title: "Günlük giriş ödülün hazır!",
+        subtitle: `+${formatCredits(DAILY_REWARD_AMOUNT)} kredi hesabına eklenmeyi bekliyor`,
+        ctaLabel: "Al",
+        onPress: () => claimDailyReward(),
+      });
+    }
+    if (globalMissionClaimable > 0) {
+      list.push({
+        id: "action-missions",
+        icon: "flame",
+        color: "#EA580C",
+        ctaBg: "#EA580C",
+        title: "Görev & 7 Günlük Seri Ödülü",
+        subtitle: `${globalMissionClaimable} ödül alınmaya hazır`,
+        ctaLabel: "Aç",
+        onPress: () => setMissionsFromNotifOpen(true),
+      });
+    }
+    const followedSet = new Set(followedUserIds || []);
+    const liveFollowed = (rooms || [])
+      .filter((r) => r?.hostId && followedSet.has(r.hostId) && r.state !== "scheduled" && r.id !== room?.id)
+      .slice(0, 3);
+    for (const liveRoom of liveFollowed) {
+      list.push({
+        id: `action-live-${liveRoom.id}`,
+        icon: "radio",
+        color: "#16A34A",
+        ctaBg: "#16A34A",
+        title: `${liveRoom.host} şu an canlı yayında`,
+        subtitle: liveRoom.title,
+        ctaLabel: "Katıl",
+        onPress: () => openRoom(liveRoom),
+      });
+    }
+    return list;
+  }, [claimDailyReward, dailyRewardClaimed, followedUserIds, globalMissionClaimable, openRoom, room?.id, rooms]);
+
+  const serverActivityNotifications = useMemo(() => {
+    return (walletActivities || [])
+      .filter((act) => Number(act?.amount) > 0)
+      .slice(0, 8)
+      .map((act) => ({
+        id: `wallet-act-${act.id}`,
+        icon: act.type === "gift_received" ? "gift" : "diamond",
+        color: act.type === "gift_received" ? "#E11D48" : "#2563EB",
+        text: `${act.description || "Kredi kazancı"} (+${formatCredits(act.amount)} kredi)`,
+        time: act.time || "",
+      }));
+  }, [walletActivities]);
+
   // --- Kosullu ekranlar (tum hook'lar yukarida cagrildi) ---
   if (brandLaunchVisible || (isSupabaseConfigured && authSession === undefined))
     return (
@@ -12503,7 +12802,7 @@ function AppContent() {
             favoriteRoomIds={favoriteRoomIds}
             recentRoomIds={recentRoomIds}
             followedUserIds={followedUserIds}
-            notificationCount={notifications.length}
+            notificationCount={notifications.length + actionableNotifications.length}
             currentUserId={authSession?.user?.id}
             events={soraEvents}
             onOpenEvent={setActiveEvent}
@@ -12518,7 +12817,12 @@ function AppContent() {
             pointerEvents={activeTab === "inbox" ? "auto" : "none"}
             style={[styles.tabPane, activeTab !== "inbox" && styles.tabPaneHidden]}
           >
-            <InboxScreen currentUserId={authSession?.user?.id} profile={profile} />
+            <InboxScreen
+              currentUserId={authSession?.user?.id}
+              profile={profile}
+              rooms={rooms}
+              onOpenRoom={openRoom}
+            />
           </View>
         ) : null}
         {mountedTabs.community ? (
@@ -12631,6 +12935,11 @@ function AppContent() {
         profile={inspectedUserId === authSession?.user?.id ? profile : null}
         isSelf={Boolean(inspectedUserId && inspectedUserId === authSession?.user?.id)}
         isFollowing={Boolean(inspectedUserId && followedUserIds.includes(inspectedUserId))}
+        liveRoom={inspectedLiveRoom}
+        onJoinLiveRoom={(targetRoom) => {
+          setInspectedUserId(null);
+          setTimeout(() => openRoom(targetRoom), 220);
+        }}
         canBlock={Boolean(
           supabase &&
           inspectedUserId &&
@@ -12832,8 +13141,15 @@ function AppContent() {
       <NotificationCenter
         visible={notificationsOpen}
         notifications={notifications}
+        actionableAlerts={actionableNotifications}
+        serverActivity={serverActivityNotifications}
         onDismiss={handleCloseNotifications}
         onClear={clearNotifications}
+      />
+      <DailyMissionsSheet
+        visible={missionsFromNotifOpen}
+        onDismiss={() => setMissionsFromNotifOpen(false)}
+        onBalanceChange={setWalletBalance}
       />
       <Onboarding visible={onboardingOpen} onComplete={completeOnboarding} />
       <EventDetailSheet
@@ -19524,5 +19840,104 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surfaceRaised,
     borderWidth: 1,
     borderColor: COLORS.lineSoft,
+  },
+  notifActionList: {
+    gap: 8,
+    marginBottom: 12,
+  },
+  notifActionCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 10,
+    borderRadius: 15,
+    backgroundColor: COLORS.surfaceRaised,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  notifActionTitle: {
+    color: COLORS.text,
+    fontSize: 12.5,
+    fontWeight: "900",
+  },
+  notifActionSub: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  notifActionCta: {
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 999,
+    flexShrink: 0,
+  },
+  notifActionCtaText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  profileLiveRoomBanner: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 16,
+    backgroundColor: "rgba(22,163,74,0.11)",
+    borderWidth: 1,
+    borderColor: "rgba(34,197,94,0.34)",
+  },
+  profileLiveDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    backgroundColor: "#16A34A",
+  },
+  profileLiveKicker: {
+    color: "#15803D",
+    fontSize: 9.5,
+    fontWeight: "900",
+    letterSpacing: 0.7,
+  },
+  profileLiveTitle: {
+    color: COLORS.text,
+    fontSize: 13,
+    fontWeight: "900",
+    marginTop: 1,
+  },
+  profileLiveCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#16A34A",
+  },
+  profileLiveCtaText: {
+    color: "#FFFFFF",
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+  roomPinnedAnnouncement: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 10,
+    marginBottom: 6,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 12,
+    backgroundColor: "rgba(245,158,11,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(253,230,138,0.28)",
+  },
+  roomPinnedAnnouncementText: {
+    flex: 1,
+    color: "#FEF3C7",
+    fontSize: 11.5,
+    lineHeight: 15.5,
+    fontWeight: "700",
   },
 });

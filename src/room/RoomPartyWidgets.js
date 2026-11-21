@@ -243,7 +243,7 @@ export const LuckyPacketBadge = memo(function LuckyPacketBadge({ packet, onPress
   );
 });
 
-const LUCKY_AMOUNTS = [1000, 5000, 25000, 100000];
+const LUCKY_AMOUNTS = [250000, 1000000, 2500000, 5000000];
 const LUCKY_SLOTS = [3, 5, 10, 15];
 
 export const LuckyPacketCreateSheet = memo(function LuckyPacketCreateSheet({
@@ -254,7 +254,7 @@ export const LuckyPacketCreateSheet = memo(function LuckyPacketCreateSheet({
   onDismiss,
 }) {
   const insets = useSafeAreaInsets();
-  const [amount, setAmount] = useState(5000);
+  const [amount, setAmount] = useState(250000);
   const [slots, setSlots] = useState(5);
   const [note, setNote] = useState("Herkese bol şans!");
   const [busy, setBusy] = useState(false);

@@ -17,6 +17,7 @@ import { COLORS } from "../theme/colors";
 import { useReducedMotion } from "../ui/Motion";
 import { playSfx, useSfxEnabled } from "../audio/SoraSfx";
 import { resolveEntranceStyle } from "../ui/PrestigeStyles";
+import { SoraGiftArtwork } from "../ui/SoraGiftArtwork";
 
 export const QUICK_REACTIONS = [
   { id: "heart", emoji: "❤️", label: "Kalp", tint: "#FF4D79" },
@@ -1396,6 +1397,124 @@ export const RoomToolsSheet = memo(function RoomToolsSheet({
   );
 });
 
+// ── 7) Oda İçi Canlı Hediye Akış Şeridi (Combo Destekli) ─────────────────────
+export const RoomGiftStreamBanner = memo(function RoomGiftStreamBanner({
+  item,
+  onExpire,
+}) {
+  const reducedMotion = useReducedMotion();
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateX = useRef(new Animated.Value(-28)).current;
+  const comboScale = useRef(new Animated.Value(1)).current;
+  const onExpireRef = useRef(onExpire);
+  onExpireRef.current = onExpire;
+
+  useEffect(() => {
+    if (!item?.triggerKey) return undefined;
+    opacity.stopAnimation();
+    translateX.stopAnimation();
+    comboScale.stopAnimation();
+
+    if (reducedMotion) {
+      opacity.setValue(1);
+      translateX.setValue(0);
+      comboScale.setValue(1);
+    } else {
+      opacity.setValue(item.comboCount > 1 ? 1 : 0);
+      translateX.setValue(item.comboCount > 1 ? 0 : -24);
+      comboScale.setValue(1.24);
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+        Animated.spring(translateX, {
+          toValue: 0,
+          friction: 7,
+          tension: 120,
+          useNativeDriver: true,
+        }),
+        Animated.spring(comboScale, {
+          toValue: 1,
+          friction: 5,
+          tension: 160,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+
+    const timer = setTimeout(() => {
+      if (reducedMotion) {
+        onExpireRef.current?.(item.triggerKey);
+        return;
+      }
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 240,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) onExpireRef.current?.(item.triggerKey);
+      });
+    }, 3400);
+
+    return () => clearTimeout(timer);
+  }, [item?.triggerKey, item?.comboCount, opacity, translateX, comboScale, reducedMotion]);
+
+  if (!item?.giftName) return null;
+
+  const accent =
+    typeof item.giftColor === "string" && /^#[0-9a-fA-F]{6}$/.test(item.giftColor.trim())
+      ? item.giftColor.trim()
+      : "#60A5FA";
+  const qty = Math.max(1, Number(item.quantity) || 1);
+  const combo = Math.max(1, Number(item.comboCount) || 1);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.giftStreamWrap,
+        { opacity, transform: [{ translateX }] },
+      ]}
+    >
+      <LinearGradient
+        colors={["rgba(15, 25, 45, 0.92)", "rgba(22, 34, 58, 0.86)"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0.5 }}
+        style={[styles.giftStreamPill, { borderColor: `${accent}78` }]}
+      >
+        <View style={[styles.giftStreamArtWrap, { backgroundColor: `${accent}24` }]}>
+          <SoraGiftArtwork
+            giftId={item.giftId}
+            giftName={item.giftName}
+            fallbackIcon={item.giftIcon || "gift"}
+            fallbackColor={accent}
+            size={32}
+          />
+        </View>
+        <View style={styles.giftStreamCopy}>
+          <Text numberOfLines={1} style={styles.giftStreamActors}>
+            {item.senderName} → {item.recipientName || "Oda"}
+          </Text>
+          <Text numberOfLines={1} style={[styles.giftStreamMeta, { color: "#FDE68A" }]}>
+            {qty > 1 ? `${qty}x ` : ""}
+            {item.giftName} gönderdi
+          </Text>
+        </View>
+        <Animated.View
+          style={[
+            styles.giftStreamComboBadge,
+            { backgroundColor: accent, transform: [{ scale: comboScale }] },
+          ]}
+        >
+          <Text style={styles.giftStreamComboText}>x{combo}</Text>
+        </Animated.View>
+      </LinearGradient>
+    </Animated.View>
+  );
+});
+
 const styles = StyleSheet.create({
   floatingLayer: {
     position: "absolute",
@@ -2215,5 +2334,64 @@ const styles = StyleSheet.create({
     lineHeight: 14,
     fontWeight: "700",
     textAlign: "center",
+  },
+  giftStreamWrap: {
+    position: "absolute",
+    top: 4,
+    left: 10,
+    right: 84,
+    zIndex: 28,
+    alignItems: "flex-start",
+  },
+  giftStreamPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    maxWidth: "100%",
+    paddingVertical: 5,
+    paddingLeft: 6,
+    paddingRight: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    shadowColor: "#000000",
+    shadowOpacity: 0.34,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 6,
+  },
+  giftStreamArtWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  giftStreamCopy: {
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  giftStreamActors: {
+    color: "#FFFFFF",
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+  giftStreamMeta: {
+    fontSize: 10.5,
+    fontWeight: "800",
+    marginTop: 1,
+  },
+  giftStreamComboBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    minWidth: 30,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  giftStreamComboText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: -0.2,
   },
 });

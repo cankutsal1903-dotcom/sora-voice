@@ -20,9 +20,13 @@ const fmtNum = (n) =>
 
 const fmtShort = (n) => {
   const v = Number(n) || 0;
+  if (v >= 1_000_000) {
+    const m = v / 1_000_000;
+    return `${Number.isInteger(m) ? m : m.toFixed(1).replace(/\.0$/, "").replace(".", ",")}Mn`;
+  }
   if (v >= 1000) {
     const k = v / 1000;
-    return `${Number.isInteger(k) ? k : k.toFixed(1).replace(".", ",")}B`;
+    return `${Number.isInteger(k) ? k : k.toFixed(1).replace(/\.0$/, "").replace(".", ",")}B`;
   }
   return String(v);
 };
@@ -175,7 +179,7 @@ export const DailyMissionsSheet = memo(function DailyMissionsSheet({
 
   const streakRewards = Array.isArray(status?.streak_rewards)
     ? status.streak_rewards
-    : [1500, 2500, 4000, 6000, 8500, 12000, 25000];
+    : [250000, 400000, 600000, 850000, 1200000, 1700000, 5000000];
   const streakDay = Number(status?.streak_day || 0);
   const streakClaimed = Boolean(status?.streak_claimed_today);
   const nextStreakDay = Number(status?.next_streak_day || 1);
@@ -299,7 +303,7 @@ export const DailyMissionsSheet = memo(function DailyMissionsSheet({
                     <Text style={[styles.streakCtaText, streakClaimed && styles.streakCtaTextDone]}>
                       {streakClaimed
                         ? "Bugünün seri ödülü alındı"
-                        : `${nextStreakDay}. Gün Ödülünü Al (+${fmtNum(streakRewards[nextStreakDay - 1] || 1500)})`}
+                        : `${nextStreakDay}. Gün Ödülünü Al (+${fmtShort(streakRewards[nextStreakDay - 1] || 250000)})`}
                     </Text>
                   </>
                 )}

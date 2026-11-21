@@ -52,6 +52,7 @@ export const mapRoom = (room) => {
     seatCount: room.seat_count === 13 ? 13 : 9,
     coupleSeat: Boolean(room.couple_seat),
     backgroundPath: room.background_path || null,
+    themeId: room.theme_id || "midnight",
     musicState: room.music_state || null,
     startsAt: room.schedule_label || formatScheduleDate(room.starts_at),
     startsAtIso: room.starts_at || null,

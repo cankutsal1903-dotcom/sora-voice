@@ -1529,6 +1529,14 @@ export const CommunityScreen = memo(function CommunityScreen({
       .sort((a, b) => (Number(b.listeners) || 0) - (Number(a.listeners) || 0));
   }, [familyMembers, myFamily?.id, myFamily?.ownerId, rooms]);
 
+  const liveRoomByHostId = useMemo(() => {
+    const map = new Map();
+    for (const r of rooms || []) {
+      if (r?.id && r?.hostId && r.state !== "scheduled") map.set(r.hostId, r);
+    }
+    return map;
+  }, [rooms]);
+
   const chatParticipantIds = useMemo(() => {
     const ids = [];
     if (currentUserId) ids.push(currentUserId);
@@ -2351,7 +2359,9 @@ export const CommunityScreen = memo(function CommunityScreen({
                     </View>
                   ) : detailTab === "members" ? (
                     <View style={{ gap: 8 }}>
-                      {detailData.members.map((member) => (
+                      {detailData.members.map((member) => {
+                        const memberLiveRoom = liveRoomByHostId.get(member.userId) || null;
+                        return (
                         <View key={member.userId} style={styles.memberRow}>
                           <Pressable
                             disabled={!onOpenUserProfile}
@@ -2377,6 +2387,19 @@ export const CommunityScreen = memo(function CommunityScreen({
                               </Text>
                             </View>
                           </Pressable>
+                          {memberLiveRoom && onOpenRoom ? (
+                            <Pressable
+                              onPress={() => {
+                                closeFamilyDetail();
+                                setTimeout(() => onOpenRoom(memberLiveRoom), 250);
+                              }}
+                              accessibilityLabel={`${member.name} odasına katıl`}
+                              style={styles.memberLiveJoinBtn}
+                            >
+                              <View style={styles.memberLiveDot} />
+                              <Text style={styles.memberLiveJoinText}>Katıl</Text>
+                            </Pressable>
+                          ) : null}
                           {detailData.family.joined && detailData.family.id === myFamily?.id ? (
                             <Pressable
                               onPress={() => {
@@ -2405,7 +2428,8 @@ export const CommunityScreen = memo(function CommunityScreen({
                             </Text>
                           </View>
                         </View>
-                      ))}
+                        );
+                      })}
                     </View>
                   ) : (
                     <View style={{ gap: 10 }}>
@@ -3351,6 +3375,28 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+  },
+  memberLiveJoinBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 9,
+    height: 30,
+    borderRadius: 999,
+    backgroundColor: "rgba(22,163,74,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(34,197,94,0.36)",
+  },
+  memberLiveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#16A34A",
+  },
+  memberLiveJoinText: {
+    color: "#15803D",
+    fontSize: 10.5,
+    fontWeight: "900",
   },
   memberGiftBtn: {
     width: 34,
