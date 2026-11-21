@@ -379,7 +379,7 @@ export const getPublicProfile = async (userId) => {
 };
 
 export const getFollowCounts = async (userId) => {
-  if (!userId) return { following: 0, followers: 0 };
+  if (!userId) return null;
   const client = requireClient();
   const { data, error } = await client.rpc("get_profile_follow_counts", { p_user_id: userId });
   if (!error) {
@@ -390,6 +390,11 @@ export const getFollowCounts = async (userId) => {
         followers: Math.max(0, Number(row.followers_count) || 0),
       };
     }
+  }
+  const { data: sessionData } = await client.auth.getSession().catch(() => ({ data: null }));
+  const selfId = sessionData?.session?.user?.id || null;
+  if (!selfId || selfId !== userId) {
+    return null;
   }
   const [following, followers] = await Promise.all([
     client.from("follows").select("following_id", { count: "exact", head: true }).eq("follower_id", userId),

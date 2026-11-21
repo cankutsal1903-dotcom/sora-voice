@@ -3448,7 +3448,7 @@ function ProfileDetailSheet({
         : profile?.seat !== null && profile?.seat !== undefined
           ? "Mikrofonda"
           : "Dinleyici";
-  const canDirectMessage = Boolean(!isSelf && onMessage && (rawHandle || targetUserId));
+  const canDirectMessage = Boolean(!isSelf && onMessage && rawHandle);
   const showStickyActions = Boolean(!isSelf && (onToggleFollow || onMessage));
 
   return (
@@ -3885,7 +3885,7 @@ function ProfileDetailSheet({
             ) : null}
             {onMessage ? (
               <Pressable
-                disabled={!canDirectMessage || (loading && !rawHandle)}
+                disabled={!canDirectMessage}
                 onPress={() =>
                   onMessage({
                     handle: rawHandle,
@@ -3895,7 +3895,7 @@ function ProfileDetailSheet({
                 }
                 style={({ pressed }) => [
                   styles.profileDetailMessageButton,
-                  (!canDirectMessage || (loading && !rawHandle)) && { opacity: 0.55 },
+                  !canDirectMessage && { opacity: 0.52 },
                   pressed && { opacity: 0.9, transform: [{ scale: 0.985 }] },
                 ]}
                 accessibilityRole="button"
