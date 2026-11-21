@@ -416,17 +416,17 @@ const formatCategoryLabel = (value) => {
 const DEFAULT_COMMUNITIES = [
   {
     id: "night-club",
-    name: "Gece Kulubu",
+    name: "Gece Kulübü",
     description: "Gece sohbetleri ve sakin odalar",
-    members: "4,2 B uye",
+    members: "4,2 B üye",
     color: ["#3979D2", "#1D3D70"],
     icon: "moon",
   },
   {
     id: "music-club",
-    name: "Sarkini Birak",
+    name: "Şarkını Bırak",
     description: "Yeni sesler ve ortak listeler",
-    members: "1,8 B uye",
+    members: "1,8 B üye",
     color: ["#2F80ED", "#1C477E"],
     icon: "musical-notes",
   },
@@ -928,7 +928,7 @@ const Discover = memo(function Discover({
           </View>
           <View style={styles.discoverEmptyCopy}>
             <Text style={styles.discoverEmptyLabel}>SAHNE HAZIR</Text>
-            <Text style={styles.discoverEmptyTitle}>İlk sesi sen başlat.</Text>
+            <Text style={styles.discoverEmptyTitle}>İlk sesi sen başlat</Text>
             <Text style={styles.discoverEmptyDescription}>
               Şu anda açık oda yok. Bir oda aç, sohbet başladığında burada
               görünsün.
@@ -1695,7 +1695,7 @@ function Inbox({ profile }) {
       <View style={styles.screenHeading}>
         <View>
           <Text style={styles.kicker}>MESAJLAR</Text>
-          <Text style={styles.pageTitle}>Sohbetlerin</Text>
+          <Text style={styles.pageTitle}>Mesajlar</Text>
         </View>
         <IconButton
           icon="create-outline"
@@ -1856,8 +1856,8 @@ function NewMessageSheet({ visible, onDismiss, onCreate }) {
     const cleanName = name.trim();
     if (!cleanName) {
       Alert.alert(
-        "Kime yazacaksin?",
-        "Sohbet baslatmak icin bir gorunen ad yaz.",
+        "Kime yazacaksın?",
+        "Sohbet başlatmak için bir görünen ad yaz.",
       );
       return;
     }
@@ -2057,9 +2057,9 @@ function Community({ onNotify }) {
       >
         <Text style={styles.communityIcon}>✦</Text>
         <View style={styles.communityBannerText}>
-          <Text style={styles.communityBannerTitle}>Kendi cevrini kur.</Text>
+          <Text style={styles.communityBannerTitle}>Kendi çevreni kur.</Text>
           <Text style={styles.communityBannerCopy}>
-            Odan, kurallarin ve birlikte buyuyen toplulugun.
+            Odan, kuralların ve birlikte büyüyen topluluğun.
           </Text>
         </View>
       </LinearGradient>
@@ -2077,7 +2077,7 @@ function Community({ onNotify }) {
               !joinedOnly && styles.communityFilterTextActive,
             ]}
           >
-            Kesfet
+            Keşfet
           </Text>
         </Pressable>
         <Pressable
@@ -2093,7 +2093,7 @@ function Community({ onNotify }) {
               joinedOnly && styles.communityFilterTextActive,
             ]}
           >
-            Katildiklarin ({joinedGroupIds.length})
+            Katıldıkların ({joinedGroupIds.length})
           </Text>
         </Pressable>
       </View>
@@ -2101,7 +2101,7 @@ function Community({ onNotify }) {
         <View style={styles.communityMeetings}>
           <View style={styles.communityMeetingsHead}>
             <Text style={styles.communityMeetingsTitle}>
-              YAKLASAN BULUSMALAR
+              YAKLAŞAN BULUŞMALAR
             </Text>
             <Text style={styles.communityMeetingsCount}>
               {eventRsvpIds.length} kayitli
@@ -2176,7 +2176,7 @@ function Community({ onNotify }) {
                   joined && styles.joinedButtonText,
                 ]}
               >
-                {joined ? "Katildin" : "Katil"}
+                {joined ? "Katıldın" : "Katıl"}
               </Text>
             </Pressable>
           </LinearGradient>
@@ -2213,8 +2213,8 @@ function CreateCommunitySheet({ visible, onDismiss, onCreate }) {
     onCreate({
       id: `community-${Date.now()}`,
       name: cleanName.slice(0, 28),
-      description: description.trim().slice(0, 56) || "Yeni bir ses toplulugu.",
-      members: "1 uye",
+      description: description.trim().slice(0, 56) || "Yeni bir ses topluluğu.",
+      members: "1 üye",
       color: COMMUNITY_COLORS[colorIndex],
       icon: "people",
       userCreated: true,
@@ -2238,22 +2238,22 @@ function CreateCommunitySheet({ visible, onDismiss, onCreate }) {
             <Ionicons name="close" size={20} color={COLORS.text} />
           </Pressable>
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <Text style={styles.kicker}>YENI TOPLULUK</Text>
-            <Text style={styles.sheetTitle}>Cevreni kur.</Text>
+            <Text style={styles.kicker}>YENİ TOPLULUK</Text>
+            <Text style={styles.sheetTitle}>Çevreni kur</Text>
             <Text style={styles.fieldLabel}>TOPLULUK ADI</Text>
             <TextInput
               value={name}
               onChangeText={setName}
-              placeholder="Orn. Gece muhabbeti"
+              placeholder="Örn. Gece muhabbeti"
               placeholderTextColor={COLORS.muted}
               style={styles.sheetInput}
               maxLength={28}
             />
-            <Text style={styles.fieldLabel}>KISA ACIKLAMA</Text>
+            <Text style={styles.fieldLabel}>KISA AÇIKLAMA</Text>
             <TextInput
               value={description}
               onChangeText={setDescription}
-              placeholder="Toplulugun ne icin var?"
+              placeholder="Topluluğun ne için var?"
               placeholderTextColor={COLORS.muted}
               style={styles.sheetInput}
               maxLength={56}
@@ -2274,7 +2274,7 @@ function CreateCommunitySheet({ visible, onDismiss, onCreate }) {
             </View>
             <Pressable onPress={create}>
               <LinearGradient colors={BRAND_GRADIENT} style={styles.createSubmit}>
-                <Text style={styles.createSubmitText}>Toplulugu olustur</Text>
+                <Text style={styles.createSubmitText}>Topluluğu oluştur</Text>
                 <Ionicons name="people" size={20} color={COLORS.primaryInk} />
               </LinearGradient>
             </Pressable>
@@ -2291,7 +2291,7 @@ function CommunityDetailsSheet({ group, joined, onDismiss, onToggleJoin }) {
     try {
       await Share.share({
         title: `Sora · ${group.name}`,
-        message: `${group.name} topluluguna katil.\n${group.description}`,
+        message: `${group.name} topluluğuna katıl.\n${group.description}`,
       });
     } catch {
       return;
@@ -2324,7 +2324,7 @@ function CommunityDetailsSheet({ group, joined, onDismiss, onToggleJoin }) {
           <Text style={styles.communityDetailDescription}>
             {group.description}
           </Text>
-          <Text style={styles.settingsCaption}>YAKLASAN BULUSMA</Text>
+          <Text style={styles.settingsCaption}>YAKLAŞAN BULUŞMA</Text>
           <View style={styles.communityEvent}>
             <View style={styles.communityEventDate}>
               <Text style={styles.communityEventDay}>CMT</Text>
@@ -2332,10 +2332,10 @@ function CommunityDetailsSheet({ group, joined, onDismiss, onToggleJoin }) {
             </View>
             <View style={styles.communityEventText}>
               <Text style={styles.communityEventTitle}>
-                {group.name} bulusmasi
+                {group.name} buluşması
               </Text>
               <Text style={styles.communityEventMeta}>
-                Canli ses odasi · 45 dk
+                Canlı ses odası · 45 dk
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
@@ -2343,7 +2343,7 @@ function CommunityDetailsSheet({ group, joined, onDismiss, onToggleJoin }) {
           <View style={styles.communityDetailActions}>
             <Pressable onPress={shareCommunity} style={styles.communityShare}>
               <Ionicons name="share-outline" size={18} color={COLORS.text} />
-              <Text style={styles.communityShareText}>Paylas</Text>
+              <Text style={styles.communityShareText}>Paylaş</Text>
             </Pressable>
             <Pressable onPress={onToggleJoin} style={styles.communityJoinWide}>
               <Text style={styles.communityJoinWideText}>
@@ -2834,26 +2834,24 @@ const Profile = memo(function Profile({
                   label={(profile.name || "S").charAt(0).toUpperCase()}
                   color={profile.color}
                   uri={profile.avatarUrl}
-                  size={homeFrameAppearance ? 54 : 62}
+                  size={60}
                   bordered={!homeFrameAppearance}
                   circle
                 />
               </ProfileFrame>
               <View style={styles.profileHomeCopy}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={[styles.profileHomeName, { flexShrink: 1 }]} numberOfLines={1}>
-                    {profile.name}
-                  </Text>
-                  <SoraLevelCrest level={level} size={24} />
+                <Text style={styles.profileHomeName} numberOfLines={1}>
+                  {profile.name}
+                </Text>
+                <View style={styles.profileHomeBadgesRow}>
+                  <SoraLevelCrest level={level} size={21} />
                   <View style={styles.profileLevelInlinePill}>
                     <Text style={styles.profileLevelInlineText}>Sv. {level}</Text>
                   </View>
-                </View>
-                {giftSpent > 0 ? (
-                  <View style={styles.profileWealthInlineRow}>
+                  {giftSpent > 0 ? (
                     <SoraWealthBadge spent={giftSpent} size="sm" showName />
-                  </View>
-                ) : null}
+                  ) : null}
+                </View>
                 <Text style={styles.profileHomeHandle} numberOfLines={1}>
                   @{profile.handle}
                   {profile.publicId ? ` · ID: ${profile.publicId}` : ""}
@@ -3897,7 +3895,7 @@ const RoomSettingsSheet = memo(function RoomSettingsSheet({
           </Pressable>
           {isHost ? (
             <>
-              <Text style={styles.settingsCaption}>EV SAHIBI KONTROLLERI</Text>
+              <Text style={styles.settingsCaption}>EV SAHİBİ KONTROLLERİ</Text>
               <Pressable onPress={onToggleRoomLock} style={styles.settingRow}>
                 <View
                   style={[
@@ -3948,7 +3946,7 @@ const RoomSettingsSheet = memo(function RoomSettingsSheet({
                   <Text style={styles.settingDescription}>
                     {chatLocked
                       ? "Sadece sen mesaj yazabilirsin"
-                      : "Tum dinleyiciler yazabilir"}
+                      : "Tüm dinleyiciler yazabilir"}
                   </Text>
                 </View>
                 <Text
@@ -3957,7 +3955,7 @@ const RoomSettingsSheet = memo(function RoomSettingsSheet({
                     chatLocked && styles.settingStateActive,
                   ]}
                 >
-                  {chatLocked ? "Kapali" : "Acik"}
+                  {chatLocked ? "Kapalı" : "Açık"}
                 </Text>
               </Pressable>
             </>
@@ -3971,12 +3969,12 @@ const RoomSettingsSheet = memo(function RoomSettingsSheet({
                   color={COLORS.primary}
                 />
                 <Text style={styles.roomRuleText}>
-                  Saygili kal, sirasini bekle ve topluluk kurallarina uy.
+                  Saygılı kal, sıranı bekle ve topluluk kurallarına uy.
                 </Text>
               </View>
               <Pressable onPress={reportRoom} style={styles.reportButton}>
                 <Ionicons name="flag-outline" size={17} color={COLORS.pink} />
-                <Text style={styles.reportButtonText}>Odayi bildir</Text>
+                <Text style={styles.reportButtonText}>Odayı bildir</Text>
               </Pressable>
               {canBlockHost && (
                 <Pressable
@@ -4004,6 +4002,14 @@ const ROOM_GIFT_QUANTITIES = [1, 5, 10, 50, 100];
 const safeHexAccent = (hex) =>
   typeof hex === "string" && /^#[0-9a-fA-F]{6}$/.test(hex.trim()) ? hex.trim() : COLORS.primary;
 
+const GIFT_SHEET_CATEGORIES = [
+  { key: "all", label: "Tümü" },
+  { key: "affordable", label: "Günlük" },
+  { key: "room", label: "Oda" },
+  { key: "mid", label: "Orta" },
+  { key: "luxury", label: "Lüks" },
+];
+
 const GiftSheet = memo(function GiftSheet({
   visible,
   coins,
@@ -4014,21 +4020,42 @@ const GiftSheet = memo(function GiftSheet({
   onDismiss,
   onSend,
 }) {
+  const insets = useSafeAreaInsets();
   const [recipientId, setRecipientId] = useState(null);
+  const [category, setCategory] = useState("all");
   const [quantity, setQuantity] = useState(1);
   const [selectedGiftId, setSelectedGiftId] = useState(gifts[0]?.id || null);
   const wasVisibleRef = useRef(false);
+  const availableCategories = useMemo(() => {
+    const present = new Set(gifts.map((item) => item?.category).filter(Boolean));
+    return GIFT_SHEET_CATEGORIES.filter(
+      (cat) => cat.key === "all" || present.has(cat.key),
+    );
+  }, [gifts]);
+  const visibleGifts = useMemo(
+    () =>
+      category === "all"
+        ? gifts
+        : gifts.filter((item) => item?.category === category),
+    [gifts, category],
+  );
   useEffect(() => {
     const justOpened = visible && !wasVisibleRef.current;
     wasVisibleRef.current = visible;
     if (visible) {
-      const defaultSelfId = recipients.find((item) => item.isSelf)?.userId || recipients[0]?.userId || null;
+      const defaultRecipientId =
+        recipients.find((item) => !item.isSelf)?.userId
+        || recipients[0]?.userId
+        || null;
       if (justOpened) {
-        setRecipientId(defaultSelfId);
+        setRecipientId(defaultRecipientId);
+        setCategory("all");
         setQuantity(1);
       } else {
         setRecipientId((prev) =>
-          recipients.some((item) => item.userId === prev) ? prev : defaultSelfId,
+          recipients.some((item) => item.userId === prev)
+            ? prev
+            : defaultRecipientId,
         );
       }
       setSelectedGiftId((prev) =>
@@ -4036,14 +4063,26 @@ const GiftSheet = memo(function GiftSheet({
       );
     }
   }, [visible, recipients, gifts]);
+  useEffect(() => {
+    if (!visible || !visibleGifts.length) return;
+    setSelectedGiftId((prev) =>
+      visibleGifts.some((item) => item.id === prev)
+        ? prev
+        : visibleGifts[0]?.id || null,
+    );
+  }, [visible, visibleGifts]);
   const selectedRecipient =
     recipients.find((item) => item.userId === recipientId)
-    || recipients.find((item) => item.isSelf)
+    || recipients.find((item) => !item.isSelf)
     || recipients[0]
     || null;
   const selectedGift = useMemo(
-    () => gifts.find((item) => item.id === selectedGiftId) || gifts[0] || null,
-    [gifts, selectedGiftId],
+    () =>
+      visibleGifts.find((item) => item.id === selectedGiftId)
+      || visibleGifts[0]
+      || gifts[0]
+      || null,
+    [visibleGifts, gifts, selectedGiftId],
   );
   const handlePressSend = () => {
     if (!selectedGift) return;
@@ -4078,7 +4117,13 @@ const GiftSheet = memo(function GiftSheet({
     >
       <View style={styles.modalOverlay}>
         <Pressable style={styles.modalDismiss} onPress={onDismiss} />
-        <View style={[styles.sheet, styles.roomGiftSheet]}>
+        <View
+          style={[
+            styles.sheet,
+            styles.roomGiftSheet,
+            { paddingBottom: Math.max(insets.bottom, 14) + 8 },
+          ]}
+        >
           <View style={styles.sheetHandle} />
           <View style={styles.roomGiftHeader}>
             <View style={{ flex: 1, marginRight: 8 }}>
@@ -4146,6 +4191,38 @@ const GiftSheet = memo(function GiftSheet({
             </ScrollView>
           </View>
 
+          {availableCategories.length > 2 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.roomGiftCategoryRow}
+              style={{ flexGrow: 0, flexShrink: 0 }}
+            >
+              {availableCategories.map((cat) => {
+                const active = category === cat.key;
+                return (
+                  <Pressable
+                    key={cat.key}
+                    onPress={() => setCategory(cat.key)}
+                    style={[
+                      styles.roomGiftCategoryPill,
+                      active && styles.roomGiftCategoryPillActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.roomGiftCategoryText,
+                        active && styles.roomGiftCategoryTextActive,
+                      ]}
+                    >
+                      {cat.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          ) : null}
+
           <View style={styles.roomGiftQtyHeader}>
             <Text style={[styles.fieldLabel, { marginBottom: 0 }]}>ADET</Text>
             <View style={styles.roomGiftQtyRow}>
@@ -4177,7 +4254,7 @@ const GiftSheet = memo(function GiftSheet({
             contentContainerStyle={{ paddingBottom: 10 }}
           >
             <View style={styles.roomGiftGrid3}>
-              {gifts.map((gift) => {
+              {visibleGifts.map((gift) => {
                 const active = selectedGift?.id === gift.id;
                 const lockedByFamily = Number(gift.minFamilyLevel || 0) > Number(userFamilyLevel || 0);
                 const totalCost = Number(gift.cost || 0) * quantity;
@@ -4208,10 +4285,10 @@ const GiftSheet = memo(function GiftSheet({
                         giftName={gift.name}
                         fallbackIcon={gift.icon}
                         fallbackColor={gift.color}
-                        size={62}
+                        size={60}
                       />
                     </View>
-                    <Text numberOfLines={1} style={styles.giftName}>
+                    <Text numberOfLines={2} style={styles.roomGiftName}>
                       {gift.name}
                     </Text>
                     <View style={styles.giftCost}>
@@ -4812,7 +4889,7 @@ const PollSheet = memo(function PollSheet({
               />
               <Text style={styles.pollEmptyTitle}>Henüz anket yok</Text>
               <Text style={styles.pollHint}>
-                Ev sahibi yeni bir anket baslattiginda burada gorunecek.
+                Ev sahibi yeni bir anket başlattığında burada görünecek.
               </Text>
             </View>
           )}
@@ -5310,9 +5387,9 @@ const ParticipantList = memo(function ParticipantList({ room }) {
         </View>
         <View style={styles.audienceCopy}>
           <Text style={styles.audienceTitle}>
-            Sahnede {participants.length} kisi
+            Sahnede {participants.length} kişi
           </Text>
-          <Text style={styles.audienceSubtitle}>Katilimcilari gor</Text>
+          <Text style={styles.audienceSubtitle}>Katılımcıları gör</Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
       </Pressable>
@@ -5335,9 +5412,9 @@ const ParticipantList = memo(function ParticipantList({ room }) {
             >
               <Ionicons name="close" size={18} color={COLORS.text} />
             </Pressable>
-            <Text style={styles.sheetTitle}>Katilimcilar</Text>
+            <Text style={styles.sheetTitle}>Katılımcılar</Text>
             <Text style={styles.settingsCaption}>
-              {room.listeners} DINLEYICI · {participants.length} KONUSMACI
+              {room.listeners} DİNLEYİCİ · {participants.length} KONUŞMACI
             </Text>
             {participants.map((participant, index) => {
               const followed = followedNames.includes(participant.name);
@@ -5361,7 +5438,7 @@ const ParticipantList = memo(function ParticipantList({ room }) {
                         ? "Ev sahibi"
                         : blocked
                           ? "Engellendi"
-                          : "Konusmaci"}
+                          : "Konuşmacı"}
                     </Text>
                   </View>
                   {!participant.host && (
@@ -8750,7 +8827,9 @@ function Room({
   }, [activeRoomParticipants, profile?.activeFrameId, profile?.avatarUrl, profile?.color, profile?.name, roomMembers, userId]);
 
   const roomGiftRecipients = useMemo(() => {
-    const others = activeRoomParticipants.filter((participant) => participant.userId !== userId);
+    const others = activeRoomParticipants
+      .filter((participant) => participant.userId !== userId)
+      .sort((a, b) => (a.role === "host" ? -1 : b.role === "host" ? 1 : 0));
     const selfEntry = userId
       ? [
           {
@@ -8762,7 +8841,7 @@ function Room({
           },
         ]
       : [];
-    return [...selfEntry, ...others];
+    return [...others, ...selfEntry];
   }, [activeRoomParticipants, profile?.avatarUrl, profile?.color, profile?.name, userId]);
 
   const handleMessageSenderPress = useCallback(
@@ -8882,8 +8961,9 @@ function Room({
   const renderStageSeat = (participant, seatIndex, variant = "regular") => {
     const isHostSeat = variant === "host";
     const isCoupleSeat = variant === "couple";
-    // Ev sahibi, Konuk ve tüm normal koltuklar birebir eşit ve simetrik boyutta.
+    // Ev sahibi, Konuk ve tüm normal koltuklar birebir eşit boyut ve dikey eksende hizalı.
     const avatarSize = compactStage ? 56 : 64;
+    const avatarStageHeight = avatarSize + (compactStage ? 18 : 22);
     const slotStyle = [
       styles.roomSpeakerSlot,
       isHostSeat && styles.roomHostStageSlot,
@@ -8906,17 +8986,19 @@ function Room({
                 : `Boş ${seatIndex}. koltuk`
           }
         >
-          <View
-            style={[
-              styles.roomEmptySeat,
-              { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 },
-            ]}
-          >
-            <Ionicons
-              name="mic-outline"
-              size={compactStage ? 22 : 26}
-              color="rgba(147,197,253,0.82)"
-            />
+          <View style={[styles.roomAvatarWrap, { height: avatarStageHeight }]}>
+            <View
+              style={[
+                styles.roomEmptySeat,
+                { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 },
+              ]}
+            >
+              <Ionicons
+                name="mic-outline"
+                size={compactStage ? 22 : 26}
+                color="rgba(147,197,253,0.82)"
+              />
+            </View>
           </View>
           <Text style={styles.roomEmptySeatLabel}>
             {isCoupleSeat ? "Konuk" : isHostSeat ? "1" : seatIndex}
@@ -8961,7 +9043,7 @@ function Room({
         accessibilityRole="button"
         accessibilityLabel={`${participant.name} kullanıcı menüsü`}
       >
-        <View style={styles.roomAvatarWrap}>
+        <View style={[styles.roomAvatarWrap, { height: avatarStageHeight }]}>
           {participant.isSpeaking ? (
             <SpeakingRing size={seatedAvatarSize + 10} color="#38BDF8" />
           ) : null}
@@ -8970,6 +9052,7 @@ function Room({
             size={seatedAvatarSize}
             compactHorizontal={!isHostSeat}
             padMode="tight"
+            style={{ paddingTop: 0, paddingBottom: 0, paddingHorizontal: 0 }}
             overlay={seatBadges}
           >
             <View
@@ -9005,7 +9088,7 @@ function Room({
             </View>
           </ProfileFrame>
         </View>
-        <Text style={[styles.roomSpeakerName, seatFrameAppearance && { marginTop: 2 }]} numberOfLines={1}>
+        <Text style={styles.roomSpeakerName} numberOfLines={1}>
           {isHostSeat ? `1 · ${participant.name}` : participant.name}
         </Text>
         {!isHostSeat ? (
@@ -9062,6 +9145,12 @@ function Room({
               <Text style={styles.roomTopBarTitle} numberOfLines={1}>
                 {roomDetails.title}
               </Text>
+            </View>
+            <View style={styles.roomHeaderSubRow}>
+              <Text style={styles.roomHeaderCaption} numberOfLines={1}>
+                {formatCategoryLabel(room.category)} · {Math.max(liveVoice.participantCount, activeRoomParticipants.length)} kişi
+                {musicPlaying ? " · müzik" : ""}
+              </Text>
               {!isHost && room.hostId ? (
                 <Pressable
                   onPress={onToggleFollowHost}
@@ -9079,15 +9168,11 @@ function Room({
                       isFollowingHost && styles.roomHeaderFollowTextActive,
                     ]}
                   >
-                    {isFollowingHost ? "Takipte" : "Takip et"}
+                    {isFollowingHost ? "Takipte" : "+ Takip"}
                   </Text>
                 </Pressable>
               ) : null}
             </View>
-            <Text style={styles.roomHeaderCaption} numberOfLines={1}>
-              {formatCategoryLabel(room.category)} · {Math.max(liveVoice.participantCount, activeRoomParticipants.length)} kişi
-              {musicPlaying ? " · müzik" : ""}
-            </Text>
           </View>
           <Pressable
             onPress={handleOpenSettings}
@@ -9129,7 +9214,12 @@ function Room({
         {/* Üst bar altı: Oda liderlik kupası + canlı sayaç + şanslı paket */}
         {!roomKeyboard.visible ? (
           <View style={styles.roomSubHeaderRow}>
-            <View style={styles.roomSubHeaderLeft}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ flex: 1, minWidth: 0 }}
+              contentContainerStyle={styles.roomSubHeaderLeft}
+            >
               <RoomTrophyPill
                 totalCoins={roomGiftTotal}
                 onPress={() => setLeaderboardOpen(true)}
@@ -9156,12 +9246,14 @@ function Room({
                   </Text>
                 </Pressable>
               ) : null}
-            </View>
+            </ScrollView>
             {activeLuckyPackets[0] ? (
-              <LuckyPacketBadge
-                packet={activeLuckyPackets[0]}
-                onPress={(pkt) => setActiveLuckyModal(pkt)}
-              />
+              <View style={{ flexShrink: 0 }}>
+                <LuckyPacketBadge
+                  packet={activeLuckyPackets[0]}
+                  onPress={(pkt) => setActiveLuckyModal(pkt)}
+                />
+              </View>
             ) : null}
           </View>
         ) : null}
@@ -14068,9 +14160,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surfaceRaised,
   },
   settingIconActive: {
-    backgroundColor: COLORS.primarySoft,
+    backgroundColor: COLORS.primary,
     borderWidth: 1,
-    borderColor: "rgba(245,196,52,0.45)",
+    borderColor: COLORS.primary,
   },
   settingContent: { flex: 1 },
   settingTitle: { color: COLORS.text, fontSize: 13, fontWeight: "800" },
@@ -17419,15 +17511,15 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "center",
     columnGap: 0,
-    rowGap: 10,
+    rowGap: 4,
     width: "100%",
   },
   roomSpeakerSlot: {
     width: "25%",
     minHeight: 84,
     alignItems: "center",
-    paddingVertical: 4,
-    gap: 5,
+    paddingVertical: 2,
+    gap: 4,
   },
   roomSpeakerAvatar: {
     width: 66,
@@ -18597,11 +18689,17 @@ const styles = StyleSheet.create({
   },
 
   /* ══ Oda: bütünleşik sohbet, alt bar ve oda sahibi kontrolleri ═════ */
-  roomTitleLine: { flexDirection: "row", alignItems: "center", gap: 7 },
+  roomTitleLine: { flexDirection: "row", alignItems: "center", gap: 6 },
+  roomHeaderSubRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    marginTop: 2,
+  },
   roomHeaderFollowPill: {
     flexShrink: 0,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     borderRadius: 999,
     backgroundColor: COLORS.primary,
     borderWidth: 1,
@@ -18687,7 +18785,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     width: "100%",
     gap: 16,
-    marginBottom: 10,
+    marginBottom: 4,
   },
   roomHostPairSlot: { width: "34%", minHeight: 88, alignItems: "center", justifyContent: "flex-start" },
   roomCouplePairSlot: { width: "34%", minHeight: 88, alignItems: "center", justifyContent: "flex-start" },
@@ -18697,6 +18795,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+  },
+  profileHomeBadgesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 4,
+    marginBottom: 1,
   },
   profileWealthInlineRow: {
     flexDirection: "row",
@@ -18719,7 +18825,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    flexShrink: 1,
+    paddingRight: 4,
   },
   roomSpeakerFocusPill: {
     flexDirection: "row",
@@ -19220,12 +19326,14 @@ const styles = StyleSheet.create({
   roomGiftGrid3: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
-    rowGap: 10,
+    justifyContent: "flex-start",
+    columnGap: "2.6%",
+    rowGap: 8,
   },
   roomGiftGridCard: {
     width: "31.6%",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 10,
     paddingHorizontal: 6,
     borderRadius: 18,
@@ -19233,6 +19341,15 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "rgba(203,218,236,0.82)",
     position: "relative",
+  },
+  roomGiftName: {
+    color: COLORS.text,
+    fontSize: 11.5,
+    lineHeight: 14,
+    minHeight: 28,
+    fontWeight: "800",
+    textAlign: "center",
+    marginTop: 4,
   },
   roomGiftGridCardActive: {
     backgroundColor: COLORS.primarySoft,

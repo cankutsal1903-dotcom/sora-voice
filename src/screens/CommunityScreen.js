@@ -2277,7 +2277,10 @@ export const CommunityScreen = memo(function CommunityScreen({
                           </Text>
                         </View>
                         <View style={[styles.progressTrack, { marginTop: 8 }]}>
-                          <View
+                          <LinearGradient
+                            colors={["#2F80ED", "#F59E0B", "#FBBF24"]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
                             style={[
                               styles.progressFill,
                               { width: `${Math.max(4, Math.round((detailProgress?.ratio || 0) * 100))}%` },
@@ -2816,7 +2819,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginTop: 5,
   },
-  progressFill: { height: "100%", borderRadius: 4 },
+  progressFill: { height: "100%", borderRadius: 4, backgroundColor: COLORS.primary },
   giftHeaderPill: {
     flexDirection: "row",
     alignItems: "center",

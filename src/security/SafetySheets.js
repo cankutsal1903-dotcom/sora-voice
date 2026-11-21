@@ -45,7 +45,7 @@ function SheetFrame({ visible, onDismiss, children, tall = false }) {
       <Pressable style={styles.dismissArea} onPress={onDismiss} />
       <View style={[styles.sheet, tall && styles.tallSheet, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
         <View style={styles.handle} />
-        <Pressable onPress={onDismiss} style={styles.closeButton}><Ionicons name="close" size={20} color={COLORS.text} /></Pressable>
+        <Pressable onPress={onDismiss} hitSlop={8} style={styles.closeButton}><Ionicons name="close" size={20} color={COLORS.text} /></Pressable>
         {children}
       </View>
     </KeyboardSafeView>
@@ -154,7 +154,7 @@ export function SafetyCenterSheet({ visible, onDismiss }) {
 
   return <SheetFrame visible={visible} onDismiss={onDismiss} tall>
     <Text style={styles.kicker}>GÜVENLİK MERKEZİ</Text>
-    <Text style={styles.title}>Alanını koru.</Text>
+    <Text style={styles.title}>Güvenlik Merkezi</Text>
     <View style={styles.notice}><Ionicons name="shield-checkmark" size={21} color={COLORS.primary} /><Text style={styles.noticeText}>Engellediğin hesapların mesajları gizlenir ve takip bağlantısı kaldırılır.</Text></View>
     {error ? <View style={styles.errorBox}><Text style={styles.errorText}>{error}</Text><Pressable onPress={load}><Text style={styles.retryText}>Yeniden dene</Text></Pressable></View> : null}
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -303,9 +303,9 @@ const styles = StyleSheet.create({
   sheet: { maxHeight: "82%", backgroundColor: COLORS.surface, paddingHorizontal: 22, paddingTop: 29, paddingBottom: 30, borderTopLeftRadius: 29, borderTopRightRadius: 29 },
   tallSheet: { height: "82%" },
   handle: { width: 38, height: 4, borderRadius: 4, backgroundColor: "#C2CEDD", position: "absolute", alignSelf: "center", top: 10 },
-  closeButton: { width: 31, height: 31, borderRadius: 16, backgroundColor: COLORS.surfaceRaised, justifyContent: "center", alignItems: "center", position: "absolute", right: 17, top: 15, zIndex: 2 },
+  closeButton: { width: 34, height: 34, borderRadius: 12, backgroundColor: COLORS.surfaceRaised, borderWidth: 1, borderColor: COLORS.line, justifyContent: "center", alignItems: "center", position: "absolute", right: 17, top: 15, zIndex: 2 },
   kicker: { color: COLORS.primary, fontSize: 10, fontWeight: "800", letterSpacing: 1.3, marginBottom: 7 },
-  title: { color: COLORS.text, fontSize: 25, fontWeight: "800", letterSpacing: -0.8, marginBottom: 9, paddingRight: 44 },
+  title: { color: COLORS.text, fontSize: 23, fontWeight: "900", letterSpacing: -0.6, marginBottom: 9, paddingRight: 44 },
   description: { color: COLORS.muted, fontSize: 12, lineHeight: 18, marginBottom: 17 },
   reasonScroll: { maxHeight: 180, marginBottom: 17 },
   reasonGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
@@ -326,9 +326,9 @@ const styles = StyleSheet.create({
   userRow: { minHeight: 62, flexDirection: "row", alignItems: "center", gap: 10, borderBottomWidth: 1, borderBottomColor: COLORS.line },
   avatar: { width: 40, height: 40, borderRadius: 14, justifyContent: "center", alignItems: "center" },
   avatarText: { color: "#FFFFFF", fontWeight: "900" },
-  rowCopy: { flex: 1 },
-  rowTitle: { color: COLORS.text, fontSize: 12, fontWeight: "800" },
-  rowMeta: { color: COLORS.muted, fontSize: 10, marginTop: 3 },
+  rowCopy: { flex: 1, minWidth: 0 },
+  rowTitle: { color: COLORS.text, fontSize: 13.5, fontWeight: "800" },
+  rowMeta: { color: COLORS.muted, fontSize: 11, marginTop: 3, lineHeight: 15 },
   outlineButton: { paddingHorizontal: 11, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: COLORS.line },
   outlineButtonText: { color: COLORS.primary, fontSize: 10, fontWeight: "800" },
   empty: { minHeight: 82, borderRadius: 14, backgroundColor: COLORS.surfaceRaised, alignItems: "center", justifyContent: "center", gap: 8, padding: 14 },
