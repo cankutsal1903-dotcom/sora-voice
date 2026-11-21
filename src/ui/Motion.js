@@ -276,12 +276,12 @@ export const AudioBars = memo(function AudioBars({
 });
 
 // Yumusak parilti: ust uste konmus, giderek acilan halkalar (sert kenarli disk yok).
-const SOFT_GLOW_BOX = 280;
+const SOFT_GLOW_BOX = 300;
 const GLOW_LAYERS = [
-  { size: 260, color: "rgba(47,128,237,0.05)" },
-  { size: 210, color: "rgba(47,128,237,0.07)" },
-  { size: 160, color: "rgba(78,150,255,0.10)" },
-  { size: 110, color: "rgba(120,177,255,0.12)" },
+  { size: 290, color: "rgba(47,128,237,0.04)" },
+  { size: 236, color: "rgba(47,128,237,0.06)" },
+  { size: 182, color: "rgba(78,150,255,0.09)" },
+  { size: 128, color: "rgba(120,177,255,0.12)" },
 ];
 
 export const BrandLaunch = memo(function BrandLaunch({
@@ -289,82 +289,51 @@ export const BrandLaunch = memo(function BrandLaunch({
   closing = false,
 }) {
   const intro = useRef(new Animated.Value(0)).current;
-  const textIntro = useRef(new Animated.Value(0)).current;
+  const glowIn = useRef(new Animated.Value(0)).current;
+  const pillIn = useRef(new Animated.Value(0)).current;
+  const wordIn = useRef(new Animated.Value(0)).current;
+  const tagIn = useRef(new Animated.Value(0)).current;
+  const statusIn = useRef(new Animated.Value(0)).current;
   const outro = useRef(new Animated.Value(1)).current;
   const breathe = useRef(new Animated.Value(0)).current;
   const shimmer = useRef(new Animated.Value(0)).current;
 
-  const introScale = useRef(
-    intro.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }),
-  ).current;
-  const introTranslate = useRef(
-    intro.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }),
-  ).current;
-  const textTranslate = useRef(
-    textIntro.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }),
-  ).current;
-  const glowScale = useRef(
-    breathe.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1.08] }),
-  ).current;
-  const glowOpacity = useRef(
-    breathe.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0.85] }),
-  ).current;
-  const outroScale = useRef(
-    outro.interpolate({ inputRange: [0, 1], outputRange: [1.02, 1] }),
-  ).current;
-  const shimmerTranslate = useRef(
-    shimmer.interpolate({ inputRange: [0, 1], outputRange: [-56, 152] }),
-  ).current;
+  const markScale = intro.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] });
+  const markTranslate = intro.interpolate({ inputRange: [0, 1], outputRange: [16, 0] });
+  const glowGrow = glowIn.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
+  const breathScale = breathe.interpolate({ inputRange: [0, 1], outputRange: [0.97, 1.05] });
+  const breathOpacity = breathe.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
+  const pillTranslate = pillIn.interpolate({ inputRange: [0, 1], outputRange: [10, 0] });
+  const wordTranslate = wordIn.interpolate({ inputRange: [0, 1], outputRange: [18, 0] });
+  const tagTranslate = tagIn.interpolate({ inputRange: [0, 1], outputRange: [10, 0] });
+  const outroScale = outro.interpolate({ inputRange: [0, 1], outputRange: [1.02, 1] });
+  const shimmerTranslate = shimmer.interpolate({ inputRange: [0, 1], outputRange: [-56, 152] });
 
   const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     if (reducedMotion) {
-      intro.setValue(1);
-      textIntro.setValue(1);
+      [intro, glowIn, pillIn, wordIn, tagIn, statusIn].forEach((v) => v.setValue(1));
       breathe.setValue(0.5);
       shimmer.setValue(0.45);
       return undefined;
     }
     const entrance = Animated.parallel([
-      Animated.spring(intro, {
-        toValue: 1,
-        damping: 18,
-        stiffness: 110,
-        mass: 1,
-        useNativeDriver: true,
-      }),
-      Animated.timing(textIntro, {
-        toValue: 1,
-        duration: 520,
-        delay: 260,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
+      Animated.spring(intro, { toValue: 1, damping: 16, stiffness: 115, mass: 1, useNativeDriver: true }),
+      Animated.timing(glowIn, { toValue: 1, duration: 1100, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(pillIn, { toValue: 1, duration: 420, delay: 360, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(wordIn, { toValue: 1, duration: 560, delay: 480, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(tagIn, { toValue: 1, duration: 480, delay: 640, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(statusIn, { toValue: 1, duration: 420, delay: 820, easing: Easing.out(Easing.quad), useNativeDriver: true }),
     ]);
     const breathing = Animated.loop(
       Animated.sequence([
-        Animated.timing(breathe, {
-          toValue: 1,
-          duration: 1700,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(breathe, {
-          toValue: 0,
-          duration: 1700,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
+        Animated.timing(breathe, { toValue: 1, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(breathe, { toValue: 0, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       ]),
     );
     const sweep = Animated.loop(
-      Animated.timing(shimmer, {
-        toValue: 1,
-        duration: 1350,
-        easing: Easing.inOut(Easing.cubic),
-        useNativeDriver: true,
-      }),
+      Animated.timing(shimmer, { toValue: 1, duration: 1350, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
     );
     entrance.start();
     breathing.start();
@@ -374,7 +343,7 @@ export const BrandLaunch = memo(function BrandLaunch({
       breathing.stop();
       sweep.stop();
     };
-  }, [breathe, intro, reducedMotion, shimmer, textIntro]);
+  }, [breathe, glowIn, intro, pillIn, reducedMotion, shimmer, statusIn, tagIn, wordIn]);
 
   useEffect(() => {
     if (!closing) return undefined;
@@ -414,7 +383,10 @@ export const BrandLaunch = memo(function BrandLaunch({
             pointerEvents="none"
             style={[
               motionStyles.glowStack,
-              { opacity: glowOpacity, transform: [{ scale: glowScale }] },
+              {
+                opacity: Animated.multiply(glowIn, breathOpacity),
+                transform: [{ scale: Animated.multiply(glowGrow, breathScale) }],
+              },
             ]}
           >
             {GLOW_LAYERS.map((layer) => (
@@ -437,36 +409,44 @@ export const BrandLaunch = memo(function BrandLaunch({
           <Animated.View
             style={{
               opacity: intro,
-              transform: [{ scale: introScale }, { translateY: introTranslate }],
+              transform: [{ scale: markScale }, { translateY: markTranslate }],
             }}
           >
-            <SoraMark size={124} />
+            <SoraMark size={128} animate={!reducedMotion} />
           </Animated.View>
         </View>
 
-        <Animated.View
-          style={[
-            motionStyles.brandCopy,
-            {
-              opacity: textIntro,
-              transform: [{ translateY: textTranslate }],
-            },
-          ]}
-        >
-          <View style={motionStyles.livePill}>
-            <AudioBars compact color="#7CC0FF" />
-            <Text style={motionStyles.livePillText}>CANLI SES TOPLULUĞU</Text>
-          </View>
-          <Text style={motionStyles.wordmark} maxFontSizeMultiplier={1.4}>
+        <View style={motionStyles.brandCopy}>
+          <Animated.View
+            style={{ opacity: pillIn, transform: [{ translateY: pillTranslate }] }}
+          >
+            <View style={motionStyles.livePill}>
+              <AudioBars compact color="#7CC0FF" />
+              <Text style={motionStyles.livePillText}>CANLI SES TOPLULUĞU</Text>
+            </View>
+          </Animated.View>
+          <Animated.Text
+            style={[
+              motionStyles.wordmark,
+              { opacity: wordIn, transform: [{ translateY: wordTranslate }] },
+            ]}
+            maxFontSizeMultiplier={1.4}
+          >
             SORA
-          </Text>
-          <Text style={motionStyles.tagline} maxFontSizeMultiplier={1.5}>
+          </Animated.Text>
+          <Animated.Text
+            style={[
+              motionStyles.tagline,
+              { opacity: tagIn, transform: [{ translateY: tagTranslate }] },
+            ]}
+            maxFontSizeMultiplier={1.5}
+          >
             SESİN · ÇEVREN · ANIN
-          </Text>
-        </Animated.View>
+          </Animated.Text>
+        </View>
 
         <Animated.View
-          style={[motionStyles.launchStatus, { opacity: textIntro }]}
+          style={[motionStyles.launchStatus, { opacity: statusIn }]}
         >
           <View style={motionStyles.loadingTrack}>
             <Animated.View
