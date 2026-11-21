@@ -12666,9 +12666,9 @@ function AppContent() {
       .slice(0, 8)
       .map((act) => ({
         id: `wallet-act-${act.id}`,
-        icon: act.type === "gift_received" ? "gift" : "diamond",
-        color: act.type === "gift_received" ? "#E11D48" : "#2563EB",
-        text: `${act.description || "Kredi kazancı"} (+${formatCredits(act.amount)} kredi)`,
+        icon: act.icon || "diamond",
+        color: act.color || "#2563EB",
+        text: `${act.text || "Kredi kazancı"} (+${formatCredits(act.amount)} kredi)`,
         time: act.time || "",
       }));
   }, [walletActivities]);
@@ -13149,7 +13149,7 @@ function AppContent() {
       <DailyMissionsSheet
         visible={missionsFromNotifOpen}
         onDismiss={() => setMissionsFromNotifOpen(false)}
-        onBalanceChange={setWalletBalance}
+        onBalanceUpdate={setWalletBalance}
       />
       <Onboarding visible={onboardingOpen} onComplete={completeOnboarding} />
       <EventDetailSheet
