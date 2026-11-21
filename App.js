@@ -934,71 +934,31 @@ const Discover = memo(function Discover({
             style={{ marginTop: 2, marginBottom: 12 }}
           />
         ) : null}
-        <Reveal distance={12}>
+        <View style={styles.discoverEmptyHeading}>
+          <Text style={[styles.sectionTitle, styles.discoverListTitle]}>Şimdi canlı</Text>
+          <Text style={styles.listCount}>0 oda açık</Text>
+        </View>
+        <Reveal distance={8}>
           <View style={styles.discoverEmptyHero}>
-            <LinearGradient
-              colors={["#E6F1FF", "#F7FBFF", "#FFFFFF"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <View style={styles.discoverEmptyStatus}>
-              <View style={styles.discoverEmptyStatusDot} />
-              <Text style={styles.discoverEmptyStatusText}>ŞU AN AÇIK ODA YOK</Text>
+            <View style={styles.discoverEmptyIcon}>
+              <Ionicons name="mic-outline" size={22} color={COLORS.primary} />
             </View>
-            <View style={styles.discoverStage} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-              <View style={styles.discoverStageHost}>
-                <SoraMark size={52} tone="light" animate />
-              </View>
-              <Text style={styles.discoverStageHostLabel}>Sen</Text>
-              <View style={styles.discoverStageRow}>
-                {[0, 1, 2, 3, 4, 5].map((seat) => (
-                  <View key={`seat-${seat}`} style={styles.discoverStageSeat}>
-                    <Ionicons name="add" size={15} color={COLORS.primaryLight} />
-                  </View>
-                ))}
-              </View>
-            </View>
-            <Text style={styles.discoverEmptyTitle}>Sahne seni bekliyor</Text>
+            <Text style={styles.discoverEmptyTitle}>Henüz açık oda yok</Text>
             <Text style={styles.discoverEmptyDescription}>
-              Bir oda aç, koltuklar dolsun. Sohbet başlayınca odan burada
-              herkese görünür.
+              İlk odayı sen aç, arkadaşların katılsın.
             </Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Yeni sesli oda aç"
               style={({ pressed }) => [
                 styles.discoverEmptyButton,
-                pressed && { transform: [{ scale: 0.97 }], opacity: 0.92 },
+                pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 },
               ]}
               onPress={onCreate}
             >
-              <LinearGradient
-                colors={["#52A5FF", "#2F80ED", "#1D5FBF"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
-              <Ionicons name="mic" size={18} color={COLORS.primaryInk} />
+              <Ionicons name="add" size={18} color={COLORS.primaryInk} />
               <Text style={styles.discoverEmptyButtonText}>Oda aç</Text>
             </Pressable>
-          </View>
-        </Reveal>
-        <Reveal delay={90} distance={10}>
-          <View style={styles.discoverSteps}>
-            {[
-              ["mic-outline", "Oda aç", "Konuyu sen seç"],
-              ["people-outline", "Koltuk dolsun", "Dinleyen katılır"],
-              ["gift-outline", "Sohbet et", "Hediyelerle coş"],
-            ].map(([icon, title, subtitle]) => (
-              <View key={title} style={styles.discoverStep}>
-                <View style={styles.discoverStepIcon}>
-                  <Ionicons name={icon} size={17} color={COLORS.primary} />
-                </View>
-                <Text numberOfLines={1} style={styles.discoverStepTitle}>{title}</Text>
-                <Text numberOfLines={1} style={styles.discoverStepSubtitle}>{subtitle}</Text>
-              </View>
-            ))}
           </View>
         </Reveal>
       </ScrollView>
@@ -14429,153 +14389,53 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 5 },
     elevation: 7,
   },
+  discoverEmptyHeading: { marginTop: 6, marginBottom: 12 },
   discoverEmptyHero: {
-    borderRadius: 28,
+    borderRadius: 22,
     paddingHorizontal: 22,
-    paddingTop: 16,
-    paddingBottom: 20,
-    alignItems: "center",
-    backgroundColor: COLORS.surface,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: COLORS.lineSoft,
-    shadowColor: "#1D3A66",
-    shadowOpacity: 0.08,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 3,
-  },
-  discoverEmptyStatus: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    paddingHorizontal: 11,
-    paddingVertical: 6,
-    borderRadius: 100,
-    backgroundColor: "rgba(255,255,255,0.85)",
-    borderWidth: 1,
-    borderColor: COLORS.line,
-  },
-  discoverEmptyStatusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: COLORS.muted,
-  },
-  discoverEmptyStatusText: {
-    color: COLORS.mutedDark,
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 1.2,
-  },
-  discoverStage: {
-    alignItems: "center",
-    marginTop: 14,
-    marginBottom: 16,
-  },
-  discoverStageHost: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: COLORS.surface,
-    borderWidth: 2.5,
-    borderColor: COLORS.primary,
-    shadowColor: COLORS.primary,
-    shadowOpacity: 0.25,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
-  },
-  discoverStageHostLabel: {
-    marginTop: 6,
-    marginBottom: 12,
-    color: COLORS.primaryDark,
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  discoverStageRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  discoverStageSeat: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.9)",
-    borderWidth: 1.5,
-    borderStyle: "dashed",
-    borderColor: "#B9D3F5",
-  },
-  discoverSteps: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 14,
-  },
-  discoverStep: {
-    flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 10,
-    borderRadius: 18,
+    paddingVertical: 26,
     alignItems: "center",
     backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.lineSoft,
   },
-  discoverStepIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  discoverEmptyIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: COLORS.primarySoft,
-    marginBottom: 8,
-  },
-  discoverStepTitle: {
-    color: COLORS.text,
-    fontSize: 12.5,
-    fontWeight: "800",
-  },
-  discoverStepSubtitle: {
-    marginTop: 2,
-    color: COLORS.muted,
-    fontSize: 11,
-    fontWeight: "600",
+    marginBottom: 12,
   },
   discoverEmptyTitle: {
     color: COLORS.text,
-    fontSize: 22,
-    lineHeight: 28,
-    fontWeight: "900",
-    letterSpacing: -0.5,
-    marginBottom: 6,
+    fontSize: 17,
+    fontWeight: "800",
+    marginBottom: 4,
     textAlign: "center",
   },
   discoverEmptyDescription: {
     color: COLORS.textSecondary,
-    fontSize: 13.5,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 19,
     textAlign: "center",
-    marginBottom: 20,
+    marginBottom: 18,
   },
   discoverEmptyButton: {
-    alignSelf: "stretch",
-    minHeight: 50,
-    borderRadius: 16,
+    minHeight: 42,
+    paddingHorizontal: 22,
+    borderRadius: 21,
     backgroundColor: COLORS.primary,
-    overflow: "hidden",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 6,
   },
   discoverEmptyButtonText: {
     color: COLORS.primaryInk,
-    fontSize: 15,
-    fontWeight: "900",
+    fontSize: 14,
+    fontWeight: "800",
   },
   iconButton: {
     width: 42,
