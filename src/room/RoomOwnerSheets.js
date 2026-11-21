@@ -20,7 +20,7 @@ import { KeyboardSafeView } from "../ui/useKeyboardInset";
 import { DEFAULT_ROOM_ANNOUNCEMENT, ROOM_BAN_DURATIONS } from "./roomApi";
 
 // ── Ortak parçalar ────────────────────────────────────────────────────────
-function SheetFrame({ visible, title, subtitle, onDismiss, children, scroll = true }) {
+function SheetFrame({ visible, title, subtitle, onDismiss, children, footer = null, scroll = true }) {
   const insets = useSafeAreaInsets();
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onDismiss}>
@@ -49,6 +49,7 @@ function SheetFrame({ visible, title, subtitle, onDismiss, children, scroll = tr
           ) : (
             children
           )}
+          {footer ? <View style={sheetStyles.footerBar}>{footer}</View> : null}
         </View>
       </KeyboardSafeView>
     </Modal>
@@ -437,93 +438,106 @@ export function RoomSettingsEditorSheet({
 
   const requestStatus = backgroundRequest?.status;
   return (
-    <SheetFrame visible={visible} title="Oda Ayarları" subtitle="Değişiklikler odadaki herkese anında yansır." onDismiss={onDismiss}>
-      <Field label="ODA ADI" value={title} onChangeText={setTitle} maxLength={36} placeholder="Oda adı" />
-      <Field
-        label="AÇIKLAMA"
-        value={description}
-        onChangeText={setDescription}
-        maxLength={180}
-        multiline
-        placeholder="Odanın konusu, kuralları…"
-      />
-      <Field
-        label="ODA DUYURUSU"
-        value={announcement}
-        onChangeText={setAnnouncement}
-        maxLength={200}
-        multiline
-        placeholder={DEFAULT_ROOM_ANNOUNCEMENT}
-        hint="Odaya giren herkese sohbette hoş geldin mesajı olarak gösterilir."
-      />
-      <PrimaryButton
-        label="Kaydet"
-        icon="checkmark"
-        busy={saving}
-        disabled={!changed || !title.trim()}
-        onPress={() =>
-          onSave({
-            title: title.trim(),
-            description: description.trim(),
-            announcement: announcement.trim() || DEFAULT_ROOM_ANNOUNCEMENT,
-          })
-        }
-      />
-
-      <Caption style={{ marginTop: 24 }}>ODA ARKA PLANI</Caption>
-      <View style={sheetStyles.backgroundCard}>
-        <View style={sheetStyles.backgroundPreview}>
-          {backgroundUrl ? (
-            <Image source={{ uri: backgroundUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-          ) : (
-            <Ionicons name="image-outline" size={26} color={COLORS.muted} />
-          )}
-        </View>
-        <View style={{ flex: 1, gap: 4 }}>
-          <Text style={sheetStyles.rowTitle}>{backgroundUrl ? "Özel arka plan" : "Varsayılan arka plan"}</Text>
-          {requestStatus ? (
-            <Text
-              style={[
-                sheetStyles.rowDescription,
-                requestStatus === "pending" && { color: COLORS.primary },
-                requestStatus === "rejected" && { color: COLORS.danger },
-              ]}
-            >
-              Son istek: {BACKGROUND_STATUS_TEXT[requestStatus] || requestStatus}
-              {requestStatus === "rejected" && backgroundRequest?.review_note ? ` · ${backgroundRequest.review_note}` : ""}
-            </Text>
-          ) : null}
-          {!backgroundUploadsEnabled ? (
-            <Text style={[sheetStyles.rowDescription, { color: COLORS.danger }]}>Arka plan değiştirme şu an kapalı.</Text>
-          ) : (
-            <Text style={sheetStyles.rowDescription}>Yüklediğin görsel incelemeden sonra odada görünür.</Text>
-          )}
-        </View>
-      </View>
-      <View style={sheetStyles.buttonRow}>
-        <SecondaryButton
-          label={uploadingBackground ? "Yükleniyor…" : "Görsel seç"}
-          icon="images-outline"
-          disabled={!backgroundUploadsEnabled || uploadingBackground}
-          onPress={onPickBackground}
-          style={{ flex: 1 }}
+    <SheetFrame
+      visible={visible}
+      title="Oda Ayarları"
+      subtitle="Değişiklikler odadaki herkese anında yansır."
+      onDismiss={onDismiss}
+      footer={
+        <PrimaryButton
+          label="Değişiklikleri kaydet"
+          icon="checkmark"
+          busy={saving}
+          disabled={!changed || !title.trim()}
+          onPress={() =>
+            onSave({
+              title: title.trim(),
+              description: description.trim(),
+              announcement: announcement.trim() || DEFAULT_ROOM_ANNOUNCEMENT,
+            })
+          }
         />
-        {backgroundUrl ? (
-          <SecondaryButton label="Kaldır" icon="trash-outline" danger onPress={onClearBackground} style={{ flex: 1 }} />
-        ) : null}
+      }
+    >
+      <Caption>ODA BİLGİLERİ</Caption>
+      <View style={sheetStyles.sectionCard}>
+        <Field label="ODA ADI" value={title} onChangeText={setTitle} maxLength={36} placeholder="Oda adı" />
+        <Field
+          label="AÇIKLAMA"
+          value={description}
+          onChangeText={setDescription}
+          maxLength={180}
+          multiline
+          placeholder="Odanın konusu, kuralları…"
+        />
+        <Field
+          label="ODA DUYURUSU"
+          value={announcement}
+          onChangeText={setAnnouncement}
+          maxLength={200}
+          multiline
+          placeholder={DEFAULT_ROOM_ANNOUNCEMENT}
+          hint="Odaya giren herkese sohbette hoş geldin mesajı olarak gösterilir."
+        />
       </View>
 
-      <Caption style={{ marginTop: 24 }}>ODA MÜZİĞİ</Caption>
-      <Pressable onPress={onOpenMusic} style={sheetStyles.row}>
-        <View style={sheetStyles.rowIcon}>
-          <Ionicons name="musical-notes-outline" size={18} color={COLORS.primary} />
+      <Caption style={{ marginTop: 18 }}>GÖRÜNÜM VE MÜZİK</Caption>
+      <View style={sheetStyles.sectionCard}>
+        <View style={sheetStyles.backgroundCard}>
+          <View style={sheetStyles.backgroundPreview}>
+            {backgroundUrl ? (
+              <Image source={{ uri: backgroundUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            ) : (
+              <Ionicons name="image-outline" size={26} color={COLORS.muted} />
+            )}
+          </View>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={sheetStyles.rowTitle}>{backgroundUrl ? "Özel arka plan" : "Varsayılan arka plan"}</Text>
+            {requestStatus ? (
+              <Text
+                style={[
+                  sheetStyles.rowDescription,
+                  requestStatus === "pending" && { color: COLORS.primary },
+                  requestStatus === "rejected" && { color: COLORS.danger },
+                ]}
+              >
+                Son istek: {BACKGROUND_STATUS_TEXT[requestStatus] || requestStatus}
+                {requestStatus === "rejected" && backgroundRequest?.review_note ? ` · ${backgroundRequest.review_note}` : ""}
+              </Text>
+            ) : null}
+            {!backgroundUploadsEnabled ? (
+              <Text style={[sheetStyles.rowDescription, { color: COLORS.danger }]}>Arka plan değiştirme şu an kapalı.</Text>
+            ) : (
+              <Text style={sheetStyles.rowDescription}>Yüklediğin görsel incelemeden sonra odada görünür.</Text>
+            )}
+          </View>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={sheetStyles.rowTitle}>Müzik ekle ve çal</Text>
-          <Text style={sheetStyles.rowDescription}>Dosyalardan müzik seç, ses seviyesini ayarla</Text>
+        <View style={sheetStyles.buttonRow}>
+          <SecondaryButton
+            label={uploadingBackground ? "Yükleniyor…" : "Görsel seç"}
+            icon="images-outline"
+            disabled={!backgroundUploadsEnabled || uploadingBackground}
+            onPress={onPickBackground}
+            style={{ flex: 1 }}
+          />
+          {backgroundUrl ? (
+            <SecondaryButton label="Kaldır" icon="trash-outline" danger onPress={onClearBackground} style={{ flex: 1 }} />
+          ) : null}
         </View>
-        <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
-      </Pressable>
+
+        <View style={sheetStyles.sectionDivider} />
+
+        <Pressable onPress={onOpenMusic} style={[sheetStyles.row, { marginBottom: 0 }]}>
+          <View style={sheetStyles.rowIcon}>
+            <Ionicons name="musical-notes-outline" size={18} color={COLORS.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={sheetStyles.rowTitle}>Müzik ekle ve çal</Text>
+            <Text style={sheetStyles.rowDescription}>Dosyalardan müzik seç, ses seviyesini ayarla</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
+        </Pressable>
+      </View>
     </SheetFrame>
   );
 }
@@ -1257,4 +1271,22 @@ const sheetStyles = StyleSheet.create({
   trackMain: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12 },
   trackTitle: { flex: 1, color: COLORS.text, fontSize: 13, fontWeight: "700" },
   trackDelete: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  sectionCard: {
+    padding: 13,
+    borderRadius: 16,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.lineSoft,
+  },
+  sectionDivider: {
+    height: 1,
+    backgroundColor: COLORS.lineSoft,
+    marginVertical: 12,
+  },
+  footerBar: {
+    paddingTop: 12,
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.lineSoft,
+  },
 });

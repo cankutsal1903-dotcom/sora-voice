@@ -819,7 +819,7 @@ export const RoomMiniGamesSheet = memo(function RoomMiniGamesSheet({
           <View style={styles.tabRow}>
             {[
               { id: "dice", label: "Şans Zarı", icon: "dice" },
-              { id: "truth_dare", label: "Doğruluk / Cesaret", icon: "flame" },
+              { id: "truth_dare", label: "Doğruluk /\nCesaret", icon: "flame" },
               { id: "wheel", label: "Şans Çarkı", icon: "aperture" },
             ].map((item) => {
               const active = tab === item.id;
@@ -836,10 +836,10 @@ export const RoomMiniGamesSheet = memo(function RoomMiniGamesSheet({
                 >
                   <Ionicons
                     name={item.icon}
-                    size={15}
+                    size={16}
                     color={active ? "#FFFFFF" : "#9BB2D1"}
                   />
-                  <Text style={[styles.tabLabel, active && styles.tabLabelActive]} numberOfLines={1}>
+                  <Text style={[styles.tabLabel, active && styles.tabLabelActive]} numberOfLines={2}>
                     {item.label}
                   </Text>
                 </Pressable>
@@ -1160,7 +1160,6 @@ export const RoomToolsSheet = memo(function RoomToolsSheet({
       icon: "gift",
       colors: ["#EF4444", "#B91C1C"],
       iconColor: "#FEF08A",
-      badgeText: "YENİ",
       onPress: () => {
         onDismiss?.();
         onOpenLuckyPacket?.();
@@ -1175,7 +1174,6 @@ export const RoomToolsSheet = memo(function RoomToolsSheet({
             iconLib: "mci",
             colors: ["#E11D48", "#2563EB"],
             iconColor: "#FFFFFF",
-            badgeText: "YENİ",
             onPress: () => {
               onDismiss?.();
               onOpenPk?.();
@@ -1206,36 +1204,14 @@ export const RoomToolsSheet = memo(function RoomToolsSheet({
         ]
       : []),
     {
-      id: "dice",
-      label: "Şans Zarı",
-      icon: "dice",
-      colors: ["#F59E0B", "#B45309"],
-      iconColor: "#FFFBEB",
-      onPress: () => {
-        onDismiss?.();
-        onSelectGame?.("dice");
-      },
-    },
-    {
-      id: "truth_dare",
-      label: "Doğruluk",
-      icon: "flame",
-      colors: ["#F43F5E", "#9F1239"],
-      iconColor: "#FFF1F2",
-      onPress: () => {
-        onDismiss?.();
-        onSelectGame?.("truth_dare");
-      },
-    },
-    {
-      id: "wheel",
-      label: "Şans Çarkı",
-      icon: "aperture",
-      colors: ["#8B5CF6", "#5B21B6"],
+      id: "mini_games",
+      label: "Mini Oyunlar",
+      icon: "game-controller",
+      colors: ["#8B5CF6", "#4F46E5"],
       iconColor: "#F5F3FF",
       onPress: () => {
         onDismiss?.();
-        onSelectGame?.("wheel");
+        onSelectGame?.("dice");
       },
     },
     ...(onOpenIcebreaker
@@ -1246,7 +1222,6 @@ export const RoomToolsSheet = memo(function RoomToolsSheet({
             icon: "sparkles",
             colors: ["#06B6D4", "#2563EB"],
             iconColor: "#FEF08A",
-            badgeText: "YENİ",
             onPress: () => {
               onDismiss?.();
               onOpenIcebreaker?.();
@@ -1286,8 +1261,8 @@ export const RoomToolsSheet = memo(function RoomToolsSheet({
     },
     {
       id: "sfx",
-      label: sfxEnabled ? "Efekt Sesi" : "Ses Kapalı",
-      icon: sfxEnabled ? "volume-medium-outline" : "volume-mute-outline",
+      label: "Ses Efektleri",
+      icon: sfxEnabled ? "volume-medium" : "volume-mute-outline",
       active: sfxEnabled,
       iconColor: sfxEnabled ? "#86EFAC" : "#94A3B8",
       onPress: () => {
@@ -1317,6 +1292,12 @@ export const RoomToolsSheet = memo(function RoomToolsSheet({
     },
   ];
 
+  // Parti öğelerini 4 sütunlu dengeli satırlara böl (eksik son satır ortalanır)
+  const partyRows = [];
+  for (let i = 0; i < partyItems.length; i += 4) {
+    partyRows.push(partyItems.slice(i, i + 4));
+  }
+
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onDismiss}>
       <View style={styles.sheetOverlay}>
@@ -1324,76 +1305,91 @@ export const RoomToolsSheet = memo(function RoomToolsSheet({
         <View style={[styles.toolsSheetCard, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
           <View style={styles.sheetHandle} />
 
-          <Text style={styles.toolsSectionTitle}>Parti</Text>
-          <View style={styles.toolsGrid}>
-            {partyItems.map((item) => (
-              <Pressable
-                key={item.id}
-                onPress={item.onPress}
-                style={({ pressed }) => [styles.toolsCell, pressed && styles.toolsCellPressed]}
-                accessibilityRole="button"
-                accessibilityLabel={item.label}
-              >
-                <View style={styles.toolsOrbWrap}>
-                  <LinearGradient
-                    colors={item.colors}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.toolsOrbParty}
-                  >
-                    {item.iconLib === "mci" ? (
-                      <MaterialCommunityIcons name={item.icon} size={24} color={item.iconColor} />
-                    ) : (
-                      <Ionicons name={item.icon} size={25} color={item.iconColor} />
-                    )}
-                  </LinearGradient>
-                  {item.badgeText ? (
-                    <View style={styles.toolsHotBadge}>
-                      <Text style={styles.toolsHotBadgeText}>{item.badgeText}</Text>
-                    </View>
-                  ) : null}
-                </View>
-                <Text style={styles.toolsLabel} numberOfLines={1}>
-                  {item.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <Text style={[styles.toolsSectionTitle, { marginTop: 12 }]}>Araçlar</Text>
-          <View style={styles.toolsGrid}>
-            {utilityItems.map((item) => (
-              <Pressable
-                key={item.id}
-                onPress={item.onPress}
-                style={({ pressed }) => [styles.toolsCell, pressed && styles.toolsCellPressed]}
-                accessibilityRole="button"
-                accessibilityLabel={item.label}
-              >
-                <View style={styles.toolsOrbWrap}>
-                  <View
-                    style={[
-                      styles.toolsOrbUtil,
-                      item.active && styles.toolsOrbUtilActive,
-                    ]}
-                  >
-                    <Ionicons name={item.icon} size={24} color={item.iconColor} />
-                  </View>
-                  {item.active ? <View style={styles.toolsActiveDot} /> : null}
-                  {item.count > 0 ? (
-                    <View style={styles.toolsCountBadge}>
-                      <Text style={styles.toolsCountBadgeText}>
-                        {item.count > 9 ? "9+" : item.count}
+          <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+            <Text style={styles.toolsSectionTitle}>Parti</Text>
+            <View style={styles.toolsRowsWrap}>
+              {partyRows.map((row, rowIdx) => (
+                <View
+                  key={`prow-${rowIdx}`}
+                  style={[
+                    styles.toolsGridRow,
+                    row.length < 4 && styles.toolsGridRowCentered,
+                  ]}
+                >
+                  {row.map((item) => (
+                    <Pressable
+                      key={item.id}
+                      onPress={item.onPress}
+                      style={({ pressed }) => [styles.toolsCell, pressed && styles.toolsCellPressed]}
+                      accessibilityRole="button"
+                      accessibilityLabel={item.label}
+                    >
+                      <View style={styles.toolsOrbWrap}>
+                        <LinearGradient
+                          colors={item.colors}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.toolsOrbParty}
+                        >
+                          {item.iconLib === "mci" ? (
+                            <MaterialCommunityIcons name={item.icon} size={22} color={item.iconColor} />
+                          ) : (
+                            <Ionicons name={item.icon} size={22} color={item.iconColor} />
+                          )}
+                        </LinearGradient>
+                        {item.badgeText ? (
+                          <View style={styles.toolsHotBadge}>
+                            <Text style={styles.toolsHotBadgeText}>{item.badgeText}</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      <Text style={styles.toolsLabel} numberOfLines={2}>
+                        {item.label}
                       </Text>
-                    </View>
-                  ) : null}
+                    </Pressable>
+                  ))}
                 </View>
-                <Text style={styles.toolsLabel} numberOfLines={1}>
-                  {item.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+              ))}
+            </View>
+
+            <View style={styles.toolsDivider} />
+
+            <Text style={styles.toolsSectionTitle}>Araçlar</Text>
+            <View style={styles.toolsGridRow}>
+              {utilityItems.map((item) => (
+                <Pressable
+                  key={item.id}
+                  onPress={item.onPress}
+                  style={({ pressed }) => [styles.toolsCell, pressed && styles.toolsCellPressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.label}
+                  accessibilityState={typeof item.active === "boolean" ? { selected: item.active } : undefined}
+                >
+                  <View style={styles.toolsOrbWrap}>
+                    <View
+                      style={[
+                        styles.toolsOrbUtil,
+                        item.active && styles.toolsOrbUtilActive,
+                      ]}
+                    >
+                      <Ionicons name={item.icon} size={22} color={item.iconColor} />
+                    </View>
+                    {item.active ? <View style={styles.toolsActiveDot} /> : null}
+                    {item.count > 0 ? (
+                      <View style={styles.toolsCountBadge}>
+                        <Text style={styles.toolsCountBadgeText}>
+                          {item.count > 9 ? "9+" : item.count}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={styles.toolsLabel} numberOfLines={2}>
+                    {item.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -1767,33 +1763,42 @@ const styles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: 6,
     marginBottom: 14,
+    padding: 4,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(148,184,230,0.12)",
   },
   tabPill: {
     flex: 1,
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
-    paddingVertical: 9,
-    paddingHorizontal: 5,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+    borderRadius: 12,
+    backgroundColor: "transparent",
   },
   tabPillActive: {
     backgroundColor: COLORS.primary,
-    borderColor: "rgba(186, 230, 253, 0.5)",
+    borderWidth: 1,
+    borderColor: "rgba(186, 230, 253, 0.45)",
   },
   tabLabel: {
     color: "#9BB2D1",
     fontSize: 10.5,
+    lineHeight: 13,
     fontWeight: "700",
+    textAlign: "center",
+    flexShrink: 1,
   },
   tabLabelActive: {
     color: "#FFFFFF",
+    fontWeight: "800",
   },
   sheetScroll: {
     flexGrow: 0,
@@ -2082,83 +2087,94 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   toolsSheetCard: {
-    backgroundColor: "#111A2C",
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
+    backgroundColor: "#0E1728",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     borderTopWidth: 1,
-    borderColor: "rgba(124, 179, 255, 0.2)",
-    paddingHorizontal: 18,
+    borderColor: "rgba(147, 197, 253, 0.22)",
+    paddingHorizontal: 16,
     paddingTop: 10,
+    maxHeight: "78%",
   },
   toolsSectionTitle: {
-    color: "#C5D7F0",
-    fontSize: 13.5,
+    color: "#B8CCE8",
+    fontSize: 12.5,
     fontWeight: "800",
-    marginBottom: 14,
-    letterSpacing: 0.2,
+    marginBottom: 12,
+    marginLeft: 4,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
   },
-  toolsGrid: {
+  toolsRowsWrap: {
+    gap: 8,
+  },
+  toolsGridRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
+    alignItems: "flex-start",
+  },
+  toolsGridRowCentered: {
+    justifyContent: "center",
+  },
+  toolsDivider: {
+    height: 1,
+    backgroundColor: "rgba(148, 184, 230, 0.12)",
+    marginVertical: 14,
   },
   toolsCell: {
     width: "25%",
+    minHeight: 82,
     alignItems: "center",
-    marginBottom: 14,
+    paddingHorizontal: 3,
+    paddingVertical: 2,
   },
   toolsCellPressed: {
-    transform: [{ scale: 0.92 }],
+    transform: [{ scale: 0.93 }],
     opacity: 0.85,
   },
   toolsOrbWrap: {
     position: "relative",
-    width: 54,
-    height: 54,
+    width: 50,
+    height: 50,
     alignItems: "center",
     justifyContent: "center",
   },
   toolsOrbParty: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 48,
+    height: 48,
+    borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.24)",
-    shadowColor: "#000000",
-    shadowOpacity: 0.32,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
   },
   toolsOrbUtil: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 48,
+    height: 48,
+    borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.08)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: "rgba(186,214,255,0.14)",
   },
   toolsOrbUtilActive: {
     backgroundColor: "rgba(47,128,237,0.24)",
-    borderColor: "rgba(118,175,255,0.55)",
+    borderColor: "rgba(118,175,255,0.52)",
   },
   toolsHotBadge: {
     position: "absolute",
-    top: -3,
-    right: -8,
+    top: -4,
+    right: -6,
     paddingHorizontal: 5,
     paddingVertical: 1.5,
-    borderRadius: 8,
-    backgroundColor: "#FF5A36",
-    borderWidth: 1,
-    borderColor: "#111A2C",
+    borderRadius: 7,
+    backgroundColor: "#EF4444",
+    borderWidth: 1.5,
+    borderColor: "#0E1728",
   },
   toolsHotBadgeText: {
     color: "#FFFFFF",
-    fontSize: 8,
+    fontSize: 7.5,
     fontWeight: "900",
     letterSpacing: 0.3,
   },
@@ -2166,17 +2182,17 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 2,
     right: 2,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
     backgroundColor: "#34D399",
-    borderWidth: 2,
-    borderColor: "#111A2C",
+    borderWidth: 1.5,
+    borderColor: "#0E1728",
   },
   toolsCountBadge: {
     position: "absolute",
-    top: -2,
-    right: -2,
+    top: -3,
+    right: -3,
     minWidth: 18,
     height: 18,
     borderRadius: 9,
@@ -2185,7 +2201,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1.5,
-    borderColor: "#111A2C",
+    borderColor: "#0E1728",
   },
   toolsCountBadgeText: {
     color: "#FFFFFF",
@@ -2193,10 +2209,11 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   toolsLabel: {
-    marginTop: 7,
+    marginTop: 6,
     color: "#E4EEFC",
-    fontSize: 11.5,
-    fontWeight: "600",
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "700",
     textAlign: "center",
   },
 });
