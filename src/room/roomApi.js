@@ -224,10 +224,41 @@ const readFileBytes = (uri) =>
     xhr.send(null);
   });
 
+const BASE64_LOOKUP = (() => {
+  const table = new Uint8Array(256).fill(255);
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  for (let i = 0; i < chars.length; i += 1) table[chars.charCodeAt(i)] = i;
+  return table;
+})();
+
+// Android content:// URI'lerinde XHR dosyayi okuyamiyor; picker base64 verirse onu kullaniriz.
+const decodeBase64 = (input) => {
+  const clean = String(input || "").replace(/[^A-Za-z0-9+/=]/g, "");
+  const padding = clean.endsWith("==") ? 2 : clean.endsWith("=") ? 1 : 0;
+  const out = new Uint8Array(Math.floor((clean.length * 3) / 4) - padding);
+  let o = 0;
+  for (let i = 0; i < clean.length; i += 4) {
+    const a = BASE64_LOOKUP[clean.charCodeAt(i)];
+    const b = BASE64_LOOKUP[clean.charCodeAt(i + 1)];
+    const c = clean.charAt(i + 2) === "=" ? 0 : BASE64_LOOKUP[clean.charCodeAt(i + 2)];
+    const d = clean.charAt(i + 3) === "=" ? 0 : BASE64_LOOKUP[clean.charCodeAt(i + 3)];
+    const n = (a << 18) | (b << 12) | (c << 6) | d;
+    if (o < out.length) out[o++] = (n >> 16) & 255;
+    if (o < out.length) out[o++] = (n >> 8) & 255;
+    if (o < out.length) out[o++] = n & 255;
+  }
+  return out.buffer;
+};
+
+const readAssetBytes = (asset) => {
+  if (asset?.base64) return Promise.resolve(decodeBase64(asset.base64));
+  return readFileBytes(asset.uri);
+};
+
 export const uploadProfileAvatar = async ({ userId, asset }) => {
   const client = requireClient();
   const initialCheck = validateFamilyAvatarAsset(asset);
-  const bytes = await readFileBytes(asset.uri);
+  const bytes = await readAssetBytes(asset);
   const { mimeType, extension } = validateFamilyAvatarAsset(asset, bytes.byteLength);
   const path = `${userId}/${safeFileName(null, initialCheck.extension || extension)}`;
   const { error: uploadError } = await client.storage
@@ -271,7 +302,7 @@ export const uploadFamilyAvatar = async ({ userId, asset }) => {
   if (!userId) throw new Error("Oturum bulunamadı.");
   const client = requireClient();
   const initialCheck = validateFamilyAvatarAsset(asset);
-  const bytes = await readFileBytes(asset.uri);
+  const bytes = await readAssetBytes(asset);
   const { mimeType, extension } = validateFamilyAvatarAsset(asset, bytes.byteLength);
   const path = `${userId}/${safeFileName(asset.fileName || null, initialCheck.extension || extension)}`;
   const { error: uploadError } = await client.storage
@@ -311,7 +342,7 @@ export const uploadRoomBackground = async ({ roomId, asset }) => {
   }
   const extension = mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpg";
   const path = `${roomId}/${safeFileName(null, extension)}`;
-  const bytes = await readFileBytes(asset.uri);
+  const bytes = await readAssetBytes(asset);
   if (bytes.byteLength <= 0 || bytes.byteLength > ROOM_BG_MAX_BYTES) {
     throw new Error("Oda arka plan görseli en fazla 6 MB olabilir.");
   }
@@ -336,7 +367,7 @@ export const uploadRoomMusic = async ({ roomId, asset }) => {
       ? AUDIO_EXT_MIME[extMatch] || "audio/mpeg"
       : rawMime;
   const path = `${roomId}/${safeFileName(asset?.name, AUDIO_EXT_MIME[extMatch] ? extMatch : "mp3")}`;
-  const bytes = await readFileBytes(asset.uri);
+  const bytes = await readAssetBytes(asset);
   if (bytes.byteLength <= 0 || bytes.byteLength > ROOM_MUSIC_MAX_BYTES) {
     throw new Error("Müzik dosyası en fazla 25 MB olabilir.");
   }

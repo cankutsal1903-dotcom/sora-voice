@@ -1154,6 +1154,7 @@ export const CommunityScreen = memo(function CommunityScreen({
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.82,
+        base64: true,
       });
       if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
