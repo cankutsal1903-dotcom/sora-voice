@@ -652,7 +652,7 @@ const moderateParticipant = async (request: Request, roomId: string) => {
       p_target_user_id: targetUserId,
       p_seat_index: null,
       p_valid_seats: null,
-    }).catch(() => undefined);
+    });
   }
 
   const provider = await getRoomProvider(userClient, roomId);
@@ -736,7 +736,7 @@ const authorizeSeat = async (request: Request, roomId: string) => {
         p_target_user_id: targetId,
         p_seat_index: null,
         p_valid_seats: null,
-      }).catch(() => undefined);
+      });
 
       await applyLiveKitPermission(
         lkService,
@@ -763,7 +763,7 @@ const authorizeSeat = async (request: Request, roomId: string) => {
       p_target_user_id: targetId,
       p_seat_index: 0,
       p_valid_seats: [0],
-    }).catch(() => undefined);
+    });
     await applyLiveKitPermission(lkService, roomId, targetId, "host", false, 0)
       .catch(() => undefined);
     return json({ ok: true, seat: 0 });
@@ -897,7 +897,7 @@ const updateLayout = async (request: Request, roomId: string) => {
   await client.rpc("prune_invalid_room_seats", {
     p_room_id: roomId,
     p_valid_seats: validList,
-  }).catch(() => undefined);
+  });
 
   const provider = await getRoomProvider(client, roomId);
   const lkService = getLiveKitServiceForProvider(provider);
