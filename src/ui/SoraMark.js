@@ -11,7 +11,10 @@ import Svg, { Defs, Ellipse, LinearGradient, Path, Rect, Stop } from "react-nati
 const TILT = (-18 * Math.PI) / 180;
 const ORBIT_STEPS = 32;
 const BAR_STEPS = 20;
-const BAR_COLOR = "#8ED2FF";
+const TONES = {
+  dark: { bar: "#8ED2FF", dot: "#E9F6FF", halo: "rgba(143,219,255,0.28)" },
+  light: { bar: "#2F80ED", dot: "#1D5FBF", halo: "rgba(47,128,237,0.22)" },
+};
 const BARS = [
   { x: 52, h: 12, phase: 0 },
   { x: 60, h: 24, phase: 0.33 },
@@ -30,8 +33,9 @@ const orbitPoint = (theta) => {
 
 const range = (n) => Array.from({ length: n + 1 }, (_, i) => i / n);
 
-function SoraMarkBase({ size = 120, animate = false, accessibilityLabel = "Sora sesli sohbet logosu" }) {
+function SoraMarkBase({ size = 120, animate = false, tone = "dark", accessibilityLabel = "Sora sesli sohbet logosu" }) {
   const k = size / 120;
+  const colors = TONES[tone] || TONES.dark;
   const [clocks] = useState(() => ({ bars: new Animated.Value(0), orbit: new Animated.Value(0) }));
 
   useEffect(() => {
@@ -122,7 +126,7 @@ function SoraMarkBase({ size = 120, animate = false, accessibilityLabel = "Sora 
             width: 4 * k,
             height: bar.h * k,
             borderRadius: 2 * k,
-            backgroundColor: BAR_COLOR,
+            backgroundColor: colors.bar,
             transform: anim ? [{ scaleY: anim.barScale(bar.phase) }] : undefined,
           }}
         />
@@ -139,7 +143,7 @@ function SoraMarkBase({ size = 120, animate = false, accessibilityLabel = "Sora 
               width: anim.halo,
               height: anim.halo,
               borderRadius: anim.halo / 2,
-              backgroundColor: "rgba(143,219,255,0.28)",
+              backgroundColor: colors.halo,
               transform: [{ translateX: anim.haloX }, { translateY: anim.haloY }],
             }}
           />
@@ -152,7 +156,7 @@ function SoraMarkBase({ size = 120, animate = false, accessibilityLabel = "Sora 
               width: anim.d,
               height: anim.d,
               borderRadius: anim.d / 2,
-              backgroundColor: "#E9F6FF",
+              backgroundColor: colors.dot,
               transform: [{ translateX: anim.dotX }, { translateY: anim.dotY }],
             }}
           />
