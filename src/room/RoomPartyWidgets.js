@@ -195,8 +195,14 @@ export const LuckyPacketBadge = memo(function LuckyPacketBadge({ packet, onPress
   useEffect(() => {
     if (!packet?.expires_at) return undefined;
     const calc = () => Math.max(0, Math.ceil((Date.parse(packet.expires_at) - Date.now()) / 1000));
-    setLeftSec(calc());
-    const t = setInterval(() => setLeftSec(calc()), 1000);
+    const initial = calc();
+    setLeftSec(initial);
+    if (initial <= 0) return undefined;
+    const t = setInterval(() => {
+      const next = calc();
+      setLeftSec(next);
+      if (next <= 0) clearInterval(t);
+    }, 1000);
     return () => clearInterval(t);
   }, [packet?.expires_at]);
 
@@ -673,25 +679,35 @@ export const RoomPollCreateSheet = memo(function RoomPollCreateSheet({
 // ── 4) Geri Sayım / Konuşma Sayacı ───────────────────────────────────────────
 export const RoomTimerPill = memo(function RoomTimerPill({ timer, canCancel = false, onCancel }) {
   const [leftSec, setLeftSec] = useState(0);
+  const [expiredOut, setExpiredOut] = useState(false);
   const finishedRef = useRef(false);
 
   useEffect(() => {
     if (!timer?.endsAt) return undefined;
     finishedRef.current = false;
+    setExpiredOut(false);
+    let intervalId = null;
     const tick = () => {
-      const s = Math.max(0, Math.ceil((timer.endsAt - Date.now()) / 1000));
+      const now = Date.now();
+      const s = Math.max(0, Math.ceil((timer.endsAt - now) / 1000));
       setLeftSec(s);
       if (s === 0 && !finishedRef.current) {
         finishedRef.current = true;
         playSfx("chime");
       }
+      if (now > timer.endsAt + 4000) {
+        setExpiredOut(true);
+        if (intervalId) clearInterval(intervalId);
+      }
     };
     tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
+    intervalId = setInterval(tick, 1000);
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [timer?.endsAt, timer?.id]);
 
-  if (!timer || !timer.endsAt) return null;
+  if (!timer || !timer.endsAt || expiredOut) return null;
   if (Date.now() > timer.endsAt + 4000) return null;
 
   const urgent = leftSec > 0 && leftSec <= 10;
@@ -800,24 +816,34 @@ export const RoomTimerCreateSheet = memo(function RoomTimerCreateSheet({
 // ── 5) Oda İçi Canlı PK Kapışması ────────────────────────────────────────────
 export const RoomPkBar = memo(function RoomPkBar({ pk, canEnd = false, onEnd }) {
   const [leftSec, setLeftSec] = useState(0);
+  const [expiredOut, setExpiredOut] = useState(false);
   const fanfarePlayedRef = useRef(null);
 
   useEffect(() => {
     if (!pk?.endsAt) return undefined;
+    setExpiredOut(false);
+    let intervalId = null;
     const tick = () => {
-      const s = Math.max(0, Math.ceil((pk.endsAt - Date.now()) / 1000));
+      const now = Date.now();
+      const s = Math.max(0, Math.ceil((pk.endsAt - now) / 1000));
       setLeftSec(s);
       if (s === 0 && fanfarePlayedRef.current !== pk.id) {
         fanfarePlayedRef.current = pk.id;
         playSfx("fanfare");
       }
+      if (now > pk.endsAt + 12000) {
+        setExpiredOut(true);
+        if (intervalId) clearInterval(intervalId);
+      }
     };
     tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
+    intervalId = setInterval(tick, 1000);
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [pk?.endsAt, pk?.id]);
 
-  if (!pk) return null;
+  if (!pk || expiredOut) return null;
   if (Date.now() > pk.endsAt + 12000) return null;
 
   const leftScore = Math.max(0, Number(pk.leftScore) || 0);

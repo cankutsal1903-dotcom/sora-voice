@@ -78,7 +78,11 @@ export function useRoomMusic({ musicState, enabled = true }) {
         if (loadedPathRef.current !== path || !playerRef.current || forceReload) {
           setStatus("loading");
           const url = await getSignedRoomFileUrl("room-music", path, 6 * 3600, { forceRefresh: forceReload });
-          if (cancelled || !url) return;
+          if (cancelled) return;
+          if (!url) {
+            setStatus("error");
+            return;
+          }
 
           destroyPlayer();
           const created = createAudioPlayer({ uri: url }, { updateInterval: 1000 });

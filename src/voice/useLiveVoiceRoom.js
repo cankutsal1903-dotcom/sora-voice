@@ -122,6 +122,7 @@ export function useLiveVoiceRoom({
   const autoRetryCountRef = useRef(0);
   const excludeProvidersRef = useRef([]);
   const intentionalDisconnectRef = useRef(false);
+  const retryingReconnectRef = useRef(false);
   const accessTokenRef = useRef(accessToken);
   const profileNameRef = useRef(profile?.name || "Sora kullanıcısı");
   const startWithMicrophoneRef = useRef(Boolean(startWithMicrophone));
@@ -228,6 +229,7 @@ export function useLiveVoiceRoom({
       clearTimeout(retryTimer);
       retryTimer = setTimeout(() => {
         if (active && !intentionalDisconnectRef.current) {
+          retryingReconnectRef.current = true;
           setConnectionAttempt((attempt) => attempt + 1);
         }
       }, delayMs);
@@ -984,7 +986,7 @@ export function useLiveVoiceRoom({
         mutedByModerator: Boolean(payload.muted),
         canPublish: canPublishNow,
         localSeat: typeof payload.seat === "number" ? payload.seat : null,
-        microphoneEnabled: wantMic,
+        microphoneEnabled: Boolean(audioTrack && wantMic),
         error: null,
       }));
       startHeartbeatLoop();
@@ -1065,6 +1067,7 @@ export function useLiveVoiceRoom({
       }
     };
 
+    retryingReconnectRef.current = false;
     connect();
     return () => {
       active = false;
@@ -1072,7 +1075,9 @@ export function useLiveVoiceRoom({
       clearTimeout(stableResetTimer);
       clearInterval(heartbeatTimer);
       tokenFetchController?.abort();
-      sendHeartbeat({ ended: true });
+      if (!retryingReconnectRef.current) {
+        sendHeartbeat({ ended: true });
+      }
       cleanupAdapter().catch(() => undefined);
       adapterRef.current = null;
     };
@@ -1115,6 +1120,7 @@ export function useLiveVoiceRoom({
     autoRetryCountRef.current = 0;
     excludeProvidersRef.current = [];
     intentionalDisconnectRef.current = false;
+    retryingReconnectRef.current = true;
     setConnectionAttempt((attempt) => attempt + 1);
   }, []);
 
