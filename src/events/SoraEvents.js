@@ -67,7 +67,7 @@ const DETAIL_FALLBACK_BG = "#F3F7FC";
 const HEAD_ASPECT = 1000 / 507;
 const PODIUM_ART = require("../../assets/events/podium.webp");
 const PODIUM_ASPECT = 900 / 396;
-const PODIUM_AVATAR_AREA = 150;
+const PODIUM_AVATAR_AREA = 124;
 const PODIUM_BLOCK_W = 112;
 // Podyum görselinde her basamağın orta x'i ve üst kenarı (görsel genişliği/yüksekliği oranı).
 const PODIUM_SPOTS = { 1: { x: 0.505, top: 0.02 }, 2: { x: 0.155, top: 0.28 }, 3: { x: 0.85, top: 0.46 } };
