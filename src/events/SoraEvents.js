@@ -49,7 +49,7 @@ const AUTO_ADVANCE_MS = 5_000;
 const ROOM_ROTATE_MS = 6_000;
 const CARD_GAP = 0;
 const BANNER_HEIGHT = 128;
-// Etkinlik türüne göre render edilmiş banner görseli; bilinmeyen türler renk geçişine düşer.
+// Etkinlik türüne göre render edilmiş banner görseli (Keşfet + Detay hero sürekliliği).
 const EVENT_BANNER_ART = {
   gift_race: require("../../assets/events/gift-race.webp"),
   room_party: require("../../assets/events/royal-night.webp"),
@@ -57,158 +57,162 @@ const EVENT_BANNER_ART = {
   family_war: require("../../assets/events/family-war.webp"),
 };
 const GOLD_BUTTON = ["#FFE9A8", "#F2B33D", "#C98A1E"];
-// Etkinlik sayfası: türe göre açık başlık görseli ve görselin alt rengiyle aynı sayfa zemini.
-const EVENT_DETAIL_ART = {
+const STAGE_BASE = "#0A1120";
+const COINS_ART = require("../../assets/events/coins.webp");
+const HERO_HEIGHT = 186;
+
+// Etkinlik detay sayfası — 4 etkinlikte birebir aynı iskelet, etkinliğe özel atmosfer ve 3D CTA ikonu.
+const EVENT_STAGE_THEME = {
   gift_race: {
-    head: require("../../assets/events/head-race.webp"),
-    bg: "#E1F1FF",
-    logo: require("../../assets/events/logo-race.webp"),
-    logoAspect: 720 / 512,
-    title: "Haftalık Hediye Yarışı",
-    dark: {
-      bg: require("../../assets/events/bg-race.webp"),
-      base: "#060A18",
-      bgTop: 120,
-      logo: require("../../assets/events/logo-race-dark.webp"),
-      logoAspect: 720 / 472,
-    },
+    stageTop: "#081C42",
+    glow: "rgba(47,128,237,0.44)",
+    unitIcon: "trophy",
+    unitColor: "#F6C86E",
+    ctaColors: ["#164DA8", "#2F80ED", "#1D68D8"],
+    ctaShadow: "#2F80ED",
+    ctaIcon: require("../../assets/events/cta-race.webp"),
+    defaultCta: "Hediye Gönder ve Katıl",
   },
   room_party: {
-    head: require("../../assets/events/head-royal.webp"),
-    bg: "#EDE3F8",
-    logo: require("../../assets/events/logo-royal.webp"),
-    logoAspect: 720 / 545,
-    title: "Kraliyet Sahnesi Gecesi",
-    dark: {
-      bg: require("../../assets/events/bg-royal.webp"),
-      base: "#141018",
-      bgTop: 20,
-      logo: require("../../assets/events/logo-royal-dark.webp"),
-      logoAspect: 720 / 521,
-    },
+    stageTop: "#1B103F",
+    glow: "rgba(139,92,246,0.44)",
+    unitIcon: "sparkles",
+    unitColor: "#F6C86E",
+    ctaColors: ["#5B21B6", "#7C3AED", "#6D28D9"],
+    ctaShadow: "#7C3AED",
+    ctaIcon: require("../../assets/events/cta-royal.webp"),
+    defaultCta: "Kraliyet Sahnesi Gönder",
   },
   love: {
-    head: require("../../assets/events/head-love.webp"),
-    bg: "#FBEAF0",
-    logo: require("../../assets/events/logo-love.webp"),
-    logoAspect: 720 / 259,
-    title: "Aşk Haftası",
-    dark: {
-      bg: require("../../assets/events/bg-love.webp"),
-      base: "#0A0A10",
-      bgTop: 110,
-      logo: require("../../assets/events/logo-love-dark.webp"),
-      logoAspect: 720 / 300,
-    },
+    stageTop: "#330B24",
+    glow: "rgba(236,72,153,0.42)",
+    unitIcon: "heart",
+    unitColor: "#FF6B9A",
+    ctaColors: ["#D91B5C", "#F43F7E", "#EC4899"],
+    ctaShadow: "#F43F7E",
+    ctaIcon: require("../../assets/events/cta-love.webp"),
+    defaultCta: "Minik Kalp Gönder",
   },
   family_war: {
-    head: require("../../assets/events/head-family.webp"),
-    bg: "#CBE4F6",
-    logo: require("../../assets/events/logo-family.webp"),
-    logoAspect: 720 / 360,
-    title: "Aile Savaşları",
-    dark: {
-      bg: require("../../assets/events/bg-family.webp"),
-      base: "#1A110F",
-      bgTop: 120,
-      logo: require("../../assets/events/logo-family-dark.webp"),
-      logoAspect: 720 / 452,
-    },
+    stageTop: "#0B1B3B",
+    glow: "rgba(59,130,246,0.42)",
+    unitIcon: "flash",
+    unitColor: "#60A5FA",
+    ctaColors: ["#1E3A8A", "#2563EB", "#1D4ED8"],
+    ctaShadow: "#2563EB",
+    ctaIcon: require("../../assets/events/cta-family.webp"),
+    defaultCta: "Ailen İçin Hediye Gönder",
   },
 };
-const LOGO_MAX_W = 300;
-const LOGO_MAX_H = 150;
-const TILE_GOLD = ["#FFE9A8", "#F2B33D", "#C98A1E"];
-// Başlık görselinin üzerinde parlayan yıldızlar: [sol %, üst %, boyut, grup]
-const HEADER_SPARKLES = [
-  [8, 22, 14, 0], [22, 58, 10, 1], [36, 14, 9, 1], [64, 18, 12, 0],
-  [78, 52, 10, 0], [90, 26, 15, 1], [14, 80, 8, 0], [86, 78, 9, 1],
+
+// Hero görselinin yalnızca sağ sahne bölgesinde parlayan ince 4 köşeli yıldızlar: [sol %, üst %, boyut, grup]
+const HERO_SPARKLES = [
+  [60, 22, 12, 0],
+  [82, 18, 10, 1],
+  [90, 48, 13, 0],
+  [67, 64, 9, 1],
 ];
-// Koyu (gösterişli) etkinlik sayfası: ilk üç için süslü çerçeveler, ödül görselleri.
-const DARK_FRAMES = {
-  1: { src: require("../../assets/events/frame-gold.webp"), aspect: 412 / 420, hole: 0.545, cx: 0.494, cy: 0.538, avatar: 70 },
-  2: { src: require("../../assets/events/frame-silver-ornate.webp"), aspect: 420 / 419, hole: 0.542, cx: 0.495, cy: 0.557, avatar: 46 },
-  3: { src: require("../../assets/events/frame-bronze-ornate.webp"), aspect: 420 / 411, hole: 0.64, cx: 0.498, cy: 0.526, avatar: 52 },
-};
-const COINS_ART = require("../../assets/events/coins.webp");
-const DARK_LOGO_MAX_H = 130;
-// Koyu sayfanın süslü arayüz parçaları (görsel); inner = yazı/ikon yerleşen iç alanın oranları [sol, üst, sağ, alt].
-const DARK_UI = {
-  top: {
-    1: { src: require("../../assets/events/top1.webp"), aspect: 220 / 360, w: 104, overlap: 20 },
-    2: { src: require("../../assets/events/top2.webp"), aspect: 167 / 360, w: 86, overlap: 12 },
-    3: { src: require("../../assets/events/top3.webp"), aspect: 167 / 360, w: 86, overlap: 12 },
+
+// Safir-lacivert emaye + fırçalanmış altın kenarlı 3D podyum (PIL ile ölçülmüş silindir koordinatları).
+const PODIUM_STAGE = {
+  src: require("../../assets/events/podium-stage.webp"),
+  aspect: 960 / 350,
+  steps: {
+    1: { cx: 0.4995, top: 0.0086, rim: 0.1114, seat: 6 },
+    2: { cx: 0.1578, top: 0.2171, rim: 0.3486, seat: 10 },
+    3: { cx: 0.8417, top: 0.3600, rim: 0.4971, seat: 11 },
   },
-  oduller: { src: require("../../assets/events/oduller.webp"), aspect: 274 / 560, w: 196 },
-  plaque: { src: require("../../assets/events/plaque.webp"), aspect: 281 / 640, w: 236, inner: [0.169, 0.267, 0.952, 0.765] },
-  katil: { src: require("../../assets/events/katil.webp"), aspect: 455 / 720, w: 184 },
-  kurallar: { src: require("../../assets/events/kurallar.webp"), aspect: 157 / 360, w: 92 },
-  close: { src: require("../../assets/events/close.webp"), aspect: 150 / 148, w: 36 },
-  tile: { src: require("../../assets/events/tile.webp"), aspect: 240 / 225, inner: [0.16, 0.233, 0.844, 0.85] },
-  rank: { src: require("../../assets/events/rank.webp"), w: 32 },
 };
-const ODULLER_H = DARK_UI.oduller.w * DARK_UI.oduller.aspect;
-// ÖDÜLLER kurdelesinin gövdesi görselin ~%55'inde: panel kenarı oradan geçer.
-const ODULLER_OVERLAP = Math.round(ODULLER_H * 0.55);
-const innerBox = ([l, t, r, b]) => ({
-  position: "absolute",
-  left: `${l * 100}%`,
-  top: `${t * 100}%`,
-  right: `${(1 - r) * 100}%`,
-  bottom: `${(1 - b) * 100}%`,
-  alignItems: "center",
-  justifyContent: "center",
-});
-const PLAQUE_INNER = innerBox(DARK_UI.plaque.inner);
-const TILE_INNER = innerBox(DARK_UI.tile.inner);
-// Ödül metnindeki anahtar kelime -> profil çerçevesi; eşleşmezse kredi (altın) görseli.
+
+// İlk 3 kademe çerçeveleri (PIL ile ölçülmüş iç delik cx/cy/hole oranları — yakutsuz Sora safir-altın dili).
+const STAGE_FRAMES = {
+  1: { src: require("../../assets/events/frame-rank1-sora.webp"), aspect: 391 / 460, hole: 0.5739, cx: 0.4989, cy: 0.5384, avatar: 56 },
+  2: { src: require("../../assets/events/frame-silver.webp"), aspect: 347 / 360, hole: 0.6361, cx: 0.4986, cy: 0.4813, avatar: 44 },
+  3: { src: require("../../assets/events/frame-bronze.webp"), aspect: 350 / 360, hole: 0.6500, cx: 0.4986, cy: 0.4900, avatar: 44 },
+};
+
+const RANK_COIN_THEMES = {
+  1: { colors: ["#FFF0B3", "#F5B83D", "#C78214"], text: "#543300" },
+  2: { colors: ["#F8FAFC", "#CBD5E1", "#8A99AE"], text: "#2D3748" },
+  3: { colors: ["#FAD4B0", "#D98E54", "#9E5727"], text: "#4A2309" },
+};
+
+const REWARD_PILL_THEMES = {
+  gold: { bg: "rgba(251,191,36,0.22)", border: "rgba(251,191,36,0.45)", text: "#FDE68A", glow: "#F6C86E" },
+  silver: { bg: "rgba(203,213,225,0.18)", border: "rgba(203,213,225,0.35)", text: "#E2E8F0", glow: "#93C5FD" },
+  bronze: { bg: "rgba(251,146,60,0.20)", border: "rgba(251,146,60,0.40)", text: "#FED7AA", glow: "#F59E0B" },
+  blue: { bg: "rgba(47,128,237,0.22)", border: "rgba(96,165,250,0.40)", text: "#93C5FD", glow: "#60A5FA" },
+};
+
+// Ödül metnindeki anahtar kelime -> gerçek Sora profil çerçevesi.
 const REWARD_FRAME_KEYWORDS = [
-  ["alev", "frame_flame"],
-  ["kehribar", "frame_amber"],
-  ["asil", "frame_family_royal"],
-  ["gümüş aile", "frame_family_silver"],
-  ["lila", "frame_lilac"],
-  ["mor ", "frame_lilac"],
+  ["alev", "frame_flame", "#F97316"],
+  ["kehribar", "frame_amber", "#F59E0B"],
+  ["kraliyet", "frame_family_royal", "#3B82F6"],
+  ["taç", "frame_family_royal", "#3B82F6"],
+  ["asil", "frame_family_royal", "#3B82F6"],
+  ["gümüş aile", "frame_family_silver", "#60A5FA"],
+  ["lila", "frame_lilac", "#A855F7"],
+  ["mor ", "frame_lilac", "#A855F7"],
+  ["pembe", "frame_lilac", "#EC4899"],
+  ["kanat", "frame_lilac", "#EC4899"],
 ];
-// Rozet ödülleri: metne göre altın/gümüş/bronz/asil rozet görseli.
+
+// Yakutsuz Sora rozet ödülleri (altın-safir, asil, gümüş-safir, bronz-kehribar).
 const REWARD_BADGES = {
-  gold: require("../../assets/events/badge-gold.webp"),
-  silver: require("../../assets/events/badge-silver.webp"),
-  bronze: require("../../assets/events/badge-bronze.webp"),
-  royal: require("../../assets/events/badge-royal.webp"),
+  gold: { src: require("../../assets/events/badge-champion.webp"), glow: "#3B82F6" },
+  royal: { src: require("../../assets/events/badge-royal.webp"), glow: "#8B5CF6" },
+  silver: { src: require("../../assets/events/badge-silver.webp"), glow: "#93C5FD" },
+  bronze: { src: require("../../assets/events/badge-bronze-clean.webp"), glow: "#F59E0B" },
 };
+
 const REWARD_BADGE_KEYWORDS = [
   ["asil", "royal"],
   ["gümüş", "silver"],
   ["bronz", "bronze"],
 ];
-// Ödül metninden görsel: rozet > profil çerçevesi > kredi (altın yığını).
-const rewardArt = (label) => {
-  const text = String(label || "").toLowerCase();
+
+const resolveRewardVisual = (label) => {
+  const text = String(label || "").toLocaleLowerCase("tr-TR");
   if (text.includes("rozet")) {
     const badge = REWARD_BADGE_KEYWORDS.find(([key]) => text.includes(key));
-    return REWARD_BADGES[badge ? badge[1] : "gold"];
+    const entry = REWARD_BADGES[badge ? badge[1] : "gold"];
+    return { source: entry.src, isFrame: false, glow: entry.glow };
   }
   const hit = REWARD_FRAME_KEYWORDS.find(([key]) => text.includes(key));
-  return (hit && PROFILE_ITEM_APPEARANCE[hit[1]]?.asset) || COINS_ART;
+  if (hit && PROFILE_ITEM_APPEARANCE[hit[1]]?.asset) {
+    return { source: PROFILE_ITEM_APPEARANCE[hit[1]].asset, isFrame: true, glow: hit[2] };
+  }
+  return { source: COINS_ART, isFrame: false, glow: "#F6C86E" };
 };
+
 const rewardDays = (label) => {
   const match = String(label || "").match(/(\d+)\s*gün/i);
   return match ? `${match[1]} gün` : null;
 };
-const DETAIL_FALLBACK_BG = "#F3F7FC";
-const HEAD_ASPECT = 1000 / 507;
-const PODIUM_ART = require("../../assets/events/podium.webp");
-const PODIUM_ASPECT = 900 / 396;
-const PODIUM_AVATAR_AREA = 124;
-const PODIUM_BLOCK_W = 112;
-// Podyum görselinde her basamağın orta x'i ve üst kenarı (görsel genişliği/yüksekliği oranı).
-const PODIUM_SPOTS = { 1: { x: 0.505, top: 0.02 }, 2: { x: 0.155, top: 0.28 }, 3: { x: 0.85, top: 0.46 } };
-// Çerçeve görselindeki boş halkanın çapı (genişliğe oran) ve merkezi.
-const PODIUM_FRAMES = {
-  1: { src: require("../../assets/events/frame-wings.webp"), aspect: 261 / 360, hole: 0.4, cx: 0.5, cy: 0.682, avatar: 54 },
-  2: { src: require("../../assets/events/frame-silver.webp"), aspect: 347 / 360, hole: 0.642, cx: 0.5, cy: 0.483, avatar: 42 },
-  3: { src: require("../../assets/events/frame-bronze.webp"), aspect: 350 / 360, hole: 0.653, cx: 0.5, cy: 0.49, avatar: 42 },
+
+const rewardSubtitle = (reward) => {
+  const cleaned = String(reward?.label || "")
+    .replace(/\s*\d+\s*gün/gi, "")
+    .replace(/\s*vitrini/gi, "")
+    .trim();
+  const lower = cleaned.toLocaleLowerCase("tr-TR");
+  if (!cleaned || lower === "kredi ödülü") {
+    const rankStr = String(reward?.rank || "").trim();
+    if (rankStr === "1." || rankStr === "1") return "Birinciye özel ödül";
+    if (rankStr.includes("-")) return "Kişi başı kredi";
+    return "Kredi ödülü";
+  }
+  return cleaned.charAt(0).toLocaleUpperCase("tr-TR") + cleaned.slice(1);
+};
+
+const rewardTierKey = (rank) => {
+  const text = String(rank ?? "").trim();
+  const num = parseInt(text, 10);
+  if (num === 1 && !text.includes("-")) return "gold";
+  if (num === 2) return "silver";
+  if (num === 3 && !text.includes("-")) return "bronze";
+  return "blue";
 };
 
 const BRAND = {
@@ -223,7 +227,6 @@ const BRAND = {
 };
 
 const HEX_RE = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
-const AVATAR_PALETTE = ["#2F80ED", "#1C5FB8", "#8B6CEF", "#FF5C8A", "#F5A623", "#26A69A", "#E65C00", "#4B6CB7"];
 
 const KIND_THEME = {
   gift_race: { colors: ["#0B3477", "#1C5FB8", "#F6C86E"], accent: "#FFD978", icon: "trophy", unit: "kredi" },
@@ -238,13 +241,6 @@ const GIFT_NAME_BY_ID = {
   royal_stage: "Kraliyet Sahnesi",
   minik_kalp: "Minik Kalp",
   mini_heart: "Minik Kalp",
-};
-
-const MEDALS = {
-  gold: { colors: ["#FFE9A8", "#F6C86E", "#D99B1E"], solid: "#E8B54A", soft: "#FFF6DD", text: "#7A5300" },
-  silver: { colors: ["#F6F8FB", "#C9D3DF", "#98A6B8"], solid: "#AEB9C7", soft: "#F1F4F8", text: "#4A5768" },
-  bronze: { colors: ["#F8D2AE", "#D9915B", "#A9633A"], solid: "#CF8650", soft: "#FCEFE4", text: "#6E3B17" },
-  blue: { colors: ["#8FC2FF", "#2F80ED", "#1C5FB8"], solid: "#2F80ED", soft: "#EAF2FF", text: "#1C4F96" },
 };
 
 const DEFAULT_EVENT_DEFINITIONS = [
@@ -412,27 +408,6 @@ const formatCompact = (value) => {
   if (num >= 1e6) return `${fmt(num / 1e6)} Mn`;
   if (num >= 1e4) return `${fmt(num / 1e3)} B`;
   return formatThousands(num);
-};
-
-const initialOf = (name) => {
-  const first = Array.from(String(name || "").trim())[0];
-  return first ? first.toLocaleUpperCase("tr-TR") : "S";
-};
-
-const colorFromName = (name) => {
-  const str = String(name || "");
-  let hash = 0;
-  for (let i = 0; i < str.length; i += 1) hash = (hash * 31 + str.charCodeAt(i)) | 0;
-  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
-};
-
-const medalForRank = (rank) => {
-  const text = String(rank ?? "").trim();
-  const num = parseInt(text, 10);
-  if (num === 1) return MEDALS.gold;
-  if (num === 2) return MEDALS.silver;
-  if (num === 3 && !text.includes("-")) return MEDALS.bronze;
-  return MEDALS.blue;
 };
 
 const splitDuration = (ms) => {
@@ -1337,95 +1312,59 @@ function useEventLeaderboard(eventId, enabled) {
   return { ...state, retry };
 }
 
-const EventAvatar = memo(function EventAvatar({ name, url, color, size = 40, ringColor }) {
+const EventAvatar = memo(function EventAvatar({ url, size = 36, ringColor, empty = false }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     setFailed(false);
   }, [url]);
-  const ring = ringColor ? { borderWidth: 2, borderColor: ringColor } : null;
+  const ring = ringColor ? { borderWidth: 1.5, borderColor: ringColor } : null;
   const dims = { width: size, height: size, borderRadius: size / 2 };
-  if (url && !failed) {
+  if (!empty && url && !failed) {
     return <Image source={{ uri: url }} onError={() => setFailed(true)} style={[styles.avatarImage, dims, ring]} />;
   }
+  const gradColors = empty ? ["#1A2C4D", "#0E1A30"] : ["#3B82F6", "#1C5FB8", "#0F2A55"];
   return (
-    <View style={[styles.avatarFallback, dims, { backgroundColor: color || colorFromName(name) }, ring]}>
-      <Text style={[styles.avatarInitial, { fontSize: Math.round(size * 0.42) }]}>{initialOf(name)}</Text>
-    </View>
+    <LinearGradient colors={gradColors} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }} style={[styles.avatarFallback, dims, ring]}>
+      <Ionicons
+        name="mic"
+        size={Math.round(size * 0.44)}
+        color={empty ? "rgba(255,255,255,0.48)" : "rgba(255,255,255,0.92)"}
+      />
+    </LinearGradient>
   );
 });
 
-const CountdownTiles = memo(function CountdownTiles({ event, accent }) {
+const HeroCountdownChip = memo(function HeroCountdownChip({ event }) {
   const upcoming = event.startsAtMs > Date.now();
   const remaining = useCountdownMs(upcoming ? event.startsAtMs : event.endsAtMs, "seconds");
-  if (remaining <= 0) {
-    return <Text style={styles.cdEnded}>Etkinlik sona erdi</Text>;
-  }
   const { days, hours, minutes, seconds } = splitDuration(remaining);
-  const parts = [
-    [days, "GÜN"],
-    [hours, "SAAT"],
-    [minutes, "DK"],
-    [seconds, "SN"],
-  ];
+  const text =
+    remaining <= 0
+      ? "Sona erdi"
+      : `${days > 0 ? `${days}g ` : ""}${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
   return (
-    <View style={styles.cdBlock}>
-      {upcoming ? <Text style={styles.cdCaption}>Başlamasına kalan</Text> : null}
-      <View style={styles.cdTiles}>
-        {parts.map(([value, label]) => (
-          <LinearGradient key={label} colors={TILE_GOLD} style={styles.cdTileRim}>
-            <View style={styles.cdTile}>
-              <Text style={[styles.cdTileValue, { color: accent }]}>{pad2(value)}</Text>
-              <Text style={styles.cdTileLabel}>{label}</Text>
-            </View>
-          </LinearGradient>
-        ))}
-      </View>
+    <View style={[styles.heroChip, styles.heroTimerChip]}>
+      <Ionicons name="time-outline" size={12.5} color="#FFFFFF" />
+      <Text style={styles.heroTimerText} numberOfLines={1}>
+        {text}
+      </Text>
     </View>
   );
 });
 
-const RewardTiles = memo(function RewardTiles({ rewards, accent, onPress }) {
-  const shown = rewards.slice(0, 4);
-  if (!shown.length) return null;
-  return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel="Ödül detayları" style={styles.rewardTiles}>
-      {shown.map((reward, i) => {
-        const medal = medalForRank(reward.rank);
-        return (
-          <LinearGradient key={`rt-${i}`} colors={TILE_GOLD} style={styles.rewardTileRim}>
-            <View style={styles.rewardTile}>
-              <LinearGradient colors={medal.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.rewardTileMedal}>
-                <Text style={styles.rewardTileRank} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-                  {String(reward.rank).replace(/\.$/, "")}
-                </Text>
-              </LinearGradient>
-              <Text style={[styles.rewardTileValue, { color: accent }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-                {reward.credits > 0 ? formatCompact(reward.credits) : "Ödül"}
-              </Text>
-              <Text style={styles.rewardTileUnit} numberOfLines={1}>
-                {reward.credits > 0 ? "kredi" : "özel"}
-              </Text>
-            </View>
-          </LinearGradient>
-        );
-      })}
-    </Pressable>
-  );
-});
-
-const HeaderSparkles = memo(function HeaderSparkles({ pulseValue }) {
-  const on = pulseValue.interpolate({ inputRange: [0, 1], outputRange: [0.2, 1] });
-  const off = pulseValue.interpolate({ inputRange: [0, 1], outputRange: [1, 0.2] });
+const HeroSparkles = memo(function HeroSparkles({ pulseValue }) {
+  const on = pulseValue.interpolate({ inputRange: [0, 1], outputRange: [0.22, 0.95] });
+  const off = pulseValue.interpolate({ inputRange: [0, 1], outputRange: [0.95, 0.22] });
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      {HEADER_SPARKLES.map(([left, top, size, group]) => {
+      {HERO_SPARKLES.map(([left, top, size, group]) => {
         const opacity = group ? off : on;
         return (
           <Animated.View
             key={`${left}-${top}`}
             style={{ position: "absolute", left: `${left}%`, top: `${top}%`, opacity, transform: [{ scale: opacity }] }}
           >
-            <MaterialCommunityIcons name="star-four-points" size={size} color="#FFF3C4" style={styles.sparkleIcon} />
+            <MaterialCommunityIcons name="star-four-points" size={size} color="#FFF4CC" style={styles.sparkleIcon} />
           </Animated.View>
         );
       })}
@@ -1433,312 +1372,357 @@ const HeaderSparkles = memo(function HeaderSparkles({ pulseValue }) {
   );
 });
 
-const RewardRow = memo(function RewardRow({ reward }) {
-  const medal = medalForRank(reward.rank);
-  const isTop = medal === MEDALS.gold;
+const FramedPodiumAvatar = memo(function FramedPodiumAvatar({ row, place, scale = 1 }) {
+  const f = STAGE_FRAMES[place];
+  const coin = RANK_COIN_THEMES[place];
+  const avSize = Math.round(f.avatar * scale);
+  const fw = Math.round((avSize * 0.96) / f.hole);
+  const fh = Math.round(fw * f.aspect);
+  const avLeft = Math.round(f.cx * fw - avSize / 2);
+  const avTop = Math.round(f.cy * fh - avSize / 2);
   return (
-    <View style={[styles.rewardRow, { backgroundColor: medal.soft }, isTop && styles.rewardRowTop]}>
-      <LinearGradient colors={medal.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.rewardMedal}>
-        {medal === MEDALS.blue ? (
-          <Text style={styles.rewardMedalTextSmall} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-            {reward.rank}
-          </Text>
-        ) : (
-          <MaterialCommunityIcons name={isTop ? "crown" : "medal"} size={20} color="#FFFFFF" />
-        )}
+    <View style={{ width: fw, height: fh }}>
+      <View style={{ position: "absolute", left: avLeft, top: avTop }}>
+        <EventAvatar url={row?.avatar_url} size={avSize} empty={!row} />
+      </View>
+      <Image source={f.src} resizeMode="contain" style={StyleSheet.absoluteFill} />
+      <LinearGradient
+        colors={coin.colors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.rankCoin}
+      >
+        <Text style={[styles.rankCoinText, { color: coin.text }]}>{place}</Text>
       </LinearGradient>
-      <View style={styles.rewardTextCol}>
-        <Text style={[styles.rewardRank, { color: medal.text }]}>{reward.rank} sıra</Text>
-        {reward.label ? (
-          <Text style={styles.rewardLabel} numberOfLines={2}>
-            {reward.label}
-          </Text>
+    </View>
+  );
+});
+
+const StagePodium = memo(function StagePodium({ rows, me, width, theme, pulseValue }) {
+  const podH = width / PODIUM_STAGE.aspect;
+  const avScale = Math.min(1, width / 328);
+  const wrapH = Math.round(podH + 68 * avScale);
+  const glowScale = pulseValue.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.08] });
+  const glowOpacity = pulseValue.interpolate({ inputRange: [0, 1], outputRange: [0.48, 0.82] });
+  const glowW = Math.round(width * 0.68);
+  const glowH = Math.round(podH * 0.96);
+  const faceW = Math.round(width * 0.295);
+
+  return (
+    <View style={[styles.podiumWrap, { width, height: wrapH }]}>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.podiumGlow,
+          {
+            width: glowW,
+            height: glowH,
+            borderRadius: glowH / 2,
+            left: (width - glowW) / 2,
+            top: 8,
+            backgroundColor: theme.glow,
+            opacity: glowOpacity,
+            transform: [{ scale: glowScale }],
+          },
+        ]}
+      />
+      <Image source={PODIUM_STAGE.src} resizeMode="contain" style={[styles.podiumArt, { width, height: podH }]} />
+      {[2, 1, 3].map((place) => {
+        const row = rows[place - 1] || null;
+        const step = PODIUM_STAGE.steps[place];
+        const cxPx = Math.round(step.cx * width);
+        const isMe = Boolean(row && me && me === row.user_id);
+        const frameBottom = Math.round(podH * (1 - step.top) - step.seat * avScale);
+        const faceTop = Math.round(wrapH - podH * (1 - step.rim)) + 3;
+        const faceH = Math.max(34, wrapH - 5 - faceTop);
+        return (
+          <React.Fragment key={`step-${place}`}>
+            <View
+              style={[
+                styles.podiumAvatarSlot,
+                { left: cxPx - 64, width: 128, bottom: frameBottom, zIndex: place === 1 ? 4 : 3 },
+              ]}
+            >
+              <FramedPodiumAvatar row={row} place={place} scale={avScale} />
+            </View>
+            <View
+              pointerEvents="none"
+              style={[
+                styles.podiumFace,
+                { left: cxPx - faceW / 2, top: faceTop, width: faceW, height: faceH },
+              ]}
+            >
+              <Text style={[styles.podiumName, isMe && styles.podiumNameMe]} numberOfLines={1}>
+                {row ? (isMe ? "Sen" : row.display_name) : "Boş sıra"}
+              </Text>
+              <View style={styles.podiumScoreRow}>
+                {row ? (
+                  <>
+                    <Ionicons name={safeIcon(theme.unitIcon, "trophy")} size={10.5} color={theme.unitColor} />
+                    <Text style={styles.podiumScore} numberOfLines={1}>
+                      {formatCompact(row.score)}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={styles.podiumScoreEmpty}>—</Text>
+                )}
+              </View>
+            </View>
+          </React.Fragment>
+        );
+      })}
+    </View>
+  );
+});
+
+const StageRewards = memo(function StageRewards({ rewards, currentUserAvatar, onToggleRules }) {
+  if (!Array.isArray(rewards) || !rewards.length) return null;
+  const isScrollable = rewards.length > 2;
+
+  const renderCard = (reward, idx) => {
+    const tier = rewardTierKey(reward.rank);
+    const pill = REWARD_PILL_THEMES[tier];
+    const visual = resolveRewardVisual(reward.label);
+    const days = rewardDays(reward.label);
+    const sub = rewardSubtitle(reward);
+    const isTop = idx === 0;
+    return (
+      <View
+        key={`rw-${idx}-${reward.rank}`}
+        style={[
+          styles.rewardCard,
+          isScrollable ? styles.rewardCardScroll : styles.rewardCardPair,
+          isTop && styles.rewardCardTop,
+        ]}
+      >
+        {isTop ? (
+          <LinearGradient
+            pointerEvents="none"
+            colors={["rgba(251,191,36,0.14)", "rgba(251,191,36,0)"]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 0.72 }}
+            style={StyleSheet.absoluteFill}
+          />
+        ) : null}
+        <View style={styles.rewardTopRow}>
+          <View style={[styles.rewardRankPill, { backgroundColor: pill.bg, borderColor: pill.border }]}>
+            <Text style={[styles.rewardRankPillText, { color: pill.text }]} numberOfLines={1}>
+              {reward.rank}
+            </Text>
+          </View>
+          {days ? (
+            <View style={styles.rewardDaysPill}>
+              <Text style={styles.rewardDaysText} numberOfLines={1}>
+                {days}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={styles.rewardArtBox}>
+          <View style={[styles.rewardArtGlow, { backgroundColor: withAlpha(visual.glow, 0.24) }]} />
+          {visual.isFrame ? (
+            <View style={styles.rewardFrameAvatar}>
+              <EventAvatar url={currentUserAvatar} size={36} />
+            </View>
+          ) : null}
+          <Image source={visual.source} resizeMode="contain" style={styles.rewardArtImg} />
+        </View>
+
+        <Text style={styles.rewardVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+          {reward.credits > 0 ? `${formatCompact(reward.credits)} kredi` : "Özel ödül"}
+        </Text>
+        <Text style={styles.rewardSub} numberOfLines={1}>
+          {sub}
+        </Text>
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.sectionBlock}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Ödüller</Text>
+        {onToggleRules ? (
+          <Pressable onPress={onToggleRules} hitSlop={8} accessibilityRole="button" style={styles.sectionLinkBtn}>
+            <Text style={styles.sectionLinkText}>Kurallar</Text>
+            <Ionicons name="chevron-forward" size={13} color="#60A5FA" />
+          </Pressable>
         ) : null}
       </View>
-      {reward.credits > 0 ? (
-        <View style={styles.rewardCredits}>
-          <MaterialCommunityIcons name="star-four-points" size={11} color="#C98A00" />
-          <Text style={styles.rewardCreditsText} numberOfLines={1}>
-            {formatCompact(reward.credits)}
+      {isScrollable ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.rewardScrollContent}
+          style={styles.rewardScrollOuter}
+        >
+          {rewards.map(renderCard)}
+        </ScrollView>
+      ) : (
+        <View style={styles.rewardPairRow}>{rewards.map(renderCard)}</View>
+      )}
+    </View>
+  );
+});
+
+const LeaderboardRow = memo(function LeaderboardRow({ row, isMe, unitIcon, unitColor, unrankedLabel = null }) {
+  return (
+    <View style={[styles.lbRow, isMe && styles.lbRowMe]}>
+      <Text style={[styles.lbRankText, isMe && styles.lbRankTextMe]} numberOfLines={1}>
+        {unrankedLabel ? "—" : row.rank}
+      </Text>
+      <EventAvatar
+        url={row.avatar_url}
+        size={34}
+        ringColor={isMe ? "rgba(96,165,250,0.65)" : "rgba(255,255,255,0.16)"}
+      />
+      <View style={styles.lbNameCol}>
+        <Text style={styles.lbName} numberOfLines={1}>
+          {row.display_name}
+        </Text>
+        {isMe ? (
+          <View style={styles.meBadge}>
+            <Text style={styles.meBadgeText}>SEN</Text>
+          </View>
+        ) : null}
+      </View>
+      {unrankedLabel ? (
+        <Text style={styles.lbUnrankedText}>{unrankedLabel}</Text>
+      ) : (
+        <View style={styles.lbScoreWrap}>
+          <Text style={styles.lbScore} numberOfLines={1}>
+            {formatThousands(row.score)}
           </Text>
+          <Ionicons name={safeIcon(unitIcon, "trophy")} size={12.5} color={unitColor} style={styles.lbIcon} />
+        </View>
+      )}
+    </View>
+  );
+});
+
+const StageLeaderboard = memo(function StageLeaderboard({
+  event,
+  enabled,
+  currentUserId,
+  currentUserAvatar,
+  currentUserName,
+  stageWidth,
+  theme,
+  pulseValue,
+  rewardsNode,
+}) {
+  const { rows, loading, error, retry } = useEventLeaderboard(event.id, enabled);
+  const me = currentUserId ? String(currentUserId) : null;
+  const userInRows = useMemo(() => Boolean(me && rows.some((r) => r.user_id === me)), [me, rows]);
+  const rest = rows.slice(3);
+
+  if (loading) {
+    return (
+      <View>
+        <View style={styles.stateBox}>
+          <ActivityIndicator color="#FFD978" />
+          <Text style={styles.stateSub}>Sıralama yükleniyor…</Text>
+        </View>
+        {rewardsNode}
+      </View>
+    );
+  }
+
+  if (error && rows.length === 0) {
+    return (
+      <View>
+        <Pressable onPress={retry} accessibilityRole="button" style={styles.stateBox}>
+          <View style={styles.stateOrb}>
+            <Ionicons name="cloud-offline-outline" size={22} color="#FFD978" />
+          </View>
+          <Text style={styles.stateTitle}>Sıralama yüklenemedi</Text>
+          <Text style={styles.stateSub}>Tekrar denemek için dokun.</Text>
+        </Pressable>
+        {rewardsNode}
+      </View>
+    );
+  }
+
+  if (rows.length === 0) {
+    return (
+      <View>
+        <View style={styles.stateBox}>
+          <View style={styles.stateOrb}>
+            <Ionicons name={safeIcon(theme.unitIcon, "trophy")} size={22} color="#FFD978" />
+          </View>
+          <Text style={styles.stateTitle}>İlk sırayı sen kap!</Text>
+          <Text style={styles.stateSub}>Henüz sıralama oluşmadı. İlk hediyeyi gönder, zirveye yerleş.</Text>
+        </View>
+        {rewardsNode}
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      {stageWidth > 0 ? (
+        <StagePodium
+          rows={rows.slice(0, 3)}
+          me={me}
+          width={stageWidth}
+          theme={theme}
+          pulseValue={pulseValue}
+        />
+      ) : null}
+      {rewardsNode}
+      {rest.length > 0 || (me && !userInRows) ? (
+        <View style={styles.sectionBlock}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Sıralama</Text>
+            <View style={styles.sectionMetaPill}>
+              <Text style={styles.sectionMetaText}>İlk {LEADERBOARD_LIMIT} · Canlı</Text>
+            </View>
+          </View>
+          <View style={styles.lbList}>
+            {rest.map((row) => (
+              <LeaderboardRow
+                key={`${row.user_id}-${row.rank}`}
+                row={row}
+                isMe={Boolean(me && me === row.user_id)}
+                unitIcon={theme.unitIcon}
+                unitColor={theme.unitColor}
+              />
+            ))}
+            {me && !userInRows ? (
+              <LeaderboardRow
+                key="self-unranked"
+                row={{
+                  rank: 0,
+                  user_id: me,
+                  display_name: currentUserName || "Sen",
+                  avatar_url: currentUserAvatar || null,
+                  score: 0,
+                }}
+                isMe
+                unrankedLabel={rows.length >= LEADERBOARD_LIMIT ? `İlk ${LEADERBOARD_LIMIT} dışında` : "Henüz puanın yok"}
+                unitIcon={theme.unitIcon}
+                unitColor={theme.unitColor}
+              />
+            ) : null}
+          </View>
         </View>
       ) : null}
     </View>
   );
 });
 
-const FramedAvatar = memo(function FramedAvatar({ row, frame: f }) {
-  // Avatar halkadan biraz büyük: çerçeve kenarı fotoğrafın kenarını örter.
-  const fw = Math.round((f.avatar * 0.96) / f.hole);
-  const fh = Math.round(fw * f.aspect);
-  return (
-    <View style={{ width: fw, height: fh }}>
-      <View style={{ position: "absolute", left: f.cx * fw - f.avatar / 2, top: f.cy * fh - f.avatar / 2 }}>
-        <EventAvatar name={row.display_name} url={row.avatar_url} color={row.avatar_color} size={f.avatar} />
-      </View>
-      <Image source={f.src} resizeMode="contain" style={StyleSheet.absoluteFill} />
-    </View>
-  );
-});
-
-const PodiumStage = memo(function PodiumStage({ rows, unit, me, width, accent, pulseValue }) {
-  const podiumH = width / PODIUM_ASPECT;
-  const glowScale = pulseValue.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.1] });
-  const glowSize = 150;
-  return (
-    <View style={{ width, height: PODIUM_AVATAR_AREA + podiumH }}>
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.podiumGlow,
-          {
-            width: glowSize,
-            height: glowSize,
-            borderRadius: glowSize / 2,
-            left: PODIUM_SPOTS[1].x * width - glowSize / 2,
-            bottom: podiumH * (1 - PODIUM_SPOTS[1].top) + 10,
-            backgroundColor: withAlpha(accent, 0.12),
-            transform: [{ scale: glowScale }],
-          },
-        ]}
-      />
-      <Image source={PODIUM_ART} resizeMode="contain" style={[styles.podiumArt, { width, height: podiumH }]} />
-      {rows.map((row, i) => {
-        const place = i + 1;
-        const spot = PODIUM_SPOTS[place];
-        const isMe = me === row.user_id;
-        return (
-          <View
-            key={row.user_id}
-            style={[
-              styles.podiumBlock,
-              { left: spot.x * width - PODIUM_BLOCK_W / 2, bottom: podiumH * (1 - spot.top) - 4 },
-            ]}
-          >
-            <FramedAvatar row={row} frame={PODIUM_FRAMES[place]} />
-            <Text style={[styles.podiumName, isMe && styles.podiumNameMe]} numberOfLines={1}>
-              {isMe ? "Sen" : row.display_name}
-            </Text>
-            <Text style={styles.podiumScore} numberOfLines={1}>
-              {formatCompact(row.score)} {unit}
-            </Text>
-          </View>
-        );
-      })}
-    </View>
-  );
-});
-
-const DarkTop3 = memo(function DarkTop3({ rows, unit, me }) {
-  const order = [2, 1, 3].filter((place) => rows[place - 1]);
-  return (
-    <View style={styles.darkTop3}>
-      {order.map((place) => {
-        const row = rows[place - 1];
-        const isMe = me === row.user_id;
-        const ribbon = DARK_UI.top[place];
-        return (
-          <View key={row.user_id} style={[styles.darkTopCol, place === 1 && styles.darkTopColFirst]}>
-            <FramedAvatar row={row} frame={DARK_FRAMES[place]} />
-            <Image
-              source={ribbon.src}
-              resizeMode="contain"
-              accessibilityLabel={`${place}. sıra`}
-              style={{ width: ribbon.w, height: ribbon.w * ribbon.aspect, marginTop: -ribbon.overlap }}
-            />
-            <Text style={styles.darkTopName} numberOfLines={1}>
-              {isMe ? "Sen" : row.display_name}
-            </Text>
-            <Text style={styles.darkTopScore} numberOfLines={1}>
-              {formatCompact(row.score)} {unit}
-            </Text>
-          </View>
-        );
-      })}
-    </View>
-  );
-});
-
-const DarkCountdown = memo(function DarkCountdown({ event }) {
-  const upcoming = event.startsAtMs > Date.now();
-  const remaining = useCountdownMs(upcoming ? event.startsAtMs : event.endsAtMs, "seconds");
-  const { days, hours, minutes, seconds } = splitDuration(remaining);
-  const text =
-    remaining <= 0 ? "Sona erdi" : `${days > 0 ? `${days}g ` : ""}${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
-  const { src, aspect, w } = DARK_UI.plaque;
-  return (
-    <View style={{ width: w, height: w * aspect, marginTop: 2 }}>
-      <Image source={src} resizeMode="contain" style={StyleSheet.absoluteFill} />
-      <View style={PLAQUE_INNER}>
-        <Text style={styles.darkPlaqueLabel}>{upcoming ? "BAŞLAMASINA KALAN" : "BİTİŞİNE KALAN"}</Text>
-        <Text style={styles.darkPlaqueTime} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-          {text}
-        </Text>
-      </View>
-    </View>
-  );
-});
-
-const DarkRewards = memo(function DarkRewards({ rewards, onPress }) {
-  const shown = rewards.slice(0, 4);
-  if (!shown.length) return null;
-  const head = DARK_UI.oduller;
-  return (
-    <View style={[styles.darkPanelWrap, { marginTop: ODULLER_OVERLAP + 14 }]}>
-      <View style={[styles.darkPanel, { paddingTop: ODULLER_H - ODULLER_OVERLAP + 6 }]}>
-        <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel="Ödül detayları" style={styles.darkRewardRow}>
-          {shown.map((reward, i) => {
-            const days = rewardDays(reward.label);
-            return (
-              <View key={`dr-${i}`} style={styles.darkRewardCol}>
-                <View style={[styles.darkTile, { aspectRatio: 1 / DARK_UI.tile.aspect }]}>
-                  <Image source={DARK_UI.tile.src} resizeMode="contain" style={StyleSheet.absoluteFill} />
-                  <View style={TILE_INNER}>
-                    <Image source={rewardArt(reward.label)} resizeMode="contain" style={styles.darkRewardArt} />
-                  </View>
-                </View>
-                {reward.credits > 0 ? (
-                  <Text style={styles.darkRewardValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-                    {formatCompact(reward.credits)}
-                  </Text>
-                ) : null}
-                <Text style={styles.darkRewardSub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                  {reward.rank} · {days || (reward.credits > 0 ? "kredi" : "ödül")}
-                </Text>
-              </View>
-            );
-          })}
-        </Pressable>
-      </View>
-      <Image
-        source={head.src}
-        resizeMode="contain"
-        accessibilityLabel="Ödüller"
-        style={[styles.darkPanelHead, { width: head.w, height: ODULLER_H, top: -ODULLER_OVERLAP }]}
-      />
-    </View>
-  );
-});
-
-const LeaderboardRow = memo(function LeaderboardRow({ row, isMe, accent, icon, dark }) {
-  if (dark) {
-    return (
-      <View style={[styles.darkRow, isMe && styles.darkRowMe]}>
-        <View style={styles.darkRowRank}>
-          <Image source={DARK_UI.rank.src} resizeMode="contain" style={StyleSheet.absoluteFill} />
-          <Text style={styles.darkRowRankText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-            {row.rank}
-          </Text>
-        </View>
-        <EventAvatar name={row.display_name} url={row.avatar_url} color={row.avatar_color} size={32} ringColor="rgba(255,215,120,0.7)" />
-        <Text style={styles.darkRowName} numberOfLines={1}>
-          {isMe ? `${row.display_name} · SEN` : row.display_name}
-        </Text>
-        <Text style={styles.darkRowScore} numberOfLines={1}>
-          {formatThousands(row.score)}
-        </Text>
-      </View>
-    );
-  }
-  return (
-    <View style={[styles.lbRow, isMe && { borderColor: accent }]}>
-      <Text style={styles.lbRankText}>{row.rank}</Text>
-      <EventAvatar name={row.display_name} url={row.avatar_url} color={row.avatar_color} size={34} />
-      <View style={styles.lbNameCol}>
-        <Text style={styles.lbName} numberOfLines={1}>
-          {row.display_name}
-        </Text>
-        {isMe ? (
-          <View style={[styles.meBadge, { backgroundColor: accent }]}>
-            <Text style={styles.meBadgeText}>SEN</Text>
-          </View>
-        ) : null}
-      </View>
-      <Text style={styles.lbScore} numberOfLines={1}>
-        {formatThousands(row.score)}
-      </Text>
-      <Ionicons name={icon} size={13} color={accent} style={styles.lbIcon} />
-    </View>
-  );
-});
-
-const LeaderboardSection = memo(function LeaderboardSection({ event, enabled, currentUserId, pulseValue, dark = false, middle = null }) {
-  const { rows, loading, error, retry } = useEventLeaderboard(event.id, enabled);
-  const [stageWidth, setStageWidth] = useState(0);
-  const accent = event.colors[1] || BRAND.blueBright;
-  const icon = safeIcon(event.icon);
-  const me = currentUserId ? String(currentUserId) : null;
-  const showPodium = rows.length >= 3;
-  const rest = showPodium ? rows.slice(3) : rows;
-  const handleLayout = useCallback((e) => {
-    const w = Math.round(e?.nativeEvent?.layout?.width || 0);
-    if (w > 0) setStageWidth((prev) => (prev === w ? prev : w));
-  }, []);
-
-  const tone = dark ? styles.darkText : null;
-  if (loading) {
-    return (
-      <View>
-        {middle}
-        <View style={styles.lbLoading}>
-          <ActivityIndicator color={dark ? "#FFD978" : accent} />
-          <Text style={[styles.lbLoadingText, tone]}>Sıralama yükleniyor…</Text>
-        </View>
-      </View>
-    );
-  }
-  if (error && rows.length === 0) {
-    return (
-      <View>
-        {middle}
-        <Pressable onPress={retry} accessibilityRole="button" style={[styles.emptyBox, dark && styles.darkEmptyBox]}>
-          <Ionicons name="cloud-offline-outline" size={26} color={dark ? "#FFD978" : accent} />
-          <Text style={[styles.emptyTitle, tone]}>Sıralama yüklenemedi</Text>
-          <Text style={[styles.emptySub, tone]}>Tekrar denemek için dokun.</Text>
-        </Pressable>
-      </View>
-    );
-  }
-  if (rows.length === 0) {
-    return (
-      <View>
-        {middle}
-        <View style={[styles.emptyBox, dark && styles.darkEmptyBox]}>
-          <Ionicons name={icon} size={26} color={dark ? "#FFD978" : accent} />
-          <Text style={[styles.emptyTitle, tone]}>Henüz sıralama yok</Text>
-          <Text style={[styles.emptySub, tone]}>İlk sen gönder, zirveye çık.</Text>
-        </View>
-      </View>
-    );
-  }
-  if (dark) {
-    return (
-      <View>
-        <DarkTop3 rows={rows.slice(0, 3)} unit={event.unit} me={me} />
-        {middle}
-        <View style={styles.lbList}>
-          {rows.slice(3).map((row) => (
-            <LeaderboardRow key={`${row.user_id}-${row.rank}`} row={row} isMe={me === row.user_id} dark />
-          ))}
-        </View>
-      </View>
-    );
-  }
-  return (
-    <View onLayout={handleLayout}>
-      {showPodium && stageWidth > 0 ? <PodiumStage rows={rows.slice(0, 3)} unit={event.unit} me={me} width={stageWidth} accent={accent} pulseValue={pulseValue} /> : null}
-      <View style={styles.lbList}>
-        {rest.map((row) => (
-          <LeaderboardRow key={`${row.user_id}-${row.rank}`} row={row} isMe={me === row.user_id} accent={accent} icon={icon} />
-        ))}
-      </View>
-    </View>
-  );
-});
-
-export const EventDetailSheet = memo(function EventDetailSheet({ visible, event, currentUserId, onDismiss, onSendGift }) {
+export const EventDetailSheet = memo(function EventDetailSheet({
+  visible,
+  event,
+  currentUserId,
+  currentUserAvatar = null,
+  currentUserName = null,
+  onDismiss,
+  onSendGift,
+}) {
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const reducedMotion = useReducedMotion();
   const sheetHeight = Math.round(windowHeight * 0.86);
 
@@ -1748,12 +1732,39 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
   const shownEvent = event || lastEventRef.current;
 
   const [mounted, setMounted] = useState(Boolean(visible && shownEvent));
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [bodyWidth, setBodyWidth] = useState(() => Math.max(260, Math.min(windowWidth - 32, 396)));
   const progress = useRef(new Animated.Value(visible && shownEvent ? 1 : 0)).current;
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const scrollRef = useRef(null);
+
   const floatValue = useLoopAnimation(mounted && !reducedMotion, floatFactory);
   const pulseValue = useLoopAnimation(mounted && !reducedMotion, pulseFactory);
   const sheenValue = useLoopAnimation(mounted && !reducedMotion, shimmerFactory);
-  const [infoOpen, setInfoOpen] = useState(false);
-  const toggleInfo = useCallback(() => setInfoOpen((v) => !v), []);
+
+  const toggleInfo = useCallback(() => {
+    setInfoOpen((prev) => {
+      const next = !prev;
+      if (next && scrollRef.current?.scrollTo) {
+        scrollRef.current.scrollTo({ y: 0, animated: !reducedMotion });
+      }
+      return next;
+    });
+  }, [reducedMotion]);
+
+  const handleBodyLayout = useCallback((e) => {
+    const w = Math.round((e?.nativeEvent?.layout?.width || 0) - 32);
+    if (w >= 240) setBodyWidth((prev) => (prev === w ? prev : Math.min(w, 420)));
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return;
+    setInfoOpen(false);
+    scrollY.setValue(0);
+    if (scrollRef.current?.scrollTo) {
+      scrollRef.current.scrollTo({ y: 0, animated: false });
+    }
+  }, [shownEvent?.id, visible, scrollY]);
 
   useEffect(() => {
     let anim = null;
@@ -1761,7 +1772,7 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
       setMounted(true);
       anim = Animated.timing(progress, {
         toValue: 1,
-        duration: reducedMotion ? 0 : 320,
+        duration: reducedMotion ? 0 : 300,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       });
@@ -1769,7 +1780,7 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
     } else {
       anim = Animated.timing(progress, {
         toValue: 0,
-        duration: reducedMotion ? 0 : 220,
+        duration: reducedMotion ? 0 : 210,
         easing: Easing.in(Easing.cubic),
         useNativeDriver: true,
       });
@@ -1789,154 +1800,40 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
     else onDismiss?.();
   }, [onSendGift, onDismiss, shownEvent]);
 
+  const onScroll = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+        useNativeDriver: true,
+      }),
+    [scrollY],
+  );
+
   if (!shownEvent || !mounted) return null;
 
   const ev = shownEvent;
-  const art = EVENT_DETAIL_ART[ev.kind];
-  const pageBg = art?.bg || DETAIL_FALLBACK_BG;
-  const accent = ev.colors[1] || BRAND.blueBright;
-  const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [sheetHeight, 0] });
-  const artScale = floatValue.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] });
+  const theme = EVENT_STAGE_THEME[ev.kind] || EVENT_STAGE_THEME.gift_race;
+  const heroArt = EVENT_BANNER_ART[ev.kind];
+  const upcoming = ev.startsAtMs > Date.now();
+  const rewards = Array.isArray(ev.rewards) ? ev.rewards : [];
+  const rules = Array.isArray(ev.rules) ? ev.rules : [];
+  const hasRules = rules.length > 0 || Boolean(ev.description);
+  const topPrize = rewards[0]?.credits || 0;
   const bottomPad = Math.max(insets.bottom, 12);
-  const ctaLabel = ev.gift_name ? `${ev.gift_name} Gönder` : "Hediye Gönder ve Katıl";
-  const showLogo = Boolean(art?.logo && ev.title === art.title);
-  const logoW = art ? Math.min(LOGO_MAX_W, LOGO_MAX_H * art.logoAspect) : 0;
-  const ctaScale = pulseValue.interpolate({ inputRange: [0, 1], outputRange: [1, 1.025] });
-  const ctaSheenX = sheenValue.interpolate({ inputRange: [0, 1], outputRange: [-160, 420] });
-  const dark = art?.dark;
+  const ctaLabel = ev.gift_name ? `${ev.gift_name} Gönder` : theme.defaultCta;
 
-  if (dark) {
-    const darkLogoW = Math.min(LOGO_MAX_W, DARK_LOGO_MAX_H * dark.logoAspect);
-    return (
-      <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={handleDismiss}>
-        <View style={styles.modalRoot}>
-          <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, { opacity: progress }]}>
-            <Pressable style={StyleSheet.absoluteFill} onPress={handleDismiss} accessibilityLabel="Kapat" />
-          </Animated.View>
-
-          <Animated.View style={[styles.sheet, { height: sheetHeight, backgroundColor: dark.base, transform: [{ translateY }] }]}>
-            <Animated.Image
-              source={dark.bg}
-              resizeMode="cover"
-              style={[styles.darkBg, { top: dark.bgTop, transform: [{ scale: artScale }] }]}
-            />
-            <LinearGradient
-              pointerEvents="none"
-              colors={[dark.base, withAlpha(dark.base, 0)]}
-              style={[styles.darkBgTopFade, { top: dark.bgTop }]}
-            />
-            <LinearGradient
-              pointerEvents="none"
-              colors={[withAlpha(dark.base, 0), withAlpha(dark.base, 0.55), dark.base]}
-              locations={[0, 0.66, 0.9]}
-              style={StyleSheet.absoluteFill}
-            />
-            <HeaderSparkles pulseValue={pulseValue} />
-            <View style={styles.darkGrabber} />
-            <Pressable
-              onPress={toggleInfo}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityState={{ expanded: infoOpen }}
-              accessibilityLabel="Kurallar"
-              style={styles.darkRulesBtn}
-            >
-              <Image
-                source={DARK_UI.kurallar.src}
-                resizeMode="contain"
-                style={{ width: DARK_UI.kurallar.w, height: DARK_UI.kurallar.w * DARK_UI.kurallar.aspect }}
-              />
-            </Pressable>
-            <Pressable
-              onPress={handleDismiss}
-              hitSlop={10}
-              style={styles.darkCloseBtn}
-              accessibilityRole="button"
-              accessibilityLabel="Kapat"
-            >
-              <Image
-                source={DARK_UI.close.src}
-                resizeMode="contain"
-                style={{ width: DARK_UI.close.w, height: DARK_UI.close.w * DARK_UI.close.aspect }}
-              />
-            </Pressable>
-
-            <ScrollView
-              style={styles.body}
-              contentContainerStyle={[styles.darkContent, { paddingBottom: bottomPad + DARK_UI.katil.w * DARK_UI.katil.aspect + 24 }]}
-              showsVerticalScrollIndicator={false}
-            >
-              {showLogo ? (
-                <Image
-                  source={dark.logo}
-                  resizeMode="contain"
-                  accessibilityRole="header"
-                  accessibilityLabel={ev.title}
-                  style={{ width: darkLogoW, height: darkLogoW / dark.logoAspect }}
-                />
-              ) : (
-                <Text style={[styles.pageTitle, styles.darkText]} numberOfLines={2}>
-                  {ev.title}
-                </Text>
-              )}
-              <DarkCountdown event={ev} />
-
-              {infoOpen ? (
-                <View style={[styles.infoCard, styles.darkInfoCard]}>
-                  {ev.rules.map((rule, i) => (
-                    <View key={`rule-${i}`} style={styles.ruleRow}>
-                      <View style={[styles.ruleDot, { backgroundColor: "#FFD978" }]} />
-                      <Text style={[styles.ruleText, styles.darkText]}>{rule}</Text>
-                    </View>
-                  ))}
-                  {ev.rewards.map((reward, i) => (
-                    <Text key={`rl-${i}`} style={styles.darkRewardLine}>
-                      {reward.rank} {reward.label}
-                      {reward.credits > 0 ? ` · ${formatThousands(reward.credits)} kredi` : ""}
-                    </Text>
-                  ))}
-                </View>
-              ) : null}
-
-              <View style={styles.darkBoard}>
-                <LeaderboardSection
-                  event={ev}
-                  enabled={mounted}
-                  currentUserId={currentUserId}
-                  pulseValue={pulseValue}
-                  dark
-                  middle={<DarkRewards rewards={ev.rewards} onPress={toggleInfo} />}
-                />
-              </View>
-            </ScrollView>
-
-            <View style={[styles.ctaBar, { paddingBottom: bottomPad + 4 }]}>
-              <LinearGradient
-                pointerEvents="none"
-                colors={[withAlpha(dark.base, 0), dark.base]}
-                locations={[0, 0.4]}
-                style={StyleSheet.absoluteFill}
-              />
-              <Animated.View style={{ transform: [{ scale: ctaScale }] }}>
-                <Pressable
-                  onPress={handleCta}
-                  accessibilityRole="button"
-                  accessibilityLabel={ctaLabel}
-                  style={({ pressed }) => [styles.darkCtaPress, pressed && styles.pressed]}
-                >
-                  <Image
-                    source={DARK_UI.katil.src}
-                    resizeMode="contain"
-                    style={{ width: DARK_UI.katil.w, height: DARK_UI.katil.w * DARK_UI.katil.aspect }}
-                  />
-                </Pressable>
-              </Animated.View>
-            </View>
-          </Animated.View>
-        </View>
-      </Modal>
-    );
-  }
+  const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [sheetHeight, 0] });
+  const heroScale = floatValue.interpolate({ inputRange: [0, 1], outputRange: [1.02, 1.06] });
+  const heroParallaxY = scrollY.interpolate({
+    inputRange: [-60, 0, HERO_HEIGHT],
+    outputRange: [-18, 0, 52],
+    extrapolate: "clamp",
+  });
+  const stickyBarOpacity = scrollY.interpolate({
+    inputRange: [108, 162],
+    outputRange: [0, 1],
+    extrapolate: "clamp",
+  });
+  const ctaSheenX = sheenValue.interpolate({ inputRange: [0, 1], outputRange: [-120, windowWidth + 80] });
 
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={handleDismiss}>
@@ -1945,129 +1842,196 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
           <Pressable style={StyleSheet.absoluteFill} onPress={handleDismiss} accessibilityLabel="Kapat" />
         </Animated.View>
 
-        <Animated.View style={[styles.sheet, { height: sheetHeight, backgroundColor: pageBg, transform: [{ translateY }] }]}>
-          <Pressable
-            onPress={handleDismiss}
-            hitSlop={10}
-            style={[styles.closeBtn, { zIndex: 20 }]}
-            accessibilityRole="button"
-            accessibilityLabel="Kapat"
-          >
-            <Ionicons name="close" size={18} color={BRAND.ink} />
-          </Pressable>
+        <Animated.View
+          onLayout={handleBodyLayout}
+          style={[styles.sheet, { height: sheetHeight, backgroundColor: STAGE_BASE, transform: [{ translateY }] }]}
+        >
+          {/* Sabit üst bar: kaydırılınca koyu başlık şeridi belirir, butonlar sabit kalır */}
+          <View pointerEvents="box-none" style={styles.stageTopBar}>
+            <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.stageTopBarBg, { opacity: stickyBarOpacity }]} />
+            <View pointerEvents="none" style={styles.stageGrabber} />
+            <Animated.View pointerEvents="none" style={[styles.stageTopBarTitleWrap, { opacity: stickyBarOpacity }]}>
+              <Text numberOfLines={1} style={styles.stageTopBarTitle}>
+                {ev.short_title || ev.title}
+              </Text>
+            </Animated.View>
+            {hasRules ? (
+              <Pressable
+                onPress={toggleInfo}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: infoOpen }}
+                accessibilityLabel="Etkinlik kuralları"
+                style={({ pressed }) => [styles.stageHeaderBtn, styles.stageHeaderBtnLeft, pressed && styles.pressed]}
+              >
+                <Ionicons name={infoOpen ? "chevron-up" : "information"} size={18} color="#FFFFFF" />
+              </Pressable>
+            ) : null}
+            <Pressable
+              onPress={handleDismiss}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Kapat"
+              style={({ pressed }) => [styles.stageHeaderBtn, styles.stageHeaderBtnRight, pressed && styles.pressed]}
+            >
+              <Ionicons name="close" size={19} color="#FFFFFF" />
+            </Pressable>
+          </View>
 
-          <ScrollView
+          <Animated.ScrollView
+            ref={scrollRef}
             style={styles.body}
             contentContainerStyle={{ paddingBottom: bottomPad + 86 }}
             showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onScroll={onScroll}
           >
-            <View style={[styles.headArt, { aspectRatio: HEAD_ASPECT }]}>
-              {art ? (
+            {/* A) Hero: Keşfet'teki onaylı sinematik sahnenin büyümüş devamı */}
+            <View style={styles.heroWrap}>
+              {heroArt ? (
                 <Animated.Image
-                  source={art.head}
+                  source={heroArt}
                   resizeMode="cover"
-                  style={[StyleSheet.absoluteFill, { transform: [{ scale: artScale }] }]}
+                  style={[
+                    StyleSheet.absoluteFill,
+                    { transform: [{ translateY: heroParallaxY }, { scale: heroScale }] },
+                  ]}
                 />
               ) : (
-                <>
-                  <LinearGradient colors={[withAlpha(accent, 0.22), pageBg]} style={StyleSheet.absoluteFill} />
-                  <View style={styles.headArtFallback}>
-                    <EventArtwork event={ev} size={96} color={accent} />
-                  </View>
-                </>
+                <LinearGradient colors={ev.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
               )}
-              <HeaderSparkles pulseValue={pulseValue} />
-              <LinearGradient pointerEvents="none" colors={[withAlpha(pageBg, 0), pageBg]} style={styles.headFade} />
-              <View style={styles.grabber} />
-            </View>
-
-            <View style={styles.titleBlock}>
-              {showLogo ? (
-                <Image
-                  source={art.logo}
-                  resizeMode="contain"
-                  accessibilityRole="header"
-                  accessibilityLabel={ev.title}
-                  style={{ width: logoW, height: logoW / art.logoAspect }}
-                />
-              ) : (
-                <Text style={styles.pageTitle} numberOfLines={2}>
-                  {ev.title}
-                </Text>
-              )}
-              <CountdownTiles event={ev} accent={accent} />
-              <RewardTiles rewards={ev.rewards} accent={accent} onPress={toggleInfo} />
-              <Pressable
-                onPress={toggleInfo}
-                hitSlop={6}
-                accessibilityRole="button"
-                accessibilityState={{ expanded: infoOpen }}
-                style={styles.infoChip}
-              >
-                <Ionicons name={infoOpen ? "chevron-up" : "information-circle-outline"} size={14} color={accent} />
-                <Text style={[styles.infoChipText, { color: accent }]}>Ödül detayları ve kurallar</Text>
-              </Pressable>
-            </View>
-
-            {infoOpen ? (
-              <View style={styles.infoCard}>
-                {ev.rewards.map((reward, i) => (
-                  <RewardRow key={`reward-${i}`} reward={reward} />
-                ))}
-                {ev.rules.map((rule, i) => (
-                  <View key={`rule-${i}`} style={styles.ruleRow}>
-                    <View style={[styles.ruleDot, { backgroundColor: accent }]} />
-                    <Text style={styles.ruleText}>{rule}</Text>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-
-            <View style={styles.bodyContent}>
-              <LeaderboardSection event={ev} enabled={mounted} currentUserId={currentUserId} pulseValue={pulseValue} />
-            </View>
-          </ScrollView>
-
-          <View style={[styles.ctaBar, { paddingBottom: bottomPad + 4 }]}>
-            <LinearGradient
-              pointerEvents="none"
-              colors={[withAlpha(pageBg, 0), pageBg]}
-              locations={[0, 0.35]}
-              style={StyleSheet.absoluteFill}
-            />
-            <Animated.View style={{ transform: [{ scale: ctaScale }] }}>
-            <Pressable
-              onPress={handleCta}
-              accessibilityRole="button"
-              accessibilityLabel={ctaLabel}
-              style={({ pressed }) => [styles.ctaButton, { shadowColor: accent }, pressed && styles.pressed]}
-            >
               <LinearGradient
-                colors={[withAlpha(accent, 0.72), accent]}
+                pointerEvents="none"
+                colors={["rgba(6,10,22,0.90)", "rgba(6,10,22,0.54)", "rgba(6,10,22,0)"]}
+                locations={[0, 0.44, 0.74]}
                 start={{ x: 0, y: 0.5 }}
                 end={{ x: 1, y: 0.5 }}
                 style={StyleSheet.absoluteFill}
               />
               <LinearGradient
                 pointerEvents="none"
-                colors={["rgba(255,255,255,0.28)", "rgba(255,255,255,0)"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={styles.ctaGloss}
+                colors={["rgba(6,10,22,0.48)", "rgba(6,10,22,0)"]}
+                style={styles.heroTopScrim}
               />
-              <Animated.View pointerEvents="none" style={[styles.ctaSheen, { transform: [{ translateX: ctaSheenX }] }]}>
+              <LinearGradient
+                pointerEvents="none"
+                colors={[withAlpha(theme.stageTop, 0), withAlpha(theme.stageTop, 0.82), theme.stageTop]}
+                locations={[0, 0.72, 1]}
+                style={styles.heroBottomFade}
+              />
+              {!reducedMotion ? <HeroSparkles pulseValue={pulseValue} /> : null}
+
+              <View style={styles.heroTextCol}>
+                <LiveKicker upcoming={upcoming} pulseValue={pulseValue} />
+                <Text style={styles.heroTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>
+                  {ev.short_title || ev.title}
+                </Text>
+                <View style={styles.heroChipsRow}>
+                  <HeroCountdownChip event={ev} />
+                  {topPrize > 0 ? (
+                    <View style={[styles.heroChip, styles.heroPrizeChip]}>
+                      <LinearGradient colors={GOLD_BUTTON} style={styles.heroPrizeCoin} />
+                      <Text style={styles.heroPrizeText} numberOfLines={1}>
+                        {formatCompact(topPrize)}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            </View>
+
+            {/* B) Sora Gece Vitrini gövdesi */}
+            <View style={styles.stageBody}>
+              <LinearGradient
+                pointerEvents="none"
+                colors={[theme.stageTop, STAGE_BASE, "#0E192E", STAGE_BASE]}
+                locations={[0, 0.34, 0.72, 1]}
+                style={StyleSheet.absoluteFill}
+              />
+
+              {infoOpen && hasRules ? (
+                <View style={styles.rulesCard}>
+                  <Text style={styles.rulesTitle}>Etkinlik Kuralları</Text>
+                  {rules.length > 0 ? (
+                    rules.map((rule, i) => (
+                      <View key={`rule-${i}`} style={styles.ruleRow}>
+                        <View style={styles.ruleDot} />
+                        <Text style={styles.ruleText}>{rule}</Text>
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={styles.ruleText}>{ev.description}</Text>
+                  )}
+                </View>
+              ) : null}
+
+              <StageLeaderboard
+                event={ev}
+                enabled={mounted}
+                currentUserId={currentUserId}
+                currentUserAvatar={currentUserAvatar}
+                currentUserName={currentUserName}
+                stageWidth={bodyWidth}
+                theme={theme}
+                pulseValue={pulseValue}
+                rewardsNode={
+                  <StageRewards
+                    rewards={rewards}
+                    currentUserAvatar={currentUserAvatar}
+                    onToggleRules={hasRules ? toggleInfo : null}
+                  />
+                }
+              />
+            </View>
+          </Animated.ScrollView>
+
+          {/* C) Sabit CTA bar — Android overflow uyumlu çift katmanlı 3D hediye butonu */}
+          <View style={[styles.ctaBar, { paddingBottom: bottomPad + 4 }]}>
+            <LinearGradient
+              pointerEvents="none"
+              colors={[withAlpha(STAGE_BASE, 0), withAlpha(STAGE_BASE, 0.94), STAGE_BASE]}
+              locations={[0, 0.34, 1]}
+              style={StyleSheet.absoluteFill}
+            />
+            <Pressable
+              onPress={handleCta}
+              accessibilityRole="button"
+              accessibilityLabel={ctaLabel}
+              style={({ pressed }) => [styles.ctaOuter, pressed && styles.pressed]}
+            >
+              <View style={[styles.ctaInner, { shadowColor: theme.ctaShadow }]}>
                 <LinearGradient
-                  colors={["rgba(255,255,255,0)", "rgba(255,255,255,0.5)", "rgba(255,255,255,0)"]}
+                  colors={theme.ctaColors}
                   start={{ x: 0, y: 0.5 }}
                   end={{ x: 1, y: 0.5 }}
-                  style={styles.ctaSheenBand}
+                  style={StyleSheet.absoluteFill}
                 />
-              </Animated.View>
-              <View pointerEvents="none" style={styles.ctaRim} />
-              <Ionicons name="gift" size={19} color="#FFFFFF" />
-              <Text style={styles.ctaText}>{ctaLabel}</Text>
+                <LinearGradient
+                  pointerEvents="none"
+                  colors={["rgba(255,255,255,0.26)", "rgba(255,255,255,0)"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                  style={styles.ctaGloss}
+                />
+                {!reducedMotion ? (
+                  <Animated.View pointerEvents="none" style={[styles.ctaSheen, { transform: [{ translateX: ctaSheenX }] }]}>
+                    <LinearGradient
+                      colors={["rgba(255,255,255,0)", "rgba(255,255,255,0.34)", "rgba(255,255,255,0)"]}
+                      start={{ x: 0, y: 0.5 }}
+                      end={{ x: 1, y: 0.5 }}
+                      style={styles.ctaSheenBand}
+                    />
+                  </Animated.View>
+                ) : null}
+                <View pointerEvents="none" style={styles.ctaRim} />
+                <Text style={styles.ctaText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.84}>
+                  {ctaLabel}
+                </Text>
+              </View>
+              <View pointerEvents="none" style={styles.ctaIconFloat}>
+                <Image source={theme.ctaIcon} resizeMode="contain" style={styles.ctaIconImg} />
+              </View>
             </Pressable>
-            </Animated.View>
           </View>
         </Animated.View>
       </View>
@@ -2361,7 +2325,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
 
-  // Sheet
+  // Sheet — Sora Gece Vitrini (Banner devamı + Liderlik Podyumu laciverti)
   modalRoot: { flex: 1, justifyContent: "flex-end" },
   backdrop: { backgroundColor: "rgba(5,10,20,0.62)" },
   sheet: {
@@ -2370,143 +2334,368 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 26,
     overflow: "hidden",
   },
-  grabber: {
+  body: { flex: 1 },
+
+  // Sabit üst bar
+  stageTopBar: {
     position: "absolute",
-    top: 8,
-    alignSelf: "center",
-    width: 42,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: "rgba(255,255,255,0.85)",
-  },
-  closeBtn: {
-    position: "absolute",
-    top: 14,
-    right: 14,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 56,
+    zIndex: 30,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.85)",
+  },
+  stageTopBarBg: {
+    backgroundColor: "rgba(10,17,32,0.95)",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.08)",
+  },
+  stageGrabber: {
+    position: "absolute",
+    top: 7,
+    alignSelf: "center",
+    width: 38,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.58)",
+  },
+  stageTopBarTitleWrap: {
+    marginTop: 6,
+    maxWidth: "62%",
+    alignItems: "center",
+  },
+  stageTopBarTitle: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+  },
+  stageHeaderBtn: {
+    position: "absolute",
+    top: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(9,18,30,0.56)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+  stageHeaderBtnLeft: { left: 14 },
+  stageHeaderBtnRight: { right: 14 },
+
+  // Hero (Keşfet banner devamı)
+  heroWrap: {
+    width: "100%",
+    height: HERO_HEIGHT,
+    overflow: "hidden",
+    backgroundColor: "#080E1C",
+  },
+  heroTopScrim: { position: "absolute", top: 0, left: 0, right: 0, height: 54 },
+  heroBottomFade: { position: "absolute", left: 0, right: 0, bottom: 0, height: 68 },
+  heroTextCol: {
+    position: "absolute",
+    left: 16,
+    bottom: 16,
+    maxWidth: "66%",
+    zIndex: 5,
+  },
+  heroTitle: {
+    marginTop: 6,
+    color: "#FFFFFF",
+    fontSize: 24,
+    fontWeight: "900",
+    lineHeight: 28,
+    letterSpacing: -0.6,
+    textShadowColor: "rgba(0,0,0,0.65)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 10,
+  },
+  heroChipsRow: {
+    marginTop: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+  heroChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    height: 25,
+    paddingHorizontal: 9,
+    borderRadius: 999,
+    backgroundColor: "rgba(8,14,28,0.64)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+  },
+  heroTimerChip: { minWidth: 100 },
+  heroTimerText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+  },
+  heroPrizeChip: { borderColor: "rgba(255,217,120,0.5)" },
+  heroPrizeCoin: { width: 12, height: 12, borderRadius: 6 },
+  heroPrizeText: { color: "#FFD978", fontSize: 11, fontWeight: "900" },
+  sparkleIcon: {
+    textShadowColor: "rgba(255,224,130,0.9)",
+    textShadowRadius: 6,
+    textShadowOffset: { width: 0, height: 0 },
   },
 
-  body: { flex: 1 },
-  rewardCreditsText: { color: "#8A5A00", fontSize: 11.5, fontWeight: "900", marginLeft: 3 },
+  // Gövde
+  stageBody: {
+    marginTop: -4,
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    minHeight: 420,
+  },
 
-  lbLoading: { alignItems: "center", paddingVertical: 28 },
-  emptyTitle: { color: BRAND.ink, fontSize: 14, fontWeight: "800", textAlign: "center" },
+  // Kurallar çekmecesi
+  rulesCard: {
+    marginBottom: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  rulesTitle: { color: "#FFFFFF", fontSize: 13, fontWeight: "900", marginBottom: 4 },
+  ruleRow: { flexDirection: "row", alignItems: "flex-start", marginTop: 6 },
+  ruleDot: { width: 5, height: 5, borderRadius: 2.5, marginTop: 6, marginRight: 8, backgroundColor: BRAND.blueBright },
+  ruleText: { flex: 1, color: "#CBD5E1", fontSize: 12, lineHeight: 17, fontWeight: "600" },
+
+  // Avatarlar
+  avatarImage: { backgroundColor: "#14243E" },
+  avatarFallback: { alignItems: "center", justifyContent: "center" },
+
+  // 3D Podyum
+  podiumWrap: { alignSelf: "center", marginTop: 4 },
+  podiumGlow: { position: "absolute" },
+  podiumArt: { position: "absolute", left: 0, bottom: 0 },
+  podiumAvatarSlot: { position: "absolute", alignItems: "center" },
+  rankCoin: {
+    position: "absolute",
+    bottom: -6,
+    alignSelf: "center",
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.85)",
+  },
+  rankCoinText: { fontSize: 10.5, fontWeight: "900" },
+  podiumFace: {
+    position: "absolute",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+    zIndex: 5,
+  },
+  podiumName: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
+    maxWidth: "100%",
+    textShadowColor: "rgba(0,0,0,0.65)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  podiumNameMe: { color: "#93C5FD" },
+  podiumScoreRow: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 },
+  podiumScore: {
+    color: "#FFD978",
+    fontSize: 11,
+    fontWeight: "900",
+    fontVariant: ["tabular-nums"],
+  },
+  podiumScoreEmpty: { color: "rgba(255,255,255,0.45)", fontSize: 11, fontWeight: "700" },
+
+  // Boş / Yükleniyor / Hata
+  stateBox: {
+    alignItems: "center",
+    gap: 6,
+    marginTop: 6,
+    paddingVertical: 22,
+    paddingHorizontal: 18,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  stateOrb: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(246,200,110,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(246,200,110,0.35)",
+    marginBottom: 4,
+  },
+  stateTitle: { color: "#FFFFFF", fontSize: 15, fontWeight: "900", textAlign: "center" },
+  stateSub: { color: "#94A3B8", fontSize: 12, fontWeight: "600", textAlign: "center" },
+
+  // Bölüm başlıkları
+  sectionBlock: { marginTop: 15 },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  sectionTitle: { color: "#FFFFFF", fontSize: 15.5, fontWeight: "900", letterSpacing: -0.35 },
+  sectionLinkBtn: { flexDirection: "row", alignItems: "center", gap: 2 },
+  sectionLinkText: { color: "#60A5FA", fontSize: 12, fontWeight: "800" },
+  sectionMetaPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  sectionMetaText: { color: "#94A3B8", fontSize: 10.5, fontWeight: "700" },
+
+  // Ödül kartları
+  rewardPairRow: { flexDirection: "row", gap: 9 },
+  rewardScrollOuter: { marginHorizontal: -16 },
+  rewardScrollContent: { paddingHorizontal: 16, gap: 9 },
+  rewardCard: {
+    borderRadius: 18,
+    paddingTop: 9,
+    paddingBottom: 10,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.055)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  rewardCardPair: { flex: 1, minWidth: 0 },
+  rewardCardScroll: { width: 142 },
+  rewardCardTop: { borderColor: "rgba(251,191,36,0.44)" },
+  rewardTopRow: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 2,
+  },
+  rewardRankPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  rewardRankPillText: { fontSize: 10, fontWeight: "900" },
+  rewardDaysPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  rewardDaysText: { color: "#CBD5E1", fontSize: 9.5, fontWeight: "800" },
+  rewardArtBox: {
+    width: 60,
+    height: 60,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  rewardArtGlow: { position: "absolute", width: 48, height: 48, borderRadius: 24 },
+  rewardFrameAvatar: { position: "absolute", alignItems: "center", justifyContent: "center" },
+  rewardArtImg: { width: 58, height: 58, zIndex: 2 },
+  rewardVal: {
+    color: "#FFD978",
+    fontSize: 13.5,
+    fontWeight: "900",
+    letterSpacing: -0.2,
+    fontVariant: ["tabular-nums"],
+  },
+  rewardSub: {
+    color: "#94A3B8",
+    fontSize: 10.5,
+    fontWeight: "700",
+    marginTop: 2,
+    maxWidth: "100%",
+  },
+
+  // Sıralama listesi (GlobalLeaderboardSheet ile birebir Sora koyu kart dili)
+  lbList: { gap: 7 },
   lbRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 9,
     paddingHorizontal: 12,
     borderRadius: 16,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1.5,
-    borderColor: "transparent",
-    shadowColor: "#1D3A66",
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    backgroundColor: "rgba(255,255,255,0.048)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.085)",
   },
-  lbRankText: { width: 22, color: "#6B7A8F", fontSize: 13, fontWeight: "900", marginRight: 8, textAlign: "center" },
-  ctaButton: {
-    height: 52,
-    borderRadius: 26,
-    overflow: "hidden",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFFFFF",
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
+  lbRowMe: {
+    backgroundColor: "#14284A",
+    borderWidth: 1.2,
+    borderColor: "rgba(96,165,250,0.56)",
   },
-  ctaGloss: { position: "absolute", left: 0, right: 0, top: 0, height: 26 },
-  infoChip: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 10, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.6)" },
-  infoChipText: { fontSize: 12, fontWeight: "800" },
-  infoCard: { marginHorizontal: 14, marginTop: 12, padding: 12, borderRadius: 18, backgroundColor: "#FFFFFF" },
-  ruleRow: { flexDirection: "row", alignItems: "flex-start", marginTop: 8 },
-  ruleDot: { width: 6, height: 6, borderRadius: 3, marginTop: 7, marginRight: 9 },
-  ruleText: { flex: 1, color: "#3B4A5E", fontSize: 13, lineHeight: 19, fontWeight: "600" },
-  emptyBox: {
-    alignItems: "center",
-    gap: 6,
-    marginTop: 14,
-    paddingVertical: 24,
-    paddingHorizontal: 18,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.75)",
+  lbRankText: {
+    width: 24,
+    color: "#94A3B8",
+    fontSize: 13,
+    fontWeight: "900",
+    marginRight: 8,
+    textAlign: "center",
+    fontVariant: ["tabular-nums"],
   },
-  podiumArt: { position: "absolute", left: 0, bottom: 0 },
-  podiumBlock: { position: "absolute", width: PODIUM_BLOCK_W, alignItems: "center" },
-  podiumName: { color: BRAND.ink, fontSize: 12, fontWeight: "800", marginTop: 2, maxWidth: "100%" },
-  podiumScore: { color: "#6B7A8F", fontSize: 10.5, fontWeight: "700", marginTop: 1 },
-  lbList: { marginTop: 10, gap: 7 },
-  lbScore: { color: BRAND.ink, fontSize: 13, fontWeight: "800", marginLeft: 8, fontVariant: ["tabular-nums"] },
+  lbRankTextMe: { color: "#60A5FA" },
+  lbNameCol: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", marginLeft: 10 },
+  lbName: { flexShrink: 1, color: "#FFFFFF", fontSize: 13.5, fontWeight: "800" },
+  meBadge: {
+    marginLeft: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: BRAND.blueBright,
+  },
+  meBadgeText: { color: "#FFFFFF", fontSize: 9, fontWeight: "900", letterSpacing: 0.5 },
+  lbScoreWrap: { flexDirection: "row", alignItems: "center", marginLeft: 8 },
+  lbScore: { color: "#FFD978", fontSize: 13, fontWeight: "900", fontVariant: ["tabular-nums"] },
   lbIcon: { marginLeft: 4 },
+  lbUnrankedText: { color: "#94A3B8", fontSize: 11.5, fontWeight: "700", marginLeft: 8 },
+
+  // Alt CTA çubuğu (Android overflow:visible dış sarmalayıcı + overflow:hidden iç hap)
   ctaBar: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 18,
-    paddingTop: 14,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    zIndex: 25,
   },
-  avatarImage: { backgroundColor: "#E6EDF7" },
-  avatarFallback: { alignItems: "center", justifyContent: "center" },
-  avatarInitial: { color: "#FFFFFF", fontWeight: "900" },
-  rewardRow: { flexDirection: "row", alignItems: "center", padding: 10, borderRadius: 16, marginBottom: 8 },
-  rewardRowTop: { borderWidth: 1, borderColor: "rgba(246,200,110,0.7)" },
-  rewardMedal: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", marginRight: 10 },
-  rewardMedalTextSmall: { color: "#FFFFFF", fontSize: 11, fontWeight: "900", paddingHorizontal: 3 },
-  rewardTextCol: { flex: 1, minWidth: 0 },
-  rewardRank: { fontSize: 11, fontWeight: "900", letterSpacing: 0.4 },
-  rewardLabel: { color: BRAND.ink, fontSize: 13.5, fontWeight: "800", marginTop: 2 },
-  rewardCredits: {
-    flexDirection: "row",
+  ctaOuter: { height: 52, overflow: "visible" },
+  ctaInner: {
+    flex: 1,
+    borderRadius: 26,
+    overflow: "hidden",
     alignItems: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: "#FFF3D1",
-    marginLeft: 8,
+    justifyContent: "center",
+    paddingLeft: 56,
+    paddingRight: 18,
+    shadowOpacity: 0.42,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
   },
-  podiumNameMe: { color: BRAND.blue },
-  lbNameCol: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", marginLeft: 10 },
-  lbName: { flexShrink: 1, color: BRAND.ink, fontSize: 14, fontWeight: "800" },
-  meBadge: { marginLeft: 6, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  meBadgeText: { color: "#FFFFFF", fontSize: 9, fontWeight: "900", letterSpacing: 0.6 },
-  lbLoadingText: { color: "#6B7A8F", fontSize: 12, fontWeight: "700", marginTop: 8 },
-  emptySub: { color: "#6B7A8F", fontSize: 12, fontWeight: "600", textAlign: "center", marginTop: 4 },
-  headArt: { width: "100%", overflow: "hidden", alignItems: "center" },
-  headArtFallback: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" },
-  headFade: { position: "absolute", left: 0, right: 0, bottom: 0, height: "35%" },
-  titleBlock: { alignItems: "center", paddingHorizontal: 14, marginTop: -34 },
-  pageTitle: { color: BRAND.ink, fontSize: 26, fontWeight: "900", letterSpacing: -0.4, textAlign: "center" },
-  bodyContent: { paddingHorizontal: 14, paddingTop: 8 },
-  ctaText: { color: "#FFFFFF", fontSize: 16, fontWeight: "900", letterSpacing: 0.2, marginLeft: 8 },
-  cdBlock: { alignItems: "center", marginTop: 8 },
-  cdCaption: { color: "#6B7A8F", fontSize: 10.5, fontWeight: "800", marginBottom: 4 },
-  cdEnded: { color: "#6B7A8F", fontSize: 13, fontWeight: "800", marginTop: 8 },
-  cdTiles: { flexDirection: "row", gap: 7 },
-  cdTileRim: { borderRadius: 13, padding: 1.5 },
-  cdTile: { width: 50, paddingVertical: 6, borderRadius: 11.5, alignItems: "center", backgroundColor: "#FFFFFF" },
-  cdTileValue: { fontSize: 20, fontWeight: "900", fontVariant: ["tabular-nums"], lineHeight: 23 },
-  cdTileLabel: { color: "#8A94A6", fontSize: 8.5, fontWeight: "900", letterSpacing: 0.8 },
-  rewardTiles: { flexDirection: "row", gap: 7, marginTop: 12, alignSelf: "stretch" },
-  rewardTileRim: { flex: 1, borderRadius: 14, padding: 1.5 },
-  rewardTile: { borderRadius: 12.5, alignItems: "center", paddingVertical: 8, paddingHorizontal: 4, backgroundColor: "#FFFDF6" },
-  rewardTileMedal: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", marginBottom: 4 },
-  rewardTileRank: { color: "#FFFFFF", fontSize: 10.5, fontWeight: "900", paddingHorizontal: 2 },
-  rewardTileValue: { fontSize: 15, fontWeight: "900" },
-  rewardTileUnit: { color: "#8A94A6", fontSize: 9.5, fontWeight: "800" },
-  sparkleIcon: { textShadowColor: "rgba(242,179,61,0.9)", textShadowRadius: 6, textShadowOffset: { width: 0, height: 0 } },
-  podiumGlow: { position: "absolute" },
-  ctaSheen: { position: "absolute", top: 0, bottom: 0, left: 0, width: 90 },
+  ctaGloss: { position: "absolute", left: 0, right: 0, top: 0, height: 24 },
+  ctaSheen: { position: "absolute", top: -10, bottom: -10, left: 0, width: 76 },
   ctaSheenBand: { flex: 1, transform: [{ skewX: "-20deg" }] },
   ctaRim: {
     position: "absolute",
@@ -2515,75 +2704,28 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     borderRadius: 26,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,233,168,0.9)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.28)",
   },
-  // top: etkinliğe göre (dark.bgTop) — sahnedeki ana obje logo ile ilk üç arasında görünsün diye.
-  darkBg: { position: "absolute", left: 0, right: 0, height: "75%", width: "100%" },
-  darkBgTopFade: { position: "absolute", left: 0, right: 0, height: 90 },
-  darkText: { color: "#FFFFFF" },
-  darkGrabber: { position: "absolute", top: 8, alignSelf: "center", width: 42, height: 5, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.55)", zIndex: 5 },
-  darkContent: { alignItems: "center", paddingTop: 44, paddingHorizontal: 12 },
-  darkInfoCard: { alignSelf: "stretch", marginHorizontal: 0, backgroundColor: "rgba(10,8,22,0.85)", borderWidth: 1, borderColor: "rgba(255,215,120,0.4)" },
-  darkRewardLine: { color: "#FFD978", fontSize: 12, fontWeight: "700", marginTop: 6 },
-  darkBoard: { alignSelf: "stretch", marginTop: 58 },
-  darkTop3: { flexDirection: "row", alignItems: "flex-end", justifyContent: "center", marginTop: 6 },
-  darkTopCol: { width: 92, alignItems: "center" },
-  darkTopColFirst: { width: 128, marginBottom: 26, marginHorizontal: -4 },
-  darkTopName: { color: "#FFFFFF", fontSize: 12.5, fontWeight: "900", marginTop: 4, maxWidth: "100%", textShadowColor: "rgba(0,0,0,0.8)", textShadowRadius: 4 },
-  darkTopScore: { color: "#FFD978", fontSize: 11, fontWeight: "800", marginTop: 1 },
-  darkRow: {
-    flexDirection: "row",
+  ctaIconFloat: {
+    position: "absolute",
+    left: 14,
+    top: -4,
+    width: 48,
+    height: 48,
     alignItems: "center",
-    gap: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    backgroundColor: "rgba(10,8,22,0.82)",
-    borderWidth: 1,
-    borderColor: "rgba(255,215,120,0.35)",
+    justifyContent: "center",
+    zIndex: 4,
+    elevation: 7,
   },
-  darkRowMe: { borderColor: "#FFD978", borderWidth: 1.5 },
-  darkRowName: { flex: 1, color: "#FFFFFF", fontSize: 13, fontWeight: "800" },
-  darkRowScore: { color: "#FFD978", fontSize: 13, fontWeight: "900", fontVariant: ["tabular-nums"] },
-  darkEmptyBox: { backgroundColor: "rgba(10,8,22,0.82)", borderWidth: 1, borderColor: "rgba(255,215,120,0.35)" },
-  darkRulesBtn: { position: "absolute", top: 12, left: 10, zIndex: 20 },
-  darkCloseBtn: { position: "absolute", top: 12, right: 10, zIndex: 20 },
-  darkPlaqueLabel: { color: "#FFD978", fontSize: 9, fontWeight: "900", letterSpacing: 1.4 },
-  darkPlaqueTime: {
-    color: "#FFF6DA",
-    fontSize: 21,
-    fontWeight: "900",
-    fontVariant: ["tabular-nums"],
-    textShadowColor: "rgba(242,179,61,0.85)",
-    textShadowRadius: 8,
-    textShadowOffset: { width: 0, height: 0 },
-  },
-  darkPanelWrap: { alignSelf: "stretch", alignItems: "center" },
-  darkPanel: {
-    alignSelf: "stretch",
-    borderRadius: 18,
-    backgroundColor: "rgba(10,8,22,0.86)",
-    borderWidth: 1,
-    borderColor: "rgba(255,215,120,0.45)",
-    paddingBottom: 12,
-    paddingHorizontal: 8,
-  },
-  darkPanelHead: { position: "absolute", alignSelf: "center" },
-  darkRewardRow: { flexDirection: "row", justifyContent: "center", gap: 6 },
-  darkRewardCol: { flex: 1, maxWidth: 80, alignItems: "center" },
-  darkTile: { width: "100%" },
-  darkRewardArt: { width: "100%", height: "100%" },
-  darkRewardValue: {
+  ctaIconImg: { width: 46, height: 46 },
+  ctaText: {
     color: "#FFFFFF",
-    fontSize: 14,
+    fontSize: 15.5,
     fontWeight: "900",
-    marginTop: 4,
-    textShadowColor: "rgba(0,0,0,0.6)",
-    textShadowRadius: 3,
+    letterSpacing: -0.1,
+    textShadowColor: "rgba(0,0,0,0.28)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
-  darkRewardSub: { color: "#FFD978", fontSize: 9.5, fontWeight: "800", marginTop: 1 },
-  darkRowRank: { width: DARK_UI.rank.w, height: DARK_UI.rank.w, alignItems: "center", justifyContent: "center" },
-  darkRowRankText: { color: "#FFE9A8", fontSize: 12, fontWeight: "900", paddingHorizontal: 5 },
-  darkCtaPress: { alignSelf: "center" },
 });

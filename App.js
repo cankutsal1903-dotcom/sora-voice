@@ -11417,6 +11417,8 @@ function AppContent() {
         visible={Boolean(activeEvent)}
         event={activeEvent}
         currentUserId={authSession?.user?.id}
+        currentUserAvatar={profile?.avatarUrl || null}
+        currentUserName={profile?.name || null}
         onDismiss={() => setActiveEvent(null)}
         onSendGift={handleEventSendGift}
       />
