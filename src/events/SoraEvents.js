@@ -132,7 +132,35 @@ const DARK_FRAMES = {
 };
 const COINS_ART = require("../../assets/events/coins.webp");
 const DARK_LOGO_MAX_H = 130;
-const RIBBON_RED = ["#E8434C", "#A3121D"];
+// Koyu sayfanın süslü arayüz parçaları (görsel); inner = yazı/ikon yerleşen iç alanın oranları [sol, üst, sağ, alt].
+const DARK_UI = {
+  top: {
+    1: { src: require("../../assets/events/top1.webp"), aspect: 220 / 360, w: 104, overlap: 20 },
+    2: { src: require("../../assets/events/top2.webp"), aspect: 167 / 360, w: 86, overlap: 12 },
+    3: { src: require("../../assets/events/top3.webp"), aspect: 167 / 360, w: 86, overlap: 12 },
+  },
+  oduller: { src: require("../../assets/events/oduller.webp"), aspect: 274 / 560, w: 196 },
+  plaque: { src: require("../../assets/events/plaque.webp"), aspect: 281 / 640, w: 236, inner: [0.169, 0.267, 0.952, 0.765] },
+  katil: { src: require("../../assets/events/katil.webp"), aspect: 455 / 720, w: 184 },
+  kurallar: { src: require("../../assets/events/kurallar.webp"), aspect: 157 / 360, w: 92 },
+  close: { src: require("../../assets/events/close.webp"), aspect: 150 / 148, w: 36 },
+  tile: { src: require("../../assets/events/tile.webp"), aspect: 240 / 225, inner: [0.16, 0.233, 0.844, 0.85] },
+  rank: { src: require("../../assets/events/rank.webp"), w: 32 },
+};
+const ODULLER_H = DARK_UI.oduller.w * DARK_UI.oduller.aspect;
+// ÖDÜLLER kurdelesinin gövdesi görselin ~%55'inde: panel kenarı oradan geçer.
+const ODULLER_OVERLAP = Math.round(ODULLER_H * 0.55);
+const innerBox = ([l, t, r, b]) => ({
+  position: "absolute",
+  left: `${l * 100}%`,
+  top: `${t * 100}%`,
+  right: `${(1 - r) * 100}%`,
+  bottom: `${(1 - b) * 100}%`,
+  alignItems: "center",
+  justifyContent: "center",
+});
+const PLAQUE_INNER = innerBox(DARK_UI.plaque.inner);
+const TILE_INNER = innerBox(DARK_UI.tile.inner);
 // Ödül metnindeki anahtar kelime -> profil çerçevesi; eşleşmezse kredi (altın) görseli.
 const REWARD_FRAME_KEYWORDS = [
   ["alev", "frame_flame"],
@@ -142,11 +170,27 @@ const REWARD_FRAME_KEYWORDS = [
   ["lila", "frame_lilac"],
   ["mor ", "frame_lilac"],
 ];
-const rewardFrameArt = (label) => {
+// Rozet ödülleri: metne göre altın/gümüş/bronz/asil rozet görseli.
+const REWARD_BADGES = {
+  gold: require("../../assets/events/badge-gold.webp"),
+  silver: require("../../assets/events/badge-silver.webp"),
+  bronze: require("../../assets/events/badge-bronze.webp"),
+  royal: require("../../assets/events/badge-royal.webp"),
+};
+const REWARD_BADGE_KEYWORDS = [
+  ["asil", "royal"],
+  ["gümüş", "silver"],
+  ["bronz", "bronze"],
+];
+// Ödül metninden görsel: rozet > profil çerçevesi > kredi (altın yığını).
+const rewardArt = (label) => {
   const text = String(label || "").toLowerCase();
-  if (text.includes("rozet")) return null;
+  if (text.includes("rozet")) {
+    const badge = REWARD_BADGE_KEYWORDS.find(([key]) => text.includes(key));
+    return REWARD_BADGES[badge ? badge[1] : "gold"];
+  }
   const hit = REWARD_FRAME_KEYWORDS.find(([key]) => text.includes(key));
-  return hit ? PROFILE_ITEM_APPEARANCE[hit[1]]?.asset || null : null;
+  return (hit && PROFILE_ITEM_APPEARANCE[hit[1]]?.asset) || COINS_ART;
 };
 const rewardDays = (label) => {
   const match = String(label || "").match(/(\d+)\s*gün/i);
@@ -1492,12 +1536,16 @@ const DarkTop3 = memo(function DarkTop3({ rows, unit, me }) {
       {order.map((place) => {
         const row = rows[place - 1];
         const isMe = me === row.user_id;
+        const ribbon = DARK_UI.top[place];
         return (
           <View key={row.user_id} style={[styles.darkTopCol, place === 1 && styles.darkTopColFirst]}>
             <FramedAvatar row={row} frame={DARK_FRAMES[place]} />
-            <LinearGradient colors={RIBBON_RED} style={styles.darkRibbon}>
-              <Text style={styles.darkRibbonText}>TOP {place}</Text>
-            </LinearGradient>
+            <Image
+              source={ribbon.src}
+              resizeMode="contain"
+              accessibilityLabel={`${place}. sıra`}
+              style={{ width: ribbon.w, height: ribbon.w * ribbon.aspect, marginTop: -ribbon.overlap }}
+            />
             <Text style={styles.darkTopName} numberOfLines={1}>
               {isMe ? "Sen" : row.display_name}
             </Text>
@@ -1517,59 +1565,58 @@ const DarkCountdown = memo(function DarkCountdown({ event }) {
   const { days, hours, minutes, seconds } = splitDuration(remaining);
   const text =
     remaining <= 0 ? "Sona erdi" : `${days > 0 ? `${days}g ` : ""}${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
+  const { src, aspect, w } = DARK_UI.plaque;
   return (
-    <LinearGradient colors={TILE_GOLD} style={styles.darkPlaqueRim}>
-      <View style={styles.darkPlaque}>
-        <MaterialCommunityIcons name="timer-sand" size={15} color="#FFD978" />
-        <Text style={styles.darkPlaqueLabel}>{upcoming ? "BAŞLAMASINA" : "BİTİŞE"}</Text>
-        <Text style={styles.darkPlaqueTime}>{text}</Text>
+    <View style={{ width: w, height: w * aspect, marginTop: 2 }}>
+      <Image source={src} resizeMode="contain" style={StyleSheet.absoluteFill} />
+      <View style={PLAQUE_INNER}>
+        <Text style={styles.darkPlaqueLabel}>{upcoming ? "BAŞLAMASINA KALAN" : "BİTİŞİNE KALAN"}</Text>
+        <Text style={styles.darkPlaqueTime} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+          {text}
+        </Text>
       </View>
-    </LinearGradient>
+    </View>
   );
 });
 
 const DarkRewards = memo(function DarkRewards({ rewards, onPress }) {
   const shown = rewards.slice(0, 4);
   if (!shown.length) return null;
+  const head = DARK_UI.oduller;
   return (
-    <LinearGradient colors={TILE_GOLD} style={styles.darkPanelRim}>
-      <View style={styles.darkPanel}>
+    <View style={[styles.darkPanelWrap, { marginTop: ODULLER_OVERLAP + 14 }]}>
+      <View style={[styles.darkPanel, { paddingTop: ODULLER_H - ODULLER_OVERLAP + 6 }]}>
         <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel="Ödül detayları" style={styles.darkRewardRow}>
           {shown.map((reward, i) => {
-            const frameArt = rewardFrameArt(reward.label);
             const days = rewardDays(reward.label);
-            const isBadge = String(reward.label || "").toLowerCase().includes("rozet");
             return (
-              <LinearGradient key={`dr-${i}`} colors={TILE_GOLD} style={styles.darkRewardRim}>
-                <View style={styles.darkReward}>
-                  <Text style={styles.darkRewardRank} numberOfLines={1}>
-                    {reward.rank}
-                  </Text>
-                  {isBadge ? (
-                    <View style={styles.darkRewardArt}>
-                      <MaterialCommunityIcons name="shield-crown" size={42} color="#FFD978" />
-                    </View>
-                  ) : (
-                    <Image source={frameArt || COINS_ART} resizeMode="contain" style={styles.darkRewardArt} />
-                  )}
-                  {reward.credits > 0 ? (
-                    <Text style={styles.darkRewardValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-                      {formatCompact(reward.credits)}
-                    </Text>
-                  ) : null}
-                  <Text style={styles.darkRewardSub} numberOfLines={1}>
-                    {days || (reward.credits > 0 ? "kredi" : "ödül")}
-                  </Text>
+              <View key={`dr-${i}`} style={styles.darkRewardCol}>
+                <View style={[styles.darkTile, { aspectRatio: 1 / DARK_UI.tile.aspect }]}>
+                  <Image source={DARK_UI.tile.src} resizeMode="contain" style={StyleSheet.absoluteFill} />
+                  <View style={TILE_INNER}>
+                    <Image source={rewardArt(reward.label)} resizeMode="contain" style={styles.darkRewardArt} />
+                  </View>
                 </View>
-              </LinearGradient>
+                {reward.credits > 0 ? (
+                  <Text style={styles.darkRewardValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                    {formatCompact(reward.credits)}
+                  </Text>
+                ) : null}
+                <Text style={styles.darkRewardSub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                  {reward.rank} · {days || (reward.credits > 0 ? "kredi" : "ödül")}
+                </Text>
+              </View>
             );
           })}
         </Pressable>
       </View>
-      <LinearGradient colors={RIBBON_RED} style={styles.darkPanelRibbon}>
-        <Text style={styles.darkRibbonText}>ÖDÜLLER</Text>
-      </LinearGradient>
-    </LinearGradient>
+      <Image
+        source={head.src}
+        resizeMode="contain"
+        accessibilityLabel="Ödüller"
+        style={[styles.darkPanelHead, { width: head.w, height: ODULLER_H, top: -ODULLER_OVERLAP }]}
+      />
+    </View>
   );
 });
 
@@ -1577,7 +1624,12 @@ const LeaderboardRow = memo(function LeaderboardRow({ row, isMe, accent, icon, d
   if (dark) {
     return (
       <View style={[styles.darkRow, isMe && styles.darkRowMe]}>
-        <Text style={styles.darkRowRank}>{row.rank}</Text>
+        <View style={styles.darkRowRank}>
+          <Image source={DARK_UI.rank.src} resizeMode="contain" style={StyleSheet.absoluteFill} />
+          <Text style={styles.darkRowRankText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+            {row.rank}
+          </Text>
+        </View>
         <EventAvatar name={row.display_name} url={row.avatar_url} color={row.avatar_color} size={32} ringColor="rgba(255,215,120,0.7)" />
         <Text style={styles.darkRowName} numberOfLines={1}>
           {isMe ? `${row.display_name} · SEN` : row.display_name}
@@ -1786,10 +1838,14 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
               hitSlop={8}
               accessibilityRole="button"
               accessibilityState={{ expanded: infoOpen }}
+              accessibilityLabel="Kurallar"
               style={styles.darkRulesBtn}
             >
-              <Ionicons name={infoOpen ? "chevron-up" : "information-circle-outline"} size={14} color="#FFD978" />
-              <Text style={styles.darkRulesText}>Kurallar</Text>
+              <Image
+                source={DARK_UI.kurallar.src}
+                resizeMode="contain"
+                style={{ width: DARK_UI.kurallar.w, height: DARK_UI.kurallar.w * DARK_UI.kurallar.aspect }}
+              />
             </Pressable>
             <Pressable
               onPress={handleDismiss}
@@ -1798,12 +1854,16 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
               accessibilityRole="button"
               accessibilityLabel="Kapat"
             >
-              <Ionicons name="close" size={18} color="#FFFFFF" />
+              <Image
+                source={DARK_UI.close.src}
+                resizeMode="contain"
+                style={{ width: DARK_UI.close.w, height: DARK_UI.close.w * DARK_UI.close.aspect }}
+              />
             </Pressable>
 
             <ScrollView
               style={styles.body}
-              contentContainerStyle={[styles.darkContent, { paddingBottom: bottomPad + 92 }]}
+              contentContainerStyle={[styles.darkContent, { paddingBottom: bottomPad + DARK_UI.katil.w * DARK_UI.katil.aspect + 24 }]}
               showsVerticalScrollIndicator={false}
             >
               {showLogo ? (
@@ -1864,19 +1924,11 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
                   accessibilityLabel={ctaLabel}
                   style={({ pressed }) => [styles.darkCtaPress, pressed && styles.pressed]}
                 >
-                  <LinearGradient colors={TILE_GOLD} style={styles.darkCtaRim}>
-                    <LinearGradient colors={RIBBON_RED} style={styles.darkCtaInner}>
-                      <Animated.View pointerEvents="none" style={[styles.ctaSheen, { transform: [{ translateX: ctaSheenX }] }]}>
-                        <LinearGradient
-                          colors={["rgba(255,255,255,0)", "rgba(255,255,255,0.45)", "rgba(255,255,255,0)"]}
-                          start={{ x: 0, y: 0.5 }}
-                          end={{ x: 1, y: 0.5 }}
-                          style={styles.ctaSheenBand}
-                        />
-                      </Animated.View>
-                      <Text style={styles.darkCtaText}>KATIL</Text>
-                    </LinearGradient>
-                  </LinearGradient>
+                  <Image
+                    source={DARK_UI.katil.src}
+                    resizeMode="contain"
+                    style={{ width: DARK_UI.katil.w, height: DARK_UI.katil.w * DARK_UI.katil.aspect }}
+                  />
                 </Pressable>
               </Animated.View>
             </View>
@@ -2471,61 +2523,15 @@ const styles = StyleSheet.create({
   darkBgTopFade: { position: "absolute", left: 0, right: 0, height: 90 },
   darkText: { color: "#FFFFFF" },
   darkGrabber: { position: "absolute", top: 8, alignSelf: "center", width: 42, height: 5, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.55)", zIndex: 5 },
-  darkCloseBtn: {
-    position: "absolute",
-    top: 14,
-    right: 14,
-    zIndex: 20,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.45)",
-    borderWidth: 1,
-    borderColor: "rgba(255,215,120,0.5)",
-  },
-  darkRulesBtn: {
-    position: "absolute",
-    top: 16,
-    left: 14,
-    zIndex: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    borderWidth: 1,
-    borderColor: "rgba(255,215,120,0.5)",
-  },
-  darkRulesText: { color: "#FFD978", fontSize: 11.5, fontWeight: "800" },
   darkContent: { alignItems: "center", paddingTop: 44, paddingHorizontal: 12 },
-  darkPlaqueRim: { borderRadius: 14, padding: 1.5, marginTop: 4 },
-  darkPlaque: { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 12.5, backgroundColor: "rgba(10,8,22,0.82)" },
-  darkPlaqueLabel: { color: "#FFD978", fontSize: 10, fontWeight: "900", letterSpacing: 1 },
-  darkPlaqueTime: { color: "#FFFFFF", fontSize: 17, fontWeight: "900", fontVariant: ["tabular-nums"] },
   darkInfoCard: { alignSelf: "stretch", marginHorizontal: 0, backgroundColor: "rgba(10,8,22,0.85)", borderWidth: 1, borderColor: "rgba(255,215,120,0.4)" },
   darkRewardLine: { color: "#FFD978", fontSize: 12, fontWeight: "700", marginTop: 6 },
-  darkBoard: { alignSelf: "stretch", marginTop: 100 },
+  darkBoard: { alignSelf: "stretch", marginTop: 58 },
   darkTop3: { flexDirection: "row", alignItems: "flex-end", justifyContent: "center", marginTop: 6 },
   darkTopCol: { width: 92, alignItems: "center" },
   darkTopColFirst: { width: 128, marginBottom: 26, marginHorizontal: -4 },
-  darkRibbon: { marginTop: -12, paddingHorizontal: 12, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: "#FFD978" },
-  darkRibbonText: { color: "#FFFFFF", fontSize: 11, fontWeight: "900", letterSpacing: 1 },
   darkTopName: { color: "#FFFFFF", fontSize: 12.5, fontWeight: "900", marginTop: 4, maxWidth: "100%", textShadowColor: "rgba(0,0,0,0.8)", textShadowRadius: 4 },
   darkTopScore: { color: "#FFD978", fontSize: 11, fontWeight: "800", marginTop: 1 },
-  darkPanelRim: { borderRadius: 18, padding: 1.5, marginTop: 22 },
-  darkPanel: { borderRadius: 16.5, backgroundColor: "rgba(10,8,22,0.88)", paddingTop: 22, paddingBottom: 12, paddingHorizontal: 8 },
-  darkPanelRibbon: { position: "absolute", top: -12, alignSelf: "center", paddingHorizontal: 22, paddingVertical: 4, borderRadius: 7, borderWidth: 1, borderColor: "#FFD978" },
-  darkRewardRow: { flexDirection: "row", gap: 7 },
-  darkRewardRim: { flex: 1, borderRadius: 12, padding: 1.5 },
-  darkReward: { borderRadius: 10.5, alignItems: "center", paddingVertical: 6, paddingHorizontal: 3, backgroundColor: "#1A1230" },
-  darkRewardRank: { color: "#FFD978", fontSize: 10, fontWeight: "900" },
-  darkRewardArt: { width: 48, height: 48, marginVertical: 3, alignItems: "center", justifyContent: "center" },
-  darkRewardValue: { color: "#FFFFFF", fontSize: 13.5, fontWeight: "900" },
-  darkRewardSub: { color: "#FFD978", fontSize: 9.5, fontWeight: "800" },
   darkRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -2538,12 +2544,46 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,215,120,0.35)",
   },
   darkRowMe: { borderColor: "#FFD978", borderWidth: 1.5 },
-  darkRowRank: { width: 22, color: "#FFD978", fontSize: 14, fontWeight: "900", textAlign: "center" },
   darkRowName: { flex: 1, color: "#FFFFFF", fontSize: 13, fontWeight: "800" },
   darkRowScore: { color: "#FFD978", fontSize: 13, fontWeight: "900", fontVariant: ["tabular-nums"] },
   darkEmptyBox: { backgroundColor: "rgba(10,8,22,0.82)", borderWidth: 1, borderColor: "rgba(255,215,120,0.35)" },
-  darkCtaPress: { borderRadius: 28, shadowColor: "#F2B33D", shadowOpacity: 0.55, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
-  darkCtaRim: { borderRadius: 28, padding: 2.5 },
-  darkCtaInner: { height: 50, borderRadius: 25.5, overflow: "hidden", alignItems: "center", justifyContent: "center" },
-  darkCtaText: { color: "#FFFFFF", fontSize: 19, fontWeight: "900", letterSpacing: 2, textShadowColor: "rgba(0,0,0,0.45)", textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 } },
+  darkRulesBtn: { position: "absolute", top: 12, left: 10, zIndex: 20 },
+  darkCloseBtn: { position: "absolute", top: 12, right: 10, zIndex: 20 },
+  darkPlaqueLabel: { color: "#FFD978", fontSize: 9, fontWeight: "900", letterSpacing: 1.4 },
+  darkPlaqueTime: {
+    color: "#FFF6DA",
+    fontSize: 21,
+    fontWeight: "900",
+    fontVariant: ["tabular-nums"],
+    textShadowColor: "rgba(242,179,61,0.85)",
+    textShadowRadius: 8,
+    textShadowOffset: { width: 0, height: 0 },
+  },
+  darkPanelWrap: { alignSelf: "stretch", alignItems: "center" },
+  darkPanel: {
+    alignSelf: "stretch",
+    borderRadius: 18,
+    backgroundColor: "rgba(10,8,22,0.86)",
+    borderWidth: 1,
+    borderColor: "rgba(255,215,120,0.45)",
+    paddingBottom: 12,
+    paddingHorizontal: 8,
+  },
+  darkPanelHead: { position: "absolute", alignSelf: "center" },
+  darkRewardRow: { flexDirection: "row", justifyContent: "center", gap: 6 },
+  darkRewardCol: { flex: 1, maxWidth: 80, alignItems: "center" },
+  darkTile: { width: "100%" },
+  darkRewardArt: { width: "100%", height: "100%" },
+  darkRewardValue: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "900",
+    marginTop: 4,
+    textShadowColor: "rgba(0,0,0,0.6)",
+    textShadowRadius: 3,
+  },
+  darkRewardSub: { color: "#FFD978", fontSize: 9.5, fontWeight: "800", marginTop: 1 },
+  darkRowRank: { width: DARK_UI.rank.w, height: DARK_UI.rank.w, alignItems: "center", justifyContent: "center" },
+  darkRowRankText: { color: "#FFE9A8", fontSize: 12, fontWeight: "900", paddingHorizontal: 5 },
+  darkCtaPress: { alignSelf: "center" },
 });
