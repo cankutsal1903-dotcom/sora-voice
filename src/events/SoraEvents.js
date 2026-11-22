@@ -59,13 +59,14 @@ const EVENT_BANNER_ART = {
 const GOLD_BUTTON = ["#FFE9A8", "#F2B33D", "#C98A1E"];
 const STAGE_BASE = "#0A1120";
 const COINS_ART = require("../../assets/events/coins.webp");
+const PODIUM_GLOW_ART = require("../../assets/events/podium-glow.webp");
 const HERO_HEIGHT = 186;
 
 // Etkinlik detay sayfası — 4 etkinlikte birebir aynı iskelet, etkinliğe özel atmosfer ve 3D CTA ikonu.
 const EVENT_STAGE_THEME = {
   gift_race: {
     stageTop: "#081C42",
-    glow: "rgba(47,128,237,0.44)",
+    glowColor: "#2F80ED",
     unitIcon: "trophy",
     unitColor: "#F6C86E",
     ctaColors: ["#164DA8", "#2F80ED", "#1D68D8"],
@@ -75,7 +76,7 @@ const EVENT_STAGE_THEME = {
   },
   room_party: {
     stageTop: "#1B103F",
-    glow: "rgba(139,92,246,0.44)",
+    glowColor: "#8B5CF6",
     unitIcon: "sparkles",
     unitColor: "#F6C86E",
     ctaColors: ["#5B21B6", "#7C3AED", "#6D28D9"],
@@ -85,7 +86,7 @@ const EVENT_STAGE_THEME = {
   },
   love: {
     stageTop: "#330B24",
-    glow: "rgba(236,72,153,0.42)",
+    glowColor: "#EC4899",
     unitIcon: "heart",
     unitColor: "#FF6B9A",
     ctaColors: ["#D91B5C", "#F43F7E", "#EC4899"],
@@ -95,7 +96,7 @@ const EVENT_STAGE_THEME = {
   },
   family_war: {
     stageTop: "#0B1B3B",
-    glow: "rgba(59,130,246,0.42)",
+    glowColor: "#3B82F6",
     unitIcon: "flash",
     unitColor: "#60A5FA",
     ctaColors: ["#1E3A8A", "#2563EB", "#1D4ED8"],
@@ -857,7 +858,7 @@ const BannerCard = memo(function BannerCard({ event, width, floatValue, pulseVal
         <Animated.Image
           source={art}
           resizeMode="cover"
-          style={[StyleSheet.absoluteFill, { transform: [{ scale: artScale }] }]}
+          style={[StyleSheet.absoluteFill, { width, height: BANNER_HEIGHT, transform: [{ scale: artScale }] }]}
         />
       ) : (
         <>
@@ -1385,7 +1386,7 @@ const FramedPodiumAvatar = memo(function FramedPodiumAvatar({ row, place, scale 
       <View style={{ position: "absolute", left: avLeft, top: avTop }}>
         <EventAvatar url={row?.avatar_url} size={avSize} empty={!row} />
       </View>
-      <Image source={f.src} resizeMode="contain" style={StyleSheet.absoluteFill} />
+      <Image source={f.src} resizeMode="contain" style={[StyleSheet.absoluteFill, { width: fw, height: fh }]} />
       <LinearGradient
         colors={coin.colors}
         start={{ x: 0, y: 0 }}
@@ -1402,25 +1403,26 @@ const StagePodium = memo(function StagePodium({ rows, me, width, theme, pulseVal
   const podH = width / PODIUM_STAGE.aspect;
   const avScale = Math.min(1, width / 328);
   const wrapH = Math.round(podH + 68 * avScale);
-  const glowScale = pulseValue.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.08] });
-  const glowOpacity = pulseValue.interpolate({ inputRange: [0, 1], outputRange: [0.48, 0.82] });
-  const glowW = Math.round(width * 0.68);
-  const glowH = Math.round(podH * 0.96);
+  const glowScale = pulseValue.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.06] });
+  const glowOpacity = pulseValue.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0.82] });
+  const glowW = Math.round(width * 0.92);
+  const glowH = Math.round(podH * 1.25);
   const faceW = Math.round(width * 0.295);
 
   return (
     <View style={[styles.podiumWrap, { width, height: wrapH }]}>
-      <Animated.View
+      <Animated.Image
         pointerEvents="none"
+        source={PODIUM_GLOW_ART}
+        resizeMode="stretch"
         style={[
           styles.podiumGlow,
           {
             width: glowW,
             height: glowH,
-            borderRadius: glowH / 2,
             left: (width - glowW) / 2,
-            top: 8,
-            backgroundColor: theme.glow,
+            top: -4,
+            tintColor: theme.glowColor,
             opacity: glowOpacity,
             transform: [{ scale: glowScale }],
           },
@@ -1520,7 +1522,12 @@ const StageRewards = memo(function StageRewards({ rewards, currentUserAvatar, on
         </View>
 
         <View style={styles.rewardArtBox}>
-          <View style={[styles.rewardArtGlow, { backgroundColor: withAlpha(visual.glow, 0.24) }]} />
+          <Image
+            pointerEvents="none"
+            source={PODIUM_GLOW_ART}
+            resizeMode="stretch"
+            style={[styles.rewardArtGlow, { tintColor: visual.glow }]}
+          />
           {visual.isFrame ? (
             <View style={styles.rewardFrameAvatar}>
               <EventAvatar url={currentUserAvatar} size={36} />
@@ -1894,7 +1901,7 @@ export const EventDetailSheet = memo(function EventDetailSheet({
                   resizeMode="cover"
                   style={[
                     StyleSheet.absoluteFill,
-                    { transform: [{ translateY: heroParallaxY }, { scale: heroScale }] },
+                    { width: windowWidth, height: HERO_HEIGHT, transform: [{ translateY: heroParallaxY }, { scale: heroScale }] },
                   ]}
                 />
               ) : (
@@ -2508,7 +2515,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
-  podiumNameMe: { color: "#93C5FD" },
+  podiumNameMe: { color: "#BAE6FD" },
   podiumScoreRow: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 },
   podiumScore: {
     color: "#FFD978",
@@ -2610,7 +2617,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
     marginBottom: 4,
   },
-  rewardArtGlow: { position: "absolute", width: 48, height: 48, borderRadius: 24 },
+  rewardArtGlow: { position: "absolute", width: 64, height: 64, opacity: 0.48 },
   rewardFrameAvatar: { position: "absolute", alignItems: "center", justifyContent: "center" },
   rewardArtImg: { width: 58, height: 58, zIndex: 2 },
   rewardVal: {
