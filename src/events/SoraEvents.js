@@ -34,6 +34,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "../auth/supabase";
 import { SoraGiftArtwork } from "../ui/SoraGiftArtwork";
 import { useReducedMotion } from "../ui/Motion";
+import { PROFILE_ITEM_APPEARANCE } from "../ui/SoraProfileFrame";
 
 // ---------------------------------------------------------------------------
 // Sabitler
@@ -64,6 +65,12 @@ const EVENT_DETAIL_ART = {
     logo: require("../../assets/events/logo-race.webp"),
     logoAspect: 720 / 512,
     title: "Haftalık Hediye Yarışı",
+    dark: {
+      bg: require("../../assets/events/bg-race.webp"),
+      base: "#060A18",
+      logo: require("../../assets/events/logo-race-dark.webp"),
+      logoAspect: 720 / 472,
+    },
   },
   room_party: {
     head: require("../../assets/events/head-royal.webp"),
@@ -95,6 +102,35 @@ const HEADER_SPARKLES = [
   [8, 22, 14, 0], [22, 58, 10, 1], [36, 14, 9, 1], [64, 18, 12, 0],
   [78, 52, 10, 0], [90, 26, 15, 1], [14, 80, 8, 0], [86, 78, 9, 1],
 ];
+// Koyu (gösterişli) etkinlik sayfası: ilk üç için süslü çerçeveler, ödül görselleri.
+const DARK_FRAMES = {
+  1: { src: require("../../assets/events/frame-gold.webp"), aspect: 412 / 420, hole: 0.545, cx: 0.494, cy: 0.538, avatar: 70 },
+  2: { src: require("../../assets/events/frame-silver-ornate.webp"), aspect: 420 / 419, hole: 0.542, cx: 0.495, cy: 0.557, avatar: 46 },
+  3: { src: require("../../assets/events/frame-bronze-ornate.webp"), aspect: 420 / 411, hole: 0.64, cx: 0.498, cy: 0.526, avatar: 52 },
+};
+const COINS_ART = require("../../assets/events/coins.webp");
+// Arka plan görseli bu kadar aşağıdan başlar: sahnedeki ana obje logo ile ilk üç arasında görünür.
+const DARK_BG_TOP = 120;
+const DARK_LOGO_MAX_H = 130;
+const RIBBON_RED = ["#E8434C", "#A3121D"];
+// Ödül metnindeki anahtar kelime -> profil çerçevesi; eşleşmezse kredi (altın) görseli.
+const REWARD_FRAME_KEYWORDS = [
+  ["alev", "frame_flame"],
+  ["kehribar", "frame_amber"],
+  ["asil", "frame_family_royal"],
+  ["gümüş aile", "frame_family_silver"],
+  ["lila", "frame_lilac"],
+  ["mor ", "frame_lilac"],
+];
+const rewardFrameArt = (label) => {
+  const text = String(label || "").toLowerCase();
+  const hit = REWARD_FRAME_KEYWORDS.find(([key]) => text.includes(key));
+  return hit ? PROFILE_ITEM_APPEARANCE[hit[1]]?.asset || null : null;
+};
+const rewardDays = (label) => {
+  const match = String(label || "").match(/(\d+)\s*gün/i);
+  return match ? `${match[1]} gün` : null;
+};
 const DETAIL_FALLBACK_BG = "#F3F7FC";
 const HEAD_ASPECT = 1000 / 507;
 const PODIUM_ART = require("../../assets/events/podium.webp");
@@ -1366,8 +1402,7 @@ const RewardRow = memo(function RewardRow({ reward }) {
   );
 });
 
-const FramedAvatar = memo(function FramedAvatar({ row, place }) {
-  const f = PODIUM_FRAMES[place];
+const FramedAvatar = memo(function FramedAvatar({ row, frame: f }) {
   // Avatar halkadan biraz büyük: çerçeve kenarı fotoğrafın kenarını örter.
   const fw = Math.round((f.avatar * 0.96) / f.hole);
   const fh = Math.round(fw * f.aspect);
@@ -1415,7 +1450,7 @@ const PodiumStage = memo(function PodiumStage({ rows, unit, me, width, accent, p
               { left: spot.x * width - PODIUM_BLOCK_W / 2, bottom: podiumH * (1 - spot.top) - 4 },
             ]}
           >
-            <FramedAvatar row={row} place={place} />
+            <FramedAvatar row={row} frame={PODIUM_FRAMES[place]} />
             <Text style={[styles.podiumName, isMe && styles.podiumNameMe]} numberOfLines={1}>
               {isMe ? "Sen" : row.display_name}
             </Text>
@@ -1429,7 +1464,102 @@ const PodiumStage = memo(function PodiumStage({ rows, unit, me, width, accent, p
   );
 });
 
-const LeaderboardRow = memo(function LeaderboardRow({ row, isMe, accent, icon }) {
+const DarkTop3 = memo(function DarkTop3({ rows, unit, me }) {
+  const order = [2, 1, 3].filter((place) => rows[place - 1]);
+  return (
+    <View style={styles.darkTop3}>
+      {order.map((place) => {
+        const row = rows[place - 1];
+        const isMe = me === row.user_id;
+        return (
+          <View key={row.user_id} style={[styles.darkTopCol, place === 1 && styles.darkTopColFirst]}>
+            <FramedAvatar row={row} frame={DARK_FRAMES[place]} />
+            <LinearGradient colors={RIBBON_RED} style={styles.darkRibbon}>
+              <Text style={styles.darkRibbonText}>TOP {place}</Text>
+            </LinearGradient>
+            <Text style={styles.darkTopName} numberOfLines={1}>
+              {isMe ? "Sen" : row.display_name}
+            </Text>
+            <Text style={styles.darkTopScore} numberOfLines={1}>
+              {formatCompact(row.score)} {unit}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+});
+
+const DarkCountdown = memo(function DarkCountdown({ event }) {
+  const upcoming = event.startsAtMs > Date.now();
+  const remaining = useCountdownMs(upcoming ? event.startsAtMs : event.endsAtMs, "seconds");
+  const { days, hours, minutes, seconds } = splitDuration(remaining);
+  const text =
+    remaining <= 0 ? "Sona erdi" : `${days > 0 ? `${days}g ` : ""}${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
+  return (
+    <LinearGradient colors={TILE_GOLD} style={styles.darkPlaqueRim}>
+      <View style={styles.darkPlaque}>
+        <MaterialCommunityIcons name="timer-sand" size={15} color="#FFD978" />
+        <Text style={styles.darkPlaqueLabel}>{upcoming ? "BAŞLAMASINA" : "BİTİŞE"}</Text>
+        <Text style={styles.darkPlaqueTime}>{text}</Text>
+      </View>
+    </LinearGradient>
+  );
+});
+
+const DarkRewards = memo(function DarkRewards({ rewards, onPress }) {
+  const shown = rewards.slice(0, 4);
+  if (!shown.length) return null;
+  return (
+    <LinearGradient colors={TILE_GOLD} style={styles.darkPanelRim}>
+      <View style={styles.darkPanel}>
+        <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel="Ödül detayları" style={styles.darkRewardRow}>
+          {shown.map((reward, i) => {
+            const frameArt = rewardFrameArt(reward.label);
+            const days = rewardDays(reward.label);
+            return (
+              <LinearGradient key={`dr-${i}`} colors={TILE_GOLD} style={styles.darkRewardRim}>
+                <View style={styles.darkReward}>
+                  <Text style={styles.darkRewardRank} numberOfLines={1}>
+                    {reward.rank}
+                  </Text>
+                  <Image source={frameArt || COINS_ART} resizeMode="contain" style={styles.darkRewardArt} />
+                  {reward.credits > 0 ? (
+                    <Text style={styles.darkRewardValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                      {formatCompact(reward.credits)}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.darkRewardSub} numberOfLines={1}>
+                    {days || (reward.credits > 0 ? "kredi" : "ödül")}
+                  </Text>
+                </View>
+              </LinearGradient>
+            );
+          })}
+        </Pressable>
+      </View>
+      <LinearGradient colors={RIBBON_RED} style={styles.darkPanelRibbon}>
+        <Text style={styles.darkRibbonText}>ÖDÜLLER</Text>
+      </LinearGradient>
+    </LinearGradient>
+  );
+});
+
+const LeaderboardRow = memo(function LeaderboardRow({ row, isMe, accent, icon, dark }) {
+  if (dark) {
+    return (
+      <View style={[styles.darkRow, isMe && styles.darkRowMe]}>
+        <Text style={styles.darkRowRank}>{row.rank}</Text>
+        <EventAvatar name={row.display_name} url={row.avatar_url} color={row.avatar_color} size={32} ringColor="rgba(255,215,120,0.7)" />
+        <Text style={styles.darkRowName} numberOfLines={1}>
+          {isMe ? `${row.display_name} · SEN` : row.display_name}
+        </Text>
+        <Text style={styles.darkRowScore} numberOfLines={1}>
+          {formatThousands(row.score)}
+        </Text>
+      </View>
+    );
+  }
   return (
     <View style={[styles.lbRow, isMe && { borderColor: accent }]}>
       <Text style={styles.lbRankText}>{row.rank}</Text>
@@ -1452,7 +1582,7 @@ const LeaderboardRow = memo(function LeaderboardRow({ row, isMe, accent, icon })
   );
 });
 
-const LeaderboardSection = memo(function LeaderboardSection({ event, enabled, currentUserId, pulseValue }) {
+const LeaderboardSection = memo(function LeaderboardSection({ event, enabled, currentUserId, pulseValue, dark = false, middle = null }) {
   const { rows, loading, error, retry } = useEventLeaderboard(event.id, enabled);
   const [stageWidth, setStageWidth] = useState(0);
   const accent = event.colors[1] || BRAND.blueBright;
@@ -1465,29 +1595,52 @@ const LeaderboardSection = memo(function LeaderboardSection({ event, enabled, cu
     if (w > 0) setStageWidth((prev) => (prev === w ? prev : w));
   }, []);
 
+  const tone = dark ? styles.darkText : null;
   if (loading) {
     return (
-      <View style={styles.lbLoading}>
-        <ActivityIndicator color={accent} />
-        <Text style={styles.lbLoadingText}>Sıralama yükleniyor…</Text>
+      <View>
+        {middle}
+        <View style={styles.lbLoading}>
+          <ActivityIndicator color={dark ? "#FFD978" : accent} />
+          <Text style={[styles.lbLoadingText, tone]}>Sıralama yükleniyor…</Text>
+        </View>
       </View>
     );
   }
   if (error && rows.length === 0) {
     return (
-      <Pressable onPress={retry} accessibilityRole="button" style={styles.emptyBox}>
-        <Ionicons name="cloud-offline-outline" size={26} color={accent} />
-        <Text style={styles.emptyTitle}>Sıralama yüklenemedi</Text>
-        <Text style={styles.emptySub}>Tekrar denemek için dokun.</Text>
-      </Pressable>
+      <View>
+        {middle}
+        <Pressable onPress={retry} accessibilityRole="button" style={[styles.emptyBox, dark && styles.darkEmptyBox]}>
+          <Ionicons name="cloud-offline-outline" size={26} color={dark ? "#FFD978" : accent} />
+          <Text style={[styles.emptyTitle, tone]}>Sıralama yüklenemedi</Text>
+          <Text style={[styles.emptySub, tone]}>Tekrar denemek için dokun.</Text>
+        </Pressable>
+      </View>
     );
   }
   if (rows.length === 0) {
     return (
-      <View style={styles.emptyBox}>
-        <Ionicons name={icon} size={26} color={accent} />
-        <Text style={styles.emptyTitle}>Henüz sıralama yok</Text>
-        <Text style={styles.emptySub}>İlk sen gönder, zirveye çık.</Text>
+      <View>
+        {middle}
+        <View style={[styles.emptyBox, dark && styles.darkEmptyBox]}>
+          <Ionicons name={icon} size={26} color={dark ? "#FFD978" : accent} />
+          <Text style={[styles.emptyTitle, tone]}>Henüz sıralama yok</Text>
+          <Text style={[styles.emptySub, tone]}>İlk sen gönder, zirveye çık.</Text>
+        </View>
+      </View>
+    );
+  }
+  if (dark) {
+    return (
+      <View>
+        <DarkTop3 rows={rows.slice(0, 3)} unit={event.unit} me={me} />
+        {middle}
+        <View style={styles.lbList}>
+          {rows.slice(3).map((row) => (
+            <LeaderboardRow key={`${row.user_id}-${row.rank}`} row={row} isMe={me === row.user_id} dark />
+          ))}
+        </View>
       </View>
     );
   }
@@ -1570,6 +1723,140 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
   const logoW = art ? Math.min(LOGO_MAX_W, LOGO_MAX_H * art.logoAspect) : 0;
   const ctaScale = pulseValue.interpolate({ inputRange: [0, 1], outputRange: [1, 1.025] });
   const ctaSheenX = sheenValue.interpolate({ inputRange: [0, 1], outputRange: [-160, 420] });
+  const dark = art?.dark;
+
+  if (dark) {
+    const darkLogoW = Math.min(LOGO_MAX_W, DARK_LOGO_MAX_H * dark.logoAspect);
+    return (
+      <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={handleDismiss}>
+        <View style={styles.modalRoot}>
+          <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, { opacity: progress }]}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={handleDismiss} accessibilityLabel="Kapat" />
+          </Animated.View>
+
+          <Animated.View style={[styles.sheet, { height: sheetHeight, backgroundColor: dark.base, transform: [{ translateY }] }]}>
+            <Animated.Image
+              source={dark.bg}
+              resizeMode="cover"
+              style={[styles.darkBg, { transform: [{ scale: artScale }] }]}
+            />
+            <LinearGradient
+              pointerEvents="none"
+              colors={[dark.base, withAlpha(dark.base, 0)]}
+              style={styles.darkBgTopFade}
+            />
+            <LinearGradient
+              pointerEvents="none"
+              colors={[withAlpha(dark.base, 0), withAlpha(dark.base, 0.55), dark.base]}
+              locations={[0, 0.66, 0.9]}
+              style={StyleSheet.absoluteFill}
+            />
+            <HeaderSparkles pulseValue={pulseValue} />
+            <View style={styles.darkGrabber} />
+            <Pressable
+              onPress={toggleInfo}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: infoOpen }}
+              style={styles.darkRulesBtn}
+            >
+              <Ionicons name={infoOpen ? "chevron-up" : "information-circle-outline"} size={14} color="#FFD978" />
+              <Text style={styles.darkRulesText}>Kurallar</Text>
+            </Pressable>
+            <Pressable
+              onPress={handleDismiss}
+              hitSlop={10}
+              style={styles.darkCloseBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Kapat"
+            >
+              <Ionicons name="close" size={18} color="#FFFFFF" />
+            </Pressable>
+
+            <ScrollView
+              style={styles.body}
+              contentContainerStyle={[styles.darkContent, { paddingBottom: bottomPad + 92 }]}
+              showsVerticalScrollIndicator={false}
+            >
+              {showLogo ? (
+                <Image
+                  source={dark.logo}
+                  resizeMode="contain"
+                  accessibilityRole="header"
+                  accessibilityLabel={ev.title}
+                  style={{ width: darkLogoW, height: darkLogoW / dark.logoAspect }}
+                />
+              ) : (
+                <Text style={[styles.pageTitle, styles.darkText]} numberOfLines={2}>
+                  {ev.title}
+                </Text>
+              )}
+              <DarkCountdown event={ev} />
+
+              {infoOpen ? (
+                <View style={[styles.infoCard, styles.darkInfoCard]}>
+                  {ev.rules.map((rule, i) => (
+                    <View key={`rule-${i}`} style={styles.ruleRow}>
+                      <View style={[styles.ruleDot, { backgroundColor: "#FFD978" }]} />
+                      <Text style={[styles.ruleText, styles.darkText]}>{rule}</Text>
+                    </View>
+                  ))}
+                  {ev.rewards.map((reward, i) => (
+                    <Text key={`rl-${i}`} style={styles.darkRewardLine}>
+                      {reward.rank} {reward.label}
+                      {reward.credits > 0 ? ` · ${formatThousands(reward.credits)} kredi` : ""}
+                    </Text>
+                  ))}
+                </View>
+              ) : null}
+
+              <View style={styles.darkBoard}>
+                <LeaderboardSection
+                  event={ev}
+                  enabled={mounted}
+                  currentUserId={currentUserId}
+                  pulseValue={pulseValue}
+                  dark
+                  middle={<DarkRewards rewards={ev.rewards} onPress={toggleInfo} />}
+                />
+              </View>
+            </ScrollView>
+
+            <View style={[styles.ctaBar, { paddingBottom: bottomPad + 4 }]}>
+              <LinearGradient
+                pointerEvents="none"
+                colors={[withAlpha(dark.base, 0), dark.base]}
+                locations={[0, 0.4]}
+                style={StyleSheet.absoluteFill}
+              />
+              <Animated.View style={{ transform: [{ scale: ctaScale }] }}>
+                <Pressable
+                  onPress={handleCta}
+                  accessibilityRole="button"
+                  accessibilityLabel={ctaLabel}
+                  style={({ pressed }) => [styles.darkCtaPress, pressed && styles.pressed]}
+                >
+                  <LinearGradient colors={TILE_GOLD} style={styles.darkCtaRim}>
+                    <LinearGradient colors={RIBBON_RED} style={styles.darkCtaInner}>
+                      <Animated.View pointerEvents="none" style={[styles.ctaSheen, { transform: [{ translateX: ctaSheenX }] }]}>
+                        <LinearGradient
+                          colors={["rgba(255,255,255,0)", "rgba(255,255,255,0.45)", "rgba(255,255,255,0)"]}
+                          start={{ x: 0, y: 0.5 }}
+                          end={{ x: 1, y: 0.5 }}
+                          style={styles.ctaSheenBand}
+                        />
+                      </Animated.View>
+                      <Text style={styles.darkCtaText}>KATIL</Text>
+                    </LinearGradient>
+                  </LinearGradient>
+                </Pressable>
+              </Animated.View>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
+    );
+  }
 
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={handleDismiss}>
@@ -2151,4 +2438,83 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "rgba(255,233,168,0.9)",
   },
+  darkBg: { position: "absolute", top: DARK_BG_TOP, left: 0, right: 0, height: "75%", width: "100%" },
+  darkBgTopFade: { position: "absolute", top: DARK_BG_TOP, left: 0, right: 0, height: 90 },
+  darkText: { color: "#FFFFFF" },
+  darkGrabber: { position: "absolute", top: 8, alignSelf: "center", width: 42, height: 5, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.55)", zIndex: 5 },
+  darkCloseBtn: {
+    position: "absolute",
+    top: 14,
+    right: 14,
+    zIndex: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.45)",
+    borderWidth: 1,
+    borderColor: "rgba(255,215,120,0.5)",
+  },
+  darkRulesBtn: {
+    position: "absolute",
+    top: 16,
+    left: 14,
+    zIndex: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    borderWidth: 1,
+    borderColor: "rgba(255,215,120,0.5)",
+  },
+  darkRulesText: { color: "#FFD978", fontSize: 11.5, fontWeight: "800" },
+  darkContent: { alignItems: "center", paddingTop: 44, paddingHorizontal: 12 },
+  darkPlaqueRim: { borderRadius: 14, padding: 1.5, marginTop: 4 },
+  darkPlaque: { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 12.5, backgroundColor: "rgba(10,8,22,0.82)" },
+  darkPlaqueLabel: { color: "#FFD978", fontSize: 10, fontWeight: "900", letterSpacing: 1 },
+  darkPlaqueTime: { color: "#FFFFFF", fontSize: 17, fontWeight: "900", fontVariant: ["tabular-nums"] },
+  darkInfoCard: { alignSelf: "stretch", marginHorizontal: 0, backgroundColor: "rgba(10,8,22,0.85)", borderWidth: 1, borderColor: "rgba(255,215,120,0.4)" },
+  darkRewardLine: { color: "#FFD978", fontSize: 12, fontWeight: "700", marginTop: 6 },
+  darkBoard: { alignSelf: "stretch", marginTop: 100 },
+  darkTop3: { flexDirection: "row", alignItems: "flex-end", justifyContent: "center", marginTop: 6 },
+  darkTopCol: { width: 92, alignItems: "center" },
+  darkTopColFirst: { width: 128, marginBottom: 26, marginHorizontal: -4 },
+  darkRibbon: { marginTop: -12, paddingHorizontal: 12, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: "#FFD978" },
+  darkRibbonText: { color: "#FFFFFF", fontSize: 11, fontWeight: "900", letterSpacing: 1 },
+  darkTopName: { color: "#FFFFFF", fontSize: 12.5, fontWeight: "900", marginTop: 4, maxWidth: "100%", textShadowColor: "rgba(0,0,0,0.8)", textShadowRadius: 4 },
+  darkTopScore: { color: "#FFD978", fontSize: 11, fontWeight: "800", marginTop: 1 },
+  darkPanelRim: { borderRadius: 18, padding: 1.5, marginTop: 22 },
+  darkPanel: { borderRadius: 16.5, backgroundColor: "rgba(10,8,22,0.88)", paddingTop: 22, paddingBottom: 12, paddingHorizontal: 8 },
+  darkPanelRibbon: { position: "absolute", top: -12, alignSelf: "center", paddingHorizontal: 22, paddingVertical: 4, borderRadius: 7, borderWidth: 1, borderColor: "#FFD978" },
+  darkRewardRow: { flexDirection: "row", gap: 7 },
+  darkRewardRim: { flex: 1, borderRadius: 12, padding: 1.5 },
+  darkReward: { borderRadius: 10.5, alignItems: "center", paddingVertical: 6, paddingHorizontal: 3, backgroundColor: "#1A1230" },
+  darkRewardRank: { color: "#FFD978", fontSize: 10, fontWeight: "900" },
+  darkRewardArt: { width: 48, height: 48, marginVertical: 3 },
+  darkRewardValue: { color: "#FFFFFF", fontSize: 13.5, fontWeight: "900" },
+  darkRewardSub: { color: "#FFD978", fontSize: 9.5, fontWeight: "800" },
+  darkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: "rgba(10,8,22,0.82)",
+    borderWidth: 1,
+    borderColor: "rgba(255,215,120,0.35)",
+  },
+  darkRowMe: { borderColor: "#FFD978", borderWidth: 1.5 },
+  darkRowRank: { width: 22, color: "#FFD978", fontSize: 14, fontWeight: "900", textAlign: "center" },
+  darkRowName: { flex: 1, color: "#FFFFFF", fontSize: 13, fontWeight: "800" },
+  darkRowScore: { color: "#FFD978", fontSize: 13, fontWeight: "900", fontVariant: ["tabular-nums"] },
+  darkEmptyBox: { backgroundColor: "rgba(10,8,22,0.82)", borderWidth: 1, borderColor: "rgba(255,215,120,0.35)" },
+  darkCtaPress: { borderRadius: 28, shadowColor: "#F2B33D", shadowOpacity: 0.55, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
+  darkCtaRim: { borderRadius: 28, padding: 2.5 },
+  darkCtaInner: { height: 50, borderRadius: 25.5, overflow: "hidden", alignItems: "center", justifyContent: "center" },
+  darkCtaText: { color: "#FFFFFF", fontSize: 19, fontWeight: "900", letterSpacing: 2, textShadowColor: "rgba(0,0,0,0.45)", textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 } },
 });
