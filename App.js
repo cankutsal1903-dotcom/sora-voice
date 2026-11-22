@@ -370,11 +370,11 @@ const INITIAL_ROOMS = [
 ];
 
 const CATEGORIES = [
-  { name: "Tumu", label: "Tümü", icon: "apps-outline" },
-  { name: "Sohbet", label: "Sohbet", icon: "chatbubbles-outline" },
-  { name: "Muzik", label: "Müzik", icon: "musical-notes-outline" },
-  { name: "Oyun", label: "Oyun", icon: "game-controller-outline" },
-  { name: "Gece", label: "Gece", icon: "moon-outline" },
+  { name: "Tumu", label: "Tümü", icon: "apps", bg: "#EAF2FF", fg: "#2F80ED" },
+  { name: "Sohbet", label: "Sohbet", icon: "chatbubbles", bg: "#EAF3FF", fg: "#2563EB" },
+  { name: "Muzik", label: "Müzik", icon: "musical-notes", bg: "#F3EEFF", fg: "#7C3AED" },
+  { name: "Oyun", label: "Oyun", icon: "game-controller", bg: "#E7F8F2", fg: "#0D9488" },
+  { name: "Gece", label: "Gece", icon: "moon", bg: "#EEF2FF", fg: "#4338CA" },
 ];
 
 const formatCategoryLabel = (value) => {
@@ -793,7 +793,6 @@ const Discover = memo(function Discover({
   const [category, setCategory] = useState("Tumu");
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
-  const [favoritesOnly, setFavoritesOnly] = useState(false);
 
   const handleToggleSearch = useCallback(() => {
     setSearching((value) => !value);
@@ -802,10 +801,6 @@ const Discover = memo(function Discover({
 
   const handleCategoryChange = useCallback((categoryName) => {
     setCategory(categoryName);
-  }, []);
-
-  const handleToggleFavoritesFilter = useCallback(() => {
-    setFavoritesOnly((value) => !value);
   }, []);
 
   const normalizedQuery = query.trim().toLowerCase();
@@ -818,9 +813,7 @@ const Discover = memo(function Discover({
           const queryMatches =
             !normalizedQuery ||
             room.title.toLowerCase().includes(normalizedQuery);
-          const favoriteMatches =
-            !favoritesOnly || favoriteRoomIds.includes(room.id);
-          return categoryMatches && queryMatches && favoriteMatches;
+          return categoryMatches && queryMatches;
         })
         .sort((firstRoom, secondRoom) => {
           const firstFavorite = favoriteRoomIds.includes(firstRoom.id) ? 1 : 0;
@@ -845,7 +838,6 @@ const Discover = memo(function Discover({
     [
       category,
       favoriteRoomIds,
-      favoritesOnly,
       normalizedQuery,
       recentRoomIds,
       rooms,
@@ -875,13 +867,11 @@ const Discover = memo(function Discover({
       .sort((a, b) => (Number(b.listeners) || 0) - (Number(a.listeners) || 0));
   }, [followedUserIds, rooms]);
 
-  const hasActiveFilter =
-    category !== "Tumu" || Boolean(normalizedQuery) || favoritesOnly;
+  const hasActiveFilter = category !== "Tumu" || Boolean(normalizedQuery);
 
   const handleResetFilters = useCallback(() => {
     setCategory("Tumu");
     setQuery("");
-    setFavoritesOnly(false);
   }, []);
 
   return (
@@ -896,15 +886,41 @@ const Discover = memo(function Discover({
         <Reveal distance={10}>
           <View style={styles.topBar}>
             <View style={styles.discoverHeadingCopy}>
-              <Text numberOfLines={1} style={styles.discoverEyebrow}>SORA · SESLİ SOHBET</Text>
               <Text numberOfLines={1} style={styles.discoverHeading}>Keşfet</Text>
             </View>
             <View style={styles.topActions}>
-              <IconButton
-                icon={searching ? "close-outline" : "search-outline"}
-                accessibilityLabel={searching ? "Oda aramayı kapat" : "Oda ara"}
-                onPress={handleToggleSearch}
-              />
+              <View style={styles.discoverUtilityCapsule}>
+                <Pressable
+                  onPress={handleToggleSearch}
+                  hitSlop={4}
+                  accessibilityRole="button"
+                  accessibilityLabel={searching ? "Oda aramayı kapat" : "Oda ara"}
+                  style={({ pressed }) => [
+                    styles.discoverCapsuleBtn,
+                    pressed && { opacity: 0.72, transform: [{ scale: 0.94 }] },
+                  ]}
+                >
+                  <Ionicons
+                    name={searching ? "close-outline" : "search-outline"}
+                    size={19}
+                    color={searching ? COLORS.primary : "#1E293B"}
+                  />
+                </Pressable>
+                <View style={styles.discoverCapsuleDivider} />
+                <Pressable
+                  onPress={onOpenNotifications}
+                  hitSlop={4}
+                  accessibilityRole="button"
+                  accessibilityLabel="Bildirimleri aç"
+                  style={({ pressed }) => [
+                    styles.discoverCapsuleBtn,
+                    pressed && { opacity: 0.72, transform: [{ scale: 0.94 }] },
+                  ]}
+                >
+                  <Ionicons name="notifications-outline" size={19} color="#1E293B" />
+                  {notificationCount > 0 ? <View style={styles.discoverCapsuleDot} /> : null}
+                </Pressable>
+              </View>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Global Liderlik Podyumu"
@@ -914,31 +930,37 @@ const Discover = memo(function Discover({
                   pressed && { transform: [{ scale: 0.94 }], opacity: 0.9 },
                 ]}
               >
-                <Ionicons name="trophy" size={19} color="#D97706" />
+                <LinearGradient
+                  colors={["#162849", "#0B1528"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <Ionicons name="trophy" size={18} color="#FFD978" />
               </Pressable>
-              <IconButton
-                icon="notifications-outline"
-                accessibilityLabel="Bildirimleri aç"
-                badge={notificationCount > 0}
-                onPress={onOpenNotifications}
-              />
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Yeni sesli oda aç"
                 onPress={onCreate}
                 style={({ pressed }) => [
                   styles.discoverCreateButton,
-                  { overflow: "hidden" },
                   pressed && { transform: [{ scale: 0.93 }], opacity: 0.9 },
                 ]}
               >
                 <LinearGradient
-                  colors={["#52A5FF", "#2F80ED", "#1D5FBF"]}
+                  colors={["#4FA3FF", "#2F80ED", "#1A5BC4"]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={[StyleSheet.absoluteFill, { borderRadius: 15 }]}
+                  style={StyleSheet.absoluteFill}
                 />
-                <Ionicons name="add" size={23} color={COLORS.primaryInk} />
+                <LinearGradient
+                  pointerEvents="none"
+                  colors={["rgba(255,255,255,0.28)", "rgba(255,255,255,0)"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                  style={styles.discoverCreateGloss}
+                />
+                <Ionicons name="add" size={22} color={COLORS.primaryInk} />
               </Pressable>
             </View>
           </View>
@@ -1049,67 +1071,61 @@ const Discover = memo(function Discover({
           contentContainerStyle={styles.categoryList}
           data={CATEGORIES}
           keyExtractor={(item) => item.name}
-          renderItem={({ item }) => (
-            <Pressable
-              onPress={() => handleCategoryChange(item.name)}
-              style={[
-                styles.categoryChip,
-                category === item.name && styles.categoryChipActive,
-              ]}
-            >
-              <Ionicons
-                name={item.icon}
-                size={16}
-                color={
-                  category === item.name ? COLORS.primaryInk : COLORS.muted
-                }
-              />
-              <Text
-                style={[
-                  styles.categoryText,
-                  category === item.name && styles.categoryTextActive,
+          renderItem={({ item }) => {
+            const active = category === item.name;
+            return (
+              <Pressable
+                onPress={() => handleCategoryChange(item.name)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                style={({ pressed }) => [
+                  styles.categoryChip,
+                  active && styles.categoryChipActive,
+                  pressed && { opacity: 0.9, transform: [{ scale: 0.96 }] },
                 ]}
               >
-                {item.label}
-              </Text>
-            </Pressable>
-          )}
+                {active ? (
+                  <LinearGradient
+                    colors={["#16294B", "#0C172B"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                ) : null}
+                <View
+                  style={[
+                    styles.categoryIconTile,
+                    active
+                      ? styles.categoryIconTileActive
+                      : { backgroundColor: item.bg || "#EAF2FF" },
+                  ]}
+                >
+                  <Ionicons
+                    name={item.icon}
+                    size={15}
+                    color={active ? "#78B8FF" : item.fg || COLORS.primary}
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.categoryText,
+                    active && styles.categoryTextActive,
+                  ]}
+                >
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          }}
           scrollEnabled={true}
           maxToRenderPerBatch={5}
           updateCellsBatchingPeriod={50}
         />
 
         <View style={styles.discoverListHeading}>
-          <View>
-            <Text style={[styles.sectionTitle, styles.discoverListTitle]}>
-              {favoritesOnly ? "Favori odalar" : "Şimdi canlı"}
-            </Text>
-            <Text style={styles.listCount}>{visibleRooms.length} oda açık</Text>
-          </View>
-          <Pressable
-            onPress={handleToggleFavoritesFilter}
-            accessibilityRole="button"
-            accessibilityState={{ selected: favoritesOnly }}
-            accessibilityLabel="Favori odaları filtrele"
-            style={[
-              styles.favoriteFilter,
-              favoritesOnly && styles.favoriteFilterActive,
-            ]}
-          >
-            <Ionicons
-              name={favoritesOnly ? "heart" : "heart-outline"}
-              size={15}
-              color={favoritesOnly ? COLORS.primaryInk : COLORS.primary}
-            />
-            <Text
-              style={[
-                styles.favoriteFilterText,
-                favoritesOnly && styles.favoriteFilterTextActive,
-              ]}
-            >
-              Favoriler
-            </Text>
-          </Pressable>
+          <Text style={[styles.sectionTitle, styles.discoverListTitle]}>
+            Canlı
+          </Text>
         </View>
         <View style={styles.roomGrid}>
           {visibleRooms.map((item, index) => (
@@ -11648,14 +11664,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     opacity: 0.8,
   },
-  categoryList: { gap: 8, paddingRight: 20, paddingBottom: 3 },
+  categoryList: { gap: 8, paddingRight: 20, paddingVertical: 3 },
   categoryChipActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primaryDark,
-    shadowColor: COLORS.primary,
-    shadowOpacity: 0.34,
+    backgroundColor: "#0C172B",
+    borderColor: "rgba(47,128,237,0.45)",
+    shadowColor: "#0C172B",
+    shadowOpacity: 0.24,
     shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 5 },
     elevation: 5,
   },
   categoryTextActive: { color: "#FFFFFF" },
@@ -14087,55 +14103,96 @@ const styles = StyleSheet.create({
   pendingMessage: { opacity: 0.58 },
   sendButtonDisabled: { opacity: 0.55 },
   topBar: {
-    height: 52,
+    height: 48,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 16,
+    marginBottom: 14,
   },
   discoverHeadingCopy: { flex: 1, minWidth: 0, justifyContent: "center" },
-  discoverEyebrow: {
-    color: COLORS.primary,
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 1.6,
-    marginBottom: 3,
-  },
   discoverHeading: {
-    color: COLORS.text,
-    fontSize: 26,
+    color: "#0F172A",
+    fontSize: 27,
     fontWeight: "900",
-    letterSpacing: -0.8,
-    lineHeight: 30,
+    letterSpacing: -0.9,
+    lineHeight: 31,
   },
-  discoverTrophyButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 15,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#FFFBEB",
+  discoverUtilityCapsule: {
+    height: 40,
+    paddingHorizontal: 4,
+    borderRadius: 999,
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "rgba(217,119,6,0.28)",
-    shadowColor: "#D97706",
-    shadowOpacity: 0.14,
+    borderColor: "rgba(203,218,236,0.9)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.05,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
+    elevation: 2,
+  },
+  discoverCapsuleBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  discoverCapsuleDivider: {
+    width: 1,
+    height: 16,
+    backgroundColor: "rgba(203,218,236,0.85)",
+  },
+  discoverCapsuleDot: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: COLORS.primary,
+    borderWidth: 1.5,
+    borderColor: "#FFFFFF",
+  },
+  discoverTrophyButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#0B1528",
+    borderWidth: 1,
+    borderColor: "rgba(246,200,110,0.55)",
+    shadowColor: "#0B1528",
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
   discoverCreateButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 15,
+    width: 40,
+    height: 40,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: COLORS.primary,
     overflow: "hidden",
     shadowColor: COLORS.primary,
-    shadowOpacity: 0.42,
+    shadowOpacity: 0.38,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
-    elevation: 7,
+    elevation: 6,
+  },
+  discoverCreateGloss: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 18,
   },
   iconButton: {
     width: 42,
@@ -14311,26 +14368,41 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   categoryChip: {
-    minHeight: 40,
+    height: 42,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    borderRadius: 14,
-    paddingHorizontal: 14,
+    gap: 7,
+    borderRadius: 15,
+    paddingLeft: 7,
+    paddingRight: 13,
+    overflow: "hidden",
     backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: "rgba(203,218,236,0.85)",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
-  categoryText: { color: COLORS.textSecondary, fontSize: 13, fontWeight: "700" },
-  listCount: { color: COLORS.muted, fontSize: 13, lineHeight: 18 },
+  categoryIconTile: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  categoryIconTileActive: {
+    backgroundColor: "rgba(47,128,237,0.28)",
+  },
+  categoryText: { color: "#1E293B", fontSize: 13, fontWeight: "800" },
   roomList: { gap: 13 },
   discoverListHeading: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginTop: 16,
+    alignItems: "center",
+    marginTop: 18,
   },
-  discoverListTitle: { marginTop: 0, marginBottom: 2 },
+  discoverListTitle: { marginTop: 0, marginBottom: 0 },
   roomGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
