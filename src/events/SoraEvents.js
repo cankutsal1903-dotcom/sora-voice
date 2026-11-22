@@ -58,11 +58,43 @@ const EVENT_BANNER_ART = {
 const GOLD_BUTTON = ["#FFE9A8", "#F2B33D", "#C98A1E"];
 // Etkinlik sayfası: türe göre açık başlık görseli ve görselin alt rengiyle aynı sayfa zemini.
 const EVENT_DETAIL_ART = {
-  gift_race: { head: require("../../assets/events/head-race.webp"), bg: "#E1F1FF" },
-  room_party: { head: require("../../assets/events/head-royal.webp"), bg: "#EDE3F8" },
-  love: { head: require("../../assets/events/head-love.webp"), bg: "#FBEAF0" },
-  family_war: { head: require("../../assets/events/head-family.webp"), bg: "#CBE4F6" },
+  gift_race: {
+    head: require("../../assets/events/head-race.webp"),
+    bg: "#E1F1FF",
+    logo: require("../../assets/events/logo-race.webp"),
+    logoAspect: 720 / 512,
+    title: "Haftalık Hediye Yarışı",
+  },
+  room_party: {
+    head: require("../../assets/events/head-royal.webp"),
+    bg: "#EDE3F8",
+    logo: require("../../assets/events/logo-royal.webp"),
+    logoAspect: 720 / 545,
+    title: "Kraliyet Sahnesi Gecesi",
+  },
+  love: {
+    head: require("../../assets/events/head-love.webp"),
+    bg: "#FBEAF0",
+    logo: require("../../assets/events/logo-love.webp"),
+    logoAspect: 720 / 259,
+    title: "Aşk Haftası",
+  },
+  family_war: {
+    head: require("../../assets/events/head-family.webp"),
+    bg: "#CBE4F6",
+    logo: require("../../assets/events/logo-family.webp"),
+    logoAspect: 720 / 360,
+    title: "Aile Savaşları",
+  },
 };
+const LOGO_MAX_W = 300;
+const LOGO_MAX_H = 150;
+const TILE_GOLD = ["#FFE9A8", "#F2B33D", "#C98A1E"];
+// Başlık görselinin üzerinde parlayan yıldızlar: [sol %, üst %, boyut, grup]
+const HEADER_SPARKLES = [
+  [8, 22, 14, 0], [22, 58, 10, 1], [36, 14, 9, 1], [64, 18, 12, 0],
+  [78, 52, 10, 0], [90, 26, 15, 1], [14, 80, 8, 0], [86, 78, 9, 1],
+];
 const DETAIL_FALLBACK_BG = "#F3F7FC";
 const HEAD_ASPECT = 1000 / 507;
 const PODIUM_ART = require("../../assets/events/podium.webp");
@@ -1221,16 +1253,81 @@ const EventAvatar = memo(function EventAvatar({ name, url, color, size = 40, rin
   );
 });
 
-const ClockCountdown = memo(function ClockCountdown({ event, accent }) {
+const CountdownTiles = memo(function CountdownTiles({ event, accent }) {
   const upcoming = event.startsAtMs > Date.now();
   const remaining = useCountdownMs(upcoming ? event.startsAtMs : event.endsAtMs, "seconds");
+  if (remaining <= 0) {
+    return <Text style={styles.cdEnded}>Etkinlik sona erdi</Text>;
+  }
   const { days, hours, minutes, seconds } = splitDuration(remaining);
-  const clock = `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
-  const text = remaining <= 0 ? "Sona erdi" : `${upcoming ? "Başlangıca " : ""}${days > 0 ? `${days}g ` : ""}${clock}`;
+  const parts = [
+    [days, "GÜN"],
+    [hours, "SAAT"],
+    [minutes, "DK"],
+    [seconds, "SN"],
+  ];
   return (
-    <View style={styles.clockChip}>
-      <Ionicons name="time-outline" size={14} color={accent} />
-      <Text style={styles.clockText}>{text}</Text>
+    <View style={styles.cdBlock}>
+      {upcoming ? <Text style={styles.cdCaption}>Başlamasına kalan</Text> : null}
+      <View style={styles.cdTiles}>
+        {parts.map(([value, label]) => (
+          <LinearGradient key={label} colors={TILE_GOLD} style={styles.cdTileRim}>
+            <View style={styles.cdTile}>
+              <Text style={[styles.cdTileValue, { color: accent }]}>{pad2(value)}</Text>
+              <Text style={styles.cdTileLabel}>{label}</Text>
+            </View>
+          </LinearGradient>
+        ))}
+      </View>
+    </View>
+  );
+});
+
+const RewardTiles = memo(function RewardTiles({ rewards, accent, onPress }) {
+  const shown = rewards.slice(0, 4);
+  if (!shown.length) return null;
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel="Ödül detayları" style={styles.rewardTiles}>
+      {shown.map((reward, i) => {
+        const medal = medalForRank(reward.rank);
+        return (
+          <LinearGradient key={`rt-${i}`} colors={TILE_GOLD} style={styles.rewardTileRim}>
+            <View style={styles.rewardTile}>
+              <LinearGradient colors={medal.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.rewardTileMedal}>
+                <Text style={styles.rewardTileRank} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                  {String(reward.rank).replace(/\.$/, "")}
+                </Text>
+              </LinearGradient>
+              <Text style={[styles.rewardTileValue, { color: accent }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                {reward.credits > 0 ? formatCompact(reward.credits) : "Ödül"}
+              </Text>
+              <Text style={styles.rewardTileUnit} numberOfLines={1}>
+                {reward.credits > 0 ? "kredi" : "özel"}
+              </Text>
+            </View>
+          </LinearGradient>
+        );
+      })}
+    </Pressable>
+  );
+});
+
+const HeaderSparkles = memo(function HeaderSparkles({ pulseValue }) {
+  const on = pulseValue.interpolate({ inputRange: [0, 1], outputRange: [0.2, 1] });
+  const off = pulseValue.interpolate({ inputRange: [0, 1], outputRange: [1, 0.2] });
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      {HEADER_SPARKLES.map(([left, top, size, group]) => {
+        const opacity = group ? off : on;
+        return (
+          <Animated.View
+            key={`${left}-${top}`}
+            style={{ position: "absolute", left: `${left}%`, top: `${top}%`, opacity, transform: [{ scale: opacity }] }}
+          >
+            <MaterialCommunityIcons name="star-four-points" size={size} color="#FFF3C4" style={styles.sparkleIcon} />
+          </Animated.View>
+        );
+      })}
     </View>
   );
 });
@@ -1284,10 +1381,27 @@ const FramedAvatar = memo(function FramedAvatar({ row, place }) {
   );
 });
 
-const PodiumStage = memo(function PodiumStage({ rows, unit, me, width }) {
+const PodiumStage = memo(function PodiumStage({ rows, unit, me, width, accent, pulseValue }) {
   const podiumH = width / PODIUM_ASPECT;
+  const glowScale = pulseValue.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.1] });
+  const glowSize = 150;
   return (
     <View style={{ width, height: PODIUM_AVATAR_AREA + podiumH }}>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.podiumGlow,
+          {
+            width: glowSize,
+            height: glowSize,
+            borderRadius: glowSize / 2,
+            left: PODIUM_SPOTS[1].x * width - glowSize / 2,
+            bottom: podiumH * (1 - PODIUM_SPOTS[1].top) + 10,
+            backgroundColor: withAlpha(accent, 0.12),
+            transform: [{ scale: glowScale }],
+          },
+        ]}
+      />
       <Image source={PODIUM_ART} resizeMode="contain" style={[styles.podiumArt, { width, height: podiumH }]} />
       {rows.map((row, i) => {
         const place = i + 1;
@@ -1338,7 +1452,7 @@ const LeaderboardRow = memo(function LeaderboardRow({ row, isMe, accent, icon })
   );
 });
 
-const LeaderboardSection = memo(function LeaderboardSection({ event, enabled, currentUserId }) {
+const LeaderboardSection = memo(function LeaderboardSection({ event, enabled, currentUserId, pulseValue }) {
   const { rows, loading, error, retry } = useEventLeaderboard(event.id, enabled);
   const [stageWidth, setStageWidth] = useState(0);
   const accent = event.colors[1] || BRAND.blueBright;
@@ -1379,7 +1493,7 @@ const LeaderboardSection = memo(function LeaderboardSection({ event, enabled, cu
   }
   return (
     <View onLayout={handleLayout}>
-      {showPodium && stageWidth > 0 ? <PodiumStage rows={rows.slice(0, 3)} unit={event.unit} me={me} width={stageWidth} /> : null}
+      {showPodium && stageWidth > 0 ? <PodiumStage rows={rows.slice(0, 3)} unit={event.unit} me={me} width={stageWidth} accent={accent} pulseValue={pulseValue} /> : null}
       <View style={styles.lbList}>
         {rest.map((row) => (
           <LeaderboardRow key={`${row.user_id}-${row.rank}`} row={row} isMe={me === row.user_id} accent={accent} icon={icon} />
@@ -1403,6 +1517,8 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
   const [mounted, setMounted] = useState(Boolean(visible && shownEvent));
   const progress = useRef(new Animated.Value(visible && shownEvent ? 1 : 0)).current;
   const floatValue = useLoopAnimation(mounted && !reducedMotion, floatFactory);
+  const pulseValue = useLoopAnimation(mounted && !reducedMotion, pulseFactory);
+  const sheenValue = useLoopAnimation(mounted && !reducedMotion, shimmerFactory);
   const [infoOpen, setInfoOpen] = useState(false);
   const toggleInfo = useCallback(() => setInfoOpen((v) => !v), []);
 
@@ -1450,6 +1566,10 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
   const artScale = floatValue.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] });
   const bottomPad = Math.max(insets.bottom, 12);
   const ctaLabel = ev.gift_name ? `${ev.gift_name} Gönder` : "Hediye Gönder ve Katıl";
+  const showLogo = Boolean(art?.logo && ev.title === art.title);
+  const logoW = art ? Math.min(LOGO_MAX_W, LOGO_MAX_H * art.logoAspect) : 0;
+  const ctaScale = pulseValue.interpolate({ inputRange: [0, 1], outputRange: [1, 1.025] });
+  const ctaSheenX = sheenValue.interpolate({ inputRange: [0, 1], outputRange: [-160, 420] });
 
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={handleDismiss}>
@@ -1489,27 +1609,37 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
                   </View>
                 </>
               )}
+              <HeaderSparkles pulseValue={pulseValue} />
               <LinearGradient pointerEvents="none" colors={[withAlpha(pageBg, 0), pageBg]} style={styles.headFade} />
               <View style={styles.grabber} />
             </View>
 
             <View style={styles.titleBlock}>
-              <Text style={styles.pageTitle} numberOfLines={2}>
-                {ev.title}
-              </Text>
-              <View style={styles.metaRow}>
-                <ClockCountdown event={ev} accent={accent} />
-                <Pressable
-                  onPress={toggleInfo}
-                  hitSlop={6}
-                  accessibilityRole="button"
-                  accessibilityState={{ expanded: infoOpen }}
-                  style={styles.infoChip}
-                >
-                  <Ionicons name={infoOpen ? "chevron-up" : "information-circle-outline"} size={14} color={accent} />
-                  <Text style={[styles.infoChipText, { color: accent }]}>Ödüller ve kurallar</Text>
-                </Pressable>
-              </View>
+              {showLogo ? (
+                <Image
+                  source={art.logo}
+                  resizeMode="contain"
+                  accessibilityRole="header"
+                  accessibilityLabel={ev.title}
+                  style={{ width: logoW, height: logoW / art.logoAspect }}
+                />
+              ) : (
+                <Text style={styles.pageTitle} numberOfLines={2}>
+                  {ev.title}
+                </Text>
+              )}
+              <CountdownTiles event={ev} accent={accent} />
+              <RewardTiles rewards={ev.rewards} accent={accent} onPress={toggleInfo} />
+              <Pressable
+                onPress={toggleInfo}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: infoOpen }}
+                style={styles.infoChip}
+              >
+                <Ionicons name={infoOpen ? "chevron-up" : "information-circle-outline"} size={14} color={accent} />
+                <Text style={[styles.infoChipText, { color: accent }]}>Ödül detayları ve kurallar</Text>
+              </Pressable>
             </View>
 
             {infoOpen ? (
@@ -1527,7 +1657,7 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
             ) : null}
 
             <View style={styles.bodyContent}>
-              <LeaderboardSection event={ev} enabled={mounted} currentUserId={currentUserId} />
+              <LeaderboardSection event={ev} enabled={mounted} currentUserId={currentUserId} pulseValue={pulseValue} />
             </View>
           </ScrollView>
 
@@ -1538,6 +1668,7 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
               locations={[0, 0.35]}
               style={StyleSheet.absoluteFill}
             />
+            <Animated.View style={{ transform: [{ scale: ctaScale }] }}>
             <Pressable
               onPress={handleCta}
               accessibilityRole="button"
@@ -1557,9 +1688,19 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
                 end={{ x: 0, y: 1 }}
                 style={styles.ctaGloss}
               />
+              <Animated.View pointerEvents="none" style={[styles.ctaSheen, { transform: [{ translateX: ctaSheenX }] }]}>
+                <LinearGradient
+                  colors={["rgba(255,255,255,0)", "rgba(255,255,255,0.5)", "rgba(255,255,255,0)"]}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={styles.ctaSheenBand}
+                />
+              </Animated.View>
+              <View pointerEvents="none" style={styles.ctaRim} />
               <Ionicons name="gift" size={19} color="#FFFFFF" />
               <Text style={styles.ctaText}>{ctaLabel}</Text>
             </Pressable>
+            </Animated.View>
           </View>
         </Animated.View>
       </View>
@@ -1918,8 +2059,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   ctaGloss: { position: "absolute", left: 0, right: 0, top: 0, height: 26 },
-  clockText: { color: BRAND.ink, fontSize: 13, fontWeight: "800", fontVariant: ["tabular-nums"] },
-  infoChip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.6)" },
+  infoChip: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 10, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.6)" },
   infoChipText: { fontSize: 12, fontWeight: "800" },
   infoCard: { marginHorizontal: 14, marginTop: 12, padding: 12, borderRadius: 18, backgroundColor: "#FFFFFF" },
   ruleRow: { flexDirection: "row", alignItems: "flex-start", marginTop: 8 },
@@ -1952,20 +2092,6 @@ const styles = StyleSheet.create({
   avatarImage: { backgroundColor: "#E6EDF7" },
   avatarFallback: { alignItems: "center", justifyContent: "center" },
   avatarInitial: { color: "#FFFFFF", fontWeight: "900" },
-  clockChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: "#FFFFFF",
-    shadowColor: "#1D3A66",
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
   rewardRow: { flexDirection: "row", alignItems: "center", padding: 10, borderRadius: 16, marginBottom: 8 },
   rewardRowTop: { borderWidth: 1, borderColor: "rgba(246,200,110,0.7)" },
   rewardMedal: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", marginRight: 10 },
@@ -1992,9 +2118,37 @@ const styles = StyleSheet.create({
   headArt: { width: "100%", overflow: "hidden", alignItems: "center" },
   headArtFallback: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" },
   headFade: { position: "absolute", left: 0, right: 0, bottom: 0, height: "35%" },
-  titleBlock: { alignItems: "center", paddingHorizontal: 18, marginTop: -18 },
+  titleBlock: { alignItems: "center", paddingHorizontal: 14, marginTop: -34 },
   pageTitle: { color: BRAND.ink, fontSize: 26, fontWeight: "900", letterSpacing: -0.4, textAlign: "center" },
-  metaRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", flexWrap: "wrap", marginTop: 10, gap: 8 },
   bodyContent: { paddingHorizontal: 14, paddingTop: 8 },
   ctaText: { color: "#FFFFFF", fontSize: 16, fontWeight: "900", letterSpacing: 0.2, marginLeft: 8 },
+  cdBlock: { alignItems: "center", marginTop: 8 },
+  cdCaption: { color: "#6B7A8F", fontSize: 10.5, fontWeight: "800", marginBottom: 4 },
+  cdEnded: { color: "#6B7A8F", fontSize: 13, fontWeight: "800", marginTop: 8 },
+  cdTiles: { flexDirection: "row", gap: 7 },
+  cdTileRim: { borderRadius: 13, padding: 1.5 },
+  cdTile: { width: 50, paddingVertical: 6, borderRadius: 11.5, alignItems: "center", backgroundColor: "#FFFFFF" },
+  cdTileValue: { fontSize: 20, fontWeight: "900", fontVariant: ["tabular-nums"], lineHeight: 23 },
+  cdTileLabel: { color: "#8A94A6", fontSize: 8.5, fontWeight: "900", letterSpacing: 0.8 },
+  rewardTiles: { flexDirection: "row", gap: 7, marginTop: 12, alignSelf: "stretch" },
+  rewardTileRim: { flex: 1, borderRadius: 14, padding: 1.5 },
+  rewardTile: { borderRadius: 12.5, alignItems: "center", paddingVertical: 8, paddingHorizontal: 4, backgroundColor: "#FFFDF6" },
+  rewardTileMedal: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  rewardTileRank: { color: "#FFFFFF", fontSize: 10.5, fontWeight: "900", paddingHorizontal: 2 },
+  rewardTileValue: { fontSize: 15, fontWeight: "900" },
+  rewardTileUnit: { color: "#8A94A6", fontSize: 9.5, fontWeight: "800" },
+  sparkleIcon: { textShadowColor: "rgba(242,179,61,0.9)", textShadowRadius: 6, textShadowOffset: { width: 0, height: 0 } },
+  podiumGlow: { position: "absolute" },
+  ctaSheen: { position: "absolute", top: 0, bottom: 0, left: 0, width: 90 },
+  ctaSheenBand: { flex: 1, transform: [{ skewX: "-20deg" }] },
+  ctaRim: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 26,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,233,168,0.9)",
+  },
 });
