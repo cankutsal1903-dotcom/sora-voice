@@ -68,6 +68,7 @@ const EVENT_DETAIL_ART = {
     dark: {
       bg: require("../../assets/events/bg-race.webp"),
       base: "#060A18",
+      bgTop: 120,
       logo: require("../../assets/events/logo-race-dark.webp"),
       logoAspect: 720 / 472,
     },
@@ -78,6 +79,13 @@ const EVENT_DETAIL_ART = {
     logo: require("../../assets/events/logo-royal.webp"),
     logoAspect: 720 / 545,
     title: "Kraliyet Sahnesi Gecesi",
+    dark: {
+      bg: require("../../assets/events/bg-royal.webp"),
+      base: "#141018",
+      bgTop: 20,
+      logo: require("../../assets/events/logo-royal-dark.webp"),
+      logoAspect: 720 / 521,
+    },
   },
   love: {
     head: require("../../assets/events/head-love.webp"),
@@ -85,6 +93,13 @@ const EVENT_DETAIL_ART = {
     logo: require("../../assets/events/logo-love.webp"),
     logoAspect: 720 / 259,
     title: "Aşk Haftası",
+    dark: {
+      bg: require("../../assets/events/bg-love.webp"),
+      base: "#0A0A10",
+      bgTop: 110,
+      logo: require("../../assets/events/logo-love-dark.webp"),
+      logoAspect: 720 / 300,
+    },
   },
   family_war: {
     head: require("../../assets/events/head-family.webp"),
@@ -92,6 +107,13 @@ const EVENT_DETAIL_ART = {
     logo: require("../../assets/events/logo-family.webp"),
     logoAspect: 720 / 360,
     title: "Aile Savaşları",
+    dark: {
+      bg: require("../../assets/events/bg-family.webp"),
+      base: "#1A110F",
+      bgTop: 120,
+      logo: require("../../assets/events/logo-family-dark.webp"),
+      logoAspect: 720 / 452,
+    },
   },
 };
 const LOGO_MAX_W = 300;
@@ -109,8 +131,6 @@ const DARK_FRAMES = {
   3: { src: require("../../assets/events/frame-bronze-ornate.webp"), aspect: 420 / 411, hole: 0.64, cx: 0.498, cy: 0.526, avatar: 52 },
 };
 const COINS_ART = require("../../assets/events/coins.webp");
-// Arka plan görseli bu kadar aşağıdan başlar: sahnedeki ana obje logo ile ilk üç arasında görünür.
-const DARK_BG_TOP = 120;
 const DARK_LOGO_MAX_H = 130;
 const RIBBON_RED = ["#E8434C", "#A3121D"];
 // Ödül metnindeki anahtar kelime -> profil çerçevesi; eşleşmezse kredi (altın) görseli.
@@ -124,6 +144,7 @@ const REWARD_FRAME_KEYWORDS = [
 ];
 const rewardFrameArt = (label) => {
   const text = String(label || "").toLowerCase();
+  if (text.includes("rozet")) return null;
   const hit = REWARD_FRAME_KEYWORDS.find(([key]) => text.includes(key));
   return hit ? PROFILE_ITEM_APPEARANCE[hit[1]]?.asset || null : null;
 };
@@ -1517,13 +1538,20 @@ const DarkRewards = memo(function DarkRewards({ rewards, onPress }) {
           {shown.map((reward, i) => {
             const frameArt = rewardFrameArt(reward.label);
             const days = rewardDays(reward.label);
+            const isBadge = String(reward.label || "").toLowerCase().includes("rozet");
             return (
               <LinearGradient key={`dr-${i}`} colors={TILE_GOLD} style={styles.darkRewardRim}>
                 <View style={styles.darkReward}>
                   <Text style={styles.darkRewardRank} numberOfLines={1}>
                     {reward.rank}
                   </Text>
-                  <Image source={frameArt || COINS_ART} resizeMode="contain" style={styles.darkRewardArt} />
+                  {isBadge ? (
+                    <View style={styles.darkRewardArt}>
+                      <MaterialCommunityIcons name="shield-crown" size={42} color="#FFD978" />
+                    </View>
+                  ) : (
+                    <Image source={frameArt || COINS_ART} resizeMode="contain" style={styles.darkRewardArt} />
+                  )}
                   {reward.credits > 0 ? (
                     <Text style={styles.darkRewardValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                       {formatCompact(reward.credits)}
@@ -1738,12 +1766,12 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
             <Animated.Image
               source={dark.bg}
               resizeMode="cover"
-              style={[styles.darkBg, { transform: [{ scale: artScale }] }]}
+              style={[styles.darkBg, { top: dark.bgTop, transform: [{ scale: artScale }] }]}
             />
             <LinearGradient
               pointerEvents="none"
               colors={[dark.base, withAlpha(dark.base, 0)]}
-              style={styles.darkBgTopFade}
+              style={[styles.darkBgTopFade, { top: dark.bgTop }]}
             />
             <LinearGradient
               pointerEvents="none"
@@ -2438,8 +2466,9 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "rgba(255,233,168,0.9)",
   },
-  darkBg: { position: "absolute", top: DARK_BG_TOP, left: 0, right: 0, height: "75%", width: "100%" },
-  darkBgTopFade: { position: "absolute", top: DARK_BG_TOP, left: 0, right: 0, height: 90 },
+  // top: etkinliğe göre (dark.bgTop) — sahnedeki ana obje logo ile ilk üç arasında görünsün diye.
+  darkBg: { position: "absolute", left: 0, right: 0, height: "75%", width: "100%" },
+  darkBgTopFade: { position: "absolute", left: 0, right: 0, height: 90 },
   darkText: { color: "#FFFFFF" },
   darkGrabber: { position: "absolute", top: 8, alignSelf: "center", width: 42, height: 5, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.55)", zIndex: 5 },
   darkCloseBtn: {
@@ -2494,7 +2523,7 @@ const styles = StyleSheet.create({
   darkRewardRim: { flex: 1, borderRadius: 12, padding: 1.5 },
   darkReward: { borderRadius: 10.5, alignItems: "center", paddingVertical: 6, paddingHorizontal: 3, backgroundColor: "#1A1230" },
   darkRewardRank: { color: "#FFD978", fontSize: 10, fontWeight: "900" },
-  darkRewardArt: { width: 48, height: 48, marginVertical: 3 },
+  darkRewardArt: { width: 48, height: 48, marginVertical: 3, alignItems: "center", justifyContent: "center" },
   darkRewardValue: { color: "#FFFFFF", fontSize: 13.5, fontWeight: "900" },
   darkRewardSub: { color: "#FFD978", fontSize: 9.5, fontWeight: "800" },
   darkRow: {
