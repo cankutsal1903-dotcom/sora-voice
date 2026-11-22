@@ -884,87 +884,6 @@ const Discover = memo(function Discover({
     setFavoritesOnly(false);
   }, []);
 
-  const featuredRoom = useMemo(() => {
-    const pool = hasActiveFilter ? visibleRooms : rooms;
-    if (!pool.length) return null;
-    return (
-      pool.find((room) => favoriteRoomIds.includes(room.id)) ||
-      pool.find((room) => recentRoomIds.includes(room.id)) ||
-      pool[0]
-    );
-  }, [favoriteRoomIds, hasActiveFilter, recentRoomIds, rooms, visibleRooms]);
-  const featuredRoomBrand = resolveRoomBrand(featuredRoom || rooms[0]);
-  if (!rooms.length) {
-    return (
-      <ScrollView
-        key="empty"
-        style={styles.discoverScroll}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.pageContent}
-      >
-        <View style={styles.topBar}>
-          <View style={styles.discoverHeadingCopy}>
-            <Text numberOfLines={1} style={styles.discoverEyebrow}>SORA · SESLİ SOHBET</Text>
-            <Text numberOfLines={1} style={styles.discoverHeading}>Keşfet</Text>
-          </View>
-          <View style={styles.topActions}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Global Liderlik Podyumu"
-              onPress={onOpenLeaderboard}
-              style={({ pressed }) => [
-                styles.discoverTrophyButton,
-                pressed && { transform: [{ scale: 0.94 }], opacity: 0.9 },
-              ]}
-            >
-              <Ionicons name="trophy" size={19} color="#D97706" />
-            </Pressable>
-            <IconButton
-              icon="notifications-outline"
-              accessibilityLabel="Bildirimleri aç"
-              badge={notificationCount > 0}
-              onPress={onOpenNotifications}
-            />
-          </View>
-        </View>
-        {events.length > 0 ? (
-          <EventBannerCarousel
-            events={events}
-            onOpenEvent={onOpenEvent}
-            style={{ marginTop: 2, marginBottom: 12 }}
-          />
-        ) : null}
-        <View style={styles.discoverEmptyHeading}>
-          <Text style={[styles.sectionTitle, styles.discoverListTitle]}>Şimdi canlı</Text>
-          <Text style={styles.listCount}>0 oda açık</Text>
-        </View>
-        <Reveal distance={8}>
-          <View style={styles.discoverEmptyHero}>
-            <View style={styles.discoverEmptyIcon}>
-              <Ionicons name="mic-outline" size={22} color={COLORS.primary} />
-            </View>
-            <Text style={styles.discoverEmptyTitle}>Henüz açık oda yok</Text>
-            <Text style={styles.discoverEmptyDescription}>
-              İlk odayı sen aç, arkadaşların katılsın.
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Yeni sesli oda aç"
-              style={({ pressed }) => [
-                styles.discoverEmptyButton,
-                pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 },
-              ]}
-              onPress={onCreate}
-            >
-              <Ionicons name="add" size={18} color={COLORS.primaryInk} />
-              <Text style={styles.discoverEmptyButtonText}>Oda aç</Text>
-            </Pressable>
-          </View>
-        </Reveal>
-      </ScrollView>
-    );
-  }
-
   return (
     <>
       <ScrollView
@@ -1123,89 +1042,6 @@ const Discover = memo(function Discover({
           </View>
         ) : null}
 
-        {featuredRoom ? (
-        <Reveal delay={50}>
-          <Pressable
-            onPress={() => handleOpenRoom(featuredRoom)}
-            accessibilityRole="button"
-            accessibilityLabel={`${featuredRoom.title} öne çıkan canlı odasını aç`}
-            style={({ pressed }) => [
-              styles.featurePressable,
-              pressed && { transform: [{ scale: 0.988 }], opacity: 0.95 },
-            ]}
-          >
-            <LinearGradient
-              colors={[...featuredRoomBrand.colors, "#0C1628"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.featureCardModern}
-            >
-              <FloatingGlow
-                color="rgba(120,192,255,0.18)"
-                size={156}
-                style={{ top: -48, right: -38 }}
-              />
-              <View style={styles.featureTop}>
-                <View style={styles.featureLivePill}>
-                  <LivePulse size={6} color="#4ADE80" />
-                  <Text style={styles.featureLiveLabel}>ŞİMDİ CANLI</Text>
-                </View>
-                <View style={styles.featureCategoryPill}>
-                  <Ionicons name="headset-outline" size={14} color="#FFFFFF" />
-                  <Text style={styles.featureCategoryText}>
-                    {formatCategoryLabel(featuredRoom.category)}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.featureModernContent}>
-                <View>
-                  <Text style={styles.featureTitle} numberOfLines={1}>
-                    {featuredRoom.title}
-                  </Text>
-                  <Text style={styles.featureSubtitle} numberOfLines={2}>
-                    {featuredRoom.description}
-                  </Text>
-                  <Text style={styles.featureListenerText}>
-                    {featuredRoom.listeners} kişi odada
-                  </Text>
-                </View>
-                <View style={styles.featureFooterModern}>
-                  <View style={styles.featureHost}>
-                    <Avatar
-                      label={
-                        featuredRoom.initials?.charAt(0) ||
-                        featuredRoom.host.charAt(0)
-                      }
-                      uri={featuredRoom.hostAvatarUrl}
-                      color={featuredRoomBrand.accent}
-                      size={32}
-                    />
-                    <View>
-                      <Text style={styles.featureHostLabel}>SUNAN</Text>
-                      <Text style={styles.featureHostName}>
-                        {featuredRoom.host}
-                      </Text>
-                    </View>
-                  </View>
-                  <LinearGradient
-                    colors={["#52A5FF", "#2F80ED", "#1D5FBF"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.featureJoinButton}
-                  >
-                    <Ionicons
-                      name="arrow-forward"
-                      size={18}
-                      color={COLORS.primaryInk}
-                    />
-                  </LinearGradient>
-                </View>
-              </View>
-            </LinearGradient>
-          </Pressable>
-        </Reveal>
-        ) : null}
-
         <Text style={styles.sectionTitle}>İlgini çeken sohbetler</Text>
         <FlatList
           horizontal
@@ -1290,11 +1126,19 @@ const Discover = memo(function Discover({
         {!visibleRooms.length && (
           <View style={styles.emptyState}>
             <View style={styles.emptyIcon}>
-              <Ionicons name="search-outline" size={25} color={COLORS.muted} />
+              <Ionicons
+                name={rooms.length ? "search-outline" : "mic-outline"}
+                size={25}
+                color={rooms.length ? COLORS.muted : COLORS.primary}
+              />
             </View>
-            <Text style={styles.emptyTitle}>Oda bulunamadı</Text>
+            <Text style={styles.emptyTitle}>
+              {rooms.length ? "Oda bulunamadı" : "Henüz açık oda yok"}
+            </Text>
             <Text style={styles.emptyDescription}>
-              Farklı bir kategori veya arama deneyebilirsin.
+              {rooms.length
+                ? "Farklı bir kategori veya arama deneyebilirsin."
+                : "Sağ üstteki + ile ilk odayı sen aç."}
             </Text>
             {hasActiveFilter ? (
               <Pressable
@@ -1350,9 +1194,24 @@ const RoomCard = memo(function RoomCard({
             end={{ x: 1, y: 1 }}
             style={styles.roomArtwork}
           >
-            <View
-              style={[styles.roomArtworkOrb, { backgroundColor: roomBrand.accent }]}
-            />
+            {room.hostAvatarUrl ? (
+              <>
+                <Image
+                  source={{ uri: room.hostAvatarUrl }}
+                  resizeMode="cover"
+                  style={StyleSheet.absoluteFill}
+                />
+                <LinearGradient
+                  colors={["rgba(0,0,0,0.25)", "rgba(0,0,0,0)", "rgba(0,0,0,0.65)"]}
+                  locations={[0, 0.35, 1]}
+                  style={StyleSheet.absoluteFill}
+                />
+              </>
+            ) : (
+              <View
+                style={[styles.roomArtworkOrb, { backgroundColor: roomBrand.accent }]}
+              />
+            )}
             <View style={styles.roomArtworkTop}>
               <View style={styles.roomArtworkLive}>
                 <LivePulse size={5} color="#4ADE80" />
@@ -1365,12 +1224,14 @@ const RoomCard = memo(function RoomCard({
                 </Text>
               </View>
             </View>
-            <View style={styles.roomArtworkMonogram}>
-              <Text style={styles.roomArtworkInitial}>
-                {room.initials || room.title?.charAt(0) || "S"}
-              </Text>
-              <AudioBars color="rgba(255,255,255,0.82)" compact />
-            </View>
+            {room.hostAvatarUrl ? null : (
+              <View style={styles.roomArtworkMonogram}>
+                <Text style={styles.roomArtworkInitial}>
+                  {room.initials || room.title?.charAt(0) || "S"}
+                </Text>
+                <AudioBars color="rgba(255,255,255,0.82)" compact />
+              </View>
+            )}
             <Text style={styles.roomArtworkTitle} numberOfLines={2}>
               {room.passwordProtected ? (
                 <Ionicons name="lock-closed" size={13} color="#FFFFFF" />
@@ -11771,35 +11632,6 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     marginBottom: 24,
   },
-  featureCard: {
-    height: 210,
-    overflow: "hidden",
-    borderRadius: 22,
-    padding: 20,
-    position: "relative",
-    backgroundColor: COLORS.text,
-  },
-  featureGlowOne: {
-    position: "absolute",
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: COLORS.primary,
-    opacity: 0.09,
-    top: -60,
-    right: -30,
-  },
-  featureGlowTwo: {
-    position: "absolute",
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: COLORS.primary,
-    bottom: -20,
-    right: 50,
-    opacity: 0.12,
-  },
-  featureContent: { flex: 1, justifyContent: "space-between" },
   liveText: {
     color: COLORS.primary,
     fontSize: 10,
@@ -11807,7 +11639,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   liveDot: { color: COLORS.pink },
-  featureFooter: { flexDirection: "row", alignItems: "center", gap: 10 },
   stackAvatars: { flexDirection: "row" },
   soundBar: {
     width: 4,
@@ -13799,91 +13630,6 @@ const styles = StyleSheet.create({
     lineHeight: 14,
     marginTop: 3,
   },
-  featureTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    zIndex: 1,
-  },
-  featureLivePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    borderRadius: 10,
-    backgroundColor: "rgba(20,13,34,0.32)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-  },
-  featureLiveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: COLORS.primary,
-  },
-  featureLiveLabel: {
-    color: "#FFFFFF",
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 0.7,
-  },
-  featureCategoryPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    borderRadius: 10,
-    backgroundColor: "rgba(255,255,255,0.13)",
-  },
-  featureCategoryText: { color: "#FFFFFF", fontSize: 9, fontWeight: "800" },
-  featureModernContent: {
-    flex: 1,
-    justifyContent: "space-between",
-    paddingTop: 17,
-    zIndex: 1,
-  },
-  featureHost: { flexDirection: "row", alignItems: "center", gap: 8 },
-  featureHostLabel: {
-    color: "rgba(255,255,255,0.60)",
-    fontSize: 8,
-    fontWeight: "900",
-    letterSpacing: 0.9,
-  },
-  featureHostName: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "800",
-    marginTop: 2,
-  },
-  featureFooterModern: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingRight: 3,
-  },
-  featureJoinButton: {
-    width: 37,
-    height: 37,
-    borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: COLORS.primary,
-  },
-  featureListenerBadge: {
-    position: "absolute",
-    right: 19,
-    bottom: 19,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 10,
-    backgroundColor: "rgba(10,11,24,0.30)",
-    zIndex: 2,
-  },
   roomHeader: {
     minHeight: 72,
     paddingHorizontal: 14,
@@ -14389,54 +14135,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 5 },
     elevation: 7,
   },
-  discoverEmptyHeading: { marginTop: 6, marginBottom: 12 },
-  discoverEmptyHero: {
-    borderRadius: 22,
-    paddingHorizontal: 22,
-    paddingVertical: 26,
-    alignItems: "center",
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.lineSoft,
-  },
-  discoverEmptyIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: COLORS.primarySoft,
-    marginBottom: 12,
-  },
-  discoverEmptyTitle: {
-    color: COLORS.text,
-    fontSize: 17,
-    fontWeight: "800",
-    marginBottom: 4,
-    textAlign: "center",
-  },
-  discoverEmptyDescription: {
-    color: COLORS.textSecondary,
-    fontSize: 13,
-    lineHeight: 19,
-    textAlign: "center",
-    marginBottom: 18,
-  },
-  discoverEmptyButton: {
-    minHeight: 42,
-    paddingHorizontal: 22,
-    borderRadius: 21,
-    backgroundColor: COLORS.primary,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  },
-  discoverEmptyButtonText: {
-    color: COLORS.primaryInk,
-    fontSize: 14,
-    fontWeight: "800",
-  },
   iconButton: {
     width: 42,
     height: 42,
@@ -14486,62 +14184,6 @@ const styles = StyleSheet.create({
     color: COLORS.primaryInk,
     fontSize: 14,
     fontWeight: "900",
-  },
-  discoverLiveSummary: {
-    minHeight: 94,
-    marginTop: 22,
-    paddingVertical: 16,
-    paddingLeft: 17,
-    paddingRight: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 14,
-    borderRadius: 23,
-    backgroundColor: COLORS.text,
-    borderWidth: 0,
-    ...ELEVATION.card,
-  },
-  discoverLiveCopy: { flex: 1, minWidth: 0 },
-  discoverLiveLabel: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 7,
-  },
-  discoverLiveLabelText: {
-    color: COLORS.primary,
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 1.1,
-  },
-  discoverLiveTitle: {
-    color: "#FFFFFF",
-    fontSize: 17,
-    lineHeight: 22,
-    fontWeight: "900",
-    letterSpacing: -0.35,
-  },
-  discoverLiveCount: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(47,128,237,0.14)",
-  },
-  discoverLiveNumber: {
-    color: COLORS.primary,
-    fontSize: 22,
-    lineHeight: 24,
-    fontWeight: "900",
-  },
-  discoverLiveCountText: {
-    color: "rgba(47,128,237,0.80)",
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 0.9,
-    marginTop: 1,
   },
   followedLiveSection: {
     marginTop: 2,
@@ -14658,44 +14300,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "800",
   },
-  featurePressable: { marginTop: 3 },
-  featureCardModern: {
-    minHeight: 184,
-    overflow: "hidden",
-    borderRadius: 24,
-    padding: 18,
-    position: "relative",
-    borderWidth: 1,
-    borderColor: "rgba(147,197,253,0.22)",
-  },
-  featureTitle: {
-    color: "#FFFFFF",
-    fontSize: 22,
-    letterSpacing: -0.7,
-    fontWeight: "900",
-    marginBottom: 6,
-    maxWidth: "100%",
-  },
-  featureSubtitle: {
-    color: "rgba(237,243,250,0.88)",
-    fontSize: 14,
-    lineHeight: 20,
-    maxWidth: "100%",
-  },
-  featureListenerText: {
-    color: "rgba(219,234,254,0.84)",
-    fontSize: 12,
-    fontWeight: "800",
-    marginTop: 10,
-  },
-  featureSound: {
-    position: "absolute",
-    right: 23,
-    bottom: 25,
-    height: 48,
-    justifyContent: "center",
-  },
-  featureListeners: { color: "#F3F7FC", fontSize: 12, fontWeight: "800" },
   sectionTitle: {
     color: COLORS.text,
     fontSize: 20,

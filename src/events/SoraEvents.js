@@ -48,6 +48,14 @@ const AUTO_ADVANCE_MS = 5_000;
 const ROOM_ROTATE_MS = 6_000;
 const CARD_GAP = 0;
 const BANNER_HEIGHT = 128;
+// Etkinlik türüne göre render edilmiş banner görseli; bilinmeyen türler renk geçişine düşer.
+const EVENT_BANNER_ART = {
+  gift_race: require("../../assets/events/gift-race.webp"),
+  room_party: require("../../assets/events/royal-night.webp"),
+  love: require("../../assets/events/love-week.webp"),
+  family_war: require("../../assets/events/family-war.webp"),
+};
+const GOLD_BUTTON = ["#FFE9A8", "#F2B33D", "#C98A1E"];
 
 const BRAND = {
   blue: "#1C5FB8",
@@ -709,13 +717,12 @@ const LiveKicker = memo(function LiveKicker({ upcoming, pulseValue, style }) {
 // 3) EventBannerCarousel
 // ---------------------------------------------------------------------------
 
-const BannerCard = memo(function BannerCard({ event, width, floatValue, pulseValue, onOpenEvent, style }) {
+const BannerCard = memo(function BannerCard({ event, width, floatValue, pulseValue, sheenValue, onOpenEvent, style }) {
   const upcoming = event.startsAtMs > Date.now();
-  const translateY = floatValue.interpolate({ inputRange: [0, 1], outputRange: [4, -7] });
-  const rotate = floatValue.interpolate({ inputRange: [0, 1], outputRange: ["-3deg", "3deg"] });
-  const glowScale = pulseValue.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.08] });
-  const sparkOpacity = pulseValue.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] });
-  const ctaColor = event.colors[0];
+  const art = EVENT_BANNER_ART[event.kind];
+  const topPrize = event.rewards?.[0]?.credits || 0;
+  const artScale = floatValue.interpolate({ inputRange: [0, 1], outputRange: [1.03, 1.09] });
+  const sheenX = sheenValue.interpolate({ inputRange: [0, 1], outputRange: [-width * 0.5, width * 1.15] });
 
   return (
     <Pressable
@@ -724,58 +731,65 @@ const BannerCard = memo(function BannerCard({ event, width, floatValue, pulseVal
       accessibilityLabel={`${event.title}. ${event.subtitle}. Katılmak için dokun.`}
       style={({ pressed }) => [styles.bannerCard, { width }, style, pressed && styles.pressed]}
     >
-      <LinearGradient colors={event.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+      {art ? (
+        <Animated.Image
+          source={art}
+          resizeMode="cover"
+          style={[StyleSheet.absoluteFill, { transform: [{ scale: artScale }] }]}
+        />
+      ) : (
+        <>
+          <LinearGradient colors={event.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+          <View pointerEvents="none" style={styles.bannerArtFallback}>
+            <EventArtwork event={event} size={78} />
+          </View>
+        </>
+      )}
       <LinearGradient
-        colors={["rgba(16,24,32,0.55)", "rgba(16,24,32,0.15)", "rgba(16,24,32,0)"]}
+        pointerEvents="none"
+        colors={["rgba(8,4,20,0.86)", "rgba(8,4,20,0.5)", "rgba(8,4,20,0)"]}
+        locations={[0, 0.42, 0.72]}
         start={{ x: 0, y: 0.5 }}
         end={{ x: 1, y: 0.5 }}
         style={StyleSheet.absoluteFill}
-        pointerEvents="none"
       />
-      <View pointerEvents="none" style={[styles.bannerOrbLarge, { backgroundColor: withAlpha(event.accent, 0.12) }]} />
-      <View pointerEvents="none" style={styles.bannerOrbSmall} />
-      <View pointerEvents="none" style={styles.bannerRing} />
       <LinearGradient
         pointerEvents="none"
-        colors={["rgba(255,255,255,0)", "rgba(255,255,255,0.14)", "rgba(255,255,255,0)"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.bannerSheen}
+        colors={["rgba(8,4,20,0)", "rgba(8,4,20,0.5)"]}
+        start={{ x: 0.5, y: 0.45 }}
+        end={{ x: 0.5, y: 1 }}
+        style={StyleSheet.absoluteFill}
       />
-
-      <View style={styles.bannerArtWrap} pointerEvents="none">
-        <Animated.View
-          style={[styles.bannerArtGlow, { backgroundColor: withAlpha(event.accent, 0.16), transform: [{ scale: glowScale }] }]}
+      <Animated.View pointerEvents="none" style={[styles.bannerSheen, { transform: [{ translateX: sheenX }] }]}>
+        <LinearGradient
+          colors={["rgba(255,240,200,0)", "rgba(255,240,200,0.28)", "rgba(255,240,200,0)"]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={styles.bannerSheenBand}
         />
-        <Animated.View style={{ transform: [{ translateY }, { rotate }] }}>
-          <EventArtwork event={event} size={78} />
-        </Animated.View>
-        <Animated.View style={[styles.bannerSparkA, { opacity: sparkOpacity }]}>
-          <Ionicons name="sparkles" size={16} color="#FFF4CC" />
-        </Animated.View>
-        <Animated.View style={[styles.bannerSparkB, { opacity: sparkOpacity }]}>
-          <Ionicons name="star" size={9} color="#FFFFFF" />
-        </Animated.View>
-      </View>
+      </Animated.View>
+      <View pointerEvents="none" style={styles.bannerEdge} />
 
-      <View style={styles.bannerContent}>
+      <View style={styles.bannerHead}>
         <LiveKicker upcoming={upcoming} pulseValue={pulseValue} />
-        <Text style={styles.bannerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>
-          {event.title}
+        <Text style={styles.bannerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+          {event.short_title || event.title}
         </Text>
-        <Text style={styles.bannerSubtitle} numberOfLines={2}>
-          {event.subtitle}
-        </Text>
-        <View style={styles.bannerFooter}>
-          <View style={styles.countdownChip}>
-            <Ionicons name="time-outline" size={12} color="#FFFFFF" />
-            <EventTimerText event={event} variant="short" withPrefix style={styles.countdownChipText} />
-          </View>
-          <View style={styles.ctaChip}>
-            <Text style={[styles.ctaChipText, { color: ctaColor }]}>Katıl</Text>
-            <Ionicons name="arrow-forward" size={12} color={ctaColor} />
-          </View>
+      </View>
+      <View style={styles.bannerFooter}>
+        <View style={styles.countdownChip}>
+          <View style={styles.countdownDot} />
+          <EventTimerText event={event} variant="long" style={styles.countdownChipText} />
         </View>
+        {topPrize > 0 ? (
+          <View style={[styles.countdownChip, styles.prizeChip]}>
+            <LinearGradient colors={GOLD_BUTTON} style={styles.prizeCoin} />
+            <Text style={styles.prizeText} numberOfLines={1}>{formatCompact(topPrize)}</Text>
+          </View>
+        ) : null}
+        <LinearGradient colors={GOLD_BUTTON} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={styles.ctaGold}>
+          <Text style={styles.ctaGoldText}>Katıl</Text>
+        </LinearGradient>
       </View>
     </Pressable>
   );
@@ -800,6 +814,7 @@ export const EventBannerCarousel = memo(function EventBannerCarousel({ events, o
 
   const floatValue = useLoopAnimation(!reducedMotion && count > 0, floatFactory);
   const pulseValue = useLoopAnimation(!reducedMotion && count > 0, pulseFactory);
+  const sheenValue = useLoopAnimation(!reducedMotion && count > 0, shimmerFactory);
 
   useEffect(() => {
     if (count <= 1 || dragging || reducedMotion) return undefined;
@@ -856,6 +871,7 @@ export const EventBannerCarousel = memo(function EventBannerCarousel({ events, o
             width={cardWidth}
             floatValue={floatValue}
             pulseValue={pulseValue}
+            sheenValue={sheenValue}
             onOpenEvent={onOpenEvent}
             style={i < count - 1 ? styles.carouselGap : null}
           />
@@ -1597,93 +1613,66 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: "hidden",
     backgroundColor: BRAND.navy,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
     shadowColor: "#0B1E3F",
     shadowOpacity: 0.22,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
     elevation: 5,
   },
-  bannerOrbLarge: { position: "absolute", width: 190, height: 190, borderRadius: 95, right: -52, top: -40 },
-  bannerOrbSmall: {
+  bannerArtFallback: { position: "absolute", right: 14, top: 0, bottom: 0, justifyContent: "center" },
+  bannerSheen: { position: "absolute", top: -20, bottom: -20, left: 0, width: 110 },
+  bannerSheenBand: { flex: 1, transform: [{ skewX: "-20deg" }] },
+  bannerEdge: {
     position: "absolute",
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    right: 110,
-    bottom: -34,
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-  bannerRing: {
-    position: "absolute",
-    width: 132,
-    height: 132,
-    borderRadius: 66,
-    right: -8,
-    top: 9,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-  },
-  bannerSheen: { position: "absolute", top: 0, bottom: 0, left: "30%", width: 90, transform: [{ skewX: "-18deg" }] },
-  bannerArtWrap: {
-    position: "absolute",
-    right: 6,
     top: 0,
+    left: 0,
+    right: 0,
     bottom: 0,
-    width: 104,
-    alignItems: "center",
-    justifyContent: "center",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,225,160,0.4)",
   },
-  bannerArtGlow: { position: "absolute", width: 78, height: 78, borderRadius: 39 },
-  bannerSparkA: { position: "absolute", top: 14, left: 10 },
-  bannerSparkB: { position: "absolute", bottom: 20, right: 14 },
-  bannerContent: { position: "absolute", left: 14, top: 11, bottom: 11, right: 108, justifyContent: "space-between" },
+  bannerHead: { position: "absolute", left: 13, top: 12, right: "38%", alignItems: "flex-start" },
   bannerTitle: {
     color: "#FFFFFF",
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: "900",
     letterSpacing: -0.3,
-    marginTop: 4,
-    textShadowColor: "rgba(0,0,0,0.35)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    marginTop: 7,
+    textShadowColor: "rgba(0,0,0,0.55)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
-  bannerSubtitle: {
-    color: "rgba(255,255,255,0.88)",
-    fontSize: 12,
-    fontWeight: "600",
-    lineHeight: 16,
-    textShadowColor: "rgba(0,0,0,0.25)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  bannerFooter: { flexDirection: "row", alignItems: "center", marginTop: 6 },
+  bannerFooter: { position: "absolute", left: 12, right: 10, bottom: 11, flexDirection: "row", alignItems: "center" },
   countdownChip: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 8,
+    paddingHorizontal: 9,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: "rgba(16,24,32,0.42)",
-    marginRight: 8,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    marginRight: 6,
     flexShrink: 1,
   },
-  countdownChipText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800", marginLeft: 4, fontVariant: ["tabular-nums"] },
-  ctaChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+  countdownDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: BRAND.live },
+  countdownChipText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800", marginLeft: 5, fontVariant: ["tabular-nums"] },
+  prizeChip: { borderColor: "rgba(255,215,120,0.4)", flexShrink: 0 },
+  prizeCoin: { width: 13, height: 13, borderRadius: 6.5 },
+  prizeText: { color: "#FFD978", fontSize: 11, fontWeight: "900", marginLeft: 5 },
+  ctaGold: {
+    marginLeft: "auto",
+    paddingHorizontal: 15,
+    paddingVertical: 7,
     borderRadius: 999,
-    backgroundColor: "#FFFFFF",
-    shadowColor: "#000000",
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    shadowColor: "#F2B33D",
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
   },
-  ctaChipText: { fontSize: 12, fontWeight: "900", marginRight: 3 },
+  ctaGoldText: { color: "#3A2205", fontSize: 12, fontWeight: "900" },
   dotsRow: { flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: 8 },
   dot: { width: 6, height: 6, borderRadius: 3, marginHorizontal: 3, backgroundColor: "rgba(28,95,184,0.22)" },
   dotActive: { width: 18, backgroundColor: BRAND.blue },
