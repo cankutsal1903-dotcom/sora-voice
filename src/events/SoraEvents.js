@@ -56,6 +56,27 @@ const EVENT_BANNER_ART = {
   family_war: require("../../assets/events/family-war.webp"),
 };
 const GOLD_BUTTON = ["#FFE9A8", "#F2B33D", "#C98A1E"];
+// Etkinlik sayfası: türe göre açık başlık görseli ve görselin alt rengiyle aynı sayfa zemini.
+const EVENT_DETAIL_ART = {
+  gift_race: { head: require("../../assets/events/head-race.webp"), bg: "#E1F1FF" },
+  room_party: { head: require("../../assets/events/head-royal.webp"), bg: "#EDE3F8" },
+  love: { head: require("../../assets/events/head-love.webp"), bg: "#FBEAF0" },
+  family_war: { head: require("../../assets/events/head-family.webp"), bg: "#CBE4F6" },
+};
+const DETAIL_FALLBACK_BG = "#F3F7FC";
+const HEAD_ASPECT = 1000 / 507;
+const PODIUM_ART = require("../../assets/events/podium.webp");
+const PODIUM_ASPECT = 900 / 396;
+const PODIUM_AVATAR_AREA = 150;
+const PODIUM_BLOCK_W = 112;
+// Podyum görselinde her basamağın orta x'i ve üst kenarı (görsel genişliği/yüksekliği oranı).
+const PODIUM_SPOTS = { 1: { x: 0.505, top: 0.02 }, 2: { x: 0.155, top: 0.28 }, 3: { x: 0.85, top: 0.46 } };
+// Çerçeve görselindeki boş halkanın çapı (genişliğe oran) ve merkezi.
+const PODIUM_FRAMES = {
+  1: { src: require("../../assets/events/frame-wings.webp"), aspect: 261 / 360, hole: 0.4, cx: 0.5, cy: 0.682, avatar: 54 },
+  2: { src: require("../../assets/events/frame-silver.webp"), aspect: 347 / 360, hole: 0.642, cx: 0.5, cy: 0.483, avatar: 42 },
+  3: { src: require("../../assets/events/frame-bronze.webp"), aspect: 350 / 360, hole: 0.653, cx: 0.5, cy: 0.49, avatar: 42 },
+};
 
 const BRAND = {
   blue: "#1C5FB8",
@@ -69,7 +90,6 @@ const BRAND = {
 };
 
 const HEX_RE = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
-const MONTHS_TR = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
 const AVATAR_PALETTE = ["#2F80ED", "#1C5FB8", "#8B6CEF", "#FF5C8A", "#F5A623", "#26A69A", "#E65C00", "#4B6CB7"];
 
 const KIND_THEME = {
@@ -259,12 +279,6 @@ const formatCompact = (value) => {
   if (num >= 1e6) return `${fmt(num / 1e6)} Mn`;
   if (num >= 1e4) return `${fmt(num / 1e3)} B`;
   return formatThousands(num);
-};
-
-const formatDateTime = (ms) => {
-  const d = new Date(ms);
-  if (!Number.isFinite(d.getTime())) return "";
-  return `${d.getDate()} ${MONTHS_TR[d.getMonth()]} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 };
 
 const initialOf = (name) => {
@@ -1207,43 +1221,16 @@ const EventAvatar = memo(function EventAvatar({ name, url, color, size = 40, rin
   );
 });
 
-const CountdownBoxes = memo(function CountdownBoxes({ event }) {
+const ClockCountdown = memo(function ClockCountdown({ event, accent }) {
   const upcoming = event.startsAtMs > Date.now();
   const remaining = useCountdownMs(upcoming ? event.startsAtMs : event.endsAtMs, "seconds");
   const { days, hours, minutes, seconds } = splitDuration(remaining);
-  const ended = remaining <= 0;
-  const parts = [
-    { value: days, label: "GÜN" },
-    { value: hours, label: "SAAT" },
-    { value: minutes, label: "DK" },
-    { value: seconds, label: "SN" },
-  ];
+  const clock = `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
+  const text = remaining <= 0 ? "Sona erdi" : `${upcoming ? "Başlangıca " : ""}${days > 0 ? `${days}g ` : ""}${clock}`;
   return (
-    <View style={styles.cdWrap}>
-      <Text style={styles.cdLabel}>{ended ? "Etkinlik sona erdi" : upcoming ? "Başlamasına kalan" : "Bitmesine kalan"}</Text>
-      <View style={styles.cdRow}>
-        {parts.map((part, i) => (
-          <React.Fragment key={part.label}>
-            {i > 0 ? <Text style={styles.cdColon}>:</Text> : null}
-            <View style={styles.cdBox}>
-              <Text style={styles.cdValue}>{pad2(part.value)}</Text>
-              <Text style={styles.cdUnit}>{part.label}</Text>
-            </View>
-          </React.Fragment>
-        ))}
-      </View>
-    </View>
-  );
-});
-
-const SectionHeader = memo(function SectionHeader({ icon, title, color, right }) {
-  return (
-    <View style={styles.sectionHeader}>
-      <View style={[styles.sectionIcon, { backgroundColor: withAlpha(color, 0.12) }]}>
-        <Ionicons name={icon} size={16} color={color} />
-      </View>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {right ? <View style={styles.sectionRight}>{right}</View> : null}
+    <View style={styles.clockChip}>
+      <Ionicons name="time-outline" size={14} color={accent} />
+      <Text style={styles.clockText}>{text}</Text>
     </View>
   );
 });
@@ -1282,39 +1269,57 @@ const RewardRow = memo(function RewardRow({ reward }) {
   );
 });
 
-const PodiumColumn = memo(function PodiumColumn({ row, place, unit, isMe }) {
-  const medal = place === 1 ? MEDALS.gold : place === 2 ? MEDALS.silver : MEDALS.bronze;
-  const size = place === 1 ? 58 : 46;
-  const pedestal = place === 1 ? styles.podiumBaseFirst : place === 2 ? styles.podiumBaseSecond : styles.podiumBaseThird;
+const FramedAvatar = memo(function FramedAvatar({ row, place }) {
+  const f = PODIUM_FRAMES[place];
+  // Avatar halkadan biraz büyük: çerçeve kenarı fotoğrafın kenarını örter.
+  const fw = Math.round((f.avatar * 0.96) / f.hole);
+  const fh = Math.round(fw * f.aspect);
   return (
-    <View style={styles.podiumCol}>
-      {place === 1 ? <MaterialCommunityIcons name="crown" size={22} color={BRAND.gold} style={styles.podiumCrown} /> : null}
-      <EventAvatar name={row.display_name} url={row.avatar_url} color={row.avatar_color} size={size} ringColor={medal.solid} />
-      <Text style={[styles.podiumName, isMe && styles.podiumNameMe]} numberOfLines={1}>
-        {isMe ? "Sen" : row.display_name}
-      </Text>
-      <Text style={styles.podiumScore} numberOfLines={1}>
-        {formatCompact(row.score)} {unit}
-      </Text>
-      <LinearGradient colors={medal.colors} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={[styles.podiumBase, pedestal]}>
-        <Text style={styles.podiumPlace}>{place}</Text>
-      </LinearGradient>
+    <View style={{ width: fw, height: fh }}>
+      <View style={{ position: "absolute", left: f.cx * fw - f.avatar / 2, top: f.cy * fh - f.avatar / 2 }}>
+        <EventAvatar name={row.display_name} url={row.avatar_url} color={row.avatar_color} size={f.avatar} />
+      </View>
+      <Image source={f.src} resizeMode="contain" style={StyleSheet.absoluteFill} />
     </View>
   );
 });
 
-const LeaderboardRow = memo(function LeaderboardRow({ row, unit, isMe, accent }) {
-  const medal = row.rank <= 3 ? medalForRank(row.rank) : null;
+const PodiumStage = memo(function PodiumStage({ rows, unit, me, width }) {
+  const podiumH = width / PODIUM_ASPECT;
   return (
-    <View style={[styles.lbRow, isMe && styles.lbRowMe, isMe && { borderColor: accent }]}>
-      <View style={styles.lbRankBox}>
-        {medal ? (
-          <MaterialCommunityIcons name="medal" size={22} color={medal.solid} />
-        ) : (
-          <Text style={styles.lbRankText}>{row.rank}</Text>
-        )}
-      </View>
-      <EventAvatar name={row.display_name} url={row.avatar_url} color={row.avatar_color} size={38} />
+    <View style={{ width, height: PODIUM_AVATAR_AREA + podiumH }}>
+      <Image source={PODIUM_ART} resizeMode="contain" style={[styles.podiumArt, { width, height: podiumH }]} />
+      {rows.map((row, i) => {
+        const place = i + 1;
+        const spot = PODIUM_SPOTS[place];
+        const isMe = me === row.user_id;
+        return (
+          <View
+            key={row.user_id}
+            style={[
+              styles.podiumBlock,
+              { left: spot.x * width - PODIUM_BLOCK_W / 2, bottom: podiumH * (1 - spot.top) - 4 },
+            ]}
+          >
+            <FramedAvatar row={row} place={place} />
+            <Text style={[styles.podiumName, isMe && styles.podiumNameMe]} numberOfLines={1}>
+              {isMe ? "Sen" : row.display_name}
+            </Text>
+            <Text style={styles.podiumScore} numberOfLines={1}>
+              {formatCompact(row.score)} {unit}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+});
+
+const LeaderboardRow = memo(function LeaderboardRow({ row, isMe, accent, icon }) {
+  return (
+    <View style={[styles.lbRow, isMe && { borderColor: accent }]}>
+      <Text style={styles.lbRankText}>{row.rank}</Text>
+      <EventAvatar name={row.display_name} url={row.avatar_url} color={row.avatar_color} size={34} />
       <View style={styles.lbNameCol}>
         <Text style={styles.lbName} numberOfLines={1}>
           {row.display_name}
@@ -1326,64 +1331,60 @@ const LeaderboardRow = memo(function LeaderboardRow({ row, unit, isMe, accent })
         ) : null}
       </View>
       <Text style={styles.lbScore} numberOfLines={1}>
-        {formatThousands(row.score)} <Text style={styles.lbUnit}>{unit}</Text>
+        {formatThousands(row.score)}
       </Text>
+      <Ionicons name={icon} size={13} color={accent} style={styles.lbIcon} />
     </View>
   );
 });
 
 const LeaderboardSection = memo(function LeaderboardSection({ event, enabled, currentUserId }) {
   const { rows, loading, error, retry } = useEventLeaderboard(event.id, enabled);
+  const [stageWidth, setStageWidth] = useState(0);
   const accent = event.colors[1] || BRAND.blueBright;
+  const icon = safeIcon(event.icon);
   const me = currentUserId ? String(currentUserId) : null;
   const showPodium = rows.length >= 3;
-  const podium = showPodium ? [rows[1], rows[0], rows[2]] : [];
   const rest = showPodium ? rows.slice(3) : rows;
-  const myRow = me ? rows.find((r) => r.user_id === me) : null;
+  const handleLayout = useCallback((e) => {
+    const w = Math.round(e?.nativeEvent?.layout?.width || 0);
+    if (w > 0) setStageWidth((prev) => (prev === w ? prev : w));
+  }, []);
 
+  if (loading) {
+    return (
+      <View style={styles.lbLoading}>
+        <ActivityIndicator color={accent} />
+        <Text style={styles.lbLoadingText}>Sıralama yükleniyor…</Text>
+      </View>
+    );
+  }
+  if (error && rows.length === 0) {
+    return (
+      <Pressable onPress={retry} accessibilityRole="button" style={styles.emptyBox}>
+        <Ionicons name="cloud-offline-outline" size={26} color={accent} />
+        <Text style={styles.emptyTitle}>Sıralama yüklenemedi</Text>
+        <Text style={styles.emptySub}>Tekrar denemek için dokun.</Text>
+      </Pressable>
+    );
+  }
+  if (rows.length === 0) {
+    return (
+      <View style={styles.emptyBox}>
+        <Ionicons name={icon} size={26} color={accent} />
+        <Text style={styles.emptyTitle}>Henüz sıralama yok</Text>
+        <Text style={styles.emptySub}>İlk sen gönder, zirveye çık.</Text>
+      </View>
+    );
+  }
   return (
-    <View style={styles.section}>
-      <SectionHeader
-        icon="podium"
-        title="Sıralama"
-        color={BRAND.blue}
-        right={myRow ? <Text style={styles.myRankText}>Senin sıran: {myRow.rank}.</Text> : null}
-      />
-      {loading ? (
-        <View style={styles.lbLoading}>
-          <ActivityIndicator color={BRAND.blueBright} />
-          <Text style={styles.lbLoadingText}>Sıralama yükleniyor…</Text>
-        </View>
-      ) : error && rows.length === 0 ? (
-        <Pressable onPress={retry} accessibilityRole="button" style={styles.emptyBox}>
-          <View style={[styles.emptyIcon, { backgroundColor: withAlpha(BRAND.blueBright, 0.14) }]}>
-            <Ionicons name="cloud-offline-outline" size={26} color={BRAND.blue} />
-          </View>
-          <Text style={styles.emptyTitle}>Sıralama şu an yüklenemedi</Text>
-          <Text style={styles.emptySub}>Tekrar denemek için dokun.</Text>
-        </Pressable>
-      ) : rows.length === 0 ? (
-        <View style={styles.emptyBox}>
-          <View style={[styles.emptyIcon, { backgroundColor: withAlpha(event.accent, 0.16) }]}>
-            <Ionicons name="gift" size={26} color={event.colors[1] || BRAND.blue} />
-          </View>
-          <Text style={styles.emptyTitle}>Sıralama yakında güncellenecek — ilk sen hediye gönder!</Text>
-          <Text style={styles.emptySub}>Zirvedeki ilk isim olma fırsatını kaçırma.</Text>
-        </View>
-      ) : (
-        <View>
-          {showPodium ? (
-            <View style={styles.podiumRow}>
-              {podium.map((row, i) => (
-                <PodiumColumn key={row.user_id} row={row} place={[2, 1, 3][i]} unit={event.unit} isMe={me === row.user_id} />
-              ))}
-            </View>
-          ) : null}
-          {rest.map((row) => (
-            <LeaderboardRow key={`${row.user_id}-${row.rank}`} row={row} unit={event.unit} isMe={me === row.user_id} accent={accent} />
-          ))}
-        </View>
-      )}
+    <View onLayout={handleLayout}>
+      {showPodium && stageWidth > 0 ? <PodiumStage rows={rows.slice(0, 3)} unit={event.unit} me={me} width={stageWidth} /> : null}
+      <View style={styles.lbList}>
+        {rest.map((row) => (
+          <LeaderboardRow key={`${row.user_id}-${row.rank}`} row={row} isMe={me === row.user_id} accent={accent} icon={icon} />
+        ))}
+      </View>
     </View>
   );
 });
@@ -1402,7 +1403,8 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
   const [mounted, setMounted] = useState(Boolean(visible && shownEvent));
   const progress = useRef(new Animated.Value(visible && shownEvent ? 1 : 0)).current;
   const floatValue = useLoopAnimation(mounted && !reducedMotion, floatFactory);
-  const pulseValue = useLoopAnimation(mounted && !reducedMotion, pulseFactory);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const toggleInfo = useCallback(() => setInfoOpen((v) => !v), []);
 
   useEffect(() => {
     let anim = null;
@@ -1441,13 +1443,13 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
   if (!shownEvent || !mounted) return null;
 
   const ev = shownEvent;
-  const upcoming = ev.startsAtMs > Date.now();
-  const last = ev.colors[ev.colors.length - 1];
+  const art = EVENT_DETAIL_ART[ev.kind];
+  const pageBg = art?.bg || DETAIL_FALLBACK_BG;
+  const accent = ev.colors[1] || BRAND.blueBright;
   const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [sheetHeight, 0] });
-  const artY = floatValue.interpolate({ inputRange: [0, 1], outputRange: [4, -8] });
-  const artGlow = pulseValue.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.1] });
+  const artScale = floatValue.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] });
   const bottomPad = Math.max(insets.bottom, 12);
-  const ctaColors = [ev.colors[0], ev.colors[1] || BRAND.blueBright];
+  const ctaLabel = ev.gift_name ? `${ev.gift_name} Gönder` : "Hediye Gönder ve Katıl";
 
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={handleDismiss}>
@@ -1456,7 +1458,7 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
           <Pressable style={StyleSheet.absoluteFill} onPress={handleDismiss} accessibilityLabel="Kapat" />
         </Animated.View>
 
-        <Animated.View style={[styles.sheet, { height: sheetHeight, transform: [{ translateY }] }]}>
+        <Animated.View style={[styles.sheet, { height: sheetHeight, backgroundColor: pageBg, transform: [{ translateY }] }]}>
           <Pressable
             onPress={handleDismiss}
             hitSlop={10}
@@ -1464,113 +1466,99 @@ export const EventDetailSheet = memo(function EventDetailSheet({ visible, event,
             accessibilityRole="button"
             accessibilityLabel="Kapat"
           >
-            <Ionicons name="close" size={19} color="#FFFFFF" />
+            <Ionicons name="close" size={18} color={BRAND.ink} />
           </Pressable>
 
-          {/* Tam kaydırılabilir içerik (Hero + Kurallar + Ödüller + Sıralama) */}
           <ScrollView
             style={styles.body}
-            contentContainerStyle={{ paddingBottom: bottomPad + 92 }}
+            contentContainerStyle={{ paddingBottom: bottomPad + 86 }}
             showsVerticalScrollIndicator={false}
           >
-            <View style={styles.hero}>
-              <LinearGradient colors={[BRAND.ink, BRAND.navy]} style={StyleSheet.absoluteFill} />
-              <LinearGradient
-                colors={[withAlpha(ev.colors[0], 0.96), withAlpha(ev.colors[1] || last, 0.82), withAlpha(last, 0.5)]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
-              <LinearGradient
-                colors={["rgba(16,24,32,0)", "rgba(16,24,32,0.58)"]}
-                start={{ x: 0, y: 0.3 }}
-                end={{ x: 0, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
-              <View pointerEvents="none" style={[styles.heroOrbA, { backgroundColor: withAlpha(ev.accent, 0.1) }]} />
-              <View pointerEvents="none" style={styles.heroOrbB} />
-
-              <View style={styles.grabber} />
-
-              <View style={styles.heroTop}>
-                <View style={styles.heroTextCol}>
-                  <LiveKicker upcoming={upcoming} pulseValue={pulseValue} />
-                  <Text style={styles.heroTitle} numberOfLines={2}>
-                    {ev.title}
-                  </Text>
-                  {ev.subtitle ? (
-                    <Text style={styles.heroSubtitle} numberOfLines={2}>
-                      {ev.subtitle}
-                    </Text>
-                  ) : null}
-                  <View style={styles.heroDateRow}>
-                    <Ionicons name="calendar-outline" size={11} color="rgba(255,255,255,0.8)" />
-                    <Text style={styles.heroDate} numberOfLines={1}>
-                      {formatDateTime(ev.startsAtMs)} – {formatDateTime(ev.endsAtMs)}
-                    </Text>
+            <View style={[styles.headArt, { aspectRatio: HEAD_ASPECT }]}>
+              {art ? (
+                <Animated.Image
+                  source={art.head}
+                  resizeMode="cover"
+                  style={[StyleSheet.absoluteFill, { transform: [{ scale: artScale }] }]}
+                />
+              ) : (
+                <>
+                  <LinearGradient colors={[withAlpha(accent, 0.22), pageBg]} style={StyleSheet.absoluteFill} />
+                  <View style={styles.headArtFallback}>
+                    <EventArtwork event={ev} size={96} color={accent} />
                   </View>
-                </View>
-                <View style={styles.heroArt} pointerEvents="none">
-                  <Animated.View
-                    style={[styles.heroArtGlow, { backgroundColor: withAlpha(ev.accent, 0.16), transform: [{ scale: artGlow }] }]}
-                  />
-                  <Animated.View style={{ transform: [{ translateY: artY }] }}>
-                    <EventArtwork event={ev} size={74} />
-                  </Animated.View>
-                </View>
-              </View>
-
-              <CountdownBoxes event={ev} />
+                </>
+              )}
+              <LinearGradient pointerEvents="none" colors={[withAlpha(pageBg, 0), pageBg]} style={styles.headFade} />
+              <View style={styles.grabber} />
             </View>
 
-            <View style={styles.bodyContent}>
-            {ev.description ? <Text style={styles.description}>{ev.description}</Text> : null}
+            <View style={styles.titleBlock}>
+              <Text style={styles.pageTitle} numberOfLines={2}>
+                {ev.title}
+              </Text>
+              <View style={styles.metaRow}>
+                <ClockCountdown event={ev} accent={accent} />
+                <Pressable
+                  onPress={toggleInfo}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: infoOpen }}
+                  style={styles.infoChip}
+                >
+                  <Ionicons name={infoOpen ? "chevron-up" : "information-circle-outline"} size={14} color={accent} />
+                  <Text style={[styles.infoChipText, { color: accent }]}>Ödüller ve kurallar</Text>
+                </Pressable>
+              </View>
+            </View>
 
-            {ev.rules.length ? (
-              <View style={styles.section}>
-                <SectionHeader icon="help-circle" title="Nasıl katılırım?" color={ev.colors[1] || BRAND.blue} />
+            {infoOpen ? (
+              <View style={styles.infoCard}>
+                {ev.rewards.map((reward, i) => (
+                  <RewardRow key={`reward-${i}`} reward={reward} />
+                ))}
                 {ev.rules.map((rule, i) => (
                   <View key={`rule-${i}`} style={styles.ruleRow}>
-                    <LinearGradient colors={ctaColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ruleNum}>
-                      <Text style={styles.ruleNumText}>{i + 1}</Text>
-                    </LinearGradient>
+                    <View style={[styles.ruleDot, { backgroundColor: accent }]} />
                     <Text style={styles.ruleText}>{rule}</Text>
                   </View>
                 ))}
               </View>
             ) : null}
 
-            {ev.rewards.length ? (
-              <View style={styles.section}>
-                <SectionHeader icon="gift" title="Ödüller" color="#D99B1E" />
-                {ev.rewards.map((reward, i) => (
-                  <RewardRow key={`reward-${i}`} reward={reward} />
-                ))}
-              </View>
-            ) : null}
-
-            <LeaderboardSection event={ev} enabled={mounted} currentUserId={currentUserId} />
+            <View style={styles.bodyContent}>
+              <LeaderboardSection event={ev} enabled={mounted} currentUserId={currentUserId} />
             </View>
           </ScrollView>
 
-          {/* Yapışkan CTA */}
           <View style={[styles.ctaBar, { paddingBottom: bottomPad + 4 }]}>
+            <LinearGradient
+              pointerEvents="none"
+              colors={[withAlpha(pageBg, 0), pageBg]}
+              locations={[0, 0.35]}
+              style={StyleSheet.absoluteFill}
+            />
             <Pressable
               onPress={handleCta}
               accessibilityRole="button"
-              accessibilityLabel="Hediye Gönder ve Katıl"
-              style={({ pressed }) => [styles.ctaButton, pressed && styles.pressed]}
+              accessibilityLabel={ctaLabel}
+              style={({ pressed }) => [styles.ctaButton, { shadowColor: accent }, pressed && styles.pressed]}
             >
-              <LinearGradient colors={ctaColors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
+              <LinearGradient
+                colors={[withAlpha(accent, 0.72), accent]}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={StyleSheet.absoluteFill}
+              />
               <LinearGradient
                 pointerEvents="none"
-                colors={["rgba(255,255,255,0.22)", "rgba(255,255,255,0)"]}
+                colors={["rgba(255,255,255,0.28)", "rgba(255,255,255,0)"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 0, y: 1 }}
                 style={styles.ctaGloss}
               />
               <Ionicons name="gift" size={19} color="#FFFFFF" />
-              <Text style={styles.ctaText}>Hediye Gönder ve Katıl</Text>
+              <Text style={styles.ctaText}>{ctaLabel}</Text>
             </Pressable>
           </View>
         </Animated.View>
@@ -1873,94 +1861,111 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
     overflow: "hidden",
-    backgroundColor: "#FFFFFF",
-  },
-  hero: { paddingTop: 10, paddingHorizontal: 16, paddingBottom: 14, overflow: "hidden" },
-  heroOrbA: { position: "absolute", width: 240, height: 240, borderRadius: 120, right: -70, top: -70 },
-  heroOrbB: {
-    position: "absolute",
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    left: -40,
-    bottom: -50,
-    backgroundColor: "rgba(255,255,255,0.07)",
   },
   grabber: {
+    position: "absolute",
+    top: 8,
     alignSelf: "center",
     width: 42,
     height: 5,
     borderRadius: 3,
-    backgroundColor: "rgba(255,255,255,0.45)",
-    marginBottom: 10,
+    backgroundColor: "rgba(255,255,255,0.85)",
   },
   closeBtn: {
     position: "absolute",
     top: 14,
     right: 14,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(16,24,32,0.4)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(255,255,255,0.85)",
   },
-  heroTop: { flexDirection: "row", alignItems: "center", marginTop: 8 },
-  heroTextCol: { flex: 1, paddingRight: 8 },
-  heroTitle: {
-    color: "#FFFFFF",
-    fontSize: 21,
-    fontWeight: "900",
-    letterSpacing: -0.4,
-    marginTop: 7,
-    textShadowColor: "rgba(0,0,0,0.35)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 5,
-  },
-  heroSubtitle: { color: "rgba(255,255,255,0.88)", fontSize: 12.5, fontWeight: "600", lineHeight: 17, marginTop: 3 },
-  heroDateRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
-  heroDate: { color: "rgba(255,255,255,0.8)", fontSize: 10.5, fontWeight: "700", marginLeft: 5 },
-  heroArt: { width: 88, height: 88, alignItems: "center", justifyContent: "center", marginRight: 22 },
-  heroArtGlow: { position: "absolute", width: 80, height: 80, borderRadius: 40 },
-  cdWrap: {
-    marginTop: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 16,
-    backgroundColor: "rgba(16,24,32,0.42)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-  },
-  cdLabel: { color: "rgba(255,255,255,0.72)", fontSize: 10, fontWeight: "800", letterSpacing: 0.6, textAlign: "center" },
-  cdRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5 },
-  cdColon: { color: BRAND.goldLight, fontSize: 17, fontWeight: "900", marginHorizontal: 4, marginBottom: 10 },
-  cdBox: {
-    minWidth: 46,
-    paddingVertical: 4,
-    borderRadius: 10,
+
+  body: { flex: 1 },
+  rewardCreditsText: { color: "#8A5A00", fontSize: 11.5, fontWeight: "900", marginLeft: 3 },
+
+  lbLoading: { alignItems: "center", paddingVertical: 28 },
+  emptyTitle: { color: BRAND.ink, fontSize: 14, fontWeight: "800", textAlign: "center" },
+  lbRow: {
+    flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderWidth: 1,
-    borderColor: "rgba(255,217,120,0.28)",
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1.5,
+    borderColor: "transparent",
+    shadowColor: "#1D3A66",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
-  cdValue: { color: "#FFFFFF", fontSize: 18, fontWeight: "900", fontVariant: ["tabular-nums"] },
-  cdUnit: { color: BRAND.goldLight, fontSize: 9, fontWeight: "900", letterSpacing: 0.8, marginTop: 1 },
-
-  body: { flex: 1, backgroundColor: "#FFFFFF" },
-  bodyContent: { paddingHorizontal: 18, paddingTop: 16 },
-  description: { color: "#3B4A5E", fontSize: 13.5, lineHeight: 20, fontWeight: "500", marginBottom: 6 },
-  section: { marginTop: 16 },
-  sectionHeader: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
-  sectionIcon: { width: 30, height: 30, borderRadius: 10, alignItems: "center", justifyContent: "center", marginRight: 9 },
-  sectionTitle: { flex: 1, color: BRAND.ink, fontSize: 17, fontWeight: "900", letterSpacing: -0.2 },
-  sectionRight: { marginLeft: 8 },
-  ruleRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 10 },
-  ruleNum: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", marginRight: 10, marginTop: 1 },
-  ruleNumText: { color: "#FFFFFF", fontSize: 12, fontWeight: "900" },
-  ruleText: { flex: 1, color: "#2A3A50", fontSize: 13.5, lineHeight: 20, fontWeight: "600" },
-
+  lbRankText: { width: 22, color: "#6B7A8F", fontSize: 13, fontWeight: "900", marginRight: 8, textAlign: "center" },
+  ctaButton: {
+    height: 52,
+    borderRadius: 26,
+    overflow: "hidden",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+  },
+  ctaGloss: { position: "absolute", left: 0, right: 0, top: 0, height: 26 },
+  clockText: { color: BRAND.ink, fontSize: 13, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  infoChip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.6)" },
+  infoChipText: { fontSize: 12, fontWeight: "800" },
+  infoCard: { marginHorizontal: 14, marginTop: 12, padding: 12, borderRadius: 18, backgroundColor: "#FFFFFF" },
+  ruleRow: { flexDirection: "row", alignItems: "flex-start", marginTop: 8 },
+  ruleDot: { width: 6, height: 6, borderRadius: 3, marginTop: 7, marginRight: 9 },
+  ruleText: { flex: 1, color: "#3B4A5E", fontSize: 13, lineHeight: 19, fontWeight: "600" },
+  emptyBox: {
+    alignItems: "center",
+    gap: 6,
+    marginTop: 14,
+    paddingVertical: 24,
+    paddingHorizontal: 18,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.75)",
+  },
+  podiumArt: { position: "absolute", left: 0, bottom: 0 },
+  podiumBlock: { position: "absolute", width: PODIUM_BLOCK_W, alignItems: "center" },
+  podiumName: { color: BRAND.ink, fontSize: 12, fontWeight: "800", marginTop: 2, maxWidth: "100%" },
+  podiumScore: { color: "#6B7A8F", fontSize: 10.5, fontWeight: "700", marginTop: 1 },
+  lbList: { marginTop: 10, gap: 7 },
+  lbScore: { color: BRAND.ink, fontSize: 13, fontWeight: "800", marginLeft: 8, fontVariant: ["tabular-nums"] },
+  lbIcon: { marginLeft: 4 },
+  ctaBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 18,
+    paddingTop: 14,
+  },
+  avatarImage: { backgroundColor: "#E6EDF7" },
+  avatarFallback: { alignItems: "center", justifyContent: "center" },
+  avatarInitial: { color: "#FFFFFF", fontWeight: "900" },
+  clockChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#1D3A66",
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
   rewardRow: { flexDirection: "row", alignItems: "center", padding: 10, borderRadius: 16, marginBottom: 8 },
   rewardRowTop: { borderWidth: 1, borderColor: "rgba(246,200,110,0.7)" },
   rewardMedal: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", marginRight: 10 },
@@ -1977,99 +1982,19 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF3D1",
     marginLeft: 8,
   },
-  rewardCreditsText: { color: "#8A5A00", fontSize: 11.5, fontWeight: "900", marginLeft: 3 },
-
-  myRankText: { color: BRAND.blue, fontSize: 12, fontWeight: "900" },
-  lbLoading: { alignItems: "center", paddingVertical: 22 },
-  lbLoadingText: { color: "#6B7A8F", fontSize: 12, fontWeight: "700", marginTop: 8 },
-  emptyBox: {
-    alignItems: "center",
-    paddingVertical: 22,
-    paddingHorizontal: 18,
-    borderRadius: 18,
-    backgroundColor: "#F5F8FD",
-    borderWidth: 1,
-    borderColor: "#E3EBF6",
-    borderStyle: "dashed",
-  },
-  emptyIcon: { width: 54, height: 54, borderRadius: 27, alignItems: "center", justifyContent: "center", marginBottom: 10 },
-  emptyTitle: { color: BRAND.ink, fontSize: 14, fontWeight: "800", textAlign: "center", lineHeight: 20 },
-  emptySub: { color: "#6B7A8F", fontSize: 12, fontWeight: "600", textAlign: "center", marginTop: 4 },
-
-  podiumRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "center", marginBottom: 12, paddingTop: 6 },
-  podiumCol: { flex: 1, alignItems: "center", marginHorizontal: 4 },
-  podiumCrown: { marginBottom: 2 },
-  podiumName: { color: BRAND.ink, fontSize: 12, fontWeight: "800", marginTop: 6, maxWidth: "100%" },
   podiumNameMe: { color: BRAND.blue },
-  podiumScore: { color: "#6B7A8F", fontSize: 11, fontWeight: "800", marginTop: 1 },
-  podiumBase: {
-    width: "100%",
-    marginTop: 6,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  podiumBaseFirst: { height: 56 },
-  podiumBaseSecond: { height: 42 },
-  podiumBaseThird: { height: 32 },
-  podiumPlace: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "900",
-    textShadowColor: "rgba(0,0,0,0.25)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  lbRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 14,
-    marginBottom: 6,
-    backgroundColor: "#F7F9FC",
-    borderWidth: 1,
-    borderColor: "transparent",
-  },
-  lbRowMe: { backgroundColor: "#EAF2FF" },
-  lbRankBox: { width: 28, alignItems: "center", marginRight: 8 },
-  lbRankText: { color: "#6B7A8F", fontSize: 14, fontWeight: "900" },
   lbNameCol: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", marginLeft: 10 },
   lbName: { flexShrink: 1, color: BRAND.ink, fontSize: 14, fontWeight: "800" },
   meBadge: { marginLeft: 6, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   meBadgeText: { color: "#FFFFFF", fontSize: 9, fontWeight: "900", letterSpacing: 0.6 },
-  lbScore: { color: BRAND.ink, fontSize: 13, fontWeight: "900", marginLeft: 8 },
-  lbUnit: { color: "#6B7A8F", fontSize: 11, fontWeight: "700" },
-
-  avatarImage: { backgroundColor: "#E6EDF7" },
-  avatarFallback: { alignItems: "center", justifyContent: "center" },
-  avatarInitial: { color: "#FFFFFF", fontWeight: "900" },
-
-  ctaBar: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 18,
-    paddingTop: 12,
-    backgroundColor: "rgba(255,255,255,0.97)",
-    borderTopWidth: 1,
-    borderTopColor: "#EEF2F8",
-  },
-  ctaButton: {
-    height: 54,
-    borderRadius: 18,
-    overflow: "hidden",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#0B1E3F",
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 5,
-  },
-  ctaGloss: { position: "absolute", left: 0, right: 0, top: 0, height: 27 },
+  lbLoadingText: { color: "#6B7A8F", fontSize: 12, fontWeight: "700", marginTop: 8 },
+  emptySub: { color: "#6B7A8F", fontSize: 12, fontWeight: "600", textAlign: "center", marginTop: 4 },
+  headArt: { width: "100%", overflow: "hidden", alignItems: "center" },
+  headArtFallback: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" },
+  headFade: { position: "absolute", left: 0, right: 0, bottom: 0, height: "35%" },
+  titleBlock: { alignItems: "center", paddingHorizontal: 18, marginTop: -18 },
+  pageTitle: { color: BRAND.ink, fontSize: 26, fontWeight: "900", letterSpacing: -0.4, textAlign: "center" },
+  metaRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", flexWrap: "wrap", marginTop: 10, gap: 8 },
+  bodyContent: { paddingHorizontal: 14, paddingTop: 8 },
   ctaText: { color: "#FFFFFF", fontSize: 16, fontWeight: "900", letterSpacing: 0.2, marginLeft: 8 },
 });
