@@ -45,13 +45,49 @@ function resetInboxCachesIfUserChanged(userId) {
   if (userId) cachedInboxUserId = userId;
 }
 
+const isSameCalendarDay = (a, b) =>
+  a.getFullYear() === b.getFullYear() &&
+  a.getMonth() === b.getMonth() &&
+  a.getDate() === b.getDate();
+
+const getDateKey = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+};
+
+const formatDateSeparator = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const today = new Date();
+  if (isSameCalendarDay(date, today)) return "Bugün";
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (isSameCalendarDay(date, yesterday)) return "Dün";
+  return TR_DAY_FMT.format(date);
+};
+
+const formatBubbleClock = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return TR_TIME_FMT.format(date);
+};
+
 const formatMessageTime = (value) => {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   const today = new Date();
-  if (date.toDateString() === today.toDateString()) {
+  if (isSameCalendarDay(date, today)) {
     return TR_TIME_FMT.format(date);
+  }
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (isSameCalendarDay(date, yesterday)) {
+    return "Dün";
   }
   return TR_DAY_FMT.format(date);
 };
@@ -79,15 +115,67 @@ const friendlyError = (error) => {
   return message;
 };
 
-const Avatar = memo(function Avatar({ name, color, size = 48, uri = null }) {
-  return (
-    <View style={[styles.avatar, { width: size, height: size, borderRadius: size * 0.34, backgroundColor: color || "#7FCBEA", overflow: "hidden" }]}>
+const Avatar = memo(function Avatar({
+  name,
+  color,
+  size = 48,
+  uri = null,
+  live = false,
+  borderColor = null,
+  style = null,
+}) {
+  const innerSize = live ? Math.max(size - 4, 20) : size;
+  const radius = innerSize / 2;
+  const circle = (
+    <View
+      style={[
+        styles.avatar,
+        {
+          width: innerSize,
+          height: innerSize,
+          borderRadius: radius,
+          backgroundColor: color || "#7FCBEA",
+          overflow: "hidden",
+          borderWidth: live ? 2 : borderColor ? 1.5 : 0,
+          borderColor: live ? "#FFFFFF" : borderColor || "transparent",
+        },
+        !live && style,
+      ]}
+    >
       {uri ? (
-        <Image source={{ uri }} style={{ width: "100%", height: "100%" }} />
+        <Image
+          source={{ uri }}
+          style={{ width: innerSize, height: innerSize, borderRadius: radius }}
+          resizeMode="cover"
+        />
       ) : (
-        <Text style={[styles.avatarText, { fontSize: size * 0.4 }]}>{(name || "S").charAt(0).toUpperCase()}</Text>
+        <Text style={[styles.avatarText, { fontSize: innerSize * 0.4 }]}>
+          {(name || "S").charAt(0).toUpperCase()}
+        </Text>
       )}
     </View>
+  );
+
+  if (!live) return circle;
+
+  const ringSize = size + 2;
+  return (
+    <LinearGradient
+      colors={["#22C55E", "#2F80ED"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[
+        styles.avatarLiveRing,
+        {
+          width: ringSize,
+          height: ringSize,
+          borderRadius: ringSize / 2,
+        },
+        style,
+      ]}
+    >
+      {circle}
+    </LinearGradient>
   );
 });
 
@@ -472,24 +560,27 @@ export const InboxScreen = memo(function InboxScreen({
       selectedConversation.userId;
     const partnerSpent = partnerId ? giftSpentMap[partnerId] || 0 : 0;
     const partnerLiveRoom = partnerId ? liveRoomByUserId.get(partnerId) || null : null;
+    const canSend = Boolean(draft.trim()) && !sending;
     return (
       <KeyboardSafeView style={styles.screen} iosOffset={insets.top}>
         <View style={styles.chatHeader}>
           <Pressable
             onPress={() => setSelectedConversation(null)}
             accessibilityLabel="Sohbet listesine dön"
+            accessibilityRole="button"
             style={({ pressed }) => [
               styles.headerButton,
-              pressed && { transform: [{ scale: 0.94 }], opacity: 0.85 },
+              pressed && { transform: [{ scale: 0.93 }], opacity: 0.82 },
             ]}
           >
-            <Ionicons name="arrow-back" size={21} color={COLORS.text} />
+            <Ionicons name="arrow-back" size={20} color="#0F172A" />
           </Pressable>
           <Avatar
             name={selectedConversation.name}
             color={selectedConversation.color}
             uri={selectedConversation.avatarUrl}
-            size={42}
+            live={Boolean(partnerLiveRoom)}
+            size={40}
           />
           <View style={styles.chatHeaderCopy}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -543,6 +634,7 @@ export const InboxScreen = memo(function InboxScreen({
             onContentSizeChange={() => chatScrollRef.current?.scrollToEnd?.({ animated: false })}
             contentContainerStyle={styles.messageList}
             keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
             {!messages.length ? (
               <EmptyState
@@ -551,76 +643,123 @@ export const InboxScreen = memo(function InboxScreen({
                 description="Bu konuşmadaki mesajlar hesabına bağlı olarak saklanır."
               />
             ) : (
-              messages.map((message) => (
-                <View
-                  key={message.id}
-                  style={[styles.messageRow, message.own && styles.messageRowOwn]}
-                >
-                  {message.own ? (
-                    <LinearGradient
-                      colors={["#3B8DF6", "#2563EB"]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={[styles.messageBubble, styles.messageBubbleOwn]}
-                    >
-                      <Text style={[styles.messageBody, styles.messageBodyOwn]}>
-                        {message.text}
-                      </Text>
-                      <Text style={[styles.messageTime, styles.messageTimeOwn]}>
-                        {formatMessageTime(message.createdAt)}
-                      </Text>
-                    </LinearGradient>
-                  ) : (
-                    <View style={styles.messageBubble}>
-                      <Text style={styles.messageBody}>{message.text}</Text>
-                      <Text style={styles.messageTime}>
-                        {formatMessageTime(message.createdAt)}
-                      </Text>
+              messages.map((message, index) => {
+                const isOwn = Boolean(
+                  message.own || (currentUserId && message.userId === currentUserId),
+                );
+                const curDateKey = getDateKey(message.createdAt);
+                const prevDateKey = index > 0 ? getDateKey(messages[index - 1]?.createdAt) : "";
+                const showDateSep = Boolean(curDateKey && curDateKey !== prevDateKey);
+                const clockText = formatBubbleClock(message.createdAt);
+                return (
+                  <View key={message.id}>
+                    {showDateSep ? (
+                      <View style={styles.dateSeparator}>
+                        <Text style={styles.dateSeparatorText}>
+                          {formatDateSeparator(message.createdAt)}
+                        </Text>
+                      </View>
+                    ) : null}
+                    <View style={[styles.messageRow, isOwn && styles.messageRowOwn]}>
+                      {!isOwn ? (
+                        <Avatar
+                          name={selectedConversation.name}
+                          color={selectedConversation.color}
+                          uri={selectedConversation.avatarUrl}
+                          size={28}
+                          borderColor="#FFFFFF"
+                          style={styles.messageAvatar}
+                        />
+                      ) : null}
+                      {isOwn ? (
+                        <LinearGradient
+                          colors={["#4598FF", "#2563EB"]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={[styles.messageBubble, styles.messageBubbleOwn]}
+                        >
+                          <Text style={[styles.messageBody, styles.messageBodyOwn]}>
+                            {message.text}
+                          </Text>
+                          {clockText ? (
+                            <Text style={[styles.messageTime, styles.messageTimeOwn]}>
+                              {clockText}
+                            </Text>
+                          ) : null}
+                        </LinearGradient>
+                      ) : (
+                        <View style={styles.messageBubble}>
+                          <Text style={styles.messageBody}>{message.text}</Text>
+                          {clockText ? (
+                            <Text style={styles.messageTime}>{clockText}</Text>
+                          ) : null}
+                        </View>
+                      )}
+                      {isOwn ? (
+                        <Avatar
+                          name={profile?.name || "Sen"}
+                          color={profile?.color || COLORS.primary}
+                          uri={profile?.avatarUrl || null}
+                          size={28}
+                          borderColor="rgba(47, 128, 237, 0.36)"
+                          style={styles.messageAvatar}
+                        />
+                      ) : null}
                     </View>
-                  )}
-                </View>
-              ))
+                  </View>
+                );
+              })
             )}
           </ScrollView>
         )}
         <View
           style={[
-            styles.composer,
+            styles.composerWrap,
             { marginBottom: keyboard.visible ? 0 : 64 + Math.max(insets.bottom, 8) },
           ]}
         >
-          <TextInput
-            value={draft}
-            onChangeText={setDraft}
-            onSubmitEditing={submitMessage}
-            returnKeyType="send"
-            placeholder="Mesaj yaz..."
-            placeholderTextColor={COLORS.muted}
-            style={styles.composerInput}
-            maxLength={500}
-            multiline
-          />
-          <Pressable
-            disabled={!draft.trim() || sending}
-            onPress={submitMessage}
-            style={({ pressed }) => [
-              styles.sendButton,
-              (!draft.trim() || sending) && styles.sendButtonDisabled,
-              pressed && { transform: [{ scale: 0.93 }] },
-            ]}
-          >
-            <LinearGradient
-              colors={["#3B8DF6", "#2563EB"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[StyleSheet.absoluteFill, { borderRadius: 21 }]}
+          <View style={styles.composerCapsule}>
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              onSubmitEditing={submitMessage}
+              returnKeyType="send"
+              placeholder="Mesaj yaz..."
+              placeholderTextColor="#8A99AE"
+              style={styles.composerInput}
+              maxLength={500}
+              multiline
             />
-            {sending ? (
-              <ActivityIndicator size="small" color={COLORS.primaryInk} />
-            ) : (
-              <Ionicons name="send" size={18} color={COLORS.primaryInk} />
-            )}
-          </Pressable>
+            <Pressable
+              disabled={!canSend}
+              onPress={submitMessage}
+              accessibilityLabel="Mesaj gönder"
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.sendButton,
+                !canSend && !sending && styles.sendButtonDisabled,
+                pressed && canSend && { transform: [{ scale: 0.92 }] },
+              ]}
+            >
+              {canSend || sending ? (
+                <LinearGradient
+                  colors={["#4FA3FF", "#2F80ED", "#1E66D4"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[StyleSheet.absoluteFill, { borderRadius: 18 }]}
+                />
+              ) : null}
+              {sending ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons
+                  name="arrow-up"
+                  size={20}
+                  color={canSend ? "#FFFFFF" : "#94A3B8"}
+                />
+              )}
+            </Pressable>
+          </View>
         </View>
       </KeyboardSafeView>
     );
@@ -630,38 +769,53 @@ export const InboxScreen = memo(function InboxScreen({
     <View style={styles.screen}>
       <Reveal distance={10}>
         <View style={styles.pageHeader}>
-          <View>
-            <Text style={styles.eyebrow}>SORA · MESAJLAR</Text>
-            <Text style={styles.pageTitle}>Mesajlar</Text>
-          </View>
+          <Text style={styles.pageTitle}>Mesajlar</Text>
           <Pressable
             onPress={() => setNewChatOpen(true)}
             accessibilityLabel="Yeni sohbet"
+            accessibilityRole="button"
             style={({ pressed }) => [
               styles.newButton,
               pressed && { transform: [{ scale: 0.93 }], opacity: 0.9 },
             ]}
           >
             <LinearGradient
-              colors={["#3B8DF6", "#2563EB"]}
+              colors={["#4FA3FF", "#2F80ED", "#1A5BC4"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={[StyleSheet.absoluteFill, { borderRadius: 15 }]}
+              style={[StyleSheet.absoluteFill, { borderRadius: 21 }]}
             />
-            <Ionicons name="create-outline" size={20} color={COLORS.primaryInk} />
+            <LinearGradient
+              colors={["rgba(255,255,255,0.28)", "rgba(255,255,255,0)"]}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
+              pointerEvents="none"
+              style={styles.newButtonGloss}
+            />
+            <Ionicons name="pencil" size={19} color="#FFFFFF" />
           </Pressable>
         </View>
       </Reveal>
       <View style={styles.search}>
-        <Ionicons name="search-outline" size={18} color={COLORS.primary} />
+        <Ionicons name="search-outline" size={18} color="#2F80ED" />
         <TextInput
           value={query}
           onChangeText={setQuery}
           placeholder="Kişi ara"
-          placeholderTextColor={COLORS.muted}
+          placeholderTextColor="#7B8BA0"
           style={styles.searchInput}
           autoCapitalize="none"
         />
+        {query ? (
+          <Pressable
+            onPress={() => setQuery("")}
+            accessibilityLabel="Aramayı temizle"
+            hitSlop={8}
+            style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+          >
+            <Ionicons name="close-circle" size={18} color="#8A99AE" />
+          </Pressable>
+        ) : null}
       </View>
       {error ? (
         <Pressable onPress={() => loadConversations()} style={styles.errorBanner}>
@@ -693,23 +847,29 @@ export const InboxScreen = memo(function InboxScreen({
               conversation.otherUserId || conversation.partnerId || conversation.userId;
             const partnerSpent = partnerId ? giftSpentMap[partnerId] || 0 : 0;
             const partnerLiveRoom = partnerId ? liveRoomByUserId.get(partnerId) || null : null;
+            const unreadCount = Number(conversation.unreadCount || 0);
+            const hasUnread = unreadCount > 0;
+            const isLast = index === visibleConversations.length - 1;
             return (
-              <Reveal key={conversation.id} delay={Math.min(index, 6) * 45} distance={10}>
+              <Reveal key={conversation.id} delay={Math.min(index, 6) * 40} distance={8}>
                 <Pressable
                   onPress={() => openConversation(conversation)}
                   style={({ pressed }) => [
-                    styles.conversationCard,
-                    pressed && { transform: [{ scale: 0.985 }], opacity: 0.92 },
+                    styles.conversationRow,
+                    isLast && styles.conversationRowLast,
+                    pressed && { opacity: 0.72, transform: [{ scale: 0.992 }] },
                   ]}
                 >
                   <Avatar
                     name={conversation.name}
                     color={conversation.color}
                     uri={conversation.avatarUrl}
+                    live={Boolean(partnerLiveRoom)}
+                    size={50}
                   />
                   <View style={styles.conversationCopy}>
                     <View style={styles.conversationTop}>
-                      <View style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <View style={styles.conversationNameWrap}>
                         <Text numberOfLines={1} style={styles.conversationName}>
                           {conversation.name}
                         </Text>
@@ -723,15 +883,35 @@ export const InboxScreen = memo(function InboxScreen({
                           </View>
                         ) : null}
                       </View>
-                      <Text numberOfLines={1} style={styles.conversationTime}>
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.conversationTime,
+                          hasUnread && styles.conversationTimeUnread,
+                        ]}
+                      >
                         {formatMessageTime(conversation.lastMessageAt)}
                       </Text>
                     </View>
-                    <Text numberOfLines={1} style={styles.conversationMessage}>
-                      {conversation.lastMessage || "@" + conversation.handle}
-                    </Text>
+                    <View style={styles.conversationBottom}>
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.conversationMessage,
+                          hasUnread && styles.conversationMessageUnread,
+                        ]}
+                      >
+                        {conversation.lastMessage || "@" + conversation.handle}
+                      </Text>
+                      {hasUnread ? (
+                        <View style={styles.unreadBadge}>
+                          <Text style={styles.unreadBadgeText}>
+                            {unreadCount > 99 ? "99+" : unreadCount}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
                   </View>
-                  <Ionicons name="chevron-forward" size={16} color={COLORS.muted} />
                 </Pressable>
               </Reveal>
             );
@@ -750,12 +930,9 @@ export const InboxScreen = memo(function InboxScreen({
             <View style={styles.sheetHandle} />
             <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
               <View style={styles.sheetHeader}>
-                <View>
-                  <Text style={styles.eyebrow}>YENİ SOHBET</Text>
-                  <Text style={styles.sheetTitle}>Yeni sohbet</Text>
-                </View>
+                <Text style={styles.sheetTitle}>Yeni sohbet</Text>
                 <Pressable onPress={() => setNewChatOpen(false)} style={styles.headerButton}>
-                  <Ionicons name="close" size={21} color={COLORS.text} />
+                  <Ionicons name="close" size={20} color="#0F172A" />
                 </Pressable>
               </View>
               <Text style={styles.fieldLabel}>KULLANICI ADI</Text>
@@ -807,44 +984,67 @@ export const InboxScreen = memo(function InboxScreen({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },
-  pageHeader: { paddingHorizontal: 18, paddingTop: 15, paddingBottom: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  eyebrow: { color: COLORS.primary, fontSize: 10, fontWeight: "900", letterSpacing: 1.6 },
-  pageTitle: { color: COLORS.text, fontSize: 30, lineHeight: 35, fontWeight: "900", letterSpacing: -1.1, marginTop: 3 },
+  pageHeader: {
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  pageTitle: {
+    color: "#0F172A",
+    fontSize: 28,
+    lineHeight: 33,
+    fontWeight: "900",
+    letterSpacing: -0.9,
+  },
   newButton: {
-    width: 45,
-    height: 45,
-    borderRadius: 15,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: COLORS.primary,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
-    shadowColor: "#1D5FBF",
+    shadowColor: "#2F80ED",
     shadowOpacity: 0.34,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
     elevation: 5,
+  },
+  newButtonGloss: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 19,
   },
   search: {
     marginHorizontal: 18,
-    height: 48,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.line,
+    height: 44,
+    paddingHorizontal: 15,
+    borderRadius: 999,
+    backgroundColor: "#E8F0FA",
     flexDirection: "row",
     alignItems: "center",
     gap: 9,
-    shadowColor: "#162A48",
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
   },
-  searchInput: { flex: 1, color: COLORS.text, fontSize: 14 },
+  searchInput: { flex: 1, color: "#0F172A", fontSize: 14, fontWeight: "500" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, padding: 32 },
   loadingText: { color: COLORS.muted, fontSize: 12 },
-  errorBanner: { marginHorizontal: 18, marginTop: 12, padding: 12, borderRadius: 14, backgroundColor: "rgba(217,79,92,0.10)", borderWidth: 1, borderColor: "rgba(217,79,92,0.28)", flexDirection: "row", alignItems: "center", gap: 8 },
+  errorBanner: {
+    marginHorizontal: 18,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: "rgba(217,79,92,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(217,79,92,0.28)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   errorText: { color: "#B93E4A", fontSize: 12, lineHeight: 17, flex: 1 },
   emptyState: { flex: 1, minHeight: 280, paddingHorizontal: 18, paddingTop: 18, justifyContent: "flex-start" },
   emptyHeroCard: {
@@ -890,120 +1090,185 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   emptyActionText: { color: COLORS.primaryInk, fontSize: 13, fontWeight: "900" },
-  conversationList: { paddingHorizontal: 18, paddingTop: 14, paddingBottom: 110, gap: 10 },
-  conversationCard: {
+  conversationList: { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 112 },
+  conversationRow: {
     minHeight: 74,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 19,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: "rgba(203,218,236,0.82)",
+    paddingVertical: 13,
+    paddingHorizontal: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(203,218,236,0.58)",
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    shadowColor: "#0F172A",
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    gap: 13,
   },
-  avatar: { alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: "rgba(255,255,255,0.34)" },
+  conversationRowLast: {
+    borderBottomWidth: 0,
+  },
+  avatar: { alignItems: "center", justifyContent: "center" },
+  avatarLiveRing: { alignItems: "center", justifyContent: "center", padding: 2 },
   avatarText: { color: "#FFFFFF", fontWeight: "900" },
   conversationCopy: { flex: 1, minWidth: 0 },
-  conversationTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
-  conversationName: { flexShrink: 1, color: COLORS.text, fontSize: 15, fontWeight: "900" },
-  conversationTime: { flexShrink: 0, color: COLORS.muted, fontSize: 11, fontWeight: "700" },
-  conversationMessage: { color: COLORS.textSecondary, fontSize: 13, lineHeight: 18, marginTop: 4 },
-  conversationHandle: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
+  conversationTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+  },
+  conversationNameWrap: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  conversationName: { flexShrink: 1, color: "#0F172A", fontSize: 15.5, fontWeight: "800" },
+  conversationTime: { flexShrink: 0, color: "#8190A2", fontSize: 11.5, fontWeight: "700" },
+  conversationTimeUnread: { color: "#2F80ED", fontWeight: "800" },
+  conversationBottom: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    marginTop: 3,
+  },
+  conversationMessage: { flex: 1, color: "#617287", fontSize: 13.5, lineHeight: 18, fontWeight: "500" },
+  conversationMessageUnread: { color: "#1E293B", fontWeight: "700" },
+  unreadBadge: {
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 6,
+    borderRadius: 999,
+    backgroundColor: "#2F80ED",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  unreadBadgeText: { color: "#FFFFFF", fontSize: 10.5, fontWeight: "900" },
   chatHeader: {
-    minHeight: 68,
+    minHeight: 64,
     paddingHorizontal: 14,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(203,218,236,0.75)",
-    backgroundColor: COLORS.surface,
+    borderBottomColor: "rgba(203,218,236,0.72)",
+    backgroundColor: "#FFFFFF",
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    elevation: 1,
   },
   headerButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
-    backgroundColor: COLORS.raised,
-    borderWidth: 1,
-    borderColor: "rgba(203,218,236,0.82)",
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#F1F5FA",
     alignItems: "center",
     justifyContent: "center",
   },
   chatHeaderCopy: { flex: 1, minWidth: 0 },
-  chatHeaderName: { flexShrink: 1, color: COLORS.text, fontSize: 15.5, fontWeight: "900" },
-  chatHeaderHandle: { color: COLORS.muted, fontSize: 11.5, marginTop: 2 },
-  savedBadge: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 10, backgroundColor: "rgba(47,128,237,0.12)", paddingHorizontal: 8, paddingVertical: 6 },
-  savedBadgeText: { color: COLORS.primary, fontSize: 10, fontWeight: "800" },
-  messageList: { flexGrow: 1, justifyContent: "flex-end", padding: 15, gap: 9 },
-  messageRow: { flexDirection: "row", justifyContent: "flex-start" },
+  chatHeaderName: { flexShrink: 1, color: "#0F172A", fontSize: 15.5, fontWeight: "900" },
+  chatHeaderHandle: { color: "#64748B", fontSize: 11.5, fontWeight: "600", marginTop: 1 },
+  messageList: { flexGrow: 1, justifyContent: "flex-end", paddingHorizontal: 12, paddingTop: 14, paddingBottom: 14, gap: 10 },
+  dateSeparator: {
+    alignSelf: "center",
+    paddingHorizontal: 11,
+    paddingVertical: 3.5,
+    borderRadius: 999,
+    backgroundColor: "rgba(148,163,184,0.17)",
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  dateSeparatorText: { color: "#64748B", fontSize: 10.5, fontWeight: "800" },
+  messageRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "flex-start",
+    gap: 8,
+  },
   messageRowOwn: { justifyContent: "flex-end" },
+  messageAvatar: {
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.12,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
   messageBubble: {
-    maxWidth: "82%",
+    maxWidth: "74%",
     paddingHorizontal: 13,
     paddingVertical: 9,
-    borderRadius: 19,
+    borderRadius: 20,
     borderBottomLeftRadius: 6,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: "rgba(203,218,236,0.86)",
+    backgroundColor: "#E8F1FC",
   },
   messageBubbleOwn: {
-    borderBottomLeftRadius: 19,
+    borderBottomLeftRadius: 20,
     borderBottomRightRadius: 6,
-    borderWidth: 0,
+    shadowColor: "#2563EB",
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
-  messageBody: { color: COLORS.text, fontSize: 14, lineHeight: 20 },
-  messageBodyOwn: { color: COLORS.primaryInk },
-  messageTime: { color: COLORS.muted, fontSize: 10.5, marginTop: 4, alignSelf: "flex-end" },
+  messageBody: { color: "#0F172A", fontSize: 14, lineHeight: 19.5, fontWeight: "500" },
+  messageBodyOwn: { color: "#FFFFFF" },
+  messageTime: { color: "#64748B", fontSize: 10, fontWeight: "700", marginTop: 3.5, alignSelf: "flex-end" },
   messageTimeOwn: { color: "rgba(255,255,255,0.84)" },
-  composer: {
+  composerWrap: {
     paddingHorizontal: 12,
-    paddingTop: 9,
-    paddingBottom: Platform.OS === "ios" ? 12 : 9,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(203,218,236,0.75)",
-    backgroundColor: COLORS.surface,
+    paddingTop: 8,
+    paddingBottom: Platform.OS === "ios" ? 12 : 10,
+    backgroundColor: COLORS.background,
+  },
+  composerCapsule: {
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 8,
+    paddingLeft: 16,
+    paddingRight: 5,
+    paddingVertical: 5,
+    borderRadius: 26,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(203,218,236,0.95)",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
   composerInput: {
     flex: 1,
-    minHeight: 41,
+    minHeight: 36,
     maxHeight: 110,
-    borderRadius: 21,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: COLORS.background,
-    borderWidth: 1,
-    borderColor: "rgba(203,218,236,0.88)",
-    color: COLORS.text,
+    paddingVertical: Platform.OS === "ios" ? 8 : 6,
+    paddingHorizontal: 0,
+    color: "#0F172A",
     fontSize: 14,
+    fontWeight: "500",
   },
   sendButton: {
-    width: 41,
-    height: 41,
-    borderRadius: 21,
-    backgroundColor: COLORS.primary,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#2F80ED",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
-    elevation: 1,
+    shadowColor: "#2F80ED",
+    shadowOpacity: 0.32,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
   },
-  sendButtonDisabled: { opacity: 0.42 },
+  sendButtonDisabled: {
+    backgroundColor: "#E4EEF9",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
   modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(4,5,9,0.64)" },
   sheet: { paddingHorizontal: 19, paddingTop: 11, paddingBottom: Platform.OS === "ios" ? 32 : 21, borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.line },
   sheetHandle: { width: 42, height: 4, borderRadius: 2, backgroundColor: "#C2CEDD", alignSelf: "center", marginBottom: 15 },
   sheetHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
-  sheetTitle: { color: COLORS.text, fontSize: 25, fontWeight: "900", marginTop: 3 },
+  sheetTitle: { color: "#0F172A", fontSize: 24, fontWeight: "900", letterSpacing: -0.5 },
   fieldLabel: { color: COLORS.muted, fontSize: 10.5, letterSpacing: 1.2, fontWeight: "900", marginBottom: 8 },
   handleInput: { height: 50, borderRadius: 15, paddingHorizontal: 14, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.line, flexDirection: "row", alignItems: "center" },
   handlePrefix: { color: COLORS.primary, fontSize: 16, fontWeight: "900" },
@@ -1018,16 +1283,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 2.5,
     borderRadius: 999,
-    backgroundColor: "rgba(22,163,74,0.13)",
-    borderWidth: 1,
-    borderColor: "rgba(34,197,94,0.34)",
+    backgroundColor: "rgba(34,197,94,0.14)",
     flexShrink: 0,
   },
   liveInlineDot: {
-    width: 6,
-    height: 6,
+    width: 5.5,
+    height: 5.5,
     borderRadius: 3,
-    backgroundColor: "#16A34A",
+    backgroundColor: "#22C55E",
   },
   liveInlineText: {
     color: "#15803D",
