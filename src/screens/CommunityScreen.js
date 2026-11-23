@@ -50,8 +50,6 @@ import { GiftComboButton } from "../ui/GiftComboButton";
 import { KeyboardSafeView, useKeyboardInset } from "../ui/useKeyboardInset";
 import { SoraGiftEffect } from "../ui/SoraGiftEffect";
 import { CoinBlastEffect } from "../ui/CoinBlastEffect";
-import { ShimmerSweep } from "../ui/SoraFx";
-import { LivePulse } from "../ui/Motion";
 import { SoraWealthBadge } from "../ui/SoraWealthTier";
 import { useGiftSpentMap } from "../data/wealthStore";
 
@@ -74,9 +72,34 @@ const createUuid = () =>
 
 const TR_NUMBER_FMT = new Intl.NumberFormat("tr-TR");
 const TR_TIME_FMT = new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", minute: "2-digit" });
+const TR_DAY_FMT = new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short" });
 
 const formatCredits = (value) =>
   TR_NUMBER_FMT.format(Math.max(0, Math.floor(Number(value) || 0)));
+
+const isSameCalendarDay = (a, b) =>
+  a.getFullYear() === b.getFullYear() &&
+  a.getMonth() === b.getMonth() &&
+  a.getDate() === b.getDate();
+
+const getDateKey = (iso) => {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+};
+
+const formatDateSeparator = (iso) => {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const today = new Date();
+  if (isSameCalendarDay(date, today)) return "Bugün";
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (isSameCalendarDay(date, yesterday)) return "Dün";
+  return TR_DAY_FMT.format(date);
+};
 
 const formatMessageTime = (iso) => {
   if (!iso) return "";
@@ -158,35 +181,57 @@ const FamilyAvatar = memo(function FamilyAvatar({ uri, name, size = 52, radius =
   );
 });
 
-const MemberAvatar = memo(function MemberAvatar({ uri, name, color = "#2F80ED", size = 38 }) {
+const MemberAvatar = memo(function MemberAvatar({
+  uri,
+  name,
+  color = "#2F80ED",
+  size = 38,
+  borderColor = null,
+  style = null,
+}) {
   const initial = String(name || "S").trim().charAt(0).toUpperCase() || "S";
+  const resolvedBorder = borderColor || (uri ? "rgba(47,128,237,0.22)" : "rgba(255,255,255,0.72)");
   if (uri) {
     return (
-      <Image
-        source={{ uri }}
-        style={{
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: COLORS.primarySoft,
-          borderWidth: 1.5,
-          borderColor: "rgba(47,128,237,0.22)",
-        }}
-      />
+      <View
+        style={[
+          {
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            backgroundColor: COLORS.primarySoft,
+            borderWidth: 1.5,
+            borderColor: resolvedBorder,
+            overflow: "hidden",
+            alignItems: "center",
+            justifyContent: "center",
+          },
+          style,
+        ]}
+      >
+        <Image
+          source={{ uri }}
+          style={{ width: size, height: size, borderRadius: size / 2 }}
+          resizeMode="cover"
+        />
+      </View>
     );
   }
   return (
     <View
-      style={{
-        width: size,
-        height: size,
-        borderRadius: size / 2,
-        backgroundColor: color || COLORS.primary,
-        borderWidth: 1.5,
-        borderColor: "rgba(255,255,255,0.72)",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
+      style={[
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: color || COLORS.primary,
+          borderWidth: 1.5,
+          borderColor: resolvedBorder,
+          alignItems: "center",
+          justifyContent: "center",
+        },
+        style,
+      ]}
     >
       <Text style={{ color: "#FFFFFF", fontSize: Math.round(size * 0.38), fontWeight: "900" }}>
         {initial}
@@ -242,7 +287,9 @@ const FamilyMessageRow = memo(function FamilyMessageRow({
         uri={resolvedAvatarUrl}
         name={resolvedSenderName}
         color={resolvedSenderColor}
-        size={38}
+        size={30}
+        borderColor={msg.own ? "rgba(47, 128, 237, 0.36)" : "#FFFFFF"}
+        style={styles.msgAvatarShadow}
       />
     </Pressable>
   );
@@ -306,24 +353,40 @@ const FamilyMessageRow = memo(function FamilyMessageRow({
               </View>
             </View>
           </Pressable>
+        ) : msg.own ? (
+          <Pressable
+            onLongPress={handleLongPressGift}
+            delayLongPress={240}
+            style={({ pressed }) => [pressed && { opacity: 0.9 }]}
+          >
+            <LinearGradient
+              colors={["#4598FF", "#2563EB"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.msgBubble, styles.msgBubbleOwn]}
+            >
+              <Text style={[styles.msgText, styles.msgTextOwn]}>
+                {msg.text}
+              </Text>
+              <Text style={[styles.msgTime, styles.msgTimeOwn]}>
+                {formatMessageTime(msg.createdAt)}
+              </Text>
+            </LinearGradient>
+          </Pressable>
         ) : (
           <Pressable
             onLongPress={handleLongPressGift}
             delayLongPress={240}
             style={({ pressed }) => [
               styles.msgBubble,
-              msg.own ? styles.msgBubbleOwn : styles.msgBubbleOther,
+              styles.msgBubbleOther,
               pressed && { opacity: 0.88 },
             ]}
           >
-            <View style={styles.msgInlineRow}>
-              <Text style={[styles.msgText, msg.own && styles.msgTextOwn]}>
-                {msg.text}
-              </Text>
-              <Text style={[styles.msgTime, msg.own && styles.msgTimeOwn]}>
-                {formatMessageTime(msg.createdAt)}
-              </Text>
-            </View>
+            <Text style={styles.msgText}>{msg.text}</Text>
+            <Text style={styles.msgTime}>
+              {formatMessageTime(msg.createdAt)}
+            </Text>
           </Pressable>
         )}
       </View>
@@ -334,12 +397,9 @@ const FamilyMessageRow = memo(function FamilyMessageRow({
 });
 
 const FamilyChatComposer = memo(function FamilyChatComposer({
-  currentUserId,
-  profile,
   sendingMessage,
   onSendText,
   onOpenGiftSheet,
-  onOpenUserProfile,
   bottomMargin,
 }) {
   const [draft, setDraft] = useState("");
@@ -352,76 +412,65 @@ const FamilyChatComposer = memo(function FamilyChatComposer({
     if (ok) setDraft("");
   }, [draft, onSendText, sendingMessage]);
 
-  const handleAvatarPress = useCallback(() => {
-    if (currentUserId) onOpenUserProfile?.(currentUserId);
-  }, [currentUserId, onOpenUserProfile]);
-
   const handleGiftPress = useCallback(() => {
     onOpenGiftSheet?.(null);
   }, [onOpenGiftSheet]);
 
   return (
-    <View style={[styles.composerRow, { marginBottom: bottomMargin }]}>
-      <Pressable
-        onPress={handleAvatarPress}
-        style={styles.composerAvatarWrap}
-        accessibilityRole="button"
-        accessibilityLabel="Profil fotoğrafın"
-      >
-        <MemberAvatar
-          uri={profile?.avatarUrl || null}
-          name={profile?.name || "Sen"}
-          color={profile?.color || COLORS.primary}
-          size={38}
+    <View style={[styles.composerWrap, { marginBottom: bottomMargin }]}>
+      <View style={styles.composerCapsule}>
+        <TextInput
+          value={draft}
+          onChangeText={setDraft}
+          onSubmitEditing={handleSend}
+          returnKeyType="send"
+          placeholder="Ailene mesaj yaz..."
+          placeholderTextColor="#8A99AE"
+          maxLength={1000}
+          multiline
+          style={styles.composerInput}
         />
-      </Pressable>
-      <TextInput
-        value={draft}
-        onChangeText={setDraft}
-        placeholder="Ailene mesaj yaz..."
-        placeholderTextColor={COLORS.muted}
-        maxLength={1000}
-        multiline
-        style={styles.composerInput}
-      />
-      <Pressable
-        onPress={handleGiftPress}
-        accessibilityLabel="Hediye kutusu"
-        style={({ pressed }) => [
-          styles.composerGiftBtn,
-          pressed && { transform: [{ scale: 0.92 }] },
-        ]}
-      >
-        <LinearGradient
-          colors={["#52A5FF", "#2F80ED", "#7C3AED"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
-        />
-        <Ionicons name="gift" size={19} color="#FFFFFF" />
-      </Pressable>
-      <Pressable
-        disabled={!canSend}
-        onPress={handleSend}
-        accessibilityLabel="Mesaj gönder"
-        style={({ pressed }) => [
-          styles.sendBtn,
-          !canSend && styles.sendBtnDisabled,
-          pressed && { transform: [{ scale: 0.92 }] },
-        ]}
-      >
-        <LinearGradient
-          colors={["#52A5FF", "#2F80ED", "#1D5FBF"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
-        />
-        {sendingMessage ? (
-          <ActivityIndicator size="small" color={COLORS.primaryInk} />
-        ) : (
-          <Ionicons name="send" size={17} color={COLORS.primaryInk} />
-        )}
-      </Pressable>
+        <Pressable
+          onPress={handleGiftPress}
+          accessibilityLabel="Hediye kutusu"
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.composerGiftBtn,
+            pressed && { transform: [{ scale: 0.92 }], opacity: 0.8 },
+          ]}
+        >
+          <Ionicons name="gift-outline" size={20} color="#64748B" />
+        </Pressable>
+        <Pressable
+          disabled={!canSend}
+          onPress={handleSend}
+          accessibilityLabel="Mesaj gönder"
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.sendBtn,
+            !canSend && !sendingMessage && styles.sendBtnDisabled,
+            pressed && canSend && { transform: [{ scale: 0.92 }] },
+          ]}
+        >
+          {canSend || sendingMessage ? (
+            <LinearGradient
+              colors={["#4FA3FF", "#2F80ED", "#1E66D4"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[StyleSheet.absoluteFill, { borderRadius: 18 }]}
+            />
+          ) : null}
+          {sendingMessage ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Ionicons
+              name="arrow-up"
+              size={20}
+              color={canSend ? "#FFFFFF" : "#94A3B8"}
+            />
+          )}
+        </Pressable>
+      </View>
     </View>
   );
 });
@@ -1557,11 +1606,6 @@ export const CommunityScreen = memo(function CommunityScreen({
     </View>
   );
 
-  const myProgress = useMemo(
-    () => (myFamily ? computeFamilyLevelProgress(myFamily.xp, myFamily.level) : null),
-    [myFamily],
-  );
-
   const detailProgress = useMemo(
     () =>
       detailData?.family
@@ -1584,19 +1628,6 @@ export const CommunityScreen = memo(function CommunityScreen({
     return map;
   }, [familyMembers]);
   memberByIdRef.current = memberById;
-
-  const familyLiveRooms = useMemo(() => {
-    if (!myFamily?.id || !Array.isArray(rooms) || rooms.length === 0) return [];
-    const memberIds = new Set();
-    if (myFamily.ownerId) memberIds.add(myFamily.ownerId);
-    for (const m of familyMembers) {
-      if (m?.userId) memberIds.add(m.userId);
-    }
-    if (memberIds.size === 0) return [];
-    return rooms
-      .filter((r) => r?.hostId && memberIds.has(r.hostId))
-      .sort((a, b) => (Number(b.listeners) || 0) - (Number(a.listeners) || 0));
-  }, [familyMembers, myFamily?.id, myFamily?.ownerId, rooms]);
 
   const liveRoomByHostId = useMemo(() => {
     const map = new Map();
@@ -1627,17 +1658,34 @@ export const CommunityScreen = memo(function CommunityScreen({
   const chatKeyExtractor = useCallback((item) => String(item.id), []);
 
   const renderChatItem = useCallback(
-    ({ item: msg }) => (
-      <FamilyMessageRow
-        msg={msg}
-        knownMember={msg.userId ? memberById.get(msg.userId) : null}
-        senderSpent={msg.userId ? giftSpentMap[msg.userId] || 0 : 0}
-        profile={profile}
-        onOpenUserProfile={onOpenUserProfile}
-        onOpenGiftSheet={openGiftSheet}
-      />
-    ),
-    [giftSpentMap, memberById, onOpenUserProfile, openGiftSheet, profile],
+    ({ item: msg, index }) => {
+      const curDateKey = getDateKey(msg.createdAt);
+      const olderDateKey =
+        index + 1 < reversedMessages.length
+          ? getDateKey(reversedMessages[index + 1]?.createdAt)
+          : "";
+      const showDateSep = Boolean(curDateKey && curDateKey !== olderDateKey);
+      return (
+        <View>
+          {showDateSep ? (
+            <View style={styles.dateSeparator}>
+              <Text style={styles.dateSeparatorText}>
+                {formatDateSeparator(msg.createdAt)}
+              </Text>
+            </View>
+          ) : null}
+          <FamilyMessageRow
+            msg={msg}
+            knownMember={msg.userId ? memberById.get(msg.userId) : null}
+            senderSpent={msg.userId ? giftSpentMap[msg.userId] || 0 : 0}
+            profile={profile}
+            onOpenUserProfile={onOpenUserProfile}
+            onOpenGiftSheet={openGiftSheet}
+          />
+        </View>
+      );
+    },
+    [giftSpentMap, memberById, onOpenUserProfile, openGiftSheet, profile, reversedMessages],
   );
 
   return (
@@ -1645,35 +1693,21 @@ export const CommunityScreen = memo(function CommunityScreen({
       {myFamily ? (
         // ── Üye olunan aile varsa doğrudan Aile Sohbeti açılır ─────────────────
         <KeyboardSafeView style={{ flex: 1 }} iosOffset={insets.top}>
-          <LinearGradient
-            colors={["#101D36", "#1A325C", "#0F192E"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.chatHeader}
-          >
-            <ShimmerSweep duration={4800} color="rgba(255,255,255,0.12)" />
+          <View style={styles.chatHeader}>
             <Pressable
               onPress={() => openFamilyDetail(myFamily.id, "levels")}
-              style={styles.chatHeaderIdentity}
+              style={({ pressed }) => [
+                styles.chatHeaderIdentity,
+                pressed && { opacity: 0.78 },
+              ]}
             >
-              <FamilyAvatar uri={myFamily.avatarUrl} name={myFamily.name} size={46} radius={15} />
-              <View style={{ flex: 1 }}>
-                <View style={styles.chatTitleRow}>
-                  <Text numberOfLines={1} style={styles.chatTitle}>
-                    {myFamily.name}
-                  </Text>
-                  <LinearGradient
-                    colors={["#FFD66B", "#F59E0B"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.chatHeaderLevelBadge}
-                  >
-                    <Text style={styles.chatHeaderLevelBadgeText}>Sv. {myFamily.level}</Text>
-                  </LinearGradient>
-                </View>
+              <FamilyAvatar uri={myFamily.avatarUrl} name={myFamily.name} size={40} radius={20} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text numberOfLines={1} style={styles.chatTitle}>
+                  {myFamily.name}
+                </Text>
                 <Text numberOfLines={1} style={styles.chatSubtitle}>
-                  {myFamily.memberCount} üye
-                  {myFamily.familyCode ? ` · ID: ${myFamily.familyCode}` : ""}
+                  {myFamily.memberCount} üye · Sv. {myFamily.level}
                 </Text>
               </View>
             </Pressable>
@@ -1681,129 +1715,27 @@ export const CommunityScreen = memo(function CommunityScreen({
               <Pressable
                 onPress={() => setDiscoverModalOpen(true)}
                 accessibilityLabel="Aileleri keşfet"
+                accessibilityRole="button"
                 style={({ pressed }) => [
                   styles.headerIconBtn,
-                  pressed && { transform: [{ scale: 0.93 }], opacity: 0.85 },
+                  pressed && { backgroundColor: "rgba(15,23,42,0.06)", transform: [{ scale: 0.93 }] },
                 ]}
               >
-                <Ionicons name="compass-outline" size={19} color="#9CC8FF" />
+                <Ionicons name="compass-outline" size={20} color="#475569" />
               </Pressable>
               <Pressable
                 onPress={() => openFamilyDetail(myFamily.id, "levels")}
                 accessibilityLabel="Aile profili ve seviyeler"
+                accessibilityRole="button"
                 style={({ pressed }) => [
                   styles.headerIconBtn,
-                  pressed && { transform: [{ scale: 0.93 }], opacity: 0.85 },
+                  pressed && { backgroundColor: "rgba(15,23,42,0.06)", transform: [{ scale: 0.93 }] },
                 ]}
               >
-                <Ionicons name="shield-checkmark-outline" size={19} color="#FFD66B" />
+                <Ionicons name="shield-outline" size={20} color="#475569" />
               </Pressable>
             </View>
-          </LinearGradient>
-
-          <View style={styles.xpStrip}>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <View style={styles.xpStripLabels}>
-                <View style={styles.xpStripTopRow}>
-                  <Text style={styles.xpStripTitle} numberOfLines={1}>
-                    {myProgress?.currentTitle}
-                  </Text>
-                  <Text style={styles.xpStripPercent}>
-                    %{Math.min(100, Math.round((myProgress?.ratio || 0) * 100))}
-                  </Text>
-                </View>
-                <Text style={styles.xpStripValue} numberOfLines={1}>
-                  {formatCredits(myProgress?.gainedInLevel || 0)} / {formatCredits(myProgress?.stepRequiredXp || 100000)} XP
-                </Text>
-              </View>
-              <View style={styles.progressTrack}>
-                <LinearGradient
-                  colors={["#2F80ED", "#F59E0B", "#FBBF24"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={[
-                    styles.progressFill,
-                    { width: `${Math.max(4, Math.round((myProgress?.ratio || 0) * 100))}%` },
-                  ]}
-                />
-              </View>
-            </View>
-            <Pressable
-              onPress={() => openGiftSheet(null)}
-              accessibilityLabel="Ailede hediye gönder"
-              style={({ pressed }) => [
-                styles.giftHeaderPill,
-                pressed && { transform: [{ scale: 0.94 }], opacity: 0.9 },
-              ]}
-            >
-              <LinearGradient
-                colors={["#52A5FF", "#2F80ED", "#7C3AED"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[StyleSheet.absoluteFill, { borderRadius: 12 }]}
-              />
-              <Ionicons name="gift" size={14} color="#FFFFFF" />
-              <Text style={styles.giftHeaderPillText}>Hediye</Text>
-            </Pressable>
           </View>
-
-          {familyLiveRooms.length > 0 && onOpenRoom ? (
-            <View style={styles.familyLiveWrap}>
-              {familyLiveRooms.slice(0, 2).map((liveRoom) => {
-                const member = liveRoom.hostId ? memberById.get(liveRoom.hostId) : null;
-                return (
-                  <Pressable
-                    key={liveRoom.id}
-                    onPress={() => onOpenRoom(liveRoom)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${liveRoom.title} canlı aile odasına katıl`}
-                    style={({ pressed }) => [
-                      styles.familyLiveBar,
-                      pressed && { transform: [{ scale: 0.985 }], opacity: 0.92 },
-                    ]}
-                  >
-                    <LinearGradient
-                      colors={["#0F213E", "#183766", "#13294B"]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={[StyleSheet.absoluteFill, { borderRadius: 14 }]}
-                    />
-                    <View style={styles.familyLiveAvatarBox}>
-                      <MemberAvatar
-                        uri={liveRoom.hostAvatarUrl || member?.avatarUrl || null}
-                        name={liveRoom.host || member?.name || "Aile"}
-                        color={liveRoom.accent || member?.color || COLORS.primary}
-                        size={34}
-                      />
-                      <View style={styles.familyLiveDotWrap}>
-                        <LivePulse size={7} color="#22C55E" />
-                      </View>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <View style={styles.familyLiveTopRow}>
-                        <Text style={styles.familyLiveBadgeText}>AİLE YAYINDA</Text>
-                        <Text style={styles.familyLiveCountText}>
-                          · {Math.max(1, Number(liveRoom.listeners) || 1)} kişi
-                        </Text>
-                      </View>
-                      <Text numberOfLines={1} style={styles.familyLiveTitle}>
-                        {liveRoom.title}
-                      </Text>
-                    </View>
-                    <LinearGradient
-                      colors={["#22C55E", "#16A34A"]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.familyLiveJoinBtn}
-                    >
-                      <Ionicons name="headset" size={13} color="#FFFFFF" />
-                      <Text style={styles.familyLiveJoinText}>Katıl</Text>
-                    </LinearGradient>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : null}
 
           {messagesError ? (
             <Pressable
@@ -1856,12 +1788,9 @@ export const CommunityScreen = memo(function CommunityScreen({
           />
 
           <FamilyChatComposer
-            currentUserId={currentUserId}
-            profile={profile}
             sendingMessage={sendingMessage}
             onSendText={handleSendText}
             onOpenGiftSheet={openGiftSheet}
-            onOpenUserProfile={onOpenUserProfile}
             bottomMargin={keyboard.visible ? 0 : 64 + Math.max(insets.bottom, 8)}
           />
         </KeyboardSafeView>
@@ -2792,117 +2721,31 @@ const styles = StyleSheet.create({
 
   // ── Aile Sohbeti ve Hediye Mesajı Stilleri ──────────────────────────────────
   chatHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    overflow: "hidden",
+    minHeight: 62,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(120,180,255,0.18)",
+    borderBottomColor: "rgba(226,232,240,0.85)",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
-    elevation: 4,
   },
-  chatHeaderIdentity: { flex: 1, flexDirection: "row", alignItems: "center", gap: 11 },
-  chatTitleRow: { flexDirection: "row", alignItems: "center", gap: 7 },
-  chatTitle: { flexShrink: 1, color: "#FFFFFF", fontSize: 16, fontWeight: "900" },
-  chatHeaderLevelBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 9,
-  },
-  chatHeaderLevelBadgeText: { color: "#1A1204", fontSize: 10, fontWeight: "900" },
-  chatSubtitle: { color: "rgba(210,228,255,0.78)", fontSize: 11, marginTop: 2, fontWeight: "600" },
-  chatHeaderActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  chatHeaderIdentity: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10 },
+  chatTitle: { flexShrink: 1, color: "#0F172A", fontSize: 16.5, fontWeight: "900", letterSpacing: -0.3 },
+  chatSubtitle: { color: "#64748B", fontSize: 11.5, marginTop: 1, fontWeight: "500" },
+  chatHeaderActions: { flexDirection: "row", alignItems: "center", gap: 4 },
   headerIconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 13,
-    backgroundColor: "rgba(255,255,255,0.11)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
-  },
-  xpStrip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: COLORS.surfaceRaised,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.lineSoft,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  familyLiveWrap: {
-    paddingHorizontal: 14,
-    paddingTop: 8,
-    paddingBottom: 2,
-    gap: 6,
-  },
-  familyLiveBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(34,197,94,0.34)",
-    overflow: "hidden",
-  },
-  familyLiveAvatarBox: {
-    position: "relative",
-  },
-  familyLiveDotWrap: {
-    position: "absolute",
-    right: -2,
-    bottom: -2,
-    width: 13,
-    height: 13,
-    borderRadius: 6.5,
-    backgroundColor: "#0F213E",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  familyLiveTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  familyLiveBadgeText: {
-    color: "#4ADE80",
-    fontSize: 9.5,
-    fontWeight: "900",
-    letterSpacing: 0.7,
-  },
-  familyLiveCountText: {
-    color: "rgba(219,234,254,0.78)",
-    fontSize: 10.5,
-    fontWeight: "700",
-  },
-  familyLiveTitle: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "800",
-    marginTop: 1,
-  },
-  familyLiveJoinBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 11,
-    paddingVertical: 6.5,
-    borderRadius: 10,
-  },
-  familyLiveJoinText: {
-    color: "#FFFFFF",
-    fontSize: 11.5,
-    fontWeight: "900",
   },
   xpStripLabels: { gap: 2 },
   xpStripTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  xpStripTitle: { flex: 1, color: COLORS.text, fontSize: 12, fontWeight: "800" },
   xpStripPercent: { color: COLORS.primary, fontSize: 10.5, fontWeight: "900", flexShrink: 0 },
   xpStripValue: { color: COLORS.textSecondary, fontSize: 10.5, fontWeight: "700" },
   progressTrack: {
@@ -2913,29 +2756,35 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   progressFill: { height: "100%", borderRadius: 4, backgroundColor: COLORS.primary },
-  giftHeaderPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 13,
-    height: 34,
-    borderRadius: 12,
-    overflow: "hidden",
-    elevation: 2,
-  },
-  giftHeaderPillText: { color: "#FFFFFF", fontSize: 11.5, fontWeight: "900" },
   messagesList: {
-    paddingHorizontal: 14,
-    paddingTop: 20,
+    paddingHorizontal: 12,
+    paddingTop: 14,
     paddingBottom: 14,
-    gap: 11,
+    gap: 10,
     flexGrow: 1,
     justifyContent: "flex-end",
   },
-  msgRow: { flexDirection: "row", alignItems: "flex-end", gap: 9 },
+  dateSeparator: {
+    alignSelf: "center",
+    paddingHorizontal: 11,
+    paddingVertical: 3.5,
+    borderRadius: 999,
+    backgroundColor: "rgba(148,163,184,0.17)",
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  dateSeparatorText: { color: "#64748B", fontSize: 10.5, fontWeight: "800" },
+  msgRow: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
   msgRowOwn: { justifyContent: "flex-end" },
-  msgAvatarPress: { width: 38, height: 38, alignItems: "center", justifyContent: "center" },
-  msgContentCol: { maxWidth: "75%", alignItems: "flex-start" },
+  msgAvatarPress: { width: 30, height: 30, alignItems: "center", justifyContent: "center" },
+  msgAvatarShadow: {
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.12,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  msgContentCol: { maxWidth: "74%", alignItems: "flex-start" },
   msgContentColOwn: { alignItems: "flex-end" },
   msgSenderRow: {
     flexDirection: "row",
@@ -2951,35 +2800,29 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   msgBubble: {
-    minHeight: 39,
-    minWidth: 66,
+    minWidth: 64,
     paddingHorizontal: 13,
     paddingVertical: 9,
-    borderRadius: 19,
+    borderRadius: 20,
     justifyContent: "center",
   },
   msgBubbleOther: {
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: "rgba(203,218,236,0.86)",
+    backgroundColor: "#E8F1FC",
     borderBottomLeftRadius: 6,
   },
   msgBubbleOwn: {
-    backgroundColor: "#2563EB",
+    borderBottomLeftRadius: 20,
     borderBottomRightRadius: 6,
+    shadowColor: "#2563EB",
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
-  msgInlineRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "flex-end",
-    justifyContent: "flex-end",
-    columnGap: 8,
-    rowGap: 2,
-  },
-  msgText: { color: COLORS.text, fontSize: 14, lineHeight: 20, flexShrink: 1 },
-  msgTextOwn: { color: COLORS.primaryInk },
-  msgTime: { color: COLORS.muted, fontSize: 10.5, lineHeight: 15, marginLeft: "auto" },
-  msgTimeOwn: { color: "rgba(255,255,255,0.82)" },
+  msgText: { color: "#0F172A", fontSize: 14, lineHeight: 19.5, fontWeight: "500" },
+  msgTextOwn: { color: "#FFFFFF" },
+  msgTime: { color: "#64748B", fontSize: 10, fontWeight: "700", marginTop: 3.5, alignSelf: "flex-end" },
+  msgTimeOwn: { color: "rgba(255,255,255,0.84)" },
   giftMsgCard: {
     width: 272,
     maxWidth: "100%",
@@ -2999,13 +2842,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(47,128,237,0.34)",
     borderBottomLeftRadius: 18,
     borderBottomRightRadius: 6,
-  },
-  giftMsgBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
   },
   giftMsgTitle: { color: COLORS.text, fontSize: 13, fontWeight: "900" },
   giftMsgBody: { color: COLORS.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 2 },
@@ -3029,55 +2865,66 @@ const styles = StyleSheet.create({
     borderRadius: 7,
   },
   giftMsgTime: { color: COLORS.muted, fontSize: 10.5, marginLeft: "auto" },
-  composerRow: {
+  composerWrap: {
     paddingHorizontal: 12,
-    paddingVertical: 9,
-    backgroundColor: COLORS.surface,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(203,218,236,0.75)",
+    paddingTop: 8,
+    paddingBottom: Platform.OS === "ios" ? 12 : 10,
+    backgroundColor: COLORS.background,
+  },
+  composerCapsule: {
     flexDirection: "row",
     alignItems: "flex-end",
-    gap: 8,
-  },
-  composerAvatarWrap: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
+    gap: 6,
+    paddingLeft: 16,
+    paddingRight: 5,
+    paddingVertical: 5,
+    borderRadius: 26,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(203,218,236,0.95)",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
   composerGiftBtn: {
-    width: 41,
-    height: 41,
-    borderRadius: 21,
-    overflow: "hidden",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
-    elevation: 1,
   },
   composerInput: {
     flex: 1,
-    minHeight: 41,
-    maxHeight: 96,
-    borderRadius: 21,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    backgroundColor: COLORS.background,
-    borderWidth: 1,
-    borderColor: "rgba(203,218,236,0.88)",
-    color: COLORS.text,
+    minHeight: 36,
+    maxHeight: 110,
+    paddingVertical: Platform.OS === "ios" ? 8 : 6,
+    paddingHorizontal: 0,
+    color: "#0F172A",
     fontSize: 14,
+    fontWeight: "500",
   },
   sendBtn: {
-    width: 41,
-    height: 41,
-    borderRadius: 21,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     overflow: "hidden",
-    backgroundColor: COLORS.primary,
+    backgroundColor: "#2F80ED",
     alignItems: "center",
     justifyContent: "center",
-    elevation: 1,
+    shadowColor: "#2F80ED",
+    shadowOpacity: 0.32,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
   },
-  sendBtnDisabled: { opacity: 0.45 },
+  sendBtnDisabled: {
+    backgroundColor: "#E4EEF9",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
 
   // ── Aile Hediye Kutusu Stilleri ─────────────────────────────────────────────
   giftHeaderRight: { flexDirection: "row", alignItems: "center", gap: 8 },
