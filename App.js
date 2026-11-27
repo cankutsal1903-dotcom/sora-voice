@@ -3720,16 +3720,16 @@ const SpeakingRing = memo(function SpeakingRing({
     return () => loop.stop();
   }, [pulse, reducedMotion]);
   const scale = reducedMotion
-    ? 1.08
+    ? 1.05
     : pulse.interpolate({
         inputRange: [0, 1],
-        outputRange: [1, 1.26],
+        outputRange: [1, 1.15],
       });
   const opacity = reducedMotion
-    ? 0.72
+    ? 0.45
     : pulse.interpolate({
         inputRange: [0, 0.55, 1],
-        outputRange: [0.85, 0.36, 0],
+        outputRange: [0.55, 0.22, 0],
       });
   return (
     <Animated.View
@@ -3740,7 +3740,7 @@ const SpeakingRing = memo(function SpeakingRing({
           width: size,
           height: size,
           borderRadius: size / 2,
-          borderWidth: 2.2,
+          borderWidth: 1.8,
           borderColor: color,
           opacity,
           transform: [{ scale }],
@@ -4342,9 +4342,11 @@ const APP_STORAGE_KEYS = [
 
 const RoomComposer = memo(function RoomComposer({
   onSend,
-  onOpenGift,
   sending,
-  barHeight = 42,
+  barHeight = 40,
+  reactionTrayOpen = false,
+  onToggleReactionTray,
+  onQuickHeart,
 }) {
   const [value, setValue] = useState("");
 
@@ -4369,7 +4371,7 @@ const RoomComposer = memo(function RoomComposer({
         onChangeText={handleChange}
         onSubmitEditing={handleSubmit}
         placeholder="Mesaj yaz…"
-        placeholderTextColor="rgba(218,232,250,0.68)"
+        placeholderTextColor="#7C92AF"
         accessibilityLabel="Oda mesajı"
         style={[styles.roomInputField, { height: barHeight }]}
         maxLength={160}
@@ -4385,9 +4387,30 @@ const RoomComposer = memo(function RoomComposer({
           accessibilityLabel={sending ? "Mesaj gönderiliyor" : "Mesajı gönder"}
         >
           <Ionicons
-            name={sending ? "hourglass-outline" : "send"}
-            size={13}
+            name={sending ? "hourglass-outline" : "arrow-up"}
+            size={15}
             color="#FFFFFF"
+          />
+        </Pressable>
+      ) : onToggleReactionTray ? (
+        <Pressable
+          hitSlop={6}
+          onPress={onToggleReactionTray}
+          onLongPress={onQuickHeart}
+          delayLongPress={220}
+          style={({ pressed }) => [
+            styles.roomInputEmojiBtn,
+            reactionTrayOpen && styles.roomInputEmojiBtnActive,
+            pressed && { opacity: 0.72 },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Hızlı emoji tepkileri"
+          accessibilityState={{ selected: reactionTrayOpen }}
+        >
+          <Ionicons
+            name={reactionTrayOpen ? "close" : "happy-outline"}
+            size={18}
+            color={reactionTrayOpen ? "#F8FAFC" : "#8FA5C2"}
           />
         </Pressable>
       ) : null}
@@ -4432,21 +4455,29 @@ const RoomMessageRow = memo(function RoomMessageRow({
         >
           <Avatar
             circle
-            size={28}
+            size={24}
             uri={senderAvatarUrl}
             color={senderColor || "#2F80ED"}
             label={(item.user || "S").charAt(0).toUpperCase()}
           />
         </Pressable>
       ) : null}
-      <View
+      <Pressable
+        disabled={!canReport && (!showAvatar || !item.userId)}
+        onPress={showAvatar && item.userId ? handleSenderPress : undefined}
+        onLongPress={canReport ? handleReport : undefined}
+        delayLongPress={320}
+        accessibilityHint={canReport ? "Mesajı bildirmek için uzun basın" : undefined}
         style={[
           styles.messageBubble,
-          hasPrestigeBubble && {
-            backgroundColor: bubbleTheme.bg,
-            borderColor: bubbleTheme.border,
-            borderWidth: 1,
-          },
+          hasPrestigeBubble && [
+            styles.messageBubblePrestige,
+            {
+              backgroundColor: bubbleTheme.bg,
+              borderColor: bubbleTheme.border,
+              borderWidth: 1,
+            },
+          ],
           item.system && styles.messageBubbleSystem,
           item.announcement && styles.messageBubbleAnnouncement,
           isGiftMsg && styles.messageBubbleGift,
@@ -4456,7 +4487,7 @@ const RoomMessageRow = memo(function RoomMessageRow({
           <Ionicons
             name="megaphone"
             size={13}
-            color="#9CC6FF"
+            color="#93C5FD"
             style={styles.messageAnnouncementIcon}
           />
         ) : null}
@@ -4467,7 +4498,7 @@ const RoomMessageRow = memo(function RoomMessageRow({
               giftName={giftMeta.gift_name}
               fallbackIcon={giftMeta.gift_icon}
               fallbackColor={giftMeta.gift_color}
-              size={28}
+              size={24}
             />
           </View>
         ) : null}
@@ -4493,16 +4524,7 @@ const RoomMessageRow = memo(function RoomMessageRow({
             </>
           )}
         </Text>
-      </View>
-      {canReport ? (
-        <Pressable
-          accessibilityLabel="Mesajı bildir"
-          onPress={handleReport}
-          style={styles.messageReportButton}
-        >
-          <Ionicons name="flag-outline" size={12} color={COLORS.muted} />
-        </Pressable>
-      ) : null}
+      </Pressable>
     </View>
   );
 });
@@ -4628,10 +4650,10 @@ function Room({
   const insets = useSafeAreaInsets();
   const { width: roomViewportWidth } = useWindowDimensions();
   const narrowRoomBar = roomViewportWidth < 375;
-  const barBtnSize = narrowRoomBar ? 36 : 40;
-  const barGiftSize = narrowRoomBar ? 38 : 42;
-  const barGap = narrowRoomBar ? 4 : 6;
-  const barPadX = narrowRoomBar ? 8 : 12;
+  const barBtnSize = narrowRoomBar ? 38 : 40;
+  const barGiftSize = narrowRoomBar ? 38 : 40;
+  const barGap = narrowRoomBar ? 6 : 8;
+  const barPadX = narrowRoomBar ? 12 : 14;
   useEffect(() => {
     console.warn("[room-entry] Room component mounted");
     return () => console.warn("[room-entry] Room component unmounted");
@@ -7363,9 +7385,15 @@ function Room({
   const renderStageSeat = (participant, seatIndex, variant = "regular") => {
     const isHostSeat = variant === "host";
     const isCoupleSeat = variant === "couple";
-    // Ev sahibi, Konuk ve tüm normal koltuklar birebir eşit boyut ve dikey eksende hizalı.
-    const avatarSize = compactStage ? 56 : 64;
-    const avatarStageHeight = avatarSize + (compactStage ? 18 : 22);
+    const avatarSize =
+      isHostSeat && !roomDetails.coupleSeat
+        ? compactStage
+          ? 58
+          : 64
+        : compactStage
+          ? 52
+          : 58;
+    const avatarStageHeight = avatarSize + (compactStage ? 14 : 18);
     const slotStyle = [
       styles.roomSpeakerSlot,
       isHostSeat && styles.roomHostStageSlot,
@@ -7396,9 +7424,9 @@ function Room({
               ]}
             >
               <Ionicons
-                name="mic-outline"
-                size={compactStage ? 22 : 26}
-                color="rgba(147,197,253,0.82)"
+                name="add"
+                size={compactStage ? 18 : 20}
+                color="rgba(148,163,184,0.48)"
               />
             </View>
           </View>
@@ -7421,11 +7449,11 @@ function Room({
       <>
         {participant.microphoneEnabled ? (
           <View style={[styles.roomMicOnBadge, { zIndex: 12, elevation: 6 }]}>
-            <Ionicons name="mic" size={9} color="#11131A" />
+            <Ionicons name="mic" size={10} color="#34D399" />
           </View>
         ) : (
           <View style={[styles.roomMicOffBadge, { zIndex: 12, elevation: 6 }]}>
-            <Ionicons name="mic-off" size={9} color="rgba(255,255,255,0.85)" />
+            <Ionicons name="mic-off" size={10} color="#7D91AC" />
           </View>
         )}
         {participant.role === "moderator" ? (
@@ -7447,7 +7475,7 @@ function Room({
       >
         <View style={[styles.roomAvatarWrap, { height: avatarStageHeight }]}>
           {participant.isSpeaking ? (
-            <SpeakingRing size={seatedAvatarSize + 10} color="#38BDF8" />
+            <SpeakingRing size={seatedAvatarSize + 8} color="#60A5FA" />
           ) : null}
           <ProfileFrame
             appearance={seatFrameAppearance}
@@ -7463,8 +7491,6 @@ function Room({
                 { width: seatedAvatarSize, height: seatedAvatarSize, borderRadius: seatedAvatarSize / 2 },
                 isHostSeat && styles.roomHostStageAvatar,
                 isHostSeat && { width: seatedAvatarSize, height: seatedAvatarSize, borderRadius: seatedAvatarSize / 2 },
-                participant.role === "host" && styles.roomSpeakerAvatarHost,
-                participant.microphoneEnabled && styles.roomSpeakerAvatarActive,
                 participant.isSpeaking && styles.roomSpeakerAvatarSpeaking,
                 seatFrameAppearance?.asset && { borderWidth: 0 },
               ]}
@@ -7472,8 +7498,8 @@ function Room({
               <LinearGradient
                 colors={
                   isHostSeat
-                    ? ["#8CC8FF", "#347CE0"]
-                    : ["#527DB8", "#203D66"]
+                    ? ["#60A5FA", "#2563EB"]
+                    : ["#476C9E", "#1E3557"]
                 }
                 style={[StyleSheet.absoluteFill, { borderRadius: seatedAvatarSize / 2 }]}
               />
@@ -7490,12 +7516,22 @@ function Room({
             </View>
           </ProfileFrame>
         </View>
-        <Text style={styles.roomSpeakerName} numberOfLines={1}>
-          {isHostSeat ? `1 · ${participant.name}` : participant.name}
-        </Text>
-        {!isHostSeat ? (
+        <View style={styles.roomSpeakerNameRow}>
+          <Text
+            style={[styles.roomSpeakerName, isHostSeat && styles.roomHostStageName]}
+            numberOfLines={1}
+          >
+            {participant.name}
+          </Text>
+          {participant.isSpeaking ? <AudioBars color="#60A5FA" compact /> : null}
+        </View>
+        {isHostSeat ? (
+          <Text style={styles.roomHostRoleLabel} numberOfLines={1}>
+            Ev sahibi
+          </Text>
+        ) : isCoupleSeat ? (
           <Text style={styles.roomSpeakerRole} numberOfLines={1}>
-            {participant.isSpeaking ? "Konuşuyor" : isCoupleSeat ? "Konuk" : `${seatIndex}`}
+            Konuk
           </Text>
         ) : null}
       </Pressable>
@@ -7548,32 +7584,26 @@ function Room({
         </>
       ) : null}
       {minimized ? null : (
-        <StatusBar barStyle="light-content" backgroundColor="#11131A" />
+        <StatusBar barStyle="light-content" backgroundColor={activeRoomTheme.colors[0]} />
       )}
       <KeyboardSafeView iosOffset={insets.top} style={{ flex: 1 }}>
-        {/* ── Üst bar: küçült · oda bilgisi · menü · çıkış ── */}
+        {/* ── Üst bar: çerçevesiz küçült · oda bilgisi · menü · çıkış ── */}
         <View style={styles.roomTopBar}>
           <Pressable
             onPress={onMinimize}
-            style={styles.roomTopBarBack}
+            hitSlop={6}
+            style={({ pressed }) => [styles.roomTopBarBack, pressed && { opacity: 0.65 }]}
             accessibilityLabel="Odayı küçült"
           >
-            <Ionicons name="chevron-down" size={22} color="#FFFFFF" />
+            <Ionicons name="chevron-down" size={21} color="#CBD5E1" />
           </Pressable>
           <View style={styles.roomHeaderRoom}>
             <View style={styles.roomTitleLine}>
               {roomDetails.passwordProtected ? (
-                <Ionicons name="lock-closed" size={13} color="#A9C9F4" />
+                <Ionicons name="lock-closed" size={13} color="#93C5FD" />
               ) : null}
               <Text style={styles.roomTopBarTitle} numberOfLines={1}>
                 {roomDetails.title}
-              </Text>
-            </View>
-            <View style={styles.roomHeaderSubRow}>
-              <Text style={styles.roomHeaderCaption} numberOfLines={1}>
-                {showClosedRoomState
-                  ? `${formatCategoryLabel(room.category)} · Kapalı`
-                  : `${formatCategoryLabel(room.category)} · ${Math.max(1, liveVoice.participantCount, activeRoomParticipants.length)} kişi${musicPlaying ? " · müzik" : ""}`}
               </Text>
               {!isHost && room.hostId ? (
                 <Pressable
@@ -7597,13 +7627,22 @@ function Room({
                 </Pressable>
               ) : null}
             </View>
+            <View style={styles.roomHeaderSubRow}>
+              {!showClosedRoomState ? <View style={styles.roomHeaderLiveDot} /> : null}
+              <Text style={styles.roomHeaderCaption} numberOfLines={1}>
+                {showClosedRoomState
+                  ? `${formatCategoryLabel(room.category)} · Kapalı`
+                  : `${formatCategoryLabel(room.category)} · ${Math.max(1, liveVoice.participantCount, activeRoomParticipants.length)} kişi${musicPlaying ? " · müzik" : ""}`}
+              </Text>
+            </View>
           </View>
           <Pressable
             onPress={handleOpenSettings}
-            style={styles.roomTopBarMore}
+            hitSlop={6}
+            style={({ pressed }) => [styles.roomTopBarMore, pressed && { opacity: 0.65 }]}
             accessibilityLabel="Oda seçenekleri"
           >
-            <Ionicons name="ellipsis-horizontal" size={20} color="#FFFFFF" />
+            <Ionicons name="ellipsis-horizontal" size={20} color="#CBD5E1" />
             {canModerate && micRequests.length ? (
               <View style={styles.roomTopBarBadge}>
                 <Text style={styles.roomTopBarBadgeText}>
@@ -7614,10 +7653,15 @@ function Room({
           </Pressable>
           <Pressable
             onPress={leaveRoom}
-            style={[styles.roomTopBarMore, styles.roomTopBarLeave]}
+            hitSlop={6}
+            style={({ pressed }) => [
+              styles.roomTopBarMore,
+              styles.roomTopBarLeave,
+              pressed && { opacity: 0.65 },
+            ]}
             accessibilityLabel="Odadan çık"
           >
-            <Ionicons name="power" size={18} color="#F3A9AC" />
+            <Ionicons name="power" size={18} color="#FDA4AF" />
           </Pressable>
         </View>
 
@@ -7663,7 +7707,7 @@ function Room({
                   accessibilityRole="button"
                   accessibilityLabel={`${focusedSpeaker.participant.name} konuşuyor, profili aç`}
                 >
-                  <AudioBars color="#4ADE80" compact />
+                  <AudioBars color="#60A5FA" compact />
                   <Text numberOfLines={1} style={styles.roomSpeakerFocusText}>
                     {focusedSpeaker.participant.name}
                     {focusedSpeaker.extraCount > 0 ? ` +${focusedSpeaker.extraCount}` : ""}
@@ -7717,12 +7761,6 @@ function Room({
             </View>
           ) : (
             <View style={styles.roomStage}>
-              <LinearGradient
-                colors={["rgba(47,128,237,0.16)", "rgba(82,104,174,0.035)", "rgba(47,128,237,0)"]}
-                locations={[0, 0.48, 1]}
-                style={styles.roomStageGlow}
-                pointerEvents="none"
-              />
               <View style={styles.roomHostSeatRow}>
                 {renderStageSeat(hostStageParticipant, 0, "host")}
                 {roomDetails.coupleSeat
@@ -7806,6 +7844,13 @@ function Room({
         ) : null}
 
         <View style={styles.roomChatArea}>
+          {!backgroundUrl ? (
+            <LinearGradient
+              colors={[activeRoomTheme.colors[1], `${activeRoomTheme.colors[1]}00`]}
+              style={styles.roomChatTopFade}
+              pointerEvents="none"
+            />
+          ) : null}
           <RoomGiftStreamBanner
             item={minimized ? null : giftStreamItem}
             onExpire={handleExpireGiftStream}
@@ -7905,7 +7950,7 @@ function Room({
           onDismiss={handleCloseReactionTray}
         />
 
-        {/* Alt bar: mesaj yazma alanı + emoji + ses + mikrofon + hediye + 4 kareli araçlar */}
+        {/* Alt bar: sade mesaj kapsülü (emoji + ↑) + ses + mikrofon + mat Sora mavisi hediye + araçlar */}
         <View
           style={[
             styles.roomBottomBar,
@@ -7915,33 +7960,11 @@ function Room({
           <RoomComposer
             onSend={sendMessage}
             sending={messageSending}
-            barHeight={barGiftSize}
+            barHeight={barBtnSize}
+            reactionTrayOpen={reactionTrayOpen}
+            onToggleReactionTray={handleToggleReactionTray}
+            onQuickHeart={() => handleSendQuickReaction("heart")}
           />
-          <Pressable
-            hitSlop={4}
-            style={({ pressed }) => [
-              styles.roomBarButton,
-              {
-                width: barBtnSize,
-                height: barBtnSize,
-                borderRadius: barBtnSize / 2,
-              },
-              reactionTrayOpen && styles.roomBarButtonActive,
-              pressed && { transform: [{ scale: 0.92 }] },
-            ]}
-            onPress={handleToggleReactionTray}
-            onLongPress={() => handleSendQuickReaction("heart")}
-            delayLongPress={220}
-            accessibilityRole="button"
-            accessibilityLabel="Hızlı emoji tepkileri"
-            accessibilityState={{ selected: reactionTrayOpen }}
-          >
-            <Ionicons
-              name={reactionTrayOpen ? "close" : "happy-outline"}
-              size={20}
-              color={reactionTrayOpen ? "#FFFFFF" : "#E2EEFF"}
-            />
-          </Pressable>
           <Pressable
             hitSlop={4}
             style={({ pressed }) => [
@@ -7961,8 +7984,8 @@ function Room({
           >
             <Ionicons
               name={speakerOn ? "volume-high-outline" : "volume-mute-outline"}
-              size={20}
-              color={speakerOn ? "#E2EEFF" : "#FCA5A5"}
+              size={19}
+              color={speakerOn ? "#CBD5E1" : "#FCA5A5"}
             />
           </Pressable>
           <Pressable
@@ -7985,8 +8008,8 @@ function Room({
           >
             <Ionicons
               name={micButtonIcon}
-              size={19}
-              color={micOn ? "#4ADE80" : iAmSeated ? "#E2EEFF" : "#9BB2D1"}
+              size={18}
+              color={micOn ? "#6EE7B7" : iAmSeated ? "#CBD5E1" : "#8DA4C2"}
             />
           </Pressable>
           <Pressable
@@ -7998,7 +8021,6 @@ function Room({
                 width: barGiftSize,
                 height: barGiftSize,
                 borderRadius: barGiftSize / 2,
-                overflow: "hidden",
               },
               pressed && { transform: [{ scale: 0.92 }], opacity: 0.9 },
             ]}
@@ -8006,13 +8028,7 @@ function Room({
             accessibilityRole="button"
             accessibilityLabel="Hediye gönder"
           >
-            <LinearGradient
-              colors={["#52A5FF", "#7C3AED", "#EC4899"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[StyleSheet.absoluteFill, { borderRadius: barGiftSize / 2 }]}
-            />
-            <Ionicons name="gift" size={20} color="#FFFFFF" />
+            <Ionicons name="gift-outline" size={19} color="#FFFFFF" />
           </Pressable>
           <Pressable
             hitSlop={4}
@@ -8032,8 +8048,8 @@ function Room({
           >
             <Ionicons
               name="grid-outline"
-              size={19}
-              color={musicPlaying || toolsOpen ? "#93C5FD" : "#E2EEFF"}
+              size={18}
+              color={musicPlaying || toolsOpen ? "#93C5FD" : "#CBD5E1"}
             />
             {musicPlaying || (canModerate && micRequests.length > 0) ? (
               <View style={styles.roomBarToolDot} />
@@ -15135,18 +15151,36 @@ const styles = StyleSheet.create({
   },
   roomHostStageSlot: {
     width: "100%",
-    minHeight: 106,
+    minHeight: 96,
     paddingTop: 0,
     paddingBottom: 0,
   },
   roomHostStageAvatar: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    borderWidth: 3,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 0,
   },
   roomHostStageInitial: {
-    fontSize: 28,
+    fontSize: 22,
+  },
+  roomHostStageName: {
+    color: "#F1F5F9",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  roomHostRoleLabel: {
+    color: "#7C92AF",
+    fontSize: 10.5,
+    fontWeight: "500",
+    marginTop: -1,
+  },
+  roomSpeakerNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    maxWidth: "94%",
   },
   roomConnectionNotice: {
     flexDirection: "row",
@@ -15261,9 +15295,15 @@ const styles = StyleSheet.create({
     marginHorizontal: 2,
   },
   roomHeaderCaption: {
-    color: "#A9BEDB",
-    fontSize: 11,
+    color: "#7F93AE",
+    fontSize: 11.5,
     fontWeight: "500",
+  },
+  roomHeaderLiveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#34D399",
   },
   roomRoomMeta: { flex: 1, minWidth: 0 },
   roomInlineTitle: {
@@ -15305,24 +15345,15 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   roomSpeakerRole: {
-    color: "#A9C9F4",
-    fontSize: 9,
-    fontWeight: "700",
-    overflow: "hidden",
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 8,
-    backgroundColor: "rgba(47,128,237,0.13)",
+    color: "#7C92AF",
+    fontSize: 10,
+    fontWeight: "500",
+    marginTop: -1,
   },
   roomEmptySeatLabel: {
-    color: "#D3E3FA",
+    color: "rgba(148,163,184,0.52)",
     fontSize: 11,
-    fontWeight: "800",
-    overflow: "hidden",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    backgroundColor: "rgba(47,128,237,0.18)",
+    fontWeight: "500",
   },
   roomSpeakerSlotHost: {
     backgroundColor: "rgba(47,128,237,0.045)",
@@ -15357,38 +15388,33 @@ const styles = StyleSheet.create({
   },
   roomScreen: {
     flex: 1,
-    backgroundColor: "#0B0F17",
+    backgroundColor: "#09101C",
   },
   roomTopBar: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
     paddingHorizontal: 14,
     paddingTop: 8,
-    paddingBottom: 8,
+    paddingBottom: 4,
   },
   roomTopBarBack: {
-    width: 42,
-    height: 42,
-    borderRadius: 15,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "transparent",
   },
   roomTopBarMore: {
-    width: 42,
-    height: 42,
-    borderRadius: 15,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "transparent",
   },
   roomTopBarCategory: {
-
     color: "#76AFFF",
     fontSize: 9,
     fontWeight: "900",
@@ -15396,10 +15422,10 @@ const styles = StyleSheet.create({
   },
   roomTopBarTitle: {
     flexShrink: 1,
-    color: "#F3F7FF",
-    fontSize: 15,
-    fontWeight: "800",
-    letterSpacing: 0,
+    color: "#F8FAFC",
+    fontSize: 16.5,
+    fontWeight: "700",
+    letterSpacing: -0.25,
   },
   roomLiveBand: {
     flexDirection: "row",
@@ -15610,74 +15636,72 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "center",
     columnGap: 0,
-    rowGap: 4,
+    rowGap: 10,
     width: "100%",
   },
   roomSpeakerSlot: {
     width: "25%",
-    minHeight: 84,
+    minHeight: 82,
     alignItems: "center",
     paddingVertical: 2,
-    gap: 4,
+    gap: 3,
   },
   roomSpeakerAvatar: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "rgba(118,175,255,0.42)",
+    borderWidth: 0,
   },
   roomSpeakerAvatarActive: { borderColor: COLORS.primary },
   roomSpeakerAvatarSpeaking: {
-    borderColor: "#38BDF8",
-    borderWidth: 2.5,
+    borderColor: "#60A5FA",
+    borderWidth: 2,
   },
-  roomSpeakerInitial: { color: "#FFFFFF", fontSize: 20, fontWeight: "900" },
+  roomSpeakerInitial: { color: "#FFFFFF", fontSize: 19, fontWeight: "700" },
   roomMicOnBadge: {
     position: "absolute",
     bottom: -2,
     right: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 19,
+    height: 19,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: COLORS.primary,
+    backgroundColor: "#121D30",
+    borderWidth: 2,
+    borderColor: "#0C1423",
   },
   roomMicOffBadge: {
     position: "absolute",
     bottom: -2,
     right: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 19,
+    height: 19,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#1D2E43",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "#121D30",
+    borderWidth: 2,
+    borderColor: "#0C1423",
   },
   roomSpeakerName: {
-    color: "#F8FAFC",
-    fontSize: 12,
-    fontWeight: "800",
-    maxWidth: "100%",
-    textShadowColor: "rgba(4,9,20,0.65)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    color: "#E2E8F0",
+    fontSize: 11.5,
+    fontWeight: "500",
+    flexShrink: 1,
   },
 
   roomEmptySeat: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(20,38,70,0.72)",
-    borderWidth: 1.5,
-    borderColor: "rgba(147,197,253,0.28)",
+    backgroundColor: "rgba(255,255,255,0.036)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
   },
   roomHandBtn: {
     flexDirection: "row",
@@ -16039,7 +16063,7 @@ const styles = StyleSheet.create({
     color: "#F3F5F1",
     fontSize: 13,
   },
-  messageUser: { color: "#FFFFFF", fontWeight: "900" },
+  messageUser: { color: "#F1F5F9", fontWeight: "600" },
 
   /* ══ WePlay / Hazan tarzı profil ekranı ══════════════════════════ */
   profileHomeHeaderRow: {
@@ -16896,33 +16920,30 @@ const styles = StyleSheet.create({
   },
 
   /* ══ Oda: bütünleşik sohbet, alt bar ve oda sahibi kontrolleri ═════ */
-  roomTitleLine: { flexDirection: "row", alignItems: "center", gap: 6 },
+  roomTitleLine: { flexDirection: "row", alignItems: "center", gap: 7 },
   roomHeaderSubRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
+    gap: 6,
     marginTop: 2,
   },
   roomHeaderFollowPill: {
     flexShrink: 0,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
     borderRadius: 999,
-    backgroundColor: COLORS.primary,
-    borderWidth: 1,
-    borderColor: "rgba(156,198,255,0.45)",
+    backgroundColor: "rgba(255,255,255,0.085)",
   },
   roomHeaderFollowPillActive: {
-    backgroundColor: "rgba(118,175,255,0.16)",
-    borderColor: "rgba(118,175,255,0.38)",
+    backgroundColor: "rgba(96,165,250,0.15)",
   },
   roomHeaderFollowText: {
-    color: "#FFFFFF",
+    color: "#E2E8F0",
     fontSize: 11,
-    fontWeight: "800",
+    fontWeight: "600",
   },
   roomHeaderFollowTextActive: {
-    color: "#9CC6FF",
+    color: "#93C5FD",
   },
   selfSheetProfileCard: {
     flexDirection: "row",
@@ -16968,22 +16989,21 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   roomTopBarLeave: {
-    backgroundColor: "rgba(227,102,108,0.12)",
-    borderColor: "rgba(227,102,108,0.2)",
+    backgroundColor: "transparent",
   },
   roomTopBarBadge: {
     position: "absolute",
-    top: -4,
-    right: -4,
-    minWidth: 17,
-    height: 17,
-    borderRadius: 9,
+    top: 1,
+    right: 1,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
     paddingHorizontal: 4,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: COLORS.danger,
-    borderWidth: 2,
-    borderColor: "#0B0F17",
+    borderWidth: 1.5,
+    borderColor: "#0E1729",
   },
   roomTopBarBadgeText: { color: "#FFFFFF", fontSize: 9, fontWeight: "900" },
   roomHostSeatRow: {
@@ -16992,7 +17012,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     width: "100%",
     gap: 16,
-    marginBottom: 4,
+    marginBottom: 12,
   },
   roomHostPairSlot: { width: "34%", minHeight: 88, alignItems: "center", justifyContent: "flex-start" },
   roomCouplePairSlot: { width: "34%", minHeight: 88, alignItems: "center", justifyContent: "flex-start" },
@@ -17024,14 +17044,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
+    paddingTop: 2,
     paddingBottom: 2,
     gap: 8,
   },
   roomSubHeaderLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 7,
     paddingRight: 4,
   },
   roomSpeakerFocusPill: {
@@ -17039,18 +17060,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 5,
     paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: "rgba(22,163,74,0.22)",
-    borderWidth: 1,
-    borderColor: "rgba(74,222,128,0.45)",
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.055)",
     maxWidth: 152,
     flexShrink: 1,
   },
   roomSpeakerFocusText: {
-    color: "#DCFCE7",
+    color: "#CBD5E1",
     fontSize: 11,
-    fontWeight: "800",
+    fontWeight: "600",
     flexShrink: 1,
   },
   roomUnreadJumpPill: {
@@ -17081,6 +17100,14 @@ const styles = StyleSheet.create({
     flex: 1,
     position: "relative",
   },
+  roomChatTopFade: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 22,
+    zIndex: 4,
+  },
   roomEventPosterAnchor: {
     position: "absolute",
     top: 6,
@@ -17094,46 +17121,55 @@ const styles = StyleSheet.create({
     zIndex: 28,
     elevation: 8,
   },
-  roomSpeakerGridCompact: { rowGap: 4 },
-  roomSpeakerSlotCompact: { minHeight: 76, paddingVertical: 2, gap: 4 },
+  roomSpeakerGridCompact: { rowGap: 6 },
+  roomSpeakerSlotCompact: { minHeight: 74, paddingVertical: 2, gap: 3 },
   roomAdminBadge: { backgroundColor: "#9CD3FF" },
   roomChatFlow: {
     paddingHorizontal: 8,
-    paddingTop: 2,
+    paddingTop: 8,
     paddingBottom: 6,
   },
   roomChatStatus: {
-    color: "#8FA6C4",
-    fontSize: 10,
-    fontWeight: "700",
+    color: "#7E95B3",
+    fontSize: 10.5,
+    fontWeight: "600",
     marginBottom: 6,
   },
-  messageList: { gap: 7, paddingBottom: 4 },
-  messageRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  messageList: { gap: 9, paddingBottom: 4 },
+  messageRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   messageBubble: {
     flexDirection: "row",
     alignItems: "flex-start",
-    maxWidth: "88%",
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    borderRadius: 15,
-    backgroundColor: "rgba(10,18,34,0.58)",
-    borderWidth: 1,
-    borderColor: "rgba(148,184,238,0.14)",
+    flexShrink: 1,
+    maxWidth: "90%",
+    paddingHorizontal: 0,
+    paddingVertical: 2,
+    borderRadius: 12,
+    backgroundColor: "transparent",
+  },
+  messageBubblePrestige: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 13,
   },
   messageBubbleSystem: {
-    backgroundColor: "rgba(47,128,237,0.16)",
-    borderColor: "rgba(147,197,253,0.18)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
   },
   messageBubbleAnnouncement: {
-    backgroundColor: "rgba(37,99,235,0.22)",
+    backgroundColor: "rgba(59,130,246,0.14)",
     borderWidth: 1,
-    borderColor: "rgba(147,197,253,0.34)",
+    borderColor: "rgba(147,197,253,0.22)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
-  messageAnnouncementIcon: { marginTop: 3, marginRight: 6 },
-  messageText: { flexShrink: 1, color: "#EAF1FA", fontSize: 13.5, lineHeight: 19.5 },
-  systemMessage: { color: "#B8D0EC", fontStyle: "normal", fontSize: 12.5, lineHeight: 18 },
-  announcementMessage: { color: "#F1F7FF", fontWeight: "800" },
+  messageAnnouncementIcon: { marginTop: 2, marginRight: 6 },
+  messageText: { flexShrink: 1, color: "#CBD5E1", fontSize: 13, lineHeight: 18.5 },
+  systemMessage: { color: "#88A0BD", fontStyle: "normal", fontSize: 12, lineHeight: 17 },
+  announcementMessage: { color: "#E2E8F0", fontWeight: "700" },
   messageReportButton: {
     width: 24,
     height: 24,
@@ -17145,36 +17181,44 @@ const styles = StyleSheet.create({
   roomBottomBar: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingTop: 8,
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingTop: 6,
     paddingBottom: 10,
-    backgroundColor: "rgba(9,15,28,0.96)",
-    borderTopWidth: 1,
-    borderColor: "rgba(147,197,253,0.12)",
+    backgroundColor: "transparent",
   },
   roomInputPill: {
     flex: 1,
     minWidth: 96,
-    height: 42,
+    height: 40,
     flexDirection: "row",
     alignItems: "center",
-    paddingLeft: 13,
+    paddingLeft: 14,
     paddingRight: 5,
-    borderRadius: 21,
-    backgroundColor: "rgba(255,255,255,0.09)",
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.065)",
     borderWidth: 1,
-    borderColor: "rgba(186,214,255,0.16)",
+    borderColor: "rgba(255,255,255,0.08)",
   },
   roomInputField: {
     flex: 1,
     minWidth: 0,
-    height: 42,
+    height: 40,
     paddingVertical: 0,
     color: "#F8FAFC",
     fontSize: 13,
     textAlignVertical: "center",
     includeFontPadding: false,
+  },
+  roomInputEmojiBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  roomInputEmojiBtnActive: {
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
   roomInputSend: {
     width: 30,
@@ -17182,7 +17226,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: COLORS.primary,
+    backgroundColor: "#3B82F6",
   },
   roomBarButton: {
     width: 40,
@@ -17190,37 +17234,33 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.09)",
-    borderWidth: 1,
-    borderColor: "rgba(186,214,255,0.16)",
+    backgroundColor: "rgba(255,255,255,0.065)",
     position: "relative",
   },
   roomBarButtonActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: "rgba(147,197,253,0.75)",
+    backgroundColor: "#3B82F6",
   },
   roomBarButtonMicLive: {
-    backgroundColor: "rgba(22,163,74,0.22)",
-    borderColor: "rgba(74,222,128,0.62)",
+    backgroundColor: "rgba(52,211,153,0.13)",
+    borderWidth: 1,
+    borderColor: "rgba(52,211,153,0.28)",
   },
   roomBarButtonPending: {
-    backgroundColor: "rgba(47,128,237,0.22)",
-    borderColor: "rgba(118,175,255,0.45)",
+    backgroundColor: "rgba(59,130,246,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(147,197,253,0.34)",
   },
   roomBarButtonMuted: {
-    backgroundColor: "rgba(239,68,68,0.15)",
-    borderColor: "rgba(252,165,165,0.34)",
+    backgroundColor: "rgba(248,113,113,0.13)",
   },
   roomBarButtonOn: {
-    backgroundColor: "rgba(47,128,237,0.22)",
-    borderColor: "rgba(147,197,253,0.48)",
+    backgroundColor: "rgba(59,130,246,0.18)",
   },
   roomBarGift: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "#6366F1",
-    borderColor: "rgba(255,255,255,0.34)",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#3B82F6",
   },
   roomBarToolDot: {
     position: "absolute",
@@ -17650,12 +17690,16 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   roomMessageAvatarPress: {
-    marginTop: 2,
-    marginRight: 7,
+    marginTop: 1,
   },
   messageBubbleGift: {
-    borderColor: "rgba(250,204,21,0.36)",
-    backgroundColor: "rgba(28,38,68,0.82)",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(226,190,121,0.24)",
+    backgroundColor: "rgba(255,255,255,0.05)",
   },
   emptyResetButton: {
     marginTop: 14,

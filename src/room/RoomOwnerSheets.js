@@ -21,7 +21,7 @@ import { KeyboardSafeView } from "../ui/useKeyboardInset";
 import { COUPLE_SEAT_INDEX, DEFAULT_ROOM_ANNOUNCEMENT, ROOM_BAN_DURATIONS } from "./roomApi";
 
 export const ROOM_THEMES = [
-  { id: "midnight", name: "Gece Safiri", colors: ["#142746", "#101A2B", "#0A101B"], accent: "#3B82F6" },
+  { id: "midnight", name: "Gece Safiri", colors: ["#101A2D", "#0C1423", "#09101C"], accent: "#3B82F6" },
   { id: "royal_gold", name: "Altın Gece", colors: ["#2C2110", "#1B150E", "#0C0A08"], accent: "#F59E0B" },
   { id: "nebula", name: "Mor Nebula", colors: ["#2A174D", "#181030", "#0B0818"], accent: "#A855F7" },
   { id: "ruby", name: "Yakut Sahne", colors: ["#3D1426", "#220E19", "#0E070C"], accent: "#F43F5E" },

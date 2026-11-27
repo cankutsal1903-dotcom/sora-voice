@@ -56,11 +56,11 @@ export const RoomTrophyPill = memo(function RoomTrophyPill({ totalCoins = 0, onP
       accessibilityRole="button"
       accessibilityLabel="Oda hediye sıralamasını aç"
     >
-      <MaterialCommunityIcons name="trophy" size={13} color="#FDE047" />
+      <MaterialCommunityIcons name="trophy" size={12} color="#E2BE79" />
       <Text style={styles.trophyText} numberOfLines={1}>
         {fmtShort(totalCoins)}
       </Text>
-      <Ionicons name="chevron-forward" size={11} color="rgba(254,240,138,0.8)" />
+      <Ionicons name="chevron-forward" size={11} color="rgba(226,232,240,0.45)" />
     </Pressable>
   );
 });
@@ -1153,15 +1153,13 @@ const styles = StyleSheet.create({
   trophyPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 5,
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 12,
-    backgroundColor: "rgba(16,28,48,0.78)",
-    borderWidth: 1,
-    borderColor: "rgba(251,191,36,0.34)",
+    backgroundColor: "rgba(255,255,255,0.055)",
   },
-  trophyText: { color: "#FEF08A", fontSize: 11, fontWeight: "900", fontVariant: ["tabular-nums"] },
+  trophyText: { color: "#E2E8F0", fontSize: 11, fontWeight: "700", fontVariant: ["tabular-nums"] },
 
   // Leaderboard rows
   emptyBox: { alignItems: "center", paddingVertical: 28, gap: 6 },
