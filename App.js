@@ -1499,6 +1499,7 @@ const Profile = memo(function Profile({
   onBalanceUpdate,
   onSyncUserLevel,
   onOpenUserProfile,
+  onCreateRoom = null,
 }) {
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [missionsOpen, setMissionsOpen] = useState(false);
@@ -1506,10 +1507,9 @@ const Profile = memo(function Profile({
   const [levelSheetOpen, setLevelSheetOpen] = useState(false);
   const [syncingLevel, setSyncingLevel] = useState(false);
   const [recentActivity, setRecentActivity] = useState([]);
-  const [activityStreak, setActivityStreak] = useState(1);
   const [followedCount, setFollowedCount] = useState(0);
   const [followedProfiles, setFollowedProfiles] = useState([]);
-  const [profileTab, setProfileTab] = useState("rooms");
+  const [profileTab, setProfileTab] = useState("badges");
   const [profileDetailsOpen, setProfileDetailsOpen] = useState(false);
   const openSafetyCenter = useCallback(() => setSafetyOpen(true), []);
   const openProfileDetails = useCallback(
@@ -1526,59 +1526,6 @@ const Profile = memo(function Profile({
     }
   }, [onSyncUserLevel, syncingLevel]);
   const openDailyMissions = useCallback(() => setMissionsOpen(true), []);
-  const actions = useMemo(
-    () => [
-      {
-        key: "missions",
-        icon: "flame",
-        iconColor: "#EA580C",
-        iconBg: "rgba(234,88,12,0.12)",
-        title: "Görevler & 7 Günlük Seri",
-        badge: missionClaimable > 0 ? `${missionClaimable} ÖDÜL` : null,
-        badgeColor: "#EA580C",
-        badgeBg: "rgba(234,88,12,0.12)",
-        action: openDailyMissions,
-      },
-      {
-        key: "daily",
-        icon: dailyRewardClaimed ? "checkmark-circle" : "gift",
-        iconColor: dailyRewardClaimed ? COLORS.success : COLORS.warning,
-        iconBg: dailyRewardClaimed ? COLORS.successSoft : COLORS.warningSoft,
-        title: dailyRewardClaimed ? "Günlük ödül alındı" : "Günlük ödülünü al",
-        badge: dailyRewardClaimed ? null : `+${formatCredits(DAILY_REWARD_AMOUNT)}`,
-        badgeColor: "#B45309",
-        badgeBg: COLORS.goldSoft,
-        action: dailyRewardClaimed ? onOpenWallet : onClaimDailyReward,
-      },
-      {
-        key: "safety",
-        icon: "shield-checkmark",
-        iconColor: COLORS.violet,
-        iconBg: COLORS.violetSoft,
-        title: "Güvenlik merkezi",
-        badge: null,
-        action: openSafetyCenter,
-      },
-      {
-        key: "settings",
-        icon: "settings",
-        iconColor: COLORS.primary,
-        iconBg: COLORS.primarySoft,
-        title: "Ayarlar",
-        badge: null,
-        action: onOpenSettings,
-      },
-    ],
-    [
-      dailyRewardClaimed,
-      missionClaimable,
-      onClaimDailyReward,
-      onOpenSettings,
-      onOpenWallet,
-      openDailyMissions,
-      openSafetyCenter,
-    ],
-  );
   useEffect(() => {
     AsyncStorage.getItem(ROOM_HISTORY_KEY)
       .then((savedHistory) => {
@@ -1594,7 +1541,7 @@ const Profile = memo(function Profile({
                       other.title === item.title,
                   ) === index,
               )
-              .slice(0, 3),
+              .slice(0, 6),
           );
       })
       .catch(() => undefined);
@@ -1638,35 +1585,6 @@ const Profile = memo(function Profile({
       active = false;
     };
   }, [followedUserIds.length, userId]);
-  useEffect(() => {
-    const updateStreak = async () => {
-      try {
-        const today = new Date();
-        const todayKey = today.toDateString();
-        const savedStreak = JSON.parse(
-          (await AsyncStorage.getItem(ACTIVITY_STREAK_KEY)) || "{}",
-        );
-        if (savedStreak.lastDate === todayKey) {
-          setActivityStreak(savedStreak.count || 1);
-          return;
-        }
-        const previousDate = new Date(today);
-        previousDate.setDate(today.getDate() - 1);
-        const nextCount =
-          savedStreak.lastDate === previousDate.toDateString()
-            ? (savedStreak.count || 1) + 1
-            : 1;
-        setActivityStreak(nextCount);
-        await AsyncStorage.setItem(
-          ACTIVITY_STREAK_KEY,
-          JSON.stringify({ lastDate: todayKey, count: nextCount }),
-        );
-      } catch {
-        setActivityStreak(1);
-      }
-    };
-    updateStreak();
-  }, []);
   const shareProfile = async () => {
     try {
       await Share.share({
@@ -1677,6 +1595,7 @@ const Profile = memo(function Profile({
       return;
     }
   };
+  const visitedRoomCount = Math.max(recentActivity.length, Number(favoriteCount) || 0);
   const badges = useMemo(
     () => [
       {
@@ -1684,7 +1603,6 @@ const Profile = memo(function Profile({
         icon: "headset",
         title: "İlk dinleme",
         hint: "Bir odaya katıl",
-        gradient: ["#5AA2FF", "#2F6FE0"],
         tint: "#2F80ED",
         unlocked: recentActivity.length > 0,
       },
@@ -1693,37 +1611,68 @@ const Profile = memo(function Profile({
         icon: "mic",
         title: "Ev sahibi",
         hint: "İlk odanı aç",
-        gradient: ["#FFC861", "#F08A24"],
         tint: "#F08A24",
         unlocked: hostedRoomCount > 0,
       },
       {
         id: "curator",
-        icon: "heart",
+        icon: "compass",
         title: "Kaşif",
-        hint: `${Math.min(favoriteCount, 3)}/3 favori`,
-        gradient: ["#FF7AA8", "#D9417A"],
+        hint: `${Math.min(visitedRoomCount, 3)}/3 oda`,
         tint: "#D9417A",
-        unlocked: favoriteCount >= 3,
+        unlocked: visitedRoomCount >= 3,
       },
       {
         id: "family",
         icon: "shield-checkmark",
         title: family ? `Aile Sv. ${family.level}` : "Aile üyesi",
         hint: family ? family.name : "Bir aileye katıl",
-        gradient: ["#2F80ED", "#1D4E89"],
         tint: "#2F80ED",
         unlocked: Boolean(family),
       },
     ],
-    [recentActivity.length, hostedRoomCount, favoriteCount, family],
+    [recentActivity.length, hostedRoomCount, visitedRoomCount, family],
   );
   const level = Math.max(1, Math.floor(Number(profile.userLevel) || 1));
   const userXp = Math.max(0, Math.floor(Number(profile.userXp) || 0));
   const badgeTier = getBadgeTierConfigForLevel(level);
+  const wealthInfo = useMemo(() => getWealthTier(giftSpent || 0), [giftSpent]);
+  const wealthPct = Math.min(100, Math.max(0, Math.round((wealthInfo.progress || 0) * 100)));
   const homeFrameAppearance = PROFILE_ITEM_APPEARANCE[profile.activeFrameId];
-  const homeThemeAppearance = PROFILE_ITEM_APPEARANCE[profile.activeProfileThemeId];
   const [wealthLadderOpen, setWealthLadderOpen] = useState(false);
+  const profileTabItems = useMemo(
+    () => [
+      {
+        id: "badges",
+        label: "Rozetler",
+        icon: "ribbon-outline",
+        fg: "#7C3AED",
+        bg: "#F1EDFE",
+      },
+      {
+        id: "rooms",
+        label: myRooms.length > 0 ? `Odalarım (${myRooms.length})` : "Odalarım",
+        icon: "mic-outline",
+        fg: "#2F80ED",
+        bg: "#EAF2FF",
+      },
+      {
+        id: "following",
+        label: followedCount > 0 ? `Takip (${followedCount})` : "Takip",
+        icon: "heart-outline",
+        fg: "#E11D48",
+        bg: "#FFEBF0",
+      },
+      {
+        id: "history",
+        label: "Geçmiş",
+        icon: "time-outline",
+        fg: "#D97706",
+        bg: "#FEF3DF",
+      },
+    ],
+    [followedCount, myRooms.length],
+  );
   return (
     <>
       <WealthTierLadderSheet
@@ -1738,31 +1687,100 @@ const Profile = memo(function Profile({
         maxToRenderPerBatch={15}
         updateCellsBatchingPeriod={50}
       >
+        <View style={styles.topBar}>
+          <View style={styles.discoverHeadingCopy}>
+            <Text numberOfLines={1} style={styles.discoverHeading}>Profil</Text>
+          </View>
+          <View style={styles.topActions}>
+            <View style={styles.discoverUtilityCapsule}>
+              <Pressable
+                onPress={openSafetyCenter}
+                hitSlop={4}
+                accessibilityRole="button"
+                accessibilityLabel="Güvenlik merkezi"
+                style={({ pressed }) => [
+                  styles.discoverCapsuleBtn,
+                  pressed && { opacity: 0.72, transform: [{ scale: 0.94 }] },
+                ]}
+              >
+                <Ionicons name="shield-checkmark-outline" size={19} color="#1E293B" />
+              </Pressable>
+              <View style={styles.discoverCapsuleDivider} />
+              <Pressable
+                onPress={onOpenSettings}
+                hitSlop={4}
+                accessibilityRole="button"
+                accessibilityLabel="Ayarlar"
+                style={({ pressed }) => [
+                  styles.discoverCapsuleBtn,
+                  pressed && { opacity: 0.72, transform: [{ scale: 0.94 }] },
+                ]}
+              >
+                <Ionicons name="settings-outline" size={19} color="#1E293B" />
+              </Pressable>
+            </View>
+            <Pressable
+              onPress={onEdit}
+              accessibilityRole="button"
+              accessibilityLabel="Profilini düzenle"
+              style={({ pressed }) => [
+                styles.discoverCreateButton,
+                pressed && { transform: [{ scale: 0.93 }], opacity: 0.9 },
+              ]}
+            >
+              <LinearGradient
+                colors={["#4FA3FF", "#2F80ED", "#1A5BC4"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <LinearGradient
+                pointerEvents="none"
+                colors={["rgba(255,255,255,0.28)", "rgba(255,255,255,0)"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+                style={styles.discoverCreateGloss}
+              />
+              <Ionicons name="pencil" size={18} color={COLORS.primaryInk} />
+            </Pressable>
+          </View>
+        </View>
+
         <Reveal distance={10}>
-          <View style={styles.profileHomeHeaderRow}>
+          <LinearGradient
+            colors={["#0D1B34", "#172F5B", "#0B1528"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.pfShowcaseCard}
+          >
+            <Image
+              source={require("./assets/events/podium-glow.webp")}
+              pointerEvents="none"
+              style={[
+                styles.pfShowcaseGlow,
+                { tintColor: homeFrameAppearance ? "#FB923C" : "#60A5FA" },
+              ]}
+              resizeMode="contain"
+            />
+            <ShimmerSweep
+              width={360}
+              bandWidth={84}
+              color="rgba(255,255,255,0.12)"
+              borderRadius={24}
+              delay={3200}
+            />
             <Pressable
               onPress={openProfileDetails}
               accessibilityRole="button"
               accessibilityLabel="Profil ayrıntılarını aç"
               style={({ pressed }) => [
-                styles.profileHomeIdentity,
-                homeThemeAppearance?.background
-                  ? { backgroundColor: homeThemeAppearance.background }
-                  : null,
-                pressed && styles.profileHomePressed,
+                styles.pfShowcaseTop,
+                pressed && { opacity: 0.9 },
               ]}
             >
-              <LinearGradient
-                pointerEvents="none"
-                colors={["rgba(47,128,237,0.06)", "rgba(255,255,255,0)", "rgba(96,165,250,0.07)"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.profileHomeIdentityTint}
-              />
-              <ShimmerSweep width={360} bandWidth={80} color="rgba(255,255,255,0.55)" borderRadius={24} delay={2600} />
               <ProfileFrame
                 appearance={homeFrameAppearance}
-                size={60}
+                size={62}
                 padMode="tight"
                 style={styles.profileHomeAvatarWrap}
               >
@@ -1770,365 +1788,542 @@ const Profile = memo(function Profile({
                   label={(profile.name || "S").charAt(0).toUpperCase()}
                   color={profile.color}
                   uri={profile.avatarUrl}
-                  size={60}
+                  size={62}
                   bordered={!homeFrameAppearance}
                   circle
                 />
               </ProfileFrame>
-              <View style={styles.profileHomeCopy}>
-                <Text style={styles.profileHomeName} numberOfLines={1}>
-                  {profile.name}
+              <View style={styles.pfShowcaseCopy}>
+                <View style={styles.pfShowcaseNameRow}>
+                  <Text style={styles.pfShowcaseName} numberOfLines={1}>
+                    {profile.name}
+                  </Text>
+                  <Pressable
+                    onPress={shareProfile}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Profili paylaş"
+                    style={({ pressed }) => [
+                      styles.pfShowcaseShareBtn,
+                      pressed && { opacity: 0.72, transform: [{ scale: 0.92 }] },
+                    ]}
+                  >
+                    <Ionicons name="share-outline" size={15} color="#CBD5E1" />
+                  </Pressable>
+                </View>
+                <Text style={styles.pfShowcaseHandle} numberOfLines={1}>
+                  @{profile.handle}
+                  {profile.publicId ? ` · ID ${profile.publicId}` : ""}
                 </Text>
-                <View style={styles.profileHomeBadgesRow}>
-                  <SoraLevelCrest level={level} size={21} />
-                  <View style={styles.profileLevelInlinePill}>
-                    <Text style={styles.profileLevelInlineText}>Sv. {level}</Text>
-                  </View>
+                <View style={styles.pfShowcaseBadgeRow}>
+                  <Pressable
+                    onPress={() => setLevelSheetOpen(true)}
+                    style={({ pressed }) => [
+                      styles.pfShowcaseLevelPill,
+                      pressed && { opacity: 0.8 },
+                    ]}
+                  >
+                    <SoraLevelCrest level={level} size={15} />
+                    <Text style={styles.pfShowcaseLevelText}>Sv. {level}</Text>
+                  </Pressable>
                   {giftSpent > 0 ? (
-                    <SoraWealthBadge spent={giftSpent} size="sm" showName />
+                    <Pressable
+                      onPress={() => setWealthLadderOpen(true)}
+                      style={({ pressed }) => [
+                        styles.pfShowcaseGoldPill,
+                        pressed && { opacity: 0.8 },
+                      ]}
+                    >
+                      <Text style={styles.pfShowcaseGoldText}>
+                        {wealthInfo.tier.level} · {wealthInfo.tier.name}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  {family ? (
+                    <View style={styles.pfShowcaseFamilyPill}>
+                      <Text style={styles.pfShowcaseFamilyText} numberOfLines={1}>
+                        {family.name}
+                      </Text>
+                    </View>
                   ) : null}
                 </View>
-                <Text style={styles.profileHomeHandle} numberOfLines={1}>
-                  @{profile.handle}
-                  {profile.publicId ? ` · ID: ${profile.publicId}` : ""}
-                </Text>
-                <Text style={styles.profileHomeBio} numberOfLines={1}>
-                  {profile.bio || "Sora ses dünyasındaki profilin"}
-                </Text>
+                {profile.bio ? (
+                  <Text style={styles.pfShowcaseBio} numberOfLines={1}>
+                    {profile.bio}
+                  </Text>
+                ) : null}
               </View>
-              <Ionicons name="chevron-forward" size={21} color={COLORS.muted} />
             </Pressable>
-          </View>
+
+            <Pressable
+              onPress={() => setWealthLadderOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Cömertlik seviyesini aç"
+              style={({ pressed }) => [
+                styles.pfShowcaseWealth,
+                pressed && { opacity: 0.86 },
+              ]}
+            >
+              <View style={styles.pfShowcaseWealthRow}>
+                <Text style={styles.pfShowcaseWealthTitle} numberOfLines={1}>
+                  Cömertlik · {wealthInfo.tier.name}
+                </Text>
+                <View style={styles.pfShowcaseWealthMetaRow}>
+                  <Text style={styles.pfShowcaseWealthMeta} numberOfLines={1}>
+                    {wealthInfo.next
+                      ? `${formatCreditsCompact(giftSpent || 0)} / ${formatCreditsCompact(wealthInfo.next.minSpent)} · `
+                      : "Zirve · "}
+                  </Text>
+                  <Text style={styles.pfShowcaseWealthPct}>%{wealthPct}</Text>
+                  <Ionicons name="chevron-forward" size={13} color="rgba(253,230,138,0.75)" />
+                </View>
+              </View>
+              <View style={styles.pfShowcaseTrack}>
+                <LinearGradient
+                  colors={["#FCD34D", "#F59E0B", "#60A5FA"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[
+                    styles.pfShowcaseFill,
+                    { width: `${Math.max(4, wealthPct)}%` },
+                  ]}
+                />
+              </View>
+            </Pressable>
+          </LinearGradient>
         </Reveal>
 
         <Reveal delay={45} distance={10}>
-          <View style={styles.profileWealthCardWrap}>
-            <SoraWealthCard
-              spent={giftSpent || 0}
-              onPress={() => setWealthLadderOpen(true)}
-            />
-          </View>
-        </Reveal>
-
-        <Reveal delay={85} distance={10}>
-          <View style={styles.profileBannerRow}>
-            <Pressable
-              onPress={onEdit}
-              style={({ pressed }) => [
-                styles.profileBannerButton,
-                styles.profileBannerLight,
-                pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 },
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Profilini kişiselleştir"
-            >
-              <View style={styles.profileBannerCopy}>
-                <Text style={styles.profileBannerTitleLight}>Profilini düzenle</Text>
-                <Text style={styles.profileBannerCaptionLight}>Çerçeve & tema</Text>
-              </View>
-              <View style={styles.profileBannerLightIcon}>
-                <Ionicons name="color-palette" size={21} color={COLORS.primary} />
-              </View>
-            </Pressable>
+          <View style={styles.pfBentoRow}>
             <Pressable
               onPress={onOpenWallet}
-              style={({ pressed }) => [
-                styles.profileBannerButton,
-                pressed && { transform: [{ scale: 0.98 }], opacity: 0.92 },
-              ]}
               accessibilityRole="button"
               accessibilityLabel="Cüzdanı aç"
+              style={({ pressed }) => [
+                styles.pfBentoCard,
+                pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 },
+              ]}
             >
-              <LinearGradient
-                colors={["#0D1829", "#1B3154"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.profileBanner}
-              >
-                <View style={styles.profileBannerCopy}>
-                  <Text style={styles.profileBannerTitle}>Cüzdan</Text>
-                  <Text
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.76}
-                    style={styles.profileBannerBalance}
-                  >
-                    {formatCredits(coins)} kredi
-                  </Text>
-                </View>
-                <View style={styles.profileBannerDarkIcon}>
-                  <Ionicons name="wallet" size={20} color="#FDE68A" />
-                </View>
-              </LinearGradient>
+              <View style={[styles.pfBentoTile, { backgroundColor: "#EAF2FF" }]}>
+                <Ionicons name="wallet-outline" size={19} color="#2F80ED" />
+              </View>
+              <View style={styles.pfBentoCopy}>
+                <Text style={styles.pfBentoTitle} numberOfLines={1}>Cüzdan</Text>
+                <Text
+                  style={[styles.pfBentoSub, { color: "#2F80ED" }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.78}
+                >
+                  {formatCredits(coins)} kredi
+                </Text>
+              </View>
+            </Pressable>
+            <Pressable
+              onPress={openDailyMissions}
+              accessibilityRole="button"
+              accessibilityLabel="Görevler ve 7 günlük seri"
+              style={({ pressed }) => [
+                styles.pfBentoCard,
+                pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 },
+              ]}
+            >
+              <View style={[styles.pfBentoTile, { backgroundColor: "#FFF0EB" }]}>
+                <Ionicons name="flame" size={19} color="#EA580C" />
+              </View>
+              <View style={styles.pfBentoCopy}>
+                <Text style={styles.pfBentoTitle} numberOfLines={1}>Görevler</Text>
+                <Text
+                  style={[
+                    styles.pfBentoSub,
+                    missionClaimable > 0 && { color: "#EA580C" },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {missionClaimable > 0
+                    ? `${missionClaimable} ödül hazır`
+                    : "7 günlük seri"}
+                </Text>
+              </View>
             </Pressable>
           </View>
         </Reveal>
 
-        <Text style={styles.pfSection}>HESABIN</Text>
-        <View style={styles.pfMenu}>
-          {actions.map((item, idx) => (
-            <Pressable
-              key={item.key}
-              accessibilityRole="button"
-              accessibilityLabel={item.title}
-              onPress={item.action}
-              style={({ pressed }) => [
-                styles.pfMenuRow,
-                idx === actions.length - 1 && { borderBottomWidth: 0 },
-                pressed && styles.pfMenuRowPressed,
-              ]}
-            >
-              <View style={[styles.pfMenuIcon, { backgroundColor: item.iconBg }]}>
-                <Ionicons name={item.icon} size={18} color={item.iconColor} />
-              </View>
-              <Text style={styles.pfMenuTitle} numberOfLines={1}>{item.title}</Text>
-              {item.badge ? (
-                <View style={[styles.pfMenuBadge, { backgroundColor: item.badgeBg }]}>
-                  <Text style={[styles.pfMenuBadgeText, { color: item.badgeColor }]}>
-                    {item.badge}
-                  </Text>
-                </View>
-              ) : null}
-              <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
-            </Pressable>
-          ))}
-        </View>
-
-        <Pressable
-          onPress={() => setLevelSheetOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel={`Seviye ${String(level).padStart(2, "0")}`}
-          style={({ pressed }) => [
-            styles.profileLevelSummary,
-            pressed && { opacity: 0.86 },
-          ]}
-        >
-          <SoraLevelCrest level={level} size={38} />
-          <View style={styles.pfLevelInfo}>
-            <Text style={styles.pfLevelTitle}>
-              Seviye {String(level).padStart(2, "0")}
-            </Text>
-          </View>
-          <View style={styles.profileBadgeTierChip}>
-            <Text style={styles.profileBadgeTierChipText} numberOfLines={1}>
-              {badgeTier.title}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
-        </Pressable>
-
-        <View style={styles.pfTabs}>
+        <Reveal delay={80} distance={10}>
           <Pressable
-            onPress={() => setProfileTab("rooms")}
-            style={[styles.pfTab, profileTab === "rooms" && styles.pfTabActive]}
+            onPress={dailyRewardClaimed ? onOpenWallet : onClaimDailyReward}
             accessibilityRole="button"
-            accessibilityLabel="Odalarım sekmesi"
-          >
-            <Text
-              style={[
-                styles.pfTabText,
-                profileTab === "rooms" && styles.pfTabTextActive,
-              ]}
-            >
-              Odalarım
-            </Text>
-            <View style={styles.pfTabBadge}>
-              <Text style={styles.pfTabBadgeText}>{myRooms.length}</Text>
-            </View>
-          </Pressable>
-          <Pressable
-            onPress={() => setProfileTab("following")}
-            style={[
-              styles.pfTab,
-              profileTab === "following" && styles.pfTabActive,
+            accessibilityLabel={dailyRewardClaimed ? "Günlük ödül alındı" : "Günlük giriş ödülünü al"}
+            style={({ pressed }) => [
+              styles.pfDailyBar,
+              dailyRewardClaimed && styles.pfDailyBarClaimed,
+              pressed && { transform: [{ scale: 0.985 }], opacity: 0.92 },
             ]}
-            accessibilityRole="button"
-            accessibilityLabel="Takip ettiklerim sekmesi"
           >
-            <Text
+            <View
               style={[
-                styles.pfTabText,
-                profileTab === "following" && styles.pfTabTextActive,
+                styles.pfBentoTile,
+                {
+                  backgroundColor: dailyRewardClaimed
+                    ? "rgba(22,163,74,0.12)"
+                    : "#FEF3DF",
+                },
               ]}
             >
-              Takip ettiklerim
-            </Text>
-            <View style={styles.pfTabBadge}>
-              <Text style={styles.pfTabBadgeText}>{followedCount}</Text>
+              <Ionicons
+                name={dailyRewardClaimed ? "checkmark-circle" : "gift"}
+                size={19}
+                color={dailyRewardClaimed ? "#16A34A" : "#D97706"}
+              />
             </View>
+            <View style={styles.pfBentoCopy}>
+              <Text style={styles.pfBentoTitle} numberOfLines={1}>
+                {dailyRewardClaimed ? "Günlük ödül alındı" : "Günlük giriş ödülü"}
+              </Text>
+              <Text
+                style={[
+                  styles.pfBentoSub,
+                  { color: dailyRewardClaimed ? "#15803D" : "#B45309" },
+                ]}
+                numberOfLines={1}
+              >
+                {dailyRewardClaimed
+                  ? `Yarın tekrar +${formatCredits(DAILY_REWARD_AMOUNT)} kredi`
+                  : `+${formatCredits(DAILY_REWARD_AMOUNT)} kredi hazır`}
+              </Text>
+            </View>
+            {dailyRewardClaimed ? (
+              <View style={styles.pfDailyDonePill}>
+                <Text style={styles.pfDailyDoneText}>Alındı</Text>
+              </View>
+            ) : (
+              <LinearGradient
+                colors={["#FDE073", "#F59E0B"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.pfDailyGoldPill}
+              >
+                <Text style={styles.pfDailyGoldText}>Al</Text>
+              </LinearGradient>
+            )}
           </Pressable>
-        </View>
-        {profileTab === "rooms" ? (
-          myRooms.length ? (
-            myRooms.map((item) => (
-              <View key={item.id} style={styles.pfActivityRow}>
+        </Reveal>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={[styles.categoryList, styles.pfPillTabs]}
+        >
+          {profileTabItems.map((item) => {
+            const active = profileTab === item.id;
+            return (
+              <Pressable
+                key={item.id}
+                onPress={() => setProfileTab(item.id)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                style={({ pressed }) => [
+                  styles.categoryChip,
+                  active && styles.categoryChipActive,
+                  pressed && { transform: [{ scale: 0.96 }] },
+                ]}
+              >
+                {active ? (
+                  <LinearGradient
+                    colors={["#16294B", "#0C172B"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                ) : null}
                 <View
                   style={[
-                    styles.pfActivityAvatar,
-                    { backgroundColor: item.accent || COLORS.purple },
+                    styles.categoryIconTile,
+                    active
+                      ? styles.categoryIconTileActive
+                      : { backgroundColor: item.bg },
                   ]}
                 >
-                  <Text style={styles.pfActivityAvatarText}>
-                    {item.initials || (item.title || "S").charAt(0)}
-                  </Text>
+                  <Ionicons
+                    name={item.icon}
+                    size={15}
+                    color={active ? "#78B8FF" : item.fg}
+                  />
                 </View>
-                <View style={styles.pfActivityInfo}>
-                  <Text style={styles.pfActivityTitle} numberOfLines={1}>
-                    {item.title}
-                  </Text>
-                  <Text style={styles.pfActivityMeta}>
-                    {formatCategoryLabel(item.category)} · {item.listeners ?? 0} dinleyici
-                  </Text>
-                </View>
-                <Ionicons name="mic-outline" size={18} color={COLORS.muted} />
-              </View>
-            ))
-          ) : (
-            <View style={styles.pfEmpty}>
-              <Ionicons name="mic-off-outline" size={16} color={COLORS.muted} />
-              <Text style={styles.pfEmptyText}>Henüz bir oda açmadın.</Text>
-            </View>
-          )
-        ) : followedProfiles.length ? (
-          followedProfiles.map((person) => (
-            <Pressable
-              key={person.id}
-              onPress={() => person.id && supabase && onOpenUserProfile?.(person.id)}
-              style={styles.pfActivityRow}
-            >
-              <Avatar
-                label={(person.name || "S").charAt(0).toUpperCase()}
-                color={person.color || COLORS.primaryLight}
-                uri={person.avatarUrl || null}
-                size={42}
-                circle
-              />
-              <View style={styles.pfActivityInfo}>
-                <Text style={styles.pfActivityTitle} numberOfLines={1}>
-                  {person.name || "Sora kullanıcısı"}
+                <Text
+                  style={[
+                    styles.categoryText,
+                    active && styles.categoryTextActive,
+                  ]}
+                >
+                  {item.label}
                 </Text>
-                <Text style={styles.pfActivityMeta} numberOfLines={1}>
-                  {person.handle ? `@${person.handle} · Takip ediliyor` : "Takip ediliyor"}
-                </Text>
-              </View>
-              <Ionicons name="heart" size={16} color={COLORS.primary} />
-            </Pressable>
-          ))
-        ) : (
-          <View style={styles.pfEmpty}>
-            <Ionicons name="heart-outline" size={16} color={COLORS.muted} />
-            <Text style={styles.pfEmptyText}>Henüz kimseyi takip etmiyorsun.</Text>
-          </View>
-        )}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
 
-        <Text style={styles.pfSection}>SEVİYE ROZETLERİ</Text>
-        <View style={styles.pfBadgeGridStack}>
-          {[LEVEL_BADGE_TIERS.slice(0, 3), LEVEL_BADGE_TIERS.slice(3, 6)].map(
-            (row, rowIdx) => (
-              <View key={`lvl-row-${rowIdx}`} style={styles.pfBadgeRow}>
-                {row.map((tier) => {
-                  const unlocked = level >= tier.minLevel;
-                  return (
-                    <Pressable
-                      key={tier.key}
-                      onPress={() => setLevelSheetOpen(true)}
+        {profileTab === "badges" ? (
+          <View style={styles.pfTabSection}>
+            <Pressable
+              onPress={() => setLevelSheetOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`Seviye ${String(level).padStart(2, "0")}`}
+              style={({ pressed }) => [
+                styles.pfLevelSummaryCard,
+                pressed && { opacity: 0.88 },
+              ]}
+            >
+              <SoraLevelCrest level={level} size={36} />
+              <View style={styles.pfLevelInfo}>
+                <Text style={styles.pfLevelTitle}>
+                  Seviye {String(level).padStart(2, "0")}
+                </Text>
+                <Text style={styles.pfLevelSubText} numberOfLines={1}>
+                  {badgeTier.title}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
+            </Pressable>
+
+            <Text style={styles.pfSectionCompact}>SEVİYE ROZETLERİ</Text>
+            <View style={styles.pfBadgeGridStack}>
+              {[LEVEL_BADGE_TIERS.slice(0, 3), LEVEL_BADGE_TIERS.slice(3, 6)].map(
+                (row, rowIdx) => (
+                  <View key={`lvl-row-${rowIdx}`} style={styles.pfBadgeRow}>
+                    {row.map((tier) => {
+                      const unlocked = level >= tier.minLevel;
+                      const isCurrentTier = badgeTier.key === tier.key;
+                      return (
+                        <Pressable
+                          key={tier.key}
+                          onPress={() => setLevelSheetOpen(true)}
+                          style={({ pressed }) => [
+                            styles.pfBadgeClean,
+                            isCurrentTier && styles.pfBadgeCleanActive,
+                            !unlocked && { opacity: 0.56 },
+                            pressed && { transform: [{ scale: 0.97 }] },
+                          ]}
+                        >
+                          <View style={{ marginBottom: 4, position: "relative" }}>
+                            <SoraLevelCrest level={tier.minLevel} size={42} locked={!unlocked} />
+                            {!unlocked ? (
+                              <View style={styles.pfBadgeLock}>
+                                <Ionicons name="lock-closed" size={10} color="#FFFFFF" />
+                              </View>
+                            ) : null}
+                          </View>
+                          <Text
+                            style={[styles.pfBadgeText, !unlocked && { color: COLORS.muted }]}
+                            numberOfLines={2}
+                          >
+                            {tier.title}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.pfBadgeHint,
+                              isCurrentTier && { color: "#2F80ED", fontWeight: "800" },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {unlocked ? tier.rangeLabel : `Sv. ${tier.minLevel}`}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ),
+              )}
+            </View>
+
+            <Text style={styles.pfSectionCompact}>ETKİNLİK ROZETLERİ</Text>
+            <View style={styles.pfBadgeGridStack}>
+              {[badges.slice(0, 2), badges.slice(2, 4)].map((row, rowIdx) => (
+                <View key={`ach-row-${rowIdx}`} style={styles.pfBadgeRow}>
+                  {row.map((badge) => (
+                    <View
+                      key={badge.id}
                       style={[
-                        styles.pfBadge,
-                        unlocked && { borderColor: `${tier.borderColor}66` },
-                        !unlocked && { opacity: 0.62 },
+                        styles.pfAchCard,
+                        !badge.unlocked && styles.pfAchCardLocked,
                       ]}
                     >
-                      <View style={{ marginBottom: 4, position: "relative" }}>
-                        <SoraLevelCrest level={tier.minLevel} size={44} locked={!unlocked} />
-                        {!unlocked ? (
+                      <View style={{ position: "relative" }}>
+                        <SoraAchievementBadge
+                          badgeId={badge.id}
+                          size={38}
+                          locked={!badge.unlocked}
+                        />
+                        {!badge.unlocked ? (
                           <View style={styles.pfBadgeLock}>
-                            <Ionicons name="lock-closed" size={10} color="#FFFFFF" />
+                            <Ionicons name="lock-closed" size={9} color="#FFFFFF" />
                           </View>
                         ) : null}
                       </View>
-                      <Text
-                        style={[styles.pfBadgeText, !unlocked && { color: COLORS.muted }]}
-                        numberOfLines={2}
-                      >
-                        {tier.title}
-                      </Text>
-                      <Text style={styles.pfBadgeHint} numberOfLines={1}>
-                        {unlocked ? tier.rangeLabel : `Sv. ${tier.minLevel}`}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ),
-          )}
-        </View>
-
-        <Text style={styles.pfSection}>ETKİNLİK ROZETLERİ</Text>
-        <View style={styles.pfBadgeGridStack}>
-          {[badges.slice(0, 4)].map((row, rowIdx) => (
-            <View key={`ach-row-${rowIdx}`} style={[styles.pfBadgeRow, { gap: 8 }]}>
-              {row.map((badge) => (
-                <View
-                  key={badge.id}
-                  style={[
-                    styles.pfBadge,
-                    { paddingVertical: 10, paddingHorizontal: 4, borderRadius: 16 },
-                    badge.unlocked && { borderColor: `${badge.tint}55` },
-                  ]}
-                >
-                  <View style={[styles.pfBadgeMedal, { width: 46, height: 46 }]}>
-                    <SoraAchievementBadge
-                      badgeId={badge.id}
-                      size={42}
-                      locked={!badge.unlocked}
-                    />
-                    {!badge.unlocked ? (
-                      <View style={styles.pfBadgeLock}>
-                        <Ionicons name="lock-closed" size={10} color="#FFFFFF" />
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text
+                          style={[
+                            styles.pfAchTitle,
+                            !badge.unlocked && { color: COLORS.muted },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {badge.title}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.pfAchStatus,
+                            !badge.unlocked && { color: COLORS.muted },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {badge.unlocked ? "Kazanıldı" : badge.hint}
+                        </Text>
                       </View>
-                    ) : null}
-                  </View>
-                  <Text
-                    style={[styles.pfBadgeText, !badge.unlocked && { color: COLORS.muted }]}
-                    numberOfLines={2}
-                  >
-                    {badge.title}
-                  </Text>
-                  <Text style={styles.pfBadgeHint} numberOfLines={1}>
-                    {badge.unlocked ? "Kazanıldı" : badge.hint}
-                  </Text>
+                    </View>
+                  ))}
                 </View>
               ))}
             </View>
-          ))}
-        </View>
-        {recentActivity.length > 0 && (
-          <>
-            <Text style={styles.pfSection}>GEÇMİŞ</Text>
-            {recentActivity.map((item) => (
-              <View key={item.id} style={styles.pfActivityRow}>
-                <View
-                  style={[
-                    styles.pfActivityAvatar,
-                    { backgroundColor: item.color || COLORS.purple },
-                  ]}
-                >
-                  <Text style={styles.pfActivityAvatarText}>
-                    {item.initials || (item.title || "S").charAt(0)}
-                  </Text>
-                </View>
-                <View style={styles.pfActivityInfo}>
-                  <Text style={styles.pfActivityTitle} numberOfLines={1}>
-                    {item.title}
-                  </Text>
-                  <Text style={styles.pfActivityMeta}>
-                    {formatCategoryLabel(item.category)} · {formatHistoryTime(item)}
-                  </Text>
-                </View>
-                <Ionicons name="headset-outline" size={18} color={COLORS.muted} />
+          </View>
+        ) : profileTab === "rooms" ? (
+          <View style={styles.pfTabSection}>
+            {myRooms.length ? (
+              <View style={styles.pfGroupedCard}>
+                {myRooms.map((item, idx) => (
+                  <View
+                    key={item.id}
+                    style={[
+                      styles.pfGroupedRow,
+                      idx === myRooms.length - 1 && styles.pfGroupedRowLast,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.pfActivityAvatar,
+                        { backgroundColor: item.accent || "#EAF2FF" },
+                      ]}
+                    >
+                      <Text style={styles.pfActivityAvatarText}>
+                        {item.initials || (item.title || "S").charAt(0)}
+                      </Text>
+                    </View>
+                    <View style={styles.pfActivityInfo}>
+                      <Text style={styles.pfActivityTitle} numberOfLines={1}>
+                        {item.title}
+                      </Text>
+                      <Text style={styles.pfActivityMeta}>
+                        {formatCategoryLabel(item.category)} · {item.listeners ?? 0} dinleyici
+                      </Text>
+                    </View>
+                    <View style={styles.pfRowActionOrb}>
+                      <Ionicons name="mic-outline" size={16} color="#2F80ED" />
+                    </View>
+                  </View>
+                ))}
               </View>
-            ))}
-          </>
+            ) : (
+              <View style={styles.pfEmptyCard}>
+                <View style={styles.pfEmptyLeft}>
+                  <Ionicons name="mic-off-outline" size={18} color={COLORS.muted} />
+                  <Text style={styles.pfEmptyText}>Henüz bir oda açmadın.</Text>
+                </View>
+                {onCreateRoom ? (
+                  <Pressable
+                    onPress={onCreateRoom}
+                    style={({ pressed }) => [
+                      styles.pfEmptyCta,
+                      pressed && { opacity: 0.8 },
+                    ]}
+                  >
+                    <Text style={styles.pfEmptyCtaText}>+ Oda aç</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            )}
+          </View>
+        ) : profileTab === "following" ? (
+          <View style={styles.pfTabSection}>
+            {followedProfiles.length ? (
+              <View style={styles.pfGroupedCard}>
+                {followedProfiles.map((person, idx) => (
+                  <Pressable
+                    key={person.id}
+                    onPress={() => person.id && supabase && onOpenUserProfile?.(person.id)}
+                    style={({ pressed }) => [
+                      styles.pfGroupedRow,
+                      idx === followedProfiles.length - 1 && styles.pfGroupedRowLast,
+                      pressed && { opacity: 0.78 },
+                    ]}
+                  >
+                    <Avatar
+                      label={(person.name || "S").charAt(0).toUpperCase()}
+                      color={person.color || COLORS.primaryLight}
+                      uri={person.avatarUrl || null}
+                      size={40}
+                      circle
+                    />
+                    <View style={styles.pfActivityInfo}>
+                      <Text style={styles.pfActivityTitle} numberOfLines={1}>
+                        {person.name || "Sora kullanıcısı"}
+                      </Text>
+                      <Text style={styles.pfActivityMeta} numberOfLines={1}>
+                        {person.handle ? `@${person.handle} · Takip ediliyor` : "Takip ediliyor"}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={17} color={COLORS.muted} />
+                  </Pressable>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.pfEmptyCard}>
+                <View style={styles.pfEmptyLeft}>
+                  <Ionicons name="heart-outline" size={18} color={COLORS.muted} />
+                  <Text style={styles.pfEmptyText}>Henüz kimseyi takip etmiyorsun.</Text>
+                </View>
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={styles.pfTabSection}>
+            {recentActivity.length ? (
+              <View style={styles.pfGroupedCard}>
+                {recentActivity.map((item, idx) => (
+                  <View
+                    key={item.id}
+                    style={[
+                      styles.pfGroupedRow,
+                      idx === recentActivity.length - 1 && styles.pfGroupedRowLast,
+                    ]}
+                  >
+                    <View style={styles.pfHistoryAvatar}>
+                      <Text style={styles.pfHistoryAvatarText}>
+                        {item.initials || (item.title || "S").charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={styles.pfActivityInfo}>
+                      <Text style={styles.pfActivityTitle} numberOfLines={1}>
+                        {item.title}
+                      </Text>
+                      <Text style={styles.pfActivityMeta}>
+                        {formatCategoryLabel(item.category)} · {formatHistoryTime(item)}
+                      </Text>
+                    </View>
+                    <View style={styles.pfRowActionOrb}>
+                      <Ionicons name="headset-outline" size={16} color="#2F80ED" />
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.pfEmptyCard}>
+                <View style={styles.pfEmptyLeft}>
+                  <Ionicons name="time-outline" size={18} color={COLORS.muted} />
+                  <Text style={styles.pfEmptyText}>Henüz ziyaret ettiğin bir oda yok.</Text>
+                </View>
+              </View>
+            )}
+          </View>
         )}
       </ScrollView>
       <ProfileDetailSheet
@@ -3747,16 +3942,22 @@ const WalletSheet = memo(function WalletSheet({
         <Pressable style={styles.modalDismiss} onPress={onDismiss} />
         <View style={[styles.sheet, styles.walletSheet]}>
           <View style={styles.sheetHandle} />
-          <Pressable onPress={onDismiss} style={styles.sheetClose}>
-            <Ionicons name="close" size={20} color={COLORS.text} />
-          </Pressable>
+          <View style={styles.pfModalHeader}>
+            <Text style={styles.pfModalTitle}>Cüzdan</Text>
+            <Pressable
+              onPress={onDismiss}
+              style={styles.settingsHeaderClose}
+              accessibilityLabel="Kapat"
+            >
+              <Ionicons name="close" size={20} color="#0F172A" />
+            </Pressable>
+          </View>
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.walletScroll}
           >
-            <Text style={styles.kicker}>KREDİ CÜZDANI</Text>
             <LinearGradient
-              colors={["#0D1829", "#1B3154"]}
+              colors={["#0D1B34", "#172F5B", "#0B1528"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.walletBalanceCard}
@@ -3773,12 +3974,12 @@ const WalletSheet = memo(function WalletSheet({
                 >
                   {formatCredits(coins)} <Text style={styles.walletBalanceUnit}>kredi</Text>
                 </Text>
-                <Text style={styles.walletActivityTime} numberOfLines={1}>
-                  Toplam kullanılabilir bakiye
+                <Text style={styles.pfWalletBalanceHint} numberOfLines={1}>
+                  Odalarda ve ailede hediye için geçerli
                 </Text>
               </View>
-              <View style={styles.walletBalanceIcon}>
-                <Ionicons name="diamond" size={26} color="#FDE68A" />
+              <View style={styles.pfWalletDiamondBox}>
+                <Ionicons name="diamond" size={24} color="#FDE68A" />
               </View>
             </LinearGradient>
             {(promoCoins > 0 || paidCoins > 0) ? (
@@ -3798,20 +3999,21 @@ const WalletSheet = memo(function WalletSheet({
               </View>
             ) : null}
             <Text style={styles.settingsCaption}>GÜNLÜK ÖDÜL</Text>
-            <View style={styles.walletRewardRow}>
+            <View style={styles.pfDailyBar}>
               <View
                 style={[
-                  styles.walletRewardIcon,
-                  dailyRewardClaimed && {
-                    backgroundColor: COLORS.primary,
-                    borderColor: COLORS.primary,
+                  styles.pfBentoTile,
+                  {
+                    backgroundColor: dailyRewardClaimed
+                      ? "rgba(22,163,74,0.12)"
+                      : "#FEF3DF",
                   },
                 ]}
               >
                 <Ionicons
-                  name={dailyRewardClaimed ? "checkmark" : "gift-outline"}
+                  name={dailyRewardClaimed ? "checkmark-circle" : "gift"}
                   size={19}
-                  color={dailyRewardClaimed ? COLORS.primaryInk : "#6AA8F5"}
+                  color={dailyRewardClaimed ? "#16A34A" : "#D97706"}
                 />
               </View>
               <View style={styles.settingContent}>
@@ -3829,25 +4031,28 @@ const WalletSheet = memo(function WalletSheet({
               <Pressable
                 disabled={dailyRewardClaimed}
                 onPress={onClaimDailyReward}
-                style={[
-                  styles.walletClaimButton,
-                  dailyRewardClaimed && styles.walletClaimButtonDisabled,
-                ]}
+                style={({ pressed }) => [pressed && !dailyRewardClaimed && { transform: [{ scale: 0.94 }] }]}
               >
-                <Text
-                  style={[
-                    styles.walletClaimText,
-                    dailyRewardClaimed && styles.walletClaimTextDisabled,
-                  ]}
-                >
-                  {dailyRewardClaimed ? "Alındı" : `+${formatCredits(DAILY_REWARD_AMOUNT)} al`}
-                </Text>
+                {dailyRewardClaimed ? (
+                  <View style={styles.pfDailyDonePill}>
+                    <Text style={styles.pfDailyDoneText}>Alındı</Text>
+                  </View>
+                ) : (
+                  <LinearGradient
+                    colors={["#FDE073", "#F59E0B"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.pfDailyGoldPill}
+                  >
+                    <Text style={styles.pfDailyGoldText}>Al</Text>
+                  </LinearGradient>
+                )}
               </Pressable>
             </View>
-            <Text style={styles.settingsCaption}>KREDİ YÜKLEME</Text>
-            <View style={styles.transferCard}>
+            <Text style={[styles.settingsCaption, { marginTop: 16 }]}>KREDİ YÜKLEME</Text>
+            <View style={styles.pfInfoMutedCard}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                <Ionicons name="lock-closed-outline" size={16} color={COLORS.muted} />
+                <Ionicons name="lock-closed-outline" size={16} color="#64748B" />
                 <Text style={styles.transferTitle}>Geçici olarak kapalıdır</Text>
               </View>
               <Text style={styles.transferHint}>
@@ -8349,13 +8554,18 @@ function ProfileEditor({
         <Pressable style={styles.modalDismiss} onPress={onDismiss} />
         <View style={[styles.sheet, { maxHeight: "88%" }]}>
           <View style={styles.sheetHandle} />
-          <Pressable onPress={onDismiss} style={styles.sheetClose}>
-            <Ionicons name="close" size={20} color={COLORS.text} />
-          </Pressable>
+          <View style={styles.pfModalHeader}>
+            <Text style={styles.pfModalTitle}>Profilini düzenle</Text>
+            <Pressable
+              onPress={onDismiss}
+              style={styles.settingsHeaderClose}
+              accessibilityLabel="Kapat"
+            >
+              <Ionicons name="close" size={20} color="#0F172A" />
+            </Pressable>
+          </View>
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 12 }}>
-          <Text style={styles.kicker}>PROFİLİN</Text>
-          <Text style={styles.sheetTitle}>Profilini düzenle</Text>
-          <View style={styles.avatarEditRow}>
+          <View style={styles.pfEditAvatarCenter}>
             <Pressable
               onPress={pickAvatar}
               disabled={avatarBusy}
@@ -8364,7 +8574,7 @@ function ProfileEditor({
             >
               <ProfileFrame
                 appearance={editorFrameAppearance}
-                size={72}
+                size={74}
                 padMode="tight"
                 overlay={
                   <View style={[styles.avatarEditBadge, { zIndex: 20, elevation: 8 }]}>
@@ -8380,21 +8590,20 @@ function ProfileEditor({
                   label={(name || profile.name || "S").charAt(0).toUpperCase()}
                   color={profile.color}
                   uri={avatarUrl}
-                  size={72}
+                  size={74}
                   circle
                 />
               </ProfileFrame>
             </Pressable>
-            <View style={{ flex: 1, gap: 6 }}>
-              <Pressable onPress={pickAvatar} disabled={avatarBusy} style={styles.avatarEditButton}>
-                <Ionicons name="image-outline" size={16} color={COLORS.primary} />
-                <Text style={styles.avatarEditButtonText}>
+            <View style={styles.pfEditAvatarLinks}>
+              <Pressable onPress={pickAvatar} disabled={avatarBusy} hitSlop={8}>
+                <Text style={styles.pfEditAvatarChange}>
                   {avatarUrl ? "Resmi değiştir" : "Profil resmi ekle"}
                 </Text>
               </Pressable>
               {avatarUrl ? (
-                <Pressable onPress={clearAvatar} disabled={avatarBusy}>
-                  <Text style={styles.avatarEditRemove}>Resmi kaldır</Text>
+                <Pressable onPress={clearAvatar} disabled={avatarBusy} hitSlop={8}>
+                  <Text style={styles.avatarEditRemove}>Kaldır</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -8404,8 +8613,8 @@ function ProfileEditor({
             value={name}
             onChangeText={setName}
             placeholder="Adın"
-            placeholderTextColor={COLORS.muted}
-            style={styles.sheetInput}
+            placeholderTextColor="#8A99AE"
+            style={styles.pfSoftInput}
             maxLength={36}
           />
           <Text style={styles.fieldLabel}>KULLANICI ADI</Text>
@@ -8415,8 +8624,8 @@ function ProfileEditor({
             autoCapitalize="none"
             autoCorrect={false}
             placeholder="kullaniciadi"
-            placeholderTextColor={COLORS.muted}
-            style={styles.sheetInput}
+            placeholderTextColor="#8A99AE"
+            style={styles.pfSoftInput}
             maxLength={24}
           />
           <Text style={styles.fieldLabel}>KISA BİYOGRAFİ</Text>
@@ -8424,8 +8633,8 @@ function ProfileEditor({
             value={bio}
             onChangeText={setBio}
             placeholder="Seni tanıtan kısa bir not"
-            placeholderTextColor={COLORS.muted}
-            style={[styles.sheetInput, styles.profileEditorBioInput]}
+            placeholderTextColor="#8A99AE"
+            style={[styles.pfSoftInput, styles.profileEditorBioInput]}
             maxLength={180}
             multiline
           />
@@ -8621,93 +8830,105 @@ const AppSettingsSheet = memo(function AppSettingsSheet({
     >
       <View style={styles.modalOverlay}>
         <Pressable style={styles.modalDismiss} onPress={onDismiss} />
-        <View style={[styles.sheet, { maxHeight: "84%" }]}>
+        <View style={[styles.sheet, styles.pfSettingsSheet, { maxHeight: "84%" }]}>
           <View style={styles.sheetHandle} />
-          <View style={styles.settingsSheetHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.kicker}>TERCİHLER</Text>
-              <Text style={[styles.sheetTitle, { marginBottom: 4 }]}>Ayarlar</Text>
-            </View>
-            <Pressable onPress={onDismiss} style={styles.settingsHeaderClose} accessibilityLabel="Kapat">
-              <Ionicons name="close" size={20} color={COLORS.text} />
+          <View style={styles.pfModalHeader}>
+            <Text style={styles.pfModalTitle}>Ayarlar</Text>
+            <Pressable
+              onPress={onDismiss}
+              style={[styles.settingsHeaderClose, { backgroundColor: "#FFFFFF" }]}
+              accessibilityLabel="Kapat"
+            >
+              <Ionicons name="close" size={20} color="#0F172A" />
             </Pressable>
           </View>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
-          <Text style={styles.settingsCaption}>
-            BİLDİRİMLER, GİZLİLİK VE SES
-          </Text>
-          {options.map((option) => (
-            <Pressable
-              key={option.key}
-              onPress={() => onChange(option.key, !settings[option.key])}
-              style={styles.settingRow}
-              accessibilityRole="switch"
-              accessibilityState={{ checked: settings[option.key] }}
-              accessibilityLabel={option.title}
-            >
-              <View
-                style={[
-                  styles.settingIcon,
-                  settings[option.key] && styles.settingIconActive,
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 14 }}>
+            <Text style={styles.pfSectionCompact}>BİLDİRİMLER, GİZLİLİK VE SES</Text>
+            <View style={styles.pfGroupedCard}>
+              {options.map((option, idx) => (
+                <Pressable
+                  key={option.key}
+                  onPress={() => onChange(option.key, !settings[option.key])}
+                  style={[
+                    styles.pfGroupedRow,
+                    idx === options.length - 1 && styles.pfGroupedRowLast,
+                  ]}
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: settings[option.key] }}
+                  accessibilityLabel={option.title}
+                >
+                  <View
+                    style={[
+                      styles.pfBentoTile,
+                      {
+                        width: 36,
+                        height: 36,
+                        borderRadius: 12,
+                        backgroundColor: settings[option.key] ? "#EAF2FF" : "#F1F5FA",
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={option.icon}
+                      size={18}
+                      color={settings[option.key] ? "#2F80ED" : "#64748B"}
+                    />
+                  </View>
+                  <View style={styles.settingContent}>
+                    <Text style={styles.settingTitle}>{option.title}</Text>
+                    <Text style={styles.settingDescription}>
+                      {option.description}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={settings[option.key]}
+                    pointerEvents="none"
+                    trackColor={{ false: "#CBD5E1", true: "#2F80ED" }}
+                    thumbColor="#FFFFFF"
+                  />
+                </Pressable>
+              ))}
+            </View>
+            <Text style={[styles.pfSectionCompact, { marginTop: 18 }]}>HESAP VE VERİLER</Text>
+            <View style={styles.pfGroupedCard}>
+              <Pressable
+                onPress={onOpenAccount}
+                style={({ pressed }) => [
+                  styles.pfGroupedRow,
+                  pressed && { opacity: 0.78 },
                 ]}
               >
-                <Ionicons
-                  name={option.icon}
-                  size={18}
-                  color={
-                    settings[option.key] ? COLORS.primaryInk : COLORS.primary
-                  }
-                />
-              </View>
-              <View style={styles.settingContent}>
-                <Text style={styles.settingTitle}>{option.title}</Text>
-                <Text style={styles.settingDescription}>
-                  {option.description}
-                </Text>
-              </View>
-              <Switch
-                value={settings[option.key]}
-                pointerEvents="none"
-                trackColor={{ false: "#4C5E73", true: "#2F80ED" }}
-                thumbColor={settings[option.key] ? "#FFFFFF" : "#E2E8F0"}
-              />
-            </Pressable>
-          ))}
-          <Text style={[styles.settingsCaption, styles.settingsDataCaption]}>
-            HESAP VE VERİLER
-          </Text>
-          <Pressable onPress={onOpenAccount} style={styles.settingsLink}>
-            <View style={styles.settingIcon}>
-              <Ionicons
-                name="person-circle-outline"
-                size={18}
-                color={COLORS.primary}
-              />
+                <View style={[styles.pfBentoTile, { width: 36, height: 36, borderRadius: 12, backgroundColor: "#EAF2FF" }]}>
+                  <Ionicons name="person-circle-outline" size={19} color="#2F80ED" />
+                </View>
+                <View style={styles.settingContent}>
+                  <Text style={styles.settingTitle}>Hesap ve güvenlik</Text>
+                  <Text style={styles.settingDescription}>
+                    Parola, oturum ve hesap silme işlemleri
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
+              </Pressable>
+              <Pressable
+                onPress={onOpenDataControls}
+                style={({ pressed }) => [
+                  styles.pfGroupedRow,
+                  styles.pfGroupedRowLast,
+                  pressed && { opacity: 0.78 },
+                ]}
+              >
+                <View style={[styles.pfBentoTile, { width: 36, height: 36, borderRadius: 12, backgroundColor: "#F1F5FA" }]}>
+                  <Ionicons name="shield-checkmark-outline" size={19} color="#475569" />
+                </View>
+                <View style={styles.settingContent}>
+                  <Text style={styles.settingTitle}>Cihaz verilerin</Text>
+                  <Text style={styles.settingDescription}>
+                    Yerel verilerini dışa aktar veya sıfırla
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
+              </Pressable>
             </View>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Hesap ve güvenlik</Text>
-              <Text style={styles.settingDescription}>
-                Parola, oturum ve hesap silme işlemleri
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
-          </Pressable>
-          <Pressable onPress={onOpenDataControls} style={styles.settingsLink}>
-            <View style={styles.settingIcon}>
-              <Ionicons
-                name="shield-checkmark-outline"
-                size={18}
-                color={COLORS.primary}
-              />
-            </View>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Cihaz verilerin</Text>
-              <Text style={styles.settingDescription}>
-                Yerel verilerini dışa aktar veya sıfırla
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
-          </Pressable>
           </ScrollView>
         </View>
       </View>
@@ -11133,6 +11354,7 @@ function AppContent() {
               onBalanceUpdate={setWalletBalance}
               onSyncUserLevel={syncUserLevelAndNotify}
               onOpenUserProfile={setInspectedUserId}
+              onCreateRoom={handleOpenCreate}
             />
           </View>
         ) : null}
@@ -17599,5 +17821,496 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     lineHeight: 15.5,
     fontWeight: "700",
+  },
+  pfShowcaseCard: {
+    position: "relative",
+    borderRadius: 24,
+    paddingHorizontal: 15,
+    paddingTop: 15,
+    paddingBottom: 13,
+    borderWidth: 1,
+    borderColor: "rgba(147,197,253,0.22)",
+    overflow: "hidden",
+    shadowColor: "#0A1428",
+    shadowOpacity: 0.24,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  pfShowcaseGlow: {
+    position: "absolute",
+    width: 152,
+    height: 152,
+    left: -18,
+    top: -18,
+    opacity: 0.42,
+  },
+  pfShowcaseTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 13,
+  },
+  pfShowcaseCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  pfShowcaseNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  pfShowcaseName: {
+    flex: 1,
+    color: "#FFFFFF",
+    fontSize: 18.5,
+    fontWeight: "900",
+    letterSpacing: -0.4,
+  },
+  pfShowcaseShareBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "rgba(255,255,255,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(148,197,255,0.20)",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  pfShowcaseHandle: {
+    color: "rgba(203,220,245,0.80)",
+    fontSize: 11.5,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  pfShowcaseBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 7,
+  },
+  pfShowcaseLevelPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingLeft: 5,
+    paddingRight: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "rgba(59,141,246,0.24)",
+    borderWidth: 1,
+    borderColor: "rgba(147,197,253,0.34)",
+  },
+  pfShowcaseLevelText: {
+    color: "#DBEAFE",
+    fontSize: 10.5,
+    fontWeight: "800",
+  },
+  pfShowcaseGoldPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "rgba(251,191,36,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(251,191,36,0.42)",
+  },
+  pfShowcaseGoldText: {
+    color: "#FDE68A",
+    fontSize: 10.5,
+    fontWeight: "800",
+  },
+  pfShowcaseFamilyPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    maxWidth: 110,
+  },
+  pfShowcaseFamilyText: {
+    color: "#E2E8F0",
+    fontSize: 10.5,
+    fontWeight: "800",
+  },
+  pfShowcaseBio: {
+    color: "rgba(203,220,245,0.72)",
+    fontSize: 11.5,
+    marginTop: 5,
+  },
+  pfShowcaseWealth: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(148,197,255,0.15)",
+  },
+  pfShowcaseWealthRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    marginBottom: 6,
+  },
+  pfShowcaseWealthTitle: {
+    flex: 1,
+    color: "#FDE68A",
+    fontSize: 11.5,
+    fontWeight: "800",
+  },
+  pfShowcaseWealthMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexShrink: 0,
+  },
+  pfShowcaseWealthMeta: {
+    color: "rgba(203,220,245,0.80)",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  pfShowcaseWealthPct: {
+    color: "#FDE68A",
+    fontSize: 11,
+    fontWeight: "900",
+    marginRight: 2,
+  },
+  pfShowcaseTrack: {
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    overflow: "hidden",
+  },
+  pfShowcaseFill: {
+    height: "100%",
+    borderRadius: 999,
+  },
+  pfBentoRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 11,
+  },
+  pfBentoCard: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 19,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(203,218,236,0.72)",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  pfBentoTile: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  pfBentoCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  pfBentoTitle: {
+    color: "#0F172A",
+    fontSize: 13.5,
+    fontWeight: "800",
+  },
+  pfBentoSub: {
+    color: "#64748B",
+    fontSize: 11.5,
+    fontWeight: "700",
+    marginTop: 1.5,
+  },
+  pfDailyBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    marginTop: 10,
+    paddingLeft: 12,
+    paddingRight: 11,
+    paddingVertical: 10,
+    borderRadius: 19,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.32)",
+    shadowColor: "#F59E0B",
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+  pfDailyBarClaimed: {
+    borderColor: "rgba(203,218,236,0.72)",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.035,
+  },
+  pfDailyGoldPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#F59E0B",
+    shadowOpacity: 0.28,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  pfDailyGoldText: {
+    color: "#1F1200",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  pfDailyDonePill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6.5,
+    borderRadius: 999,
+    backgroundColor: "rgba(22,163,74,0.12)",
+  },
+  pfDailyDoneText: {
+    color: "#15803D",
+    fontSize: 11.5,
+    fontWeight: "800",
+  },
+  pfPillTabs: {
+    marginTop: 14,
+    marginBottom: 4,
+  },
+  pfTabSection: {
+    marginTop: 10,
+  },
+  pfLevelSummaryCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    borderRadius: 19,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(203,218,236,0.68)",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.035,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  pfLevelSubText: {
+    color: "#2F80ED",
+    fontSize: 11.5,
+    fontWeight: "700",
+    marginTop: 1.5,
+  },
+  pfSectionCompact: {
+    color: "#7B8BA0",
+    fontSize: 10.5,
+    fontWeight: "800",
+    letterSpacing: 1.1,
+    marginTop: 15,
+    marginBottom: 8,
+    paddingLeft: 2,
+  },
+  pfBadgeClean: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 4,
+    paddingVertical: 11,
+    paddingHorizontal: 6,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(203,218,236,0.58)",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  pfBadgeCleanActive: {
+    backgroundColor: "#EEF5FF",
+    borderColor: "rgba(47,128,237,0.45)",
+  },
+  pfAchCard: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    paddingHorizontal: 11,
+    paddingVertical: 10,
+    borderRadius: 17,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(203,218,236,0.62)",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  pfAchCardLocked: {
+    backgroundColor: "#F8FAFD",
+    opacity: 0.72,
+  },
+  pfAchTitle: {
+    color: "#0F172A",
+    fontSize: 12.5,
+    fontWeight: "800",
+  },
+  pfAchStatus: {
+    color: "#16A34A",
+    fontSize: 10.5,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  pfGroupedCard: {
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(203,218,236,0.65)",
+    overflow: "hidden",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.035,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  pfGroupedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF2F7",
+  },
+  pfGroupedRowLast: {
+    borderBottomWidth: 0,
+  },
+  pfRowActionOrb: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#EAF2FF",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  pfEmptyCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(203,218,236,0.62)",
+  },
+  pfEmptyLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    flex: 1,
+  },
+  pfEmptyCta: {
+    paddingHorizontal: 12,
+    paddingVertical: 6.5,
+    borderRadius: 999,
+    backgroundColor: "#EAF2FF",
+  },
+  pfEmptyCtaText: {
+    color: "#2F80ED",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  pfHistoryAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#E8F1FC",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  pfHistoryAvatarText: {
+    color: "#2F80ED",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  pfModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  pfModalTitle: {
+    color: "#0F172A",
+    fontSize: 22,
+    fontWeight: "900",
+    letterSpacing: -0.6,
+  },
+  pfWalletBalanceHint: {
+    color: "rgba(203,220,245,0.72)",
+    fontSize: 11.5,
+    marginTop: 5,
+  },
+  pfWalletDiamondBox: {
+    width: 50,
+    height: 50,
+    borderRadius: 16,
+    backgroundColor: "rgba(253,230,138,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(253,230,138,0.32)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pfInfoMutedCard: {
+    borderRadius: 17,
+    padding: 14,
+    marginBottom: 14,
+    backgroundColor: "#F3F7FC",
+  },
+  pfEditAvatarCenter: {
+    alignItems: "center",
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  pfEditAvatarLinks: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    marginTop: 10,
+  },
+  pfEditAvatarChange: {
+    color: "#2F80ED",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  pfSoftInput: {
+    minHeight: 46,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    backgroundColor: "#F1F6FC",
+    color: "#0F172A",
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 13,
+  },
+  pfSettingsSheet: {
+    backgroundColor: "#F3F7FC",
   },
 });
