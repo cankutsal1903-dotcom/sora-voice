@@ -516,6 +516,27 @@ const IconButton = memo(function IconButton({
   );
 });
 
+const getNotificationTone = (icon, fallbackColor) => {
+  const name = String(icon || "").toLowerCase();
+  if (name.includes("mic") || name.includes("radio") || name.includes("headset") || name.includes("moon")) {
+    return { bg: "#ECFDF5", fg: "#059669", bucket: "rooms" };
+  }
+  if (name.includes("gift") || name.includes("star") || name.includes("trophy") || name.includes("sparkle")) {
+    return { bg: "#FEF3C7", fg: "#D97706", bucket: "social" };
+  }
+  if (name.includes("people") || name.includes("shield")) {
+    return { bg: "#EEF2FF", fg: "#4F46E5", bucket: "social" };
+  }
+  if (name.includes("person") || name.includes("heart") || name.includes("chat")) {
+    return { bg: "#E6F0FE", fg: "#2563EB", bucket: "social" };
+  }
+  return {
+    bg: "#EAF2FF",
+    fg: fallbackColor || COLORS.primary,
+    bucket: "social",
+  };
+};
+
 const NotificationCenter = memo(function NotificationCenter({
   visible,
   notifications,
@@ -524,6 +545,9 @@ const NotificationCenter = memo(function NotificationCenter({
   onDismiss,
   onClear,
 }) {
+  const insets = useSafeAreaInsets();
+  const [filterTab, setFilterTab] = useState("all");
+
   const combinedNotifications = useMemo(() => {
     const base = Array.isArray(notifications) ? notifications : [];
     const extra = Array.isArray(serverActivity) ? serverActivity : [];
@@ -552,117 +576,237 @@ const NotificationCenter = memo(function NotificationCenter({
     }
     return out;
   }, [combinedNotifications]);
+
+  const filteredNotifications = useMemo(() => {
+    if (filterTab === "all") return groupedNotifications;
+    return groupedNotifications.filter((item) => {
+      const tone = getNotificationTone(item.icon, item.color);
+      const txt = String(item.text || "").toLowerCase();
+      const isRoom =
+        tone.bucket === "rooms" ||
+        txt.includes("oda") ||
+        txt.includes("yayın") ||
+        txt.includes("yayin") ||
+        txt.includes("canlı");
+      return filterTab === "rooms" ? isRoom : !isRoom;
+    });
+  }, [filterTab, groupedNotifications]);
+
+  const { todayItems, earlierItems } = useMemo(() => {
+    const today = [];
+    const earlier = [];
+    for (const item of filteredNotifications) {
+      const t = String(item.time || "").toLowerCase();
+      if (t.includes("dün") || t.includes("dun") || t.includes("gün") || t.includes("gun")) {
+        earlier.push(item);
+      } else {
+        today.push(item);
+      }
+    }
+    return { todayItems: today, earlierItems: earlier };
+  }, [filteredNotifications]);
+
   const totalCount = actionableAlerts.length + notifications.length;
+  const renderNotificationCard = (items, showUnreadDot) => (
+    <View style={styles.notifGroupCard}>
+      {items.map((item, index) => {
+        const tone = getNotificationTone(item.icon, item.color);
+        return (
+          <View
+            key={`${item.id}-${index}`}
+            style={[
+              styles.notificationRow,
+              index === items.length - 1 && styles.notificationRowLast,
+            ]}
+          >
+            <View style={[styles.notificationIcon, { backgroundColor: tone.bg }]}>
+              <Ionicons name={item.icon || "notifications-outline"} size={17} color={tone.fg} />
+            </View>
+            <View style={styles.notificationText}>
+              <Text style={styles.notificationMessage} numberOfLines={2}>
+                {item.text}
+              </Text>
+              <Text style={styles.notificationTime}>{item.time}</Text>
+            </View>
+            {item.count > 1 ? (
+              <View style={styles.notificationCount}>
+                <Text style={styles.notificationCountText}>×{item.count}</Text>
+              </View>
+            ) : showUnreadDot && index < 2 ? (
+              <View style={styles.notifUnreadDot} />
+            ) : null}
+          </View>
+        );
+      })}
+    </View>
+  );
+
   return (
     <Modal
       transparent
       visible={visible}
-      animationType="fade"
+      animationType="slide"
       onRequestClose={onDismiss}
     >
       <View style={styles.notificationOverlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onDismiss} />
-        <View style={styles.notificationSheet}>
+        <View
+          style={[
+            styles.notificationSheet,
+            { paddingBottom: Math.max(insets.bottom, 18) + 8 },
+          ]}
+        >
+          <View style={styles.sheetHandle} />
           <View style={styles.notificationHeader}>
             <View>
               <Text style={styles.notificationTitle}>Bildirimler</Text>
               <Text style={styles.notificationSubtitle}>
                 {totalCount
-                  ? `${totalCount} yeni gelişme var`
+                  ? `${totalCount} yeni gelişme`
                   : "Her şey güncel"}
               </Text>
             </View>
-            <Pressable onPress={notifications.length ? onClear : onDismiss}>
+            <Pressable
+              hitSlop={8}
+              onPress={notifications.length ? onClear : onDismiss}
+              style={({ pressed }) => [pressed && { opacity: 0.7 }]}
+            >
               <Text style={styles.notificationClear}>
                 {notifications.length ? "Temizle" : "Kapat"}
               </Text>
             </Pressable>
           </View>
-          {actionableAlerts.length > 0 ? (
-            <View style={styles.notifActionList}>
-              {actionableAlerts.map((alert) => (
+
+          <View style={styles.notifFilterRow}>
+            {[
+              { key: "all", label: "Tümü" },
+              { key: "social", label: "Sosyal" },
+              { key: "rooms", label: "Odalar" },
+            ].map((tab) => {
+              const active = filterTab === tab.key;
+              return (
                 <Pressable
-                  key={alert.id}
-                  onPress={() => {
-                    onDismiss?.();
-                    alert.onPress?.();
-                  }}
-                  style={({ pressed }) => [
-                    styles.notifActionCard,
-                    pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+                  key={tab.key}
+                  onPress={() => setFilterTab(tab.key)}
+                  style={[
+                    styles.notifFilterPill,
+                    active && styles.notifFilterPillActive,
                   ]}
                 >
-                  <View
+                  <Text
                     style={[
-                      styles.notificationIcon,
-                      { backgroundColor: alert.color || COLORS.primary },
+                      styles.notifFilterText,
+                      active && styles.notifFilterTextActive,
                     ]}
                   >
-                    <Ionicons name={alert.icon || "sparkles"} size={16} color="#fff" />
-                  </View>
-                  <View style={styles.notificationText}>
-                    <Text style={styles.notifActionTitle} numberOfLines={1}>
-                      {alert.title}
-                    </Text>
-                    <Text style={styles.notifActionSub} numberOfLines={1}>
-                      {alert.subtitle}
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.notifActionCta,
-                      { backgroundColor: alert.ctaBg || COLORS.primary },
-                    ]}
-                  >
-                    <Text style={styles.notifActionCtaText}>{alert.ctaLabel || "Aç"}</Text>
-                  </View>
+                    {tab.label}
+                  </Text>
                 </Pressable>
-              ))}
-            </View>
-          ) : null}
-          {groupedNotifications.length ? (
-            <FlatList
-              data={groupedNotifications}
-              keyExtractor={(item, index) => `${item.id}-${index}`}
-              renderItem={({ item }) => (
-                <View style={styles.notificationRow}>
-                  <View
-                    style={[
-                      styles.notificationIcon,
-                      { backgroundColor: item.color },
-                    ]}
-                  >
-                    <Ionicons name={item.icon} size={16} color="#fff" />
-                  </View>
-                  <View style={styles.notificationText}>
-                    <Text style={styles.notificationMessage} numberOfLines={2}>
-                      {item.text}
-                    </Text>
-                    <Text style={styles.notificationTime}>{item.time}</Text>
-                  </View>
-                  {item.count > 1 ? (
-                    <View style={styles.notificationCount}>
-                      <Text style={styles.notificationCountText}>×{item.count}</Text>
-                    </View>
-                  ) : null}
-                </View>
-              )}
-              style={{ flexGrow: 0 }}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.notificationList}
-            />
-          ) : !actionableAlerts.length ? (
-            <View style={styles.notificationEmpty}>
-              <Ionicons
-                name="notifications-off-outline"
-                size={28}
-                color={COLORS.muted}
-              />
-              <Text style={styles.notificationEmptyText}>
-                Yeni bildirimin yok.
-              </Text>
-            </View>
-          ) : null}
+              );
+            })}
+          </View>
+
+          <ScrollView
+            style={{ flexGrow: 0 }}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.notificationList}
+          >
+            {actionableAlerts.length > 0 && filterTab === "all" ? (
+              <View style={styles.notifActionList}>
+                {actionableAlerts.map((alert) => {
+                  const isReward =
+                    String(alert.id || "").includes("reward") ||
+                    String(alert.id || "").includes("daily") ||
+                    String(alert.title || "").toLowerCase().includes("ödül");
+                  return (
+                    <Pressable
+                      key={alert.id}
+                      onPress={() => {
+                        onDismiss?.();
+                        alert.onPress?.();
+                      }}
+                      style={({ pressed }) => [
+                        styles.notifActionCard,
+                        isReward && styles.notifActionCardReward,
+                        pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.notifActionIcon,
+                          { backgroundColor: isReward ? "#FEF0C7" : "#EAF2FF" },
+                        ]}
+                      >
+                        <Ionicons
+                          name={alert.icon || "gift-outline"}
+                          size={18}
+                          color={isReward ? "#D97706" : alert.color || COLORS.primary}
+                        />
+                      </View>
+                      <View style={styles.notificationText}>
+                        <Text style={styles.notifActionTitle} numberOfLines={1}>
+                          {alert.title}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.notifActionSub,
+                            isReward && { color: "#92400E" },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {alert.subtitle}
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.notifActionCta,
+                          isReward
+                            ? styles.notifActionCtaGold
+                            : { backgroundColor: alert.ctaBg || COLORS.primary },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.notifActionCtaText,
+                            isReward && { color: "#1E1504" },
+                          ]}
+                        >
+                          {alert.ctaLabel || "Aç"}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+
+            {todayItems.length > 0 ? (
+              <>
+                <Text style={styles.notifSectionLabel}>Bugün</Text>
+                {renderNotificationCard(todayItems, true)}
+              </>
+            ) : null}
+            {earlierItems.length > 0 ? (
+              <>
+                <Text style={styles.notifSectionLabel}>Önceki</Text>
+                {renderNotificationCard(earlierItems, false)}
+              </>
+            ) : null}
+            {!todayItems.length && !earlierItems.length && !(actionableAlerts.length && filterTab === "all") ? (
+              <View style={styles.notificationEmpty}>
+                <Ionicons
+                  name="notifications-off-outline"
+                  size={28}
+                  color={COLORS.muted}
+                />
+                <Text style={styles.notificationEmptyText}>
+                  {filterTab === "all"
+                    ? "Yeni bildirimin yok."
+                    : "Bu kategoride bildirim yok."}
+                </Text>
+              </View>
+            ) : null}
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -4110,11 +4254,12 @@ const WalletSheet = memo(function WalletSheet({
   );
 });
 
-function CreateRoomSheet({ visible, onDismiss, onCreate }) {
+function CreateRoomSheet({ visible, hostProfile = null, onDismiss, onCreate }) {
   const insets = useSafeAreaInsets();
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("Sohbet");
   const [description, setDescription] = useState("");
+  const [focusedField, setFocusedField] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const create = async () => {
     if (submitting) return;
@@ -4146,6 +4291,7 @@ function CreateRoomSheet({ visible, onDismiss, onCreate }) {
       setSubmitting(false);
     }
   };
+  const hostName = hostProfile?.name || "Sen";
   return (
     <Modal
       transparent
@@ -4164,69 +4310,149 @@ function CreateRoomSheet({ visible, onDismiss, onCreate }) {
             style={[
               styles.sheet,
               styles.createRoomSheet,
-              { paddingBottom: Math.max(insets.bottom, 24) + 16 },
+              { paddingBottom: Math.max(insets.bottom, 22) + 14 },
             ]}
           >
             <View style={styles.sheetHandle} />
-            <Pressable onPress={onDismiss} style={styles.sheetClose}>
-              <Ionicons name="close" size={20} color={COLORS.text} />
-            </Pressable>
-            <Text style={styles.kicker}>YENİ SESLİ ODA</Text>
-            <Text style={styles.sheetTitle}>Yeni oda aç</Text>
-            <Text style={styles.fieldLabel}>KATEGORİ</Text>
-            <View style={styles.sheetCategories}>
-              {CATEGORIES.slice(1).map((item) => (
-                <Pressable
-                  key={item.name}
-                  onPress={() => setCategory(item.name)}
-                  style={[
-                    styles.sheetCategory,
-                    category === item.name && styles.sheetCategoryActive,
-                  ]}
-                >
-                  <Text
+            <View style={styles.crHeaderRow}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.crTitle}>Yeni oda aç</Text>
+                <Text style={styles.crSub}>Odan Keşfet vitrininde böyle görünecek</Text>
+              </View>
+              <Pressable onPress={onDismiss} hitSlop={8} style={styles.crCloseOrb}>
+                <Ionicons name="close" size={18} color="#334155" />
+              </Pressable>
+            </View>
+
+            <LinearGradient
+              colors={["#0D1B34", "#162E59", "#0B1528"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.crPreviewCard}
+            >
+              <Avatar
+                circle
+                size={42}
+                uri={hostProfile?.avatarUrl || null}
+                color={hostProfile?.color || COLORS.primary}
+                label={hostName.charAt(0).toUpperCase()}
+                bordered
+              />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={styles.crPreviewTopLine}>
+                  <View style={styles.crPreviewLiveDot} />
+                  <Text style={styles.crPreviewCat}>{formatCategoryLabel(category)}</Text>
+                </View>
+                <Text style={styles.crPreviewTitle} numberOfLines={1}>
+                  {title.trim() || "Oda adın burada görünür"}
+                </Text>
+                <Text style={styles.crPreviewHost} numberOfLines={1}>
+                  {hostName} · Ev sahibi
+                </Text>
+              </View>
+              <View style={styles.crPreviewBadge}>
+                <Text style={styles.crPreviewBadgeText}>Canlı</Text>
+              </View>
+            </LinearGradient>
+
+            <Text style={[styles.crLabel, { marginTop: 0 }]}>Kategori</Text>
+            <View style={styles.crCatGrid}>
+              {CATEGORIES.slice(1).map((item) => {
+                const active = category === item.name;
+                return (
+                  <Pressable
+                    key={item.name}
+                    onPress={() => setCategory(item.name)}
                     style={[
-                      styles.sheetCategoryText,
-                      category === item.name && styles.sheetCategoryTextActive,
+                      styles.crCatPill,
+                      active && styles.crCatPillActive,
                     ]}
                   >
-                    {item.label}
-                  </Text>
-                </Pressable>
-              ))}
+                    <View
+                      style={[
+                        styles.crCatIconBox,
+                        { backgroundColor: active ? "rgba(255,255,255,0.16)" : item.bg },
+                      ]}
+                    >
+                      <Ionicons
+                        name={item.icon}
+                        size={14}
+                        color={active ? "#FFFFFF" : item.fg}
+                      />
+                    </View>
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.crCatText,
+                        active && styles.crCatTextActive,
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
-            <Text style={styles.fieldLabel}>ODA ADI</Text>
-            <TextInput
-              value={title}
-              onChangeText={setTitle}
-              placeholder="Örn. Kahve arası"
-              placeholderTextColor={COLORS.muted}
-              style={styles.sheetInput}
-              maxLength={36}
-            />
-            <Text style={styles.fieldLabel}>KISA AÇIKLAMA</Text>
-            <TextInput
-              value={description}
-              onChangeText={setDescription}
-              placeholder="Odanın konusunu anlat"
-              placeholderTextColor={COLORS.muted}
-              style={[styles.sheetInput, styles.profileEditorBioInput, { minHeight: 74 }]}
-              maxLength={90}
-              multiline
-            />
-            <Pressable onPress={create} disabled={submitting}>
+
+            <Text style={styles.crLabel}>Oda adı</Text>
+            <View
+              style={[
+                styles.crInputRow,
+                focusedField === "title" && styles.crInputRowFocused,
+              ]}
+            >
+              <Ionicons
+                name="mic-outline"
+                size={17}
+                color={focusedField === "title" ? "#2563EB" : "#64748B"}
+              />
+              <TextInput
+                value={title}
+                onChangeText={setTitle}
+                onFocus={() => setFocusedField("title")}
+                onBlur={() => setFocusedField(null)}
+                placeholder="Örn. Gece Sohbeti"
+                placeholderTextColor="#94A3B8"
+                style={styles.crInputInner}
+                maxLength={36}
+              />
+              <Text style={styles.crCountInline}>{title.length}/36</Text>
+            </View>
+
+            <Text style={styles.crLabel}>Kısa açıklama</Text>
+            <View
+              style={[
+                styles.crAreaWrap,
+                focusedField === "desc" && styles.crInputRowFocused,
+              ]}
+            >
+              <TextInput
+                value={description}
+                onChangeText={setDescription}
+                onFocus={() => setFocusedField("desc")}
+                onBlur={() => setFocusedField(null)}
+                placeholder="Odanın konusunu veya atmosferini kısaca anlat…"
+                placeholderTextColor="#94A3B8"
+                style={styles.crAreaInput}
+                maxLength={90}
+                multiline
+              />
+              <Text style={styles.crAreaCount}>{description.length} / 90</Text>
+            </View>
+
+            <Pressable
+              onPress={create}
+              disabled={submitting}
+              style={({ pressed }) => [pressed && !submitting && { opacity: 0.92, transform: [{ scale: 0.99 }] }]}
+            >
               <LinearGradient
-                colors={BRAND_GRADIENT}
-                style={styles.createSubmit}
+                colors={["#4797FF", "#2563EB"]}
+                style={styles.crSubmitBtn}
               >
-                <Text style={styles.createSubmitText}>
-                  {submitting ? "Oda açılıyor..." : "Odayı oluştur"}
+                <Text style={styles.crSubmitText}>
+                  {submitting ? "Oda açılıyor…" : "Odayı oluştur"}
                 </Text>
-                <Ionicons
-                  name="arrow-forward"
-                  size={20}
-                  color={COLORS.primaryInk}
-                />
+                <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
               </LinearGradient>
             </Pressable>
           </View>
@@ -11501,6 +11727,7 @@ function AppContent() {
       />
       <CreateRoomSheet
         visible={createOpen}
+        hostProfile={profile}
         onDismiss={handleCloseCreate}
         onCreate={createRoom}
       />
@@ -12392,64 +12619,114 @@ const styles = StyleSheet.create({
   profileColorSelected: { borderColor: COLORS.text },
   notificationOverlay: {
     flex: 1,
-    paddingTop: Platform.OS === "ios" ? 61 : 27,
-    paddingHorizontal: 14,
-    backgroundColor: "rgba(26,20,16,0.42)",
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(15,23,42,0.42)",
   },
   notificationSheet: {
-    maxHeight: "70%",
-    borderRadius: 22,
-    padding: 16,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.line,
+    maxHeight: "78%",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    backgroundColor: "#F3F7FC",
   },
   notificationHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingBottom: 13,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.line,
+    marginBottom: 12,
   },
-  notificationTitle: { color: COLORS.text, fontSize: 18, fontWeight: "900" },
-  notificationSubtitle: { color: COLORS.muted, fontSize: 12, marginTop: 3 },
-  notificationClear: { color: COLORS.text, fontSize: 12, fontWeight: "900" },
-  notificationList: { paddingTop: 4 },
+  notificationTitle: { color: "#0F172A", fontSize: 21, fontWeight: "800", letterSpacing: -0.4 },
+  notificationSubtitle: { color: "#64748B", fontSize: 12, marginTop: 2 },
+  notificationClear: { color: "#2563EB", fontSize: 13, fontWeight: "700" },
+  notifFilterRow: {
+    flexDirection: "row",
+    gap: 7,
+    marginBottom: 12,
+  },
+  notifFilterPill: {
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2EBF5",
+  },
+  notifFilterPillActive: {
+    backgroundColor: "#0D1B34",
+    borderColor: "#0D1B34",
+  },
+  notifFilterText: {
+    color: "#475569",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  notifFilterTextActive: {
+    color: "#FFFFFF",
+  },
+  notifSectionLabel: {
+    color: "#64748B",
+    fontSize: 11.5,
+    fontWeight: "700",
+    marginTop: 2,
+    marginBottom: 6,
+    marginLeft: 4,
+  },
+  notifGroupCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#E4EDF7",
+    overflow: "hidden",
+    marginBottom: 10,
+  },
+  notificationList: { paddingBottom: 8 },
   notificationCount: {
     alignSelf: "center",
-    minWidth: 34,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    minWidth: 30,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
     borderRadius: 999,
-    backgroundColor: "rgba(47,128,237,0.12)",
+    backgroundColor: "#EFF6FF",
     alignItems: "center",
   },
-  notificationCountText: { color: COLORS.primary, fontSize: 11, fontWeight: "900" },
+  notificationCountText: { color: "#2563EB", fontSize: 11, fontWeight: "700" },
+  notifUnreadDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: "#2563EB",
+    alignSelf: "center",
+  },
   notificationRow: {
     flexDirection: "row",
+    alignItems: "center",
     gap: 11,
-    paddingVertical: 13,
+    paddingHorizontal: 13,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.lineSoft,
+    borderBottomColor: "#EEF3F9",
+  },
+  notificationRowLast: {
+    borderBottomWidth: 0,
   },
   notificationIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     justifyContent: "center",
     alignItems: "center",
   },
-  notificationText: { flex: 1 },
+  notificationText: { flex: 1, minWidth: 0 },
   notificationMessage: {
-    color: COLORS.text,
+    color: "#1E293B",
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "600",
     lineHeight: 18,
   },
-  notificationTime: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
-  notificationEmpty: { alignItems: "center", paddingVertical: 37, gap: 9 },
-  notificationEmptyText: { color: COLORS.muted, fontSize: 13 },
+  notificationTime: { color: "#94A3B8", fontSize: 11, marginTop: 2 },
+  notificationEmpty: { alignItems: "center", paddingVertical: 36, gap: 9 },
+  notificationEmptyText: { color: "#64748B", fontSize: 13 },
   settingsCaption: {
     color: COLORS.muted,
     fontSize: 10,
@@ -15139,9 +15416,201 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 600,
     alignSelf: "center",
-    backgroundColor: COLORS.surface,
-    borderTopWidth: 1,
-    borderColor: COLORS.line,
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+  },
+  crHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 14,
+  },
+  crTitle: {
+    color: "#0F172A",
+    fontSize: 21,
+    fontWeight: "800",
+    letterSpacing: -0.4,
+  },
+  crSub: {
+    color: "#64748B",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  crCloseOrb: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  crPreviewCard: {
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  crPreviewTopLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 2,
+  },
+  crPreviewLiveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#34D399",
+  },
+  crPreviewCat: {
+    color: "#93C5FD",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  crPreviewTitle: {
+    color: "#FFFFFF",
+    fontSize: 14.5,
+    fontWeight: "800",
+  },
+  crPreviewHost: {
+    color: "#94ACC9",
+    fontSize: 11,
+    marginTop: 1,
+  },
+  crPreviewBadge: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.10)",
+  },
+  crPreviewBadgeText: {
+    color: "#DBEAFE",
+    fontSize: 10.5,
+    fontWeight: "700",
+  },
+  crLabel: {
+    color: "#475569",
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 13,
+    marginBottom: 7,
+  },
+  crCatGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  crCatPill: {
+    width: "48.2%",
+    height: 40,
+    paddingLeft: 7,
+    paddingRight: 10,
+    borderRadius: 14,
+    backgroundColor: "#F4F8FD",
+    borderWidth: 1,
+    borderColor: "#E2EBF5",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  crCatPillActive: {
+    backgroundColor: "#0D1B34",
+    borderColor: "#0D1B34",
+  },
+  crCatIconBox: {
+    width: 26,
+    height: 26,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  crCatText: {
+    color: "#1E293B",
+    fontSize: 13,
+    fontWeight: "700",
+    flexShrink: 1,
+  },
+  crCatTextActive: {
+    color: "#FFFFFF",
+  },
+  crInputRow: {
+    height: 48,
+    paddingHorizontal: 13,
+    borderRadius: 14,
+    backgroundColor: "#F1F6FC",
+    borderWidth: 1.5,
+    borderColor: "transparent",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+  },
+  crInputRowFocused: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#3B82F6",
+  },
+  crInputInner: {
+    flex: 1,
+    color: "#0F172A",
+    fontSize: 14,
+    fontWeight: "600",
+    paddingVertical: 0,
+  },
+  crCountInline: {
+    color: "#94A3B8",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  crAreaWrap: {
+    borderRadius: 14,
+    backgroundColor: "#F1F6FC",
+    borderWidth: 1.5,
+    borderColor: "transparent",
+    paddingHorizontal: 13,
+    paddingTop: 10,
+    paddingBottom: 8,
+  },
+  crAreaInput: {
+    minHeight: 54,
+    color: "#0F172A",
+    fontSize: 13.5,
+    lineHeight: 19,
+    textAlignVertical: "top",
+    paddingVertical: 0,
+  },
+  crAreaCount: {
+    textAlign: "right",
+    color: "#94A3B8",
+    fontSize: 10.5,
+    fontWeight: "600",
+    marginTop: 4,
+  },
+  crSubmitBtn: {
+    marginTop: 18,
+    height: 50,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    shadowColor: "#2563EB",
+    shadowOpacity: 0.24,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 5,
+  },
+  crSubmitText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "700",
   },
 
 
@@ -17774,33 +18243,49 @@ const styles = StyleSheet.create({
   notifActionCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    padding: 10,
-    borderRadius: 15,
-    backgroundColor: COLORS.surfaceRaised,
+    gap: 11,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: "#E4EDF7",
+  },
+  notifActionCardReward: {
+    backgroundColor: "#FEF8E8",
+    borderColor: "#F5DFA9",
+  },
+  notifActionIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
   },
   notifActionTitle: {
-    color: COLORS.text,
-    fontSize: 12.5,
-    fontWeight: "900",
+    color: "#0F172A",
+    fontSize: 13.5,
+    fontWeight: "800",
   },
   notifActionSub: {
-    color: COLORS.textSecondary,
-    fontSize: 11,
-    marginTop: 2,
+    color: "#64748B",
+    fontSize: 11.5,
+    fontWeight: "600",
+    marginTop: 1,
   },
   notifActionCta: {
-    paddingHorizontal: 11,
-    paddingVertical: 6,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
     borderRadius: 999,
     flexShrink: 0,
   },
+  notifActionCtaGold: {
+    backgroundColor: "#F5B82E",
+  },
   notifActionCtaText: {
     color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "900",
+    fontSize: 12,
+    fontWeight: "800",
   },
   profileLiveRoomBanner: {
     marginTop: 12,

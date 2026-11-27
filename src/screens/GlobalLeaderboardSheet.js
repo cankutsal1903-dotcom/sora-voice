@@ -17,42 +17,44 @@ import { getGlobalLeaderboard } from "../data/soraRepository";
 import { SoraWealthBadge } from "../ui/SoraWealthTier";
 import { SoraLevelCrest } from "../ui/SoraGiftArtwork";
 
+const PODIUM_GLOW = require("../../assets/events/podium-glow.webp");
+
 const TABS = [
-  { key: "mostGenerous", label: "En Cömertler", icon: "diamond", accent: "#FBBF24" },
-  { key: "activeFamilies", label: "Aktif Aileler", icon: "people", accent: "#A78BFA" },
-  { key: "topLevels", label: "Zirve Seviye", icon: "star", accent: "#60A5FA" },
+  { key: "mostGenerous", label: "En Cömertler", icon: "diamond", accent: "#E2BE79" },
+  { key: "activeFamilies", label: "Aktif Aileler", icon: "people", accent: "#93C5FD" },
+  { key: "topLevels", label: "Zirve Seviye", icon: "star", accent: "#93C5FD" },
 ];
 
 const MEDAL_THEME = {
   1: {
-    ring: "#FBBF24",
-    badgeBg: "rgba(251,191,36,0.20)",
-    badgeBorder: "rgba(251,191,36,0.55)",
-    pedestal: ["rgba(251,191,36,0.26)", "rgba(251,191,36,0.06)"],
-    text: "#FDE68A",
-    icon: "crown",
-    avatarSize: 68,
-    pedestalHeight: 62,
+    ring: "#E2BE79",
+    badgeBg: "rgba(226,190,121,0.14)",
+    badgeBorder: "rgba(226,190,121,0.72)",
+    pedestal: ["rgba(226,190,121,0.16)", "rgba(226,190,121,0.02)"],
+    text: "#EAD09B",
+    lvlText: "#F3D99B",
+    avatarSize: 66,
+    pedestalHeight: 56,
   },
   2: {
     ring: "#CBD5E1",
-    badgeBg: "rgba(203,213,225,0.16)",
-    badgeBorder: "rgba(203,213,225,0.45)",
-    pedestal: ["rgba(203,213,225,0.18)", "rgba(203,213,225,0.04)"],
-    text: "#E2E8F0",
-    icon: "medal",
-    avatarSize: 56,
-    pedestalHeight: 46,
+    badgeBg: "rgba(203,213,225,0.10)",
+    badgeBorder: "rgba(203,213,225,0.50)",
+    pedestal: ["rgba(255,255,255,0.075)", "rgba(255,255,255,0.015)"],
+    text: "#9FB2CA",
+    lvlText: "#CBD5E1",
+    avatarSize: 52,
+    pedestalHeight: 42,
   },
   3: {
-    ring: "#FB923C",
-    badgeBg: "rgba(251,146,60,0.18)",
-    badgeBorder: "rgba(251,146,60,0.48)",
-    pedestal: ["rgba(251,146,60,0.20)", "rgba(251,146,60,0.04)"],
-    text: "#FED7AA",
-    icon: "medal",
-    avatarSize: 56,
-    pedestalHeight: 38,
+    ring: "#D49C72",
+    badgeBg: "rgba(212,156,114,0.10)",
+    badgeBorder: "rgba(212,156,114,0.50)",
+    pedestal: ["rgba(255,255,255,0.065)", "rgba(255,255,255,0.015)"],
+    text: "#9FB2CA",
+    lvlText: "#CBD5E1",
+    avatarSize: 52,
+    pedestalHeight: 34,
   },
 };
 
@@ -152,7 +154,9 @@ const PodiumSlot = memo(function PodiumSlot({
       ]}
     >
       <View style={styles.podiumMedalTop}>
-        <MaterialCommunityIcons name={theme.icon} size={isFirst ? 22 : 17} color={theme.ring} />
+        {isFirst ? (
+          <MaterialCommunityIcons name="crown-outline" size={18} color="#E2BE79" />
+        ) : null}
       </View>
 
       <View style={styles.podiumAvatarHolder}>
@@ -173,7 +177,7 @@ const PodiumSlot = memo(function PodiumSlot({
       </View>
 
       <Text
-        numberOfLines={2}
+        numberOfLines={1}
         style={[
           styles.podiumName,
           isFirst && styles.podiumNameFirst,
@@ -183,23 +187,9 @@ const PodiumSlot = memo(function PodiumSlot({
         {isSelf ? `${item.name} (${isFamily ? "Ailen" : "Sen"})` : item.name}
       </Text>
 
-      <View
-        style={[
-          styles.podiumScorePill,
-          { backgroundColor: theme.badgeBg, borderColor: theme.badgeBorder },
-        ]}
-      >
-        {tabKey === "mostGenerous" ? (
-          <Ionicons name="diamond" size={10} color={theme.text} />
-        ) : tabKey === "activeFamilies" ? (
-          <Ionicons name="flame" size={10} color={theme.text} />
-        ) : (
-          <Ionicons name="star" size={10} color={theme.text} />
-        )}
-        <Text numberOfLines={1} style={[styles.podiumScoreText, { color: theme.text }]}>
-          {formatPrimaryMetric(tabKey, item)}
-        </Text>
-      </View>
+      <Text numberOfLines={1} style={[styles.podiumScoreText, { color: theme.text }]}>
+        {formatPrimaryMetric(tabKey, item)}
+      </Text>
 
       <LinearGradient
         colors={theme.pedestal}
@@ -207,20 +197,19 @@ const PodiumSlot = memo(function PodiumSlot({
         end={{ x: 0, y: 1 }}
         style={[
           styles.podiumPedestal,
-          { height: theme.pedestalHeight, borderColor: theme.badgeBorder },
+          { height: theme.pedestalHeight, borderTopColor: theme.badgeBorder },
         ]}
       >
-        <Text style={[styles.podiumPedestalNum, { color: theme.ring }]}>#{place}</Text>
         {tabKey === "activeFamilies" ? (
-          <Text numberOfLines={1} style={styles.podiumPedestalMeta}>
-            Sv.{item.level} · {item.memberCount ?? 0} üye
+          <Text numberOfLines={1} style={[styles.podiumPedestalMeta, { color: theme.lvlText }]}>
+            Sv. {item.level} · {item.memberCount ?? 0} üye
           </Text>
         ) : tabKey === "topLevels" ? (
-          <Text numberOfLines={1} style={styles.podiumPedestalMeta}>
+          <Text numberOfLines={1} style={[styles.podiumPedestalMeta, { color: theme.lvlText }]}>
             {fmtCompact(item.secondaryScore)} XP
           </Text>
         ) : (
-          <Text numberOfLines={1} style={styles.podiumPedestalMeta}>
+          <Text numberOfLines={1} style={[styles.podiumPedestalMeta, { color: theme.lvlText }]}>
             Sv. {item.level}
           </Text>
         )}
@@ -256,20 +245,18 @@ const LeaderboardRow = memo(function LeaderboardRow({
 
       <EntityAvatar
         item={item}
-        size={40}
-        borderColor={isSelf ? "#60A5FA" : "rgba(255,255,255,0.18)"}
+        size={38}
+        borderColor={isSelf ? "#60A5FA" : "rgba(255,255,255,0.12)"}
         isFamily={isFamily}
       />
 
       <View style={styles.rowCopy}>
         <View style={styles.rowTitleLine}>
-          <Text numberOfLines={1} style={[styles.rowName, isSelf && { color: "#BFDBFE" }]}>
+          <Text numberOfLines={1} style={[styles.rowName, isSelf && { color: "#DBEAFE" }]}>
             {isSelf ? `${item.name} (${isFamily ? "Ailen" : "Sen"})` : item.name}
           </Text>
-          {tabKey === "mostGenerous" && item.score > 0 ? (
-            <SoraWealthBadge spent={item.score} size="xs" animated={false} />
-          ) : tabKey === "topLevels" ? (
-            <SoraLevelCrest level={item.level} size={18} />
+          {!isFamily ? (
+            <SoraLevelCrest level={item.level} size={16} />
           ) : null}
         </View>
         <Text numberOfLines={1} style={styles.rowMeta}>
@@ -277,18 +264,9 @@ const LeaderboardRow = memo(function LeaderboardRow({
         </Text>
       </View>
 
-      <View style={[styles.rowScorePill, { borderColor: `${accent}44`, backgroundColor: `${accent}1A` }]}>
-        {tabKey === "mostGenerous" ? (
-          <Ionicons name="diamond" size={11} color={accent} />
-        ) : tabKey === "activeFamilies" ? (
-          <Ionicons name="flame" size={11} color={accent} />
-        ) : (
-          <Ionicons name="star" size={11} color={accent} />
-        )}
-        <Text numberOfLines={1} style={[styles.rowScoreText, { color: accent }]}>
-          {formatPrimaryMetric(tabKey, item)}
-        </Text>
-      </View>
+      <Text numberOfLines={1} style={[styles.rowScoreText, { color: isSelf ? "#93C5FD" : accent }]}>
+        {formatPrimaryMetric(tabKey, item)}
+      </Text>
     </Pressable>
   );
 });
@@ -410,11 +388,11 @@ export const GlobalLeaderboardSheet = memo(function GlobalLeaderboardSheet({
     if (!topThree.length) return null;
     return (
       <View style={styles.podiumCard}>
-        <LinearGradient
-          colors={["rgba(251,191,36,0.12)", "rgba(47,128,237,0.08)", "rgba(15,23,42,0.2)"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
+        <Image
+          source={PODIUM_GLOW}
+          resizeMode="contain"
+          tintColor="#60A5FA"
+          style={styles.podiumGlowImg}
         />
         <View style={styles.podiumRow}>
           <PodiumSlot
@@ -451,50 +429,41 @@ export const GlobalLeaderboardSheet = memo(function GlobalLeaderboardSheet({
       onRequestClose={onDismiss}
     >
       <View style={styles.screen}>
-        <StatusBar barStyle="light-content" backgroundColor="#0A1120" />
+        <StatusBar barStyle="light-content" backgroundColor="#101C33" />
         <LinearGradient
-          colors={["#0A1120", "#111D35", "#0B1324"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          colors={["#101C33", "#0C1424", "#09101C"]}
+          locations={[0, 0.44, 1]}
           style={StyleSheet.absoluteFill}
         />
 
         {/* Header */}
         <View style={[styles.header, { paddingTop: Math.max(insets.top, 14) + 6 }]}>
-          <View style={styles.headerTitleWrap}>
-            <View style={styles.trophyOrb}>
-              <Ionicons name="trophy" size={19} color="#FBBF24" />
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={styles.headerTitle} numberOfLines={1}>
-                Liderlik Podyumu
-              </Text>
-              <Text style={styles.headerSub} numberOfLines={1}>
-                Sora global sıralaması · dokun ve incele
-              </Text>
-            </View>
-          </View>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            Liderlik
+          </Text>
           <View style={styles.headerActions}>
             <Pressable
               onPress={() => fetchBoard({ force: true })}
               disabled={loading || refreshing}
+              hitSlop={6}
               accessibilityRole="button"
               accessibilityLabel="Sıralamayı yenile"
-              style={({ pressed }) => [styles.headerBtn, pressed && { opacity: 0.75 }]}
+              style={({ pressed }) => [styles.headerBtn, pressed && { opacity: 0.65 }]}
             >
               {refreshing ? (
-                <ActivityIndicator size="small" color="#FBBF24" />
+                <ActivityIndicator size="small" color="#93C5FD" />
               ) : (
-                <Ionicons name="refresh" size={18} color="#CBD5E1" />
+                <Ionicons name="refresh" size={19} color="#CBD5E1" />
               )}
             </Pressable>
             <Pressable
               onPress={onDismiss}
+              hitSlop={6}
               accessibilityRole="button"
               accessibilityLabel="Liderlik podyumunu kapat"
-              style={({ pressed }) => [styles.headerBtn, pressed && { opacity: 0.75 }]}
+              style={({ pressed }) => [styles.headerBtn, pressed && { opacity: 0.65 }]}
             >
-              <Ionicons name="close" size={20} color="#FFFFFF" />
+              <Ionicons name="close" size={21} color="#CBD5E1" />
             </Pressable>
           </View>
         </View>
@@ -511,20 +480,15 @@ export const GlobalLeaderboardSheet = memo(function GlobalLeaderboardSheet({
                 accessibilityState={{ selected: active }}
                 style={({ pressed }) => [
                   styles.tabItem,
-                  active && [styles.tabItemActive, { borderColor: `${tab.accent}66` }],
-                  pressed && { opacity: 0.88 },
+                  active && styles.tabItemActive,
+                  pressed && { opacity: 0.85 },
                 ]}
               >
-                <Ionicons
-                  name={tab.icon}
-                  size={13}
-                  color={active ? tab.accent : "#8AA0BF"}
-                />
                 <Text
                   numberOfLines={1}
                   style={[
                     styles.tabLabel,
-                    active && { color: "#FFFFFF" },
+                    active && styles.tabLabelActive,
                   ]}
                 >
                   {tab.label}
@@ -537,7 +501,7 @@ export const GlobalLeaderboardSheet = memo(function GlobalLeaderboardSheet({
         {/* Content */}
         {loading && !items.length ? (
           <View style={styles.stateCenter}>
-            <ActivityIndicator size="large" color="#FBBF24" />
+            <ActivityIndicator size="large" color="#93C5FD" />
             <Text style={styles.stateTitle}>Podyum hazırlanıyor…</Text>
           </View>
         ) : error && !items.length ? (
@@ -566,22 +530,25 @@ export const GlobalLeaderboardSheet = memo(function GlobalLeaderboardSheet({
             </Text>
           </View>
         ) : (
-          <FlatList
-            data={restItems}
-            keyExtractor={keyExtractor}
-            renderItem={renderRow}
-            ListHeaderComponent={renderHeader}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{
-              paddingHorizontal: 16,
-              paddingTop: 10,
-              paddingBottom: Math.max(insets.bottom, 16) + (myEntry ? 82 : 20),
-              gap: 8,
-            }}
-            initialNumToRender={12}
-            maxToRenderPerBatch={10}
-            windowSize={7}
-          />
+          <View style={styles.listShell}>
+            {renderHeader()}
+            <View style={styles.listTray}>
+              <FlatList
+                data={restItems}
+                keyExtractor={keyExtractor}
+                renderItem={renderRow}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{
+                  paddingHorizontal: 16,
+                  paddingTop: 6,
+                  paddingBottom: Math.max(insets.bottom, 16) + (myEntry ? 84 : 20),
+                }}
+                initialNumToRender={12}
+                maxToRenderPerBatch={10}
+                windowSize={7}
+              />
+            </View>
+          </View>
         )}
 
         {/* Sticky self rank bar when user or their family is ranked */}
@@ -596,24 +563,22 @@ export const GlobalLeaderboardSheet = memo(function GlobalLeaderboardSheet({
               onPress={() => handlePressItem(myEntry)}
               style={({ pressed }) => [styles.myRankPill, pressed && { opacity: 0.9 }]}
             >
-              <View style={styles.myRankBadge}>
-                <Text style={styles.myRankBadgeText}>#{myEntry.rank}</Text>
-              </View>
+              <Text style={styles.myRankBadgeText}>#{myEntry.rank}</Text>
               <EntityAvatar
                 item={myEntry}
-                size={32}
-                borderColor={activeTabMeta.accent}
+                size={34}
+                borderColor="rgba(147,197,253,0.45)"
                 isFamily={activeTab === "activeFamilies"}
               />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text numberOfLines={1} style={styles.myRankTitle}>
-                  {activeTab === "activeFamilies" ? `Ailen: ${myEntry.name}` : `Senin Sıran · ${myEntry.name}`}
+                  {activeTab === "activeFamilies" ? `${myEntry.name} (Ailen)` : `${myEntry.name} (Sen)`}
                 </Text>
                 <Text numberOfLines={1} style={styles.myRankSub}>
-                  {formatSecondaryLine(activeTab, myEntry)}
+                  Kendi sıran · {formatSecondaryLine(activeTab, myEntry)}
                 </Text>
               </View>
-              <Text style={[styles.myRankScore, { color: activeTabMeta.accent }]}>
+              <Text style={styles.myRankScore}>
                 {formatPrimaryMetric(activeTab, myEntry)}
               </Text>
             </Pressable>
@@ -627,101 +592,80 @@ export const GlobalLeaderboardSheet = memo(function GlobalLeaderboardSheet({
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#0A1120",
+    backgroundColor: "#09101C",
   },
   header: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingHorizontal: 18,
+    paddingBottom: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
   },
-  headerTitleWrap: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  trophyOrb: {
-    width: 38,
-    height: 38,
-    borderRadius: 13,
-    backgroundColor: "rgba(251,191,36,0.16)",
-    borderWidth: 1,
-    borderColor: "rgba(251,191,36,0.38)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
   headerTitle: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "900",
-    letterSpacing: -0.2,
-  },
-  headerSub: {
-    color: "#8AA0BF",
-    fontSize: 11.5,
-    fontWeight: "600",
-    marginTop: 1,
+    color: "#F8FAFC",
+    fontSize: 22,
+    fontWeight: "800",
+    letterSpacing: -0.45,
   },
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 4,
   },
   headerBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 13,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },
   tabBar: {
     marginHorizontal: 16,
-    marginBottom: 8,
-    height: 44,
+    marginBottom: 12,
+    height: 42,
     padding: 4,
-    borderRadius: 15,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.09)",
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.055)",
     flexDirection: "row",
-    gap: 5,
+    gap: 4,
   },
   tabItem: {
     flex: 1,
-    borderRadius: 11,
-    flexDirection: "row",
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
-    paddingHorizontal: 4,
-    borderWidth: 1,
-    borderColor: "transparent",
+    paddingHorizontal: 6,
   },
   tabItemActive: {
     backgroundColor: "rgba(255,255,255,0.12)",
   },
   tabLabel: {
-    color: "#94A8C4",
-    fontSize: 10.5,
-    fontWeight: "800",
+    color: "#8EA3BF",
+    fontSize: 11.5,
+    fontWeight: "600",
+  },
+  tabLabelActive: {
+    color: "#F8FAFC",
+    fontWeight: "700",
+  },
+  listShell: {
+    flex: 1,
   },
   podiumCard: {
-    borderRadius: 22,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(251,191,36,0.22)",
-    backgroundColor: "rgba(18,30,52,0.85)",
-    paddingTop: 14,
-    paddingHorizontal: 10,
-    paddingBottom: 12,
-    marginBottom: 8,
+    paddingTop: 4,
+    paddingHorizontal: 16,
+    paddingBottom: 0,
+    position: "relative",
+    overflow: "visible",
+  },
+  podiumGlowImg: {
+    position: "absolute",
+    top: -10,
+    alignSelf: "center",
+    width: 210,
+    height: 130,
+    opacity: 0.22,
   },
   podiumRow: {
     flexDirection: "row",
@@ -735,10 +679,11 @@ const styles = StyleSheet.create({
     paddingTop: 14,
   },
   podiumSlotFirst: {
+    flex: 1.12,
     paddingTop: 0,
   },
   podiumMedalTop: {
-    height: 22,
+    height: 20,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 4,
@@ -756,7 +701,7 @@ const styles = StyleSheet.create({
   },
   avatarInitial: {
     color: "#FFFFFF",
-    fontWeight: "900",
+    fontWeight: "800",
   },
   podiumRankBadge: {
     position: "absolute",
@@ -768,90 +713,83 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: "#111D35",
+    borderColor: "#0E1729",
   },
   podiumRankBadgeText: {
-    color: "#0A1120",
+    color: "#0B1220",
     fontSize: 10,
-    fontWeight: "900",
+    fontWeight: "800",
   },
   podiumName: {
     color: "#E2E8F0",
     fontSize: 12,
-    fontWeight: "800",
+    fontWeight: "700",
     textAlign: "center",
-    minHeight: 20,
-    lineHeight: 15,
     marginTop: 2,
   },
   podiumNameFirst: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-  podiumScorePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-    borderWidth: 1,
-    marginTop: 4,
-    marginBottom: 8,
-    maxWidth: "100%",
+    color: "#F8FAFC",
+    fontSize: 12.5,
+    fontWeight: "800",
   },
   podiumScoreText: {
-    fontSize: 10.5,
-    fontWeight: "900",
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 2,
+    marginBottom: 9,
+    fontVariant: ["tabular-nums"],
   },
   podiumPedestal: {
     width: "100%",
-    borderRadius: 12,
-    borderWidth: 1,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    borderTopWidth: 2,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 4,
   },
-  podiumPedestalNum: {
-    fontSize: 14,
-    fontWeight: "900",
-  },
   podiumPedestalMeta: {
-    color: "#94A8C4",
-    fontSize: 9.5,
+    fontSize: 10.5,
     fontWeight: "700",
-    marginTop: 1,
+  },
+  listTray: {
+    flex: 1,
+    backgroundColor: "#101A2E",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.075)",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: "hidden",
   },
   rowCard: {
-    minHeight: 64,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "rgba(255,255,255,0.045)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    minHeight: 58,
+    paddingHorizontal: 2,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.055)",
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 11,
   },
   rowCardSelf: {
-    backgroundColor: "rgba(47,128,237,0.16)",
-    borderColor: "rgba(96,165,250,0.45)",
+    backgroundColor: "rgba(59,130,246,0.10)",
+    marginHorizontal: -6,
+    paddingHorizontal: 8,
+    borderRadius: 14,
+    borderBottomColor: "transparent",
   },
   rowCardPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.99 }],
+    opacity: 0.78,
   },
   rowRankBox: {
-    width: 26,
+    width: 24,
     alignItems: "center",
     justifyContent: "center",
   },
   rowRankText: {
-    color: "#8AA0BF",
-    fontSize: 13,
-    fontWeight: "900",
+    color: "#7C92AF",
+    fontSize: 12.5,
+    fontWeight: "700",
   },
   rowCopy: {
     flex: 1,
@@ -860,33 +798,25 @@ const styles = StyleSheet.create({
   rowTitleLine: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    gap: 6,
   },
   rowName: {
-    color: "#F8FAFC",
+    color: "#F1F5F9",
     fontSize: 13.5,
-    fontWeight: "800",
+    fontWeight: "600",
     flexShrink: 1,
   },
   rowMeta: {
-    color: "#8AA0BF",
-    fontSize: 11.5,
-    fontWeight: "600",
+    color: "#7C92AF",
+    fontSize: 11,
+    fontWeight: "500",
     marginTop: 2,
   },
-  rowScorePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 11,
-    borderWidth: 1,
-    flexShrink: 0,
-  },
   rowScoreText: {
-    fontSize: 11.5,
-    fontWeight: "900",
+    fontSize: 12.5,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+    flexShrink: 0,
   },
   stateCenter: {
     flex: 1,
@@ -898,7 +828,7 @@ const styles = StyleSheet.create({
   stateTitle: {
     color: "#F8FAFC",
     fontSize: 16,
-    fontWeight: "900",
+    fontWeight: "800",
     textAlign: "center",
     marginTop: 4,
   },
@@ -913,12 +843,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 13,
-    backgroundColor: "#2F80ED",
+    backgroundColor: "#2563EB",
   },
   retryBtnText: {
     color: "#FFFFFF",
     fontSize: 13,
-    fontWeight: "900",
+    fontWeight: "700",
   },
   myRankFooter: {
     position: "absolute",
@@ -927,47 +857,44 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingHorizontal: 16,
     paddingTop: 10,
-    backgroundColor: "rgba(10,17,32,0.92)",
+    backgroundColor: "rgba(16,26,46,0.95)",
     borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.09)",
+    borderTopColor: "rgba(255,255,255,0.07)",
   },
   myRankPill: {
-    minHeight: 50,
-    borderRadius: 15,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: "rgba(47,128,237,0.18)",
+    minHeight: 52,
+    borderRadius: 16,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    backgroundColor: "rgba(59,130,246,0.14)",
     borderWidth: 1,
-    borderColor: "rgba(96,165,250,0.42)",
+    borderColor: "rgba(96,165,250,0.28)",
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
   },
-  myRankBadge: {
-    minWidth: 32,
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-    borderRadius: 9,
-    backgroundColor: "rgba(251,191,36,0.18)",
-    alignItems: "center",
-  },
   myRankBadgeText: {
-    color: "#FDE68A",
-    fontSize: 12,
-    fontWeight: "900",
-  },
-  myRankTitle: {
-    color: "#FFFFFF",
-    fontSize: 12.5,
+    minWidth: 26,
+    textAlign: "center",
+    color: "#93C5FD",
+    fontSize: 13,
     fontWeight: "800",
   },
+  myRankTitle: {
+    color: "#DBEAFE",
+    fontSize: 13,
+    fontWeight: "700",
+  },
   myRankSub: {
-    color: "#94A8C4",
+    color: "#93C5FD",
     fontSize: 11,
-    fontWeight: "600",
+    fontWeight: "500",
+    marginTop: 1,
   },
   myRankScore: {
+    color: "#93C5FD",
     fontSize: 12.5,
-    fontWeight: "900",
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
   },
 });

@@ -38,18 +38,6 @@ const describeAuthError = (error, fallback) => {
   return message || fallback;
 };
 
-/** Odaklandiginda kenarligi marka rengine donen metin alani. */
-function Field({ focused, style, ...props }) {
-  return (
-    <TextInput
-      placeholderTextColor="#8190A2"
-      selectionColor={BRAND}
-      style={[style, focused && styles.inputFocused]}
-      {...props}
-    />
-  );
-}
-
 export function AuthScreen() {
   const [focusedField, setFocusedField] = useState(null);
   const focus = (name) => () => setFocusedField(name);
@@ -60,6 +48,7 @@ export function AuthScreen() {
   const [handle, setHandle] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const ensureAcceptedPolicies = () => {
@@ -148,20 +137,28 @@ export function AuthScreen() {
 
   const profileFields = (
     <>
-      <Text style={styles.label}>GÖRÜNEN AD</Text>
-      <Field
-        value={displayName}
-        onChangeText={setDisplayName}
-        autoCapitalize="words"
-        placeholder="Adın"
-        style={styles.input}
-        maxLength={36}
-        focused={focusedField === "name"}
-        onFocus={focus("name")}
-        onBlur={blur}
-      />
-      <Text style={styles.label}>KULLANICI ADI</Text>
-      <View style={[styles.handleInput, focusedField === "handle" && styles.handleInputFocused]}>
+      <Text style={styles.label}>Görünen ad</Text>
+      <View style={[styles.inputRow, focusedField === "name" && styles.inputRowFocused]}>
+        <Ionicons
+          name="person-outline"
+          size={17}
+          color={focusedField === "name" ? BRAND : "#8093AC"}
+        />
+        <TextInput
+          value={displayName}
+          onChangeText={setDisplayName}
+          autoCapitalize="words"
+          placeholder="Adın"
+          placeholderTextColor="#94A3B8"
+          selectionColor={BRAND}
+          style={styles.inputInner}
+          maxLength={36}
+          onFocus={focus("name")}
+          onBlur={blur}
+        />
+      </View>
+      <Text style={styles.label}>Kullanıcı adı</Text>
+      <View style={[styles.inputRow, focusedField === "handle" && styles.inputRowFocused]}>
         <Text style={styles.handlePrefix}>@</Text>
         <TextInput
           value={handle}
@@ -169,11 +166,11 @@ export function AuthScreen() {
           autoCapitalize="none"
           autoCorrect={false}
           placeholder="kullaniciadi"
-          placeholderTextColor="#8190A2"
+          placeholderTextColor="#94A3B8"
           selectionColor={BRAND}
           onFocus={focus("handle")}
           onBlur={blur}
-          style={styles.handleText}
+          style={styles.inputInner}
           maxLength={24}
         />
       </View>
@@ -215,7 +212,7 @@ export function AuthScreen() {
     : "Odaların, takiplerin ve profilin seni bekliyor.";
 
   return (
-    <LinearGradient colors={["#F3F7FC", "#F3F7FC", "#EAF3FD"]} style={styles.screen}>
+    <LinearGradient colors={["#E7F1FE", "#F3F7FC", "#F3F7FC"]} locations={[0, 0.36, 1]} style={styles.screen}>
       <SafeAreaView style={styles.safe}>
         <KeyboardSafeView style={styles.safe}>
           <ScrollView
@@ -224,8 +221,14 @@ export function AuthScreen() {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.hero}>
-              <View style={styles.logo}><SoraMark size={96} tone="light" /></View>
-              <Text style={styles.kicker}>SORA HESABI</Text>
+              <LinearGradient
+                colors={["#0D1B34", "#1E40AF", "#3B82F6"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.logoSquircle}
+              >
+                <SoraMark size={46} tone="dark" />
+              </LinearGradient>
               <Text style={styles.title}>{isRegistering ? "Sesinle yerini al." : "Sohbete geri dön."}</Text>
               <Text style={styles.subtitle}>{subtitle}</Text>
             </View>
@@ -256,60 +259,89 @@ export function AuthScreen() {
                 style={({ pressed }) => [
                   styles.googleButton,
                   submitting && styles.disabled,
-                  pressed && { opacity: 0.9 },
+                  pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
                 ]}
               >
-                <View style={styles.googleBadge}>
-                  <Ionicons name="logo-google" size={17} color={BRAND} />
-                </View>
+                <Ionicons name="logo-google" size={18} color="#2563EB" />
                 <Text style={styles.googleButtonText}>
-                  {isRegistering ? "Google ile kaydol" : "Google ile giriş yap"}
+                  {isRegistering ? "Google ile kaydol" : "Google ile devam et"}
                 </Text>
-                <Ionicons name="chevron-forward" size={17} color="#46596F" />
               </Pressable>
 
               <View style={styles.dividerRow}>
                 <View style={styles.dividerLine} />
                 <Text style={styles.or}>
-                  {isRegistering ? "veya e-posta ile kaydol" : "veya e-posta ile giriş yap"}
+                  {isRegistering ? "veya e-posta ile kaydol" : "veya e-posta ile"}
                 </Text>
                 <View style={styles.dividerLine} />
               </View>
 
               {isRegistering ? profileFields : null}
 
-              <Text style={styles.label}>E-POSTA</Text>
-              <Field
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="email-address"
-                placeholder="ornek@mail.com"
-                style={styles.input}
-                focused={focusedField === "email"}
-                onFocus={focus("email")}
-                onBlur={blur}
-              />
+              <Text style={styles.label}>E-posta</Text>
+              <View style={[styles.inputRow, focusedField === "email" && styles.inputRowFocused]}>
+                <Ionicons
+                  name="mail-outline"
+                  size={17}
+                  color={focusedField === "email" ? BRAND : "#8093AC"}
+                />
+                <TextInput
+                  value={email}
+                  onChangeText={setEmail}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="email-address"
+                  placeholder="ornek@mail.com"
+                  placeholderTextColor="#94A3B8"
+                  selectionColor={BRAND}
+                  style={styles.inputInner}
+                  onFocus={focus("email")}
+                  onBlur={blur}
+                />
+              </View>
 
-              <Text style={styles.label}>PAROLA</Text>
-              <Field
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                placeholder="En az 6 karakter"
-                style={styles.input}
-                focused={focusedField === "password"}
-                onFocus={focus("password")}
-                onBlur={blur}
-              />
+              <Text style={styles.label}>Parola</Text>
+              <View style={[styles.inputRow, focusedField === "password" && styles.inputRowFocused]}>
+                <Ionicons
+                  name="lock-closed-outline"
+                  size={17}
+                  color={focusedField === "password" ? BRAND : "#8093AC"}
+                />
+                <TextInput
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  placeholder="En az 6 karakter"
+                  placeholderTextColor="#94A3B8"
+                  selectionColor={BRAND}
+                  style={styles.inputInner}
+                  onFocus={focus("password")}
+                  onBlur={blur}
+                />
+                <Pressable
+                  onPress={() => setShowPassword((prev) => !prev)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={showPassword ? "Parolayı gizle" : "Parolayı göster"}
+                >
+                  <Ionicons
+                    name={showPassword ? "eye-off-outline" : "eye-outline"}
+                    size={18}
+                    color="#8093AC"
+                  />
+                </Pressable>
+              </View>
 
-              <Pressable disabled={submitting} onPress={submitEmail}>
-                <LinearGradient colors={[BRAND, "#1D5FBF"]} style={[styles.submit, submitting && styles.disabled]}>
+              <Pressable
+                disabled={submitting}
+                onPress={submitEmail}
+                style={({ pressed }) => [pressed && !submitting && { opacity: 0.92, transform: [{ scale: 0.99 }] }]}
+              >
+                <LinearGradient colors={["#4797FF", "#2563EB"]} style={[styles.submit, submitting && styles.disabled]}>
                   <Text style={styles.submitText}>
-                    {submitting ? "İşleniyor" : isRegistering ? "E-posta ile kaydol" : "Giriş yap"}
+                    {submitting ? "İşleniyor…" : isRegistering ? "E-posta ile kaydol" : "Giriş yap"}
                   </Text>
-                  <Ionicons name="arrow-forward" size={19} color="#FFFFFF" />
+                  <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
                 </LinearGradient>
               </Pressable>
 
@@ -329,6 +361,11 @@ export function AuthScreen() {
               </Pressable>
             </View>
 
+            <View style={styles.providerHint}>
+              <Ionicons name="shield-checkmark-outline" size={15} color="#2563EB" />
+              <Text style={styles.providerHintText}>Güvenli oturumla cihazında saklanır</Text>
+            </View>
+
             <View style={styles.legalFooter}>
               <Text style={styles.legalFooterText}>
                 Devam ederek{" "}
@@ -346,11 +383,6 @@ export function AuthScreen() {
                 {" kurallarını kabul etmiş olursun."}
               </Text>
             </View>
-
-            <View style={styles.providerHint}>
-              <Ionicons name="shield-checkmark-outline" size={16} color={BRAND} />
-              <Text style={styles.providerHintText}>Hesabın güvenli oturumla cihazında saklanır.</Text>
-            </View>
           </ScrollView>
         </KeyboardSafeView>
       </SafeAreaView>
@@ -359,10 +391,10 @@ export function AuthScreen() {
 }
 
 const CARD_SHADOW = {
-  shadowColor: "#102033",
-  shadowOpacity: 0.12,
-  shadowRadius: 22,
-  shadowOffset: { width: 0, height: 12 },
+  shadowColor: "#0F172A",
+  shadowOpacity: 0.07,
+  shadowRadius: 24,
+  shadowOffset: { width: 0, height: 10 },
   elevation: 4,
 };
 
@@ -372,77 +404,76 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
     justifyContent: "center",
-    paddingHorizontal: 24,
+    paddingHorizontal: 22,
     paddingVertical: 20,
   },
-  hero: { alignItems: "center", marginBottom: 22 },
-  logo: {
-    width: 96,
-    height: 96,
+  hero: { alignItems: "center", marginBottom: 20 },
+  logoSquircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 14,
-  },
-  kicker: {
-    color: BRAND,
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 2,
+    shadowColor: "#1D4ED8",
+    shadowOpacity: 0.24,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
   },
   title: {
-    color: "#111820",
-    fontSize: 28,
-    fontWeight: "900",
-    letterSpacing: -1.1,
-    marginTop: 8,
+    color: "#0F172A",
+    fontSize: 26,
+    fontWeight: "800",
+    letterSpacing: -0.7,
     textAlign: "center",
   },
   subtitle: {
-    color: "#46596F",
+    color: "#64748B",
     fontSize: 13,
     lineHeight: 19,
     textAlign: "center",
-    marginTop: 8,
-    maxWidth: 310,
+    marginTop: 6,
+    maxWidth: 300,
   },
   card: {
     borderRadius: 26,
-    padding: 19,
+    padding: 18,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#D9E3EF",
+    borderColor: "#E5EEF8",
     ...CARD_SHADOW,
   },
   modeTabs: {
     flexDirection: "row",
-    backgroundColor: "#EDF3FA",
+    backgroundColor: "#EEF3F9",
     borderRadius: 14,
     padding: 4,
     marginBottom: 15,
-    borderWidth: 1,
-    borderColor: "#D9E3EF",
   },
   modeTab: {
     flex: 1,
-    height: 40,
-    borderRadius: 11,
+    height: 38,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
   modeTabActive: {
     backgroundColor: "#FFFFFF",
-    shadowColor: "#102033",
-    shadowOpacity: 0.08,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.06,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
   modeTabText: {
-    color: "#46596F",
+    color: "#64748B",
     fontSize: 13,
-    fontWeight: "800",
+    fontWeight: "600",
   },
   modeTabTextActive: {
-    color: BRAND,
-    fontWeight: "900",
+    color: "#0F172A",
+    fontWeight: "700",
   },
   consentBox: {
     flexDirection: "row",
@@ -452,11 +483,11 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: "#F3F7FC",
     borderWidth: 1,
-    borderColor: "#D9E3EF",
+    borderColor: "#E2EBF5",
     marginBottom: 14,
   },
   consentBoxActive: {
-    borderColor: "rgba(47,128,237,0.45)",
+    borderColor: "rgba(37,99,235,0.4)",
     backgroundColor: "#EAF3FD",
   },
   checkbox: {
@@ -464,156 +495,137 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 7,
     borderWidth: 1.5,
-    borderColor: "#8190A2",
+    borderColor: "#94A3B8",
     backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
     marginTop: 1,
   },
   checkboxActive: {
-    backgroundColor: BRAND,
-    borderColor: BRAND,
+    backgroundColor: "#2563EB",
+    borderColor: "#2563EB",
   },
   consentText: {
     flex: 1,
-    color: "#46596F",
+    color: "#475569",
     fontSize: 11.5,
     lineHeight: 17,
   },
   legalLink: {
-    color: BRAND,
-    fontWeight: "800",
-    textDecorationLine: "underline",
+    color: "#2563EB",
+    fontWeight: "700",
   },
   googleButton: {
-    minHeight: 52,
+    minHeight: 48,
     paddingHorizontal: 14,
-    borderRadius: 15,
-    backgroundColor: "#F4F8FD",
-    borderWidth: 1,
-    borderColor: "rgba(47,128,237,0.32)",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
-  },
-  googleBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    borderRadius: 14,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#D9E3EF",
+    borderColor: "#DCE7F5",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 10,
   },
   googleButtonText: {
-    flex: 1,
-    color: "#111820",
+    color: "#0F172A",
     fontSize: 14,
-    fontWeight: "900",
+    fontWeight: "700",
   },
   dividerRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    marginVertical: 15,
+    marginVertical: 14,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: "#E1E9F3",
+    backgroundColor: "#E9F0F8",
   },
   or: {
-    color: "#8190A2",
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0.2,
+    color: "#94A3B8",
+    fontSize: 11.5,
+    fontWeight: "600",
   },
   label: {
-    color: "#46596F",
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 1.2,
-    marginBottom: 7,
-    marginTop: 4,
+    color: "#475569",
+    fontSize: 12,
+    fontWeight: "700",
+    marginBottom: 6,
+    marginTop: 2,
   },
-  input: {
-    height: 52,
-    marginBottom: 14,
-    paddingHorizontal: 14,
-    borderRadius: 15,
-    color: "#111820",
-    backgroundColor: "#EDF3FA",
-    borderWidth: 1,
-    borderColor: "#D9E3EF",
-    fontSize: 15,
-  },
-  inputFocused: {
-    borderColor: "rgba(47,128,237,0.55)",
-    backgroundColor: "#E4ECF6",
-  },
-  handleInput: {
-    height: 52,
-    marginBottom: 14,
-    paddingHorizontal: 14,
-    borderRadius: 15,
+  inputRow: {
+    height: 48,
+    marginBottom: 12,
+    paddingHorizontal: 13,
+    borderRadius: 14,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#EDF3FA",
-    borderWidth: 1,
-    borderColor: "#D9E3EF",
+    gap: 9,
+    backgroundColor: "#F1F6FC",
+    borderWidth: 1.5,
+    borderColor: "transparent",
   },
-  handleInputFocused: { borderColor: "rgba(47,128,237,0.55)" },
+  inputRowFocused: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#3B82F6",
+  },
+  inputInner: {
+    flex: 1,
+    color: "#0F172A",
+    fontSize: 14,
+    paddingVertical: 0,
+  },
   handlePrefix: {
-    color: BRAND,
-    fontSize: 16,
-    fontWeight: "900",
-    marginRight: 4,
+    color: "#2563EB",
+    fontSize: 15,
+    fontWeight: "800",
   },
-  handleText: { flex: 1, color: "#111820", fontSize: 15 },
   submit: {
-    height: 54,
-    marginTop: 4,
-    borderRadius: 16,
+    height: 50,
+    marginTop: 6,
+    borderRadius: 15,
     paddingHorizontal: 18,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    shadowColor: BRAND,
-    shadowOpacity: 0.28,
+    justifyContent: "center",
+    gap: 8,
+    shadowColor: "#2563EB",
+    shadowOpacity: 0.24,
     shadowRadius: 14,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 6,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 5,
   },
   disabled: { opacity: 0.55, shadowOpacity: 0 },
-  submitText: { color: "#FFFFFF", fontSize: 15, fontWeight: "900" },
-  toggle: { flexDirection: "row", justifyContent: "center", marginTop: 16 },
-  toggleMuted: { color: "#46596F", fontSize: 12.5 },
-  toggleLink: { color: BRAND, fontSize: 12.5, fontWeight: "900" },
-  textButton: { alignSelf: "center", paddingVertical: 11 },
-  textButtonLabel: { color: BRAND, fontSize: 12.5, fontWeight: "800" },
+  submitText: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
+  toggle: { flexDirection: "row", justifyContent: "center", marginTop: 12 },
+  toggleMuted: { color: "#64748B", fontSize: 12.5 },
+  toggleLink: { color: "#2563EB", fontSize: 12.5, fontWeight: "700" },
+  textButton: { alignSelf: "center", paddingTop: 12, paddingBottom: 4 },
+  textButtonLabel: { color: "#2563EB", fontSize: 12.5, fontWeight: "700" },
   legalFooter: {
-    marginTop: 15,
-    paddingHorizontal: 8,
+    marginTop: 10,
+    paddingHorizontal: 10,
   },
   legalFooterText: {
-    color: "#5D6F84",
+    color: "#7C8FA6",
     fontSize: 11,
     lineHeight: 16,
     textAlign: "center",
   },
   providerHint: {
-    marginTop: 12,
+    marginTop: 14,
     paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 7,
+    gap: 6,
   },
   providerHintText: {
-    color: "#8190A2",
-    fontSize: 10.5,
+    color: "#64748B",
+    fontSize: 11.5,
+    fontWeight: "600",
     textAlign: "center",
-    flexShrink: 1,
   },
 });
